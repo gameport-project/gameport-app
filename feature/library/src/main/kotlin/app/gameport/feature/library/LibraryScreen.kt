@@ -46,6 +46,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -104,6 +107,7 @@ fun LibraryScreen(
         onQueryChanged = viewModel::onQueryChanged,
         onTabSelected = viewModel::onTabSelected,
         onSortSelected = viewModel::onSortSelected,
+        onFiltersChanged = viewModel::onFiltersChanged,
         // The game's page explains first what it must (a missing permission), so it opens instead when the game cannot start straight away.
         onPlay = { game -> viewModel.playIntent(game)?.let(context::startActivity) ?: onGameClick(game.appId) },
         onGameClick = onGameClick,
@@ -118,6 +122,7 @@ internal fun LibraryContent(
     onQueryChanged: (String) -> Unit,
     onTabSelected: (LibraryTab) -> Unit,
     onSortSelected: (LibrarySort) -> Unit,
+    onFiltersChanged: (LibraryFilters) -> Unit,
     onPlay: (Game) -> Unit,
     onGameClick: (Int) -> Unit,
     onOpenDownloads: () -> Unit,
@@ -126,7 +131,7 @@ internal fun LibraryContent(
     Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
         when (uiState) {
             LibraryUiState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-            is LibraryUiState.Content -> Shelf(uiState, onQueryChanged, onTabSelected, onSortSelected, onPlay, onGameClick, onOpenDownloads, onOpenSettings)
+            is LibraryUiState.Content -> Shelf(uiState, onQueryChanged, onTabSelected, onSortSelected, onFiltersChanged, onPlay, onGameClick, onOpenDownloads, onOpenSettings)
         }
     }
 }
@@ -144,11 +149,13 @@ private fun Shelf(
     onQueryChanged: (String) -> Unit,
     onTabSelected: (LibraryTab) -> Unit,
     onSortSelected: (LibrarySort) -> Unit,
+    onFiltersChanged: (LibraryFilters) -> Unit,
     onPlay: (Game) -> Unit,
     onGameClick: (Int) -> Unit,
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
+    var filtersOpen by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
     var highlightedId by remember(state.tab, state.query) { mutableStateOf<Int?>(null) }
     val highlighted = remember(state, highlightedId) {
@@ -179,7 +186,7 @@ private fun Shelf(
         if (display.backdrop) Backdrop(highlighted, display.backdropStrength)
 
         Column(Modifier.fillMaxSize()) {
-            Header(state, onQueryChanged, onTabSelected, onOpenDownloads, onOpenSettings)
+            Header(state, onQueryChanged, onTabSelected, { filtersOpen = true }, onOpenDownloads, onOpenSettings)
 
             LazyColumn(
                 state = listState,
@@ -222,6 +229,8 @@ private fun Shelf(
         if (state.isScanning) {
             LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter))
         }
+
+        FilterOverlay(open = filtersOpen, filters = state.filters, onChange = onFiltersChanged, onClose = { filtersOpen = false })
     }
 }
 
@@ -391,6 +400,7 @@ private fun Header(
     state: LibraryUiState.Content,
     onQueryChanged: (String) -> Unit,
     onTabSelected: (LibraryTab) -> Unit,
+    onOpenFilters: () -> Unit,
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -407,6 +417,25 @@ private fun Header(
                 placeholder = stringResource(R.string.library_search_hint),
                 modifier = Modifier.weight(1f),
             )
+            // The number of filters narrowing the list sits on the button, so a filter left on is never a mystery.
+            Box {
+                GlassIconButton(onClick = onOpenFilters) {
+                    Icon(Icons.Filled.FilterList, contentDescription = stringResource(R.string.library_filters))
+                }
+                val active = state.filters.activeCount
+                if (active > 0) {
+                    Text(
+                        text = active.toString(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(18.dp)
+                            .background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.CircleShape)
+                            .wrapContentSize(Alignment.Center),
+                    )
+                }
+            }
             GlassIconButton(onClick = onOpenDownloads) {
                 Icon(Icons.Filled.Download, contentDescription = stringResource(R.string.library_downloads))
             }

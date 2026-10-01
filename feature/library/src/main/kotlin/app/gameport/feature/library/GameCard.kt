@@ -11,6 +11,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -54,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import app.gameport.core.designsystem.AttentionBadge
 import app.gameport.core.designsystem.GameImage
 import app.gameport.core.designsystem.glass
+import app.gameport.core.model.AppKind
 import app.gameport.core.model.Game
 import app.gameport.core.model.HoverAnimation
 import app.gameport.core.model.Ownership
@@ -198,18 +200,29 @@ internal fun PlayPill(name: String, size: PillSize, canPlay: Boolean, onPlay: ()
 
 @Composable
 internal fun Badges(game: Game, modifier: Modifier = Modifier) {
-    Box(modifier) {
-        val label = when {
+    val labels = listOfNotNull(
+        when {
             game.androidBuild?.isVr == true -> stringResource(R.string.library_kind_vr)
             game.ownership == Ownership.FAMILY_SHARED -> stringResource(R.string.library_family_shared)
-            else -> return
+            else -> null
+        },
+        // A demo or a beta says so: it is not the full game.
+        when (game.kind) {
+            AppKind.DEMO -> stringResource(R.string.library_label_demo)
+            AppKind.BETA -> stringResource(R.string.library_label_beta)
+            AppKind.GAME -> null
+        },
+    )
+    if (labels.isEmpty()) return
+    Column(modifier, horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        labels.forEach { label ->
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White,
+                modifier = Modifier.glass(RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 2.dp),
+            )
         }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White,
-            modifier = Modifier.glass(RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 2.dp),
-        )
     }
 }
 

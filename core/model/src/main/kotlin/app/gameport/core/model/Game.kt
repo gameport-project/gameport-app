@@ -60,11 +60,15 @@ data class AndroidBuild(
         baseDepots + dlc.filter { it.owned && it.appId in selectedDlc }.flatMap { it.depots }
 }
 
+/** What kind of Steam app it is: a full game, a demo, or a beta (a playtest or a beta app of its own). */
+enum class AppKind { GAME, DEMO, BETA }
+
 data class Game(
     val appId: Int,
     val name: String,
     val ownership: Ownership,
     val androidBuild: AndroidBuild?,
+    val kind: AppKind = AppKind.GAME,
 ) {
     /** Portrait capsule, used in grids. */
     val capsuleUrl: String get() = SteamImages.asset(appId, "library_600x900.jpg")

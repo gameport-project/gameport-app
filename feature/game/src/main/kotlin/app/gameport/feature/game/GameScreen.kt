@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.layout.layout
+import app.gameport.core.model.AppKind
 import app.gameport.core.model.Playtime
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.height
@@ -292,6 +293,11 @@ private fun GameDetails(
                     GlassChip(
                         stringResource(if (game.ownership == Ownership.OWNED) R.string.game_owned else R.string.game_family_shared),
                     )
+                    when (game.kind) {
+                        AppKind.DEMO -> GlassChip(stringResource(R.string.game_kind_demo))
+                        AppKind.BETA -> GlassChip(stringResource(R.string.game_kind_beta))
+                        AppKind.GAME -> Unit
+                    }
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     InstallActions(

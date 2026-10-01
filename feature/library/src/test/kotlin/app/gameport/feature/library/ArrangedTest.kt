@@ -1,5 +1,6 @@
 package app.gameport.feature.library
 
+import app.gameport.core.model.AppKind
 import app.gameport.core.model.DisplaySettings
 import app.gameport.core.model.Game
 import app.gameport.core.model.Library
@@ -99,5 +100,32 @@ class ArrangedTest {
         val shown = onVrTab.arranged(DisplaySettings(), PlayHistory(lastPlayed = mapOf(10 to 5L, 11 to 9L), installedAt = mapOf(10 to 1L, 11 to 2L)))
         assertEquals(listOf(11, 10), ids(shown.continueGames))
         assertEquals(listOf(10), ids(shown.allGames))
+    }
+
+    @Test
+    fun `the filters narrow every row`() {
+        val demo = Game(20, "Trial", Ownership.OWNED, null, AppKind.DEMO)
+        val beta = Game(21, "Playtest", Ownership.FAMILY_SHARED, null, AppKind.BETA)
+        val all = Library(listOf(zelda, demo, beta), false).toUiState("", LibraryTab.VR, showTabs = false)
+        val placed = PlayHistory(installedAt = mapOf(1 to 1L, 20 to 2L), favorites = setOf(21))
+        fun shown(filters: LibraryFilters) = ids(all.arranged(DisplaySettings(), placed, filters).allGames).sorted()
+
+        assertEquals(listOf(1, 20, 21), shown(LibraryFilters()))
+        assertEquals(listOf(20), shown(LibraryFilters(kinds = setOf(AppKind.DEMO))))
+        assertEquals(listOf(20, 21), shown(LibraryFilters(kinds = setOf(AppKind.DEMO, AppKind.BETA))))
+        assertEquals(listOf(1, 20), shown(LibraryFilters(install = InstallFilter.INSTALLED)))
+        assertEquals(listOf(21), shown(LibraryFilters(install = InstallFilter.NOT_INSTALLED)))
+        assertEquals(listOf(21), shown(LibraryFilters(owner = OwnerFilter.FAMILY)))
+        assertEquals(listOf(21), shown(LibraryFilters(favoritesOnly = true)))
+        assertEquals(emptyList<Int>(), shown(LibraryFilters(kinds = setOf(AppKind.GAME), owner = OwnerFilter.FAMILY)))
+    }
+
+    @Test
+    fun `filters count the groups that narrow the list, and the last kind stays selected`() {
+        assertEquals(0, LibraryFilters().activeCount)
+        assertEquals(3, LibraryFilters(kinds = setOf(AppKind.GAME), install = InstallFilter.INSTALLED, favoritesOnly = true).activeCount)
+        val onlyGames = LibraryFilters(kinds = setOf(AppKind.GAME))
+        assertEquals(onlyGames, onlyGames.toggled(AppKind.GAME))
+        assertEquals(setOf(AppKind.GAME, AppKind.DEMO), onlyGames.toggled(AppKind.DEMO).kinds)
     }
 }

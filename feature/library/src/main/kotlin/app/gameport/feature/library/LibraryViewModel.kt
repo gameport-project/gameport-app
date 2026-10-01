@@ -41,6 +41,8 @@ sealed interface LibraryUiState {
         val continueGames: List<Game> = emptyList(),
         val favoriteGames: List<Game> = emptyList(),
         val allGames: List<Game> = games,
+        /** What the player narrowed the library down to (the filter panel). */
+        val filters: LibraryFilters = LibraryFilters(),
         val favoriteIds: Set<Int> = emptySet(),
         val installedIds: Set<Int> = emptySet(),
         /** The game started most recently, which the banner shows until another is highlighted. */
@@ -62,11 +64,12 @@ class LibraryViewModel @Inject constructor(
 ) : ViewModel() {
     private val query = MutableStateFlow("")
     private val tab = MutableStateFlow(LibraryTab.VR)
+    private val filters = MutableStateFlow(LibraryFilters())
     private val showTabs = headsetDetector.isHeadset()
 
     val uiState: StateFlow<LibraryUiState> = combine(
-        combine(repository.observeLibrary(), query, tab, attention.observe(), combine(appearance.observe(), history.observe(), ::Pair)) { library, query, tab, outdated, (shown, played) ->
-            library.toUiState(query, tab, showTabs).copy(attention = outdated).arranged(shown, played)
+        combine(repository.observeLibrary(), query, tab, attention.observe(), combine(appearance.observe(), history.observe(), filters) { shown, played, narrowed -> Triple(shown, played, narrowed) }) { library, query, tab, outdated, (shown, played, narrowed) ->
+            library.toUiState(query, tab, showTabs).copy(attention = outdated).arranged(shown, played, narrowed)
         },
         updates.observe(),
     ) { state, updatable -> state.copy(updates = updatable) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LibraryUiState.Loading)
@@ -79,6 +82,8 @@ class LibraryViewModel @Inject constructor(
     fun onQueryChanged(value: String) = query.update { value }
 
     fun onTabSelected(value: LibraryTab) = tab.update { value }
+
+    fun onFiltersChanged(value: LibraryFilters) = filters.update { value }
 
     fun onSortSelected(sort: LibrarySort) = actions.setSort(sort)
 
@@ -121,16 +126,17 @@ private const val CONTINUE_LIMIT = 12
  * the rows. The sort only applies to the "all games" row; "recently played" means played on this device:
  * the games started here come first, then those installed here but never started, then the others.
  */
-internal fun LibraryUiState.Content.arranged(display: DisplaySettings, history: PlayHistory): LibraryUiState.Content {
+internal fun LibraryUiState.Content.arranged(display: DisplaySettings, history: PlayHistory, filters: LibraryFilters = LibraryFilters()): LibraryUiState.Content {
     val installedIds = history.installedAt.keys
-    val visible = games.filter { !display.hideUninstalled || it.appId in installedIds }
+    val allowed = { game: Game -> filters.accepts(game, installedIds, history.favorites) }
+    val visible = games.filter { (!display.hideUninstalled || it.appId in installedIds) && allowed(it) }
     val byName = compareBy<Game> { it.name.lowercase() }
     val newestInstall = compareByDescending<Game> { history.installedAt[it.appId] ?: 0L }
     // Played here, most recent first; a game removed from this device is no longer counted as played.
     val played = visible.filter { it.appId in installedIds && it.appId in history.lastPlayed }.sortedByDescending { history.lastPlayed[it.appId] }
     val unplayed = visible.filter { it.appId in installedIds && it.appId !in history.lastPlayed }.sortedWith(newestInstall.then(byName))
     // The "continue" row ignores the VR / Flat tab: it lists every kind of game, tabs or not.
-    val everywhere = anyKind.filter { !display.hideUninstalled || it.appId in installedIds }
+    val everywhere = anyKind.filter { (!display.hideUninstalled || it.appId in installedIds) && allowed(it) }
     val byTab = display.continueScope == ContinueScope.TAB && showTabs
     val playedAnywhere = (if (byTab) visible else everywhere).filter { it.appId in installedIds && it.appId in history.lastPlayed }.sortedByDescending { history.lastPlayed[it.appId] }
     val unplayedAnywhere = (if (byTab) visible else everywhere).filter { it.appId in installedIds && it.appId !in history.lastPlayed }.sortedWith(newestInstall.then(byName))
@@ -143,6 +149,7 @@ internal fun LibraryUiState.Content.arranged(display: DisplaySettings, history: 
     val searching = query.isNotBlank()
     return copy(
         appearance = display,
+        filters = filters,
         allGames = sorted,
         // Until games have been started here, the row is filled with the installed ones, the newest first.
         continueGames = if (searching || !display.showContinue) emptyList() else (playedAnywhere + unplayedAnywhere).take(CONTINUE_LIMIT),

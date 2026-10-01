@@ -141,4 +141,6 @@
     <string name="game_info_playtime">Temps de jeu</string>
     <string name="game_info_played_device">Sur cet appareil</string>
     <string name="game_info_played_steam">Sur Steam</string>
+    <string name="game_kind_demo">Démo</string>
+    <string name="game_kind_beta">Bêta</string>
 </resources>

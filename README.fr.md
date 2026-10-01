@@ -19,17 +19,20 @@ GamePort est une appli gratuite et open source. Elle se connecte à ton compte S
 </p>
 <p align="center">
   <img src="docs/screenshots/home-all-games.png" alt="Tous les jeux, triés" width="49%">
-  <img src="docs/screenshots/settings-appearance.png" alt="Les réglages d'apparence : couleurs, fond et covers" width="49%">
+  <img src="docs/screenshots/filters.png" alt="Les filtres : type, état, propriétaire et favoris" width="49%">
 </p>
 <p align="center">
-  <img src="docs/screenshots/downloads.png" alt="Téléchargements et jeux installés" width="32%">
-  <img src="docs/screenshots/saves.png" alt="Sauvegardes : cet appareil et le cloud Steam côte à côte" width="32%">
-  <img src="docs/screenshots/controllers.png" alt="Le mappage des manettes d'un jeu" width="32%">
+  <img src="docs/screenshots/settings-appearance.png" alt="Les réglages d'apparence : couleurs, fond et covers" width="49%">
+  <img src="docs/screenshots/downloads.png" alt="Téléchargements et jeux installés" width="49%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/saves.png" alt="Sauvegardes : cet appareil et le cloud Steam côte à côte" width="49%">
+  <img src="docs/screenshots/controllers.png" alt="Le mappage des manettes d'un jeu" width="49%">
 </p>
 
 ## Ce qu'elle fait
 
-- **Ta bibliothèque, bien rangée.** Jeux VR et plats, recherche, favoris, une rangée « Continuer » avec les derniers jeux lancés, et une apparence à ton goût : taille des covers, couleurs, fond, langue.
+- **Ta bibliothèque, bien rangée.** Jeux VR et plats, démos et bêtas, recherche, filtres, favoris, une rangée « Continuer » avec les derniers jeux lancés, et une apparence à ton goût : taille des covers, couleurs, fond, langue.
 - **Une pression pour installer.** GamePort télécharge le jeu, le prépare pour qu'il tourne sur ton appareil et l'installe. Elle te prévient quand un jeu a une nouvelle version.
 - **Ton compte Steam, tes sauvegardes.** Les jeux tournent sous ton propre compte. Les sauvegardes restent synchronisées avec le cloud Steam, et une page par jeu permet de choisir quoi restaurer ou envoyer.
 - **Un temps de jeu qui compte.** Le temps passé s'ajoute à ton compte Steam, et seulement quand le jeu est réellement à l'écran : pas quand l'appareil est en veille.

@@ -9,7 +9,7 @@
     <string name="library_family_shared">Family</string>
     <string name="library_scanning">Looking for Android games…</string>
     <string name="library_empty">No Android games found in the library.</string>
-    <string name="library_no_match">No game matches the search.</string>
+    <string name="library_no_match">No game matches the search or the filters.</string>
     <string name="library_update_one">%1$s has a new version</string>
     <string name="library_update_many">%1$d games have an update</string>
     <string name="library_row_continue">Continue</string>
@@ -24,4 +24,23 @@
     <string name="library_row_continue_all">Continue · All</string>
     <string name="library_row_continue_vr">Continue · VR</string>
     <string name="library_row_continue_flat">Continue · Flat</string>
+    <string name="library_filters">Filters</string>
+    <string name="filter_title">Filters</string>
+    <string name="filter_type">Type</string>
+    <string name="filter_status">Status</string>
+    <string name="filter_owner">Owner</string>
+    <string name="filter_all">All</string>
+    <string name="filter_installed">Installed</string>
+    <string name="filter_not_installed">Not installed</string>
+    <string name="filter_mine">Mine</string>
+    <string name="filter_family">Family</string>
+    <string name="filter_favorites">Favorites only</string>
+    <string name="filter_reset">Reset</string>
+    <string name="filter_apply">Apply</string>
+    <string name="filter_close">Close</string>
+    <string name="library_kind_game">Games</string>
+    <string name="library_kind_demo">Demos</string>
+    <string name="library_kind_beta">Betas</string>
+    <string name="library_label_demo">Demo</string>
+    <string name="library_label_beta">Beta</string>
 </resources>

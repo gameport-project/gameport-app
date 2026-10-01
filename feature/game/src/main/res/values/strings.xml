@@ -142,4 +142,6 @@
     <string name="game_info_playtime">Play time</string>
     <string name="game_info_played_device">On this device</string>
     <string name="game_info_played_steam">On Steam</string>
+    <string name="game_kind_demo">Demo</string>
+    <string name="game_kind_beta">Beta</string>
 </resources>

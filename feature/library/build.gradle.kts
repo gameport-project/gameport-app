@@ -11,4 +11,5 @@ dependencies {
     implementation(project(":core:install"))
     implementation(project(":core:sync"))
     implementation(project(":core:settings"))
+    implementation(libs.androidx.activity.compose)
 }

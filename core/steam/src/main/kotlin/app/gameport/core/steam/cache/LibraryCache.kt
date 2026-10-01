@@ -32,6 +32,8 @@ data class CachedGame(
     val isVr: Boolean,
     val depots: List<CachedDepot>,
     val saveRules: List<CachedSaveRule> = emptyList(),
+    /** `game`, `demo` or `beta`: the app type Steam gives it. */
+    val kind: String = "game",
 )
 
 /** What a previous scan learned, so the next launch only asks Steam about what is new. */
@@ -58,7 +60,7 @@ interface LibraryCacheStore {
 }
 
 /** Version 4 adds the save rules used for the cloud sync, version 6 the build id of each depot. */
-const val CACHE_VERSION = 6
+const val CACHE_VERSION = 7
 
 @Singleton
 class FileLibraryCacheStore @Inject constructor(

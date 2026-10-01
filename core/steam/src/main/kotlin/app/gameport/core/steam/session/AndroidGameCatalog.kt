@@ -2,6 +2,7 @@ package app.gameport.core.steam.session
 
 import android.util.Log
 import app.gameport.core.model.AndroidBuild
+import app.gameport.core.model.AppKind
 import app.gameport.core.model.AndroidDepot
 import app.gameport.core.model.DlcContent
 import app.gameport.core.model.SaveRule
@@ -72,6 +73,11 @@ internal fun SteamSession.androidGames(
                 appId = game.appId,
                 name = game.name,
                 ownership = if (game.appId in owned) Ownership.OWNED else Ownership.FAMILY_SHARED,
+                kind = when (game.kind) {
+                    "demo" -> AppKind.DEMO
+                    "beta" -> AppKind.BETA
+                    else -> AppKind.GAME
+                },
                 androidBuild = AndroidBuild(
                     packageName = null,
                     isVr = game.isVr,
@@ -161,7 +167,8 @@ internal fun SteamSession.androidGames(
 
 private fun KeyValue.toAndroidGame(appId: Int): CachedGame? {
     val common = this["common"]
-    if (!common["type"].value.equals("game", ignoreCase = true)) return null
+    // Games, and also demos and betas (playtests): separate Steam apps that can carry an Android build of their own.
+    val kind = common["type"].value?.lowercase()?.takeIf { it in LISTED_TYPES } ?: return null
     // A depot tagged Android is only usable once a build is published on the public branch;
     // Steam lists some ahead of release, and those have nothing to download yet.
     val depots = this["depots"].children.filter { depot ->
@@ -185,6 +192,7 @@ private fun KeyValue.toAndroidGame(appId: Int): CachedGame? {
         isVr = isVr(),
         depots = depots,
         saveRules = SaveRulesParser.parse(this["ufs"]),
+        kind = kind,
     )
 }
 
@@ -195,6 +203,9 @@ private fun KeyValue.isVr(): Boolean {
     val tags = common["store_tags"].children.map { it.asInteger(-1) }
     return "category_53" in categories || "category_54" in categories || VR_TAG in tags
 }
+
+/** The Steam app types listed in the library. */
+private val LISTED_TYPES = setOf("game", "demo", "beta")
 
 private const val TAG = "GPLibrary"
 private const val PICS_CHUNK = 200

@@ -19,17 +19,20 @@ GamePort is a free, open-source app that signs in to your Steam account, shows t
 </p>
 <p align="center">
   <img src="docs/screenshots/home-all-games.png" alt="All the games, sorted" width="49%">
-  <img src="docs/screenshots/settings-appearance.png" alt="The appearance settings: colours, background and covers" width="49%">
+  <img src="docs/screenshots/filters.png" alt="The filters: type, status, owner and favorites" width="49%">
 </p>
 <p align="center">
-  <img src="docs/screenshots/downloads.png" alt="Downloads and installed games" width="32%">
-  <img src="docs/screenshots/saves.png" alt="Saves: this device and Steam Cloud side by side" width="32%">
-  <img src="docs/screenshots/controllers.png" alt="Controller mapping for a game" width="32%">
+  <img src="docs/screenshots/settings-appearance.png" alt="The appearance settings: colours, background and covers" width="49%">
+  <img src="docs/screenshots/downloads.png" alt="Downloads and installed games" width="49%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/saves.png" alt="Saves: this device and Steam Cloud side by side" width="49%">
+  <img src="docs/screenshots/controllers.png" alt="Controller mapping for a game" width="49%">
 </p>
 
 ## What it does
 
-- **Your library, nicely laid out.** VR and flat games, search, favorites, a "Continue" row with what you played last, and a look you can make yours: cover size, colours, background, language.
+- **Your library, nicely laid out.** VR and flat games, demos and betas, search, filters, favorites, a "Continue" row with what you played last, and a look you can make yours: cover size, colours, background, language.
 - **One tap to install.** GamePort downloads the game, prepares it so it runs on your device, and installs it. It tells you when a game has a new version.
 - **Your Steam account, your saves.** Games run under your own account. Saves are kept in sync with Steam Cloud, and a page per game lets you choose what to restore or send.
 - **Play time that counts.** The time you play is added to your Steam account, and only while the game is really on screen: not while the device sleeps.
