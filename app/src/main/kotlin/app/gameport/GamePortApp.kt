@@ -1,5 +1,6 @@
 package app.gameport
 
+import androidx.navigation.NavController
 import android.app.Activity
 import android.view.WindowManager
 import androidx.compose.runtime.Composable
@@ -63,11 +64,19 @@ fun GamePortApp(viewModel: AppViewModel = hiltViewModel()) {
             onOpenDownloads = { navController.navigate(DownloadsRoute) },
             onOpenSettings = { navController.navigate(SettingsRoute) },
         )
-        settingsScreen(onBack = navController::popBackStack)
-        downloadsScreen(onBack = navController::popBackStack, onGameClick = navController::navigateToGame)
-        gameScreen(onBack = navController::popBackStack, onOpenSettings = navController::navigateToGameSettings, onOpenSaves = navController::navigateToGameSaves, onOpenControllers = navController::navigateToGameControllers)
-        gameControllersScreen(onBack = navController::popBackStack)
-        gameSavesScreen(onBack = navController::popBackStack)
-        gameSettingsScreen(onBack = navController::popBackStack)
+        settingsScreen(onBack = navController::goBack)
+        downloadsScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame)
+        gameScreen(onBack = navController::goBack, onOpenSettings = navController::navigateToGameSettings, onOpenSaves = navController::navigateToGameSaves, onOpenControllers = navController::navigateToGameControllers)
+        gameControllersScreen(onBack = navController::goBack)
+        gameSavesScreen(onBack = navController::goBack)
+        gameSettingsScreen(onBack = navController::goBack)
     }
+}
+
+/**
+ * Goes back one page, but never past the first one: a second tap on a back arrow, arriving while the page is
+ * already closing, would otherwise pop the library too and leave an empty screen.
+ */
+private fun NavController.goBack() {
+    if (previousBackStackEntry != null) popBackStack()
 }
