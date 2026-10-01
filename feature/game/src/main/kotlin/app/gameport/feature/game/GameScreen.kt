@@ -668,7 +668,8 @@ private fun InfoGroup(title: String, content: @Composable ColumnScope.() -> Unit
 
 @Composable
 private fun InfoItem(label: String, value: String) {
-    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+    // Side by side when they fit, the value under its label when it does not.
+    FlowRow(horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, style = MaterialTheme.typography.bodyMedium)
     }
