@@ -48,4 +48,18 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" "GamePort-${GITHUB_REF_NAME}.apk" --generate-notes --title "GamePort ${GITHUB_REF_NAME}"
+        run: |
+          apk="GamePort-${GITHUB_REF_NAME}.apk"
+          tools="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          body="$RUNNER_TEMP/release-notes.md"
+          # The text of the release is the notes file of this version, shown as it is, followed by how to check the APK.
+          notes="docs/releases/${GITHUB_REF_NAME}.md"
+          if [[ -f "$notes" ]]; then cp "$notes" "$body"; else echo "GamePort ${GITHUB_REF_NAME}" > "$body"; fi
+          {
+            echo
+            echo "---"
+            echo "**SHA-256 of the APK:** \`$(sha256sum "$apk" | cut -d' ' -f1)\`"
+            echo
+            echo "**Signing certificate (SHA-256):** \`$("$tools/apksigner" verify --print-certs "$apk" | sed -n 's/.*certificate SHA-256 digest: //p' | head -1)\`"
+          } >> "$body"
+          gh release create "$GITHUB_REF_NAME" "$apk" --title "GamePort ${GITHUB_REF_NAME}" --notes-file "$body"
