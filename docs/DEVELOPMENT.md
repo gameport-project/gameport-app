@@ -33,6 +33,10 @@ Games record which patch generation patched them, so GamePort can offer to patch
 - **Release builds** use `PatchVersioning.GENERATION` alone. It is raised when a release is prepared, and only if the patches or the binaries they inject (Steam shim, hook, OpenXR layer) changed since the previous release. It is the only number to touch for that.
 - **Debug builds** add a fingerprint of the injected binaries, so during development a rebuilt shim, hook or layer marks earlier games as outdated without raising anything. A change to the patches' own logic, which a fingerprint cannot see, raises `PatchVersioning.DEV_REVISION`; it goes back to 0 when `GENERATION` is raised.
 
+### The debug key
+
+Debug builds (yours and the CI's) are all signed with `app/debug.keystore`, a debug key made for this project, public on purpose (password `android`), so they update one another on a device. It is no secret and signs nothing but test builds; it is not the debug key of anyone's machine. Releases use the private key described below, which is why a release does not update over a debug build.
+
 ## Continuous integration and releases
 
 - **CI** (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: it builds the debug APK, runs the unit tests, compiles the in-game hook, checks the syntax of the OpenXR layer and scans the history for secrets and personal data.

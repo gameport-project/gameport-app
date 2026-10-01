@@ -13,6 +13,17 @@ android {
         versionName = "0.5.0"
     }
 
+    // One debug key for everyone: a build from a developer's machine and one from the CI update each other.
+    // It was made for this project only and is public on purpose (password "android"): it signs test builds, never a release.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     packaging {
         resources {
             // Several libraries ship the same license notices; the first copy is enough.

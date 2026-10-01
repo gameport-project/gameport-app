@@ -11,6 +11,7 @@ captures/
 # Signing material
 *.jks
 *.keystore
+!app/debug.keystore
 
 # macOS
 .DS_Store
