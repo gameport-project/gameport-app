@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="install_channel_name">Game installs</string>
+    <string name="install_notification_title">GamePort</string>
+    <string name="install_notification_text">Installing a game…</string>
+</resources>

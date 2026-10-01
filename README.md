@@ -1,0 +1,59 @@
+# GamePort
+
+[![CI](https://github.com/gameport-project/gameport-app/actions/workflows/ci.yml/badge.svg)](https://github.com/gameport-project/gameport-app/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/gameport-project/gameport-app?label=release)](https://github.com/gameport-project/gameport-app/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/gameport-project/gameport-app/total?label=downloads)](https://github.com/gameport-project/gameport-app/releases)
+[![Stars](https://img.shields.io/github/stars/gameport-project/gameport-app?style=flat&label=stars)](https://github.com/gameport-project/gameport-app/stargazers)
+
+**Your Steam games for Steam Frame, on your Quest, Pico or any Android device.**
+
+GamePort is a free, open-source app that signs in to your Steam account, shows the Android versions of the games you own (and those shared by your Steam family), and takes care of everything else: download, install, launch. Your saves follow you through Steam Cloud, and your play time counts on your account.
+
+> GamePort is an independent community project. It is not made by, or affiliated with, Valve, Meta or Pico.
+
+## What it does
+
+- **Your library, nicely laid out.** VR and flat games, search, favorites, a "Continue" row with what you played last, and a look you can make yours: cover size, colours, background, language.
+- **One tap to install.** GamePort downloads the game, prepares it so it runs on your device, and installs it. It tells you when a game has a new version.
+- **Your Steam account, your saves.** Games run under your own account. Saves are kept in sync with Steam Cloud, and a page per game lets you choose what to restore or send.
+- **Play time that counts.** The time you play is added to your Steam account, and only while the game is really on screen: not while the device sleeps.
+- **Your controllers, your way.** Games made for the Steam Frame controllers get translated onto yours. You can change the mapping game by game.
+- **Made for headsets, friendly to phones and tablets.** On a phone or a tablet, everything that belongs to VR simply disappears.
+
+## Works on
+
+- Meta Quest (2, 3, 3S, Pro)
+- Pico (4, 4 Ultra and others)
+- Other Android headsets, as long as they run OpenXR games
+- Android phones and tablets, for the games that are not VR
+
+## Getting started
+
+1. Download the latest APK from the [releases page](https://github.com/gameport-project/gameport-app/releases/latest) and install it on your device (sideloading).
+2. Open it and scan the QR code with the Steam app on your phone to sign in. Your password never goes through GamePort.
+3. Pick a game in your library and tap **Install**.
+4. Tap **Play**.
+
+The first time a game needs a permission, GamePort explains why before asking.
+
+## Good to know
+
+- **Every game is its own adventure.** These games were not made for your device, so GamePort tests them one by one. The list of what works, what does not and why is in [docs/COMPATIBILITY_TESTING.md](docs/COMPATIBILITY_TESTING.md).
+- **Online features may not work** in some games. Single player and saves are the focus today.
+- **One game at a time per Steam account.** Steam only allows a single game to be played on an account at once, so starting a game on your headset pauses one running on your PC. You can switch off play-time counting in the settings if you prefer.
+- **You must own the game.** GamePort only handles games on your account or shared with your Steam family.
+
+## Your privacy
+
+- Your sign-in stays on your device. It is never sent anywhere except to Steam.
+- GamePort shows no ads that track you and collects nothing about you.
+- It is free and will stay free: no paid app, no paywall.
+
+## Open source
+
+GamePort is built in the open, with the help of other free projects: a Steam emulation layer based on the [Goldberg Steam Emulator](https://gitlab.com/Mr_Goldberg/goldberg_emulator), ideas and code from [ovrport](https://github.com/ovrport/app), and [JavaSteam](https://github.com/Longi94/JavaSteam) to talk to Steam. Everything we reuse, with its licence, is listed in [docs/THIRD_PARTY_NOTICES.md](docs/THIRD_PARTY_NOTICES.md).
+
+- The part that fakes Steam inside the games lives in its own repository: **gameport-steamworks-shim**.
+- Want to build it yourself or lend a hand? See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
+Français : [README.fr.md](README.fr.md)

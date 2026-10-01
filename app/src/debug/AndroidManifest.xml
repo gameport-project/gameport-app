@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Development only: lets adb ask the running app what Steam Cloud holds for a game. -->
+        <receiver
+            android:name="app.gameport.debug.CloudDebugReceiver"
+            android:exported="true" />
+        <receiver
+            android:name="app.gameport.debug.PatchDebugReceiver"
+            android:exported="true" />
+    </application>
+
+</manifest>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_search_hint">Rechercher un jeu</string>
+    <string name="library_downloads">Téléchargements et jeux installés</string>
+    <string name="library_settings">Paramètres</string>
+    <string name="library_tab_flat">Plat</string>
+    <string name="library_family_shared">Famille</string>
+    <string name="library_scanning">Recherche des jeux Android…</string>
+    <string name="library_empty">Aucun jeu Android trouvé dans la bibliothèque.</string>
+    <string name="library_no_match">Aucun jeu ne correspond à la recherche.</string>
+    <string name="library_update_one">%1$s a une nouvelle version</string>
+    <string name="library_update_many">%1$d jeux ont une mise à jour</string>
+    <string name="library_row_continue">Continuer</string>
+    <string name="library_row_favorites">Favoris</string>
+    <string name="library_row_all">Tous les jeux</string>
+    <string name="library_play">Jouer</string>
+    <string name="library_open">Ouvrir</string>
+    <string name="library_sort">Trier : %1$s</string>
+    <string name="library_sort_name">A–Z</string>
+    <string name="library_sort_played">Récemment joués</string>
+    <string name="library_sort_installed">Récemment installés</string>
+    <string name="library_row_continue_all">Continuer · Tous</string>
+    <string name="library_row_continue_vr">Continuer · VR</string>
+    <string name="library_row_continue_flat">Continuer · Plat</string>
+</resources>

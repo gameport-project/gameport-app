@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="speed_megabytes">%1$s Mo/s</string>
+    <string name="speed_megabits">%1$s Mb/s</string>
+    <string name="back">Retour</string>
+    <string name="clear">Effacer</string>
+</resources>

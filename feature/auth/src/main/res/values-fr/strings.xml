@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="auth_sign_in">Se connecter avec Steam</string>
+    <string name="auth_confirm_in_app">Confirmez la connexion dans l\'application mobile Steam</string>
+    <string name="auth_connecting">Connexion à Steam…</string>
+    <string name="auth_cancel">Annuler</string>
+    <string name="auth_failed">La connexion a échoué</string>
+    <string name="auth_retry">Réessayer</string>
+    <string name="auth_qr_description">QR code de connexion Steam</string>
+</resources>

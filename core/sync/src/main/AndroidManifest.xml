@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- What patched games call at launch and while playing; each call is checked against the
+             package name Android reports for the caller. -->
+        <provider
+            android:name=".CloudProvider"
+            android:authorities="app.gameport.cloud"
+            android:exported="true" />
+    </application>
+
+</manifest>

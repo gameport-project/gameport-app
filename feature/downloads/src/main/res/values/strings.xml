@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="downloads_title">Downloads and installed games</string>
+    <string name="downloads_back">Back</string>
+    <string name="downloads_empty">Nothing is downloading and no game is installed yet.</string>
+    <string name="downloads_unknown_game">App %1$d</string>
+    <string name="downloads_queued">Waiting for other downloads…</string>
+    <string name="downloads_downloading">Downloading… %1$d%%</string>
+    <string name="downloads_patching">Preparing for Steam…</string>
+    <string name="downloads_installing">Installing…</string>
+    <string name="downloads_interrupted">Download interrupted</string>
+    <string name="downloads_failed">Install failed</string>
+    <string name="downloads_installed">Installed</string>
+    <string name="downloads_cancel">Cancel</string>
+    <string name="downloads_resume">Resume</string>
+    <string name="downloads_discard">Discard</string>
+    <string name="downloads_play">Play</string>
+    <string name="downloads_uninstall">Uninstall</string>
+    <string name="downloads_update">Update</string>
+    <string name="downloads_update_all">Update all</string>
+    <string name="downloads_update_available">Update available</string>
+    <string name="downloads_update_one">%1$s has a new version</string>
+    <string name="downloads_update_many">%1$d games have an update</string>
+</resources>

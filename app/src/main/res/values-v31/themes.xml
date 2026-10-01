@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12 and later draw their own start screen: the logo on the colour of the logo's gradient (its middle), not on black. -->
+    <style name="Theme.GamePort" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@drawable/window_background</item>
+        <item name="android:windowSplashScreenBackground">#FF2F3A55</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+    </style>
+</resources>

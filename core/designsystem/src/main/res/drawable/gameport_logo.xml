@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The GamePort logo (branding/icon.svg) without its background, cropped to the glyph: the G ring with a play triangle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="304"
+    android:viewportHeight="304">
+    <group android:translateX="-104" android:translateY="-104">
+        <path
+            android:pathData="M348.2,173 A124,124 0 1 0 380,256 L272,256"
+            android:strokeColor="#FFF5F5F7"
+            android:strokeWidth="48"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <group android:translateX="-12">
+            <path
+                android:pathData="M206,214 L206,298 Q206,312 218,305 L284,263 Q294,256 284,249 L218,207 Q206,200 206,214 Z"
+                android:fillColor="#FFF5F5F7"
+                android:strokeColor="#FFF5F5F7"
+                android:strokeWidth="8"
+                android:strokeLineJoin="round" />
+        </group>
+    </group>
+</vector>

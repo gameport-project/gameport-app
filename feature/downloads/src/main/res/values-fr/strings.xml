@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="downloads_title">Téléchargements et jeux installés</string>
+    <string name="downloads_back">Retour</string>
+    <string name="downloads_empty">Rien n\'est en cours de téléchargement et aucun jeu n\'est encore installé.</string>
+    <string name="downloads_unknown_game">Application %1$d</string>
+    <string name="downloads_queued">En attente des autres téléchargements…</string>
+    <string name="downloads_downloading">Téléchargement… %1$d %%</string>
+    <string name="downloads_patching">Préparation pour Steam…</string>
+    <string name="downloads_installing">Installation…</string>
+    <string name="downloads_interrupted">Téléchargement interrompu</string>
+    <string name="downloads_failed">Échec de l\'installation</string>
+    <string name="downloads_installed">Installé</string>
+    <string name="downloads_cancel">Annuler</string>
+    <string name="downloads_resume">Reprendre</string>
+    <string name="downloads_discard">Supprimer</string>
+    <string name="downloads_play">Jouer</string>
+    <string name="downloads_uninstall">Désinstaller</string>
+    <string name="downloads_update">Mettre à jour</string>
+    <string name="downloads_update_all">Tout mettre à jour</string>
+    <string name="downloads_update_available">Mise à jour disponible</string>
+    <string name="downloads_update_one">%1$s a une nouvelle version</string>
+    <string name="downloads_update_many">%1$d jeux ont une mise à jour</string>
+</resources>

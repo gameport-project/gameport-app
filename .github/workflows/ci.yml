@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gradle/actions/wrapper-validation@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build the debug APK and run the unit tests
+        run: ./gradlew assembleDebug testDebugUnitTest --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gameport-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-reports
+          path: "**/build/reports/tests/"
+
+  native:
+    name: In-game hook and OpenXR layer compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: In-game hook
+        run: scripts/build_hook.sh
+      - name: OpenXR layer (syntax)
+        run: ANDROID_NDK="$ANDROID_NDK_LATEST_HOME" scripts/build_xr_layer.sh --syntax-only
+
+  secrets:
+    name: Secrets and personal data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: No home-folder path inside the shipped binaries
+        run: scripts/check_no_personal_paths.sh
+      - name: Scan the history
+        run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest detect --source /repo --no-banner --redact

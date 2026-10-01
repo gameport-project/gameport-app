@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The banner some launchers show for the app (and while it starts): the logo centred on the gradient, drawn as a vector so it stays sharp at any size.
+     The left and right margins match, and so do the top and bottom ones. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="640"
+    android:viewportHeight="360">
+    <path android:pathData="M0,0h640v360h-640z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="0"
+                android:startY="0"
+                android:endX="640"
+                android:endY="360"
+                android:startColor="#FF222932"
+                android:endColor="#FF3C4C7A" />
+        </aapt:attr>
+    </path>
+    <group android:translateX="164.32" android:translateY="24.32" android:scaleX="0.6081" android:scaleY="0.6081">
+        <path
+            android:pathData="M348.2,173 A124,124 0 1 0 380,256 L272,256"
+            android:strokeColor="#FFF5F5F7"
+            android:strokeWidth="48"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <group android:translateX="-12">
+            <path
+                android:pathData="M206,214 L206,298 Q206,312 218,305 L284,263 Q294,256 284,249 L218,207 Q206,200 206,214 Z"
+                android:fillColor="#FFF5F5F7"
+                android:strokeColor="#FFF5F5F7"
+                android:strokeWidth="8"
+                android:strokeLineJoin="round" />
+        </group>
+    </group>
+</vector>

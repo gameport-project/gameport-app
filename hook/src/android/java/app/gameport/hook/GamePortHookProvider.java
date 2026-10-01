@@ -1,0 +1,325 @@
+package app.gameport.hook;
+
+import android.app.Activity;
+import android.app.Application;
+import android.content.ContentProvider;
+import android.content.ContentValues;
+import android.content.Context;
+import android.database.Cursor;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Environment;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.SystemClock;
+import android.util.Log;
+import java.io.File;
+
+/**
+ * Added to a patched game. Android creates a provider before the game's own code runs, whichever
+ * way the game was started, so this is where the game's saves are synced with Steam Cloud: newer
+ * cloud saves are brought down before the game reads anything, and changes are sent up when the
+ * game is left, as Steam does when a game exits. Nothing is synced while the game is in front.
+ */
+public final class GamePortHookProvider extends ContentProvider {
+    private static final String TAG = "GPHook";
+    private static final long CONFLICT_WAIT_MS = 180_000;
+    private static final long UPLOAD_AFTER_PAUSE_MS = 1_500;
+    private static final long ALIVE_INTERVAL_MS = 30_000L;
+    private static final long WARM_INTERVAL_MS = 25_000;
+
+    private SaveSync sync;
+    // Whether GamePort asked to be opened again when the game it started closes, and whether it started this game.
+    private volatile boolean returnToGamePort;
+    private volatile boolean launchedByGamePort;
+    private int liveActivities;
+    private Handler background;
+
+    @Override
+    public boolean onCreate() {
+        Context context = getContext();
+        if (context == null) return false;
+        long start = SystemClock.elapsedRealtime();
+        try {
+            applyXrSettings(context);
+            File root = Environment.getExternalStorageDirectory();
+            File files = context.getExternalFilesDir(null);
+            File backups = new File(files != null ? files : context.getFilesDir(), "gameport-backup");
+            sync = new SaveSync(root, backups, new ProviderLink(context), new SaveSync.Log() {
+                @Override public void info(String message) { Log.i(TAG, message); }
+            }, CONFLICT_WAIT_MS);
+
+            // Before the game reads its saves.
+            sync.syncAtLaunch();
+            Log.i(TAG, "launch sync finished after " + (SystemClock.elapsedRealtime() - start) + " ms");
+            prepareSteamTicket(context);
+            watchTicketRequests(context);
+            reportControllerProfile(context);
+
+            watchForUploads(context);
+        } catch (Throwable t) {
+            Log.w(TAG, "save sync unavailable; the game runs without it", t);
+        }
+        return true;
+    }
+
+    /**
+     * Asks GamePort for a Steam session ticket made with the signed-in account and leaves it in the
+     * game's folder. The Steam shim returns it when the game asks for one, so the game's own servers
+     * accept the login. Without it (GamePort offline) the shim answers with its placeholder ticket.
+     */
+    private void prepareSteamTicket(Context context) {
+        File files = context.getExternalFilesDir(null);
+        File dir = new File(files != null ? files : context.getFilesDir(), "gameport");
+        File target = new File(dir, "steam_ticket.bin");
+        target.delete();
+        try {
+            Bundle result = context.getContentResolver().call(Uri.parse("content://app.gameport.cloud"), "ticket", context.getPackageName(), null);
+            byte[] ticket = result == null ? null : result.getByteArray("ticket");
+            if (ticket == null || ticket.length == 0) {
+                Log.i(TAG, "no Steam ticket (GamePort offline, or Steam gave none)");
+                return;
+            }
+            dir.mkdirs();
+            java.io.FileOutputStream out = new java.io.FileOutputStream(target);
+            out.write(ticket);
+            out.close();
+            Log.i(TAG, "Steam session ticket ready (" + ticket.length + " bytes)");
+        } catch (Throwable t) {
+            Log.w(TAG, "could not get a Steam ticket", t);
+        }
+    }
+
+    /**
+     * The OpenXR layer leaves the kind of controllers it translated (Steam Frame or Meta) and the controls the game used the last time it ran.
+     * GamePort is told, so its controller page is offered for this game.
+     */
+    private void reportControllerProfile(Context context) {
+        try {
+            File files = context.getExternalFilesDir(null);
+            File marker = new File(new File(files != null ? files : context.getFilesDir(), "gameport"), "xr_controls.txt");
+            if (!marker.isFile()) return;
+            java.util.List<String> controls = new java.util.ArrayList<>();
+            String source = "";
+            java.io.BufferedReader in = new java.io.BufferedReader(new java.io.FileReader(marker));
+            try {
+                String line;
+                while ((line = in.readLine()) != null) {
+                    line = line.trim();
+                    if (line.startsWith("source=")) source = line.substring("source=".length());
+                    else if (!line.isEmpty()) controls.add(line);
+                }
+            } finally {
+                in.close();
+            }
+            if (controls.isEmpty()) return;
+            Bundle extras = new Bundle();
+            extras.putString("source", source);
+            extras.putStringArray("controls", controls.toArray(new String[0]));
+            context.getContentResolver().call(Uri.parse("content://app.gameport.cloud"), "controller_profile", context.getPackageName(), extras);
+            Log.i(TAG, "reported " + controls.size() + " " + source + " controls");
+        } catch (Throwable t) {
+            Log.w(TAG, "could not report the controller profile", t);
+        }
+    }
+
+    /**
+     * A session ticket is good for one use and goes stale, so the shim asks for a fresh one each time
+     * the game does: it drops a request file with an id, and this thread answers by leaving a new
+     * ticket and a "ready" file carrying the same id.
+     */
+    private void watchTicketRequests(final Context context) {
+        File files = context.getExternalFilesDir(null);
+        final File dir = new File(files != null ? files : context.getFilesDir(), "gameport");
+        final File request = new File(dir, "steam_ticket.request");
+        final File ticketFile = new File(dir, "steam_ticket.bin");
+        final File ready = new File(dir, "steam_ticket.ready");
+        Thread watcher = new Thread(new Runnable() {
+            @Override public void run() {
+                long lastWarm = SystemClock.elapsedRealtime();
+                while (!Thread.currentThread().isInterrupted()) {
+                    try {
+                        // Keep GamePort running and connected to Steam, so a ticket takes a moment when asked for.
+                        if (SystemClock.elapsedRealtime() - lastWarm > WARM_INTERVAL_MS) {
+                            lastWarm = SystemClock.elapsedRealtime();
+                            context.getContentResolver().call(Uri.parse("content://app.gameport.cloud"), "warm", context.getPackageName(), null);
+                        }
+                        if (request.exists()) {
+                            String id = readLine(request);
+                            request.delete();
+                            long begun = SystemClock.elapsedRealtime();
+                            Bundle result = context.getContentResolver().call(Uri.parse("content://app.gameport.cloud"), "ticket", context.getPackageName(), null);
+                            byte[] ticket = result == null ? null : result.getByteArray("ticket");
+                            if (ticket != null && ticket.length > 0) {
+                                writeAll(ticketFile, ticket);
+                                Log.i(TAG, "fresh Steam session ticket for request " + id + " (" + ticket.length + " bytes, " + (SystemClock.elapsedRealtime() - begun) + " ms)");
+                            } else {
+                                ticketFile.delete();
+                                Log.i(TAG, "no fresh Steam ticket for request " + id);
+                            }
+                            writeAll(ready, (id == null ? "" : id).getBytes("UTF-8"));
+                        }
+                        Thread.sleep(80);
+                    } catch (InterruptedException e) {
+                        return;
+                    } catch (Throwable t) {
+                        Log.w(TAG, "ticket request failed", t);
+                        try { Thread.sleep(500); } catch (InterruptedException e) { return; }
+                    }
+                }
+            }
+        }, "gameport-ticket");
+        watcher.setDaemon(true);
+        watcher.start();
+    }
+
+    private static String readLine(File file) {
+        try {
+            java.io.BufferedReader in = new java.io.BufferedReader(new java.io.FileReader(file));
+            try { return in.readLine(); } finally { in.close(); }
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private static void writeAll(File file, byte[] bytes) throws java.io.IOException {
+        File tmp = new File(file.getParentFile(), file.getName() + ".tmp");
+        java.io.FileOutputStream out = new java.io.FileOutputStream(tmp);
+        try { out.write(bytes); } finally { out.close(); }
+        if (!tmp.renameTo(file)) {
+            file.delete();
+            tmp.renameTo(file);
+        }
+    }
+
+    /**
+     * Hands the player's seated-mode settings to GamePort's OpenXR layer, which reads them from the
+     * environment when the game creates its OpenXR instance. The last answer is kept, so the setting
+     * still applies when GamePort cannot be reached.
+     */
+    private void applyXrSettings(Context context) {
+        File cache = new File(context.getFilesDir(), "gameport-xr.cfg");
+        String seated = "0";
+        String eyeCm = "0";
+        String controls = "";
+        String family = "";
+        try {
+            Bundle config = context.getContentResolver().call(Uri.parse("content://app.gameport.cloud"), "config", context.getPackageName(), null);
+            if (config == null) throw new java.io.IOException("no answer");
+            seated = config.getBoolean("seated") ? "1" : "0";
+            eyeCm = String.valueOf(config.getInt("eyeCm"));
+            String map = config.getString("xrMap");
+            controls = map == null ? "" : map;
+            String platform = config.getString("xrFamily");
+            family = platform == null ? "" : platform;
+            returnToGamePort = config.getBoolean("returnToGamePort");
+            java.io.FileWriter out = new java.io.FileWriter(cache);
+            out.write(seated + "\n" + eyeCm + "\n" + controls + "\n" + family + "\n");
+            out.close();
+        } catch (Throwable t) {
+            try {
+                java.io.BufferedReader in = new java.io.BufferedReader(new java.io.FileReader(cache));
+                seated = in.readLine();
+                eyeCm = in.readLine();
+                String map = in.readLine();
+                controls = map == null ? "" : map;
+                String platform = in.readLine();
+                family = platform == null ? "" : platform;
+                in.close();
+            } catch (Throwable ignored) {
+                // No earlier answer either: seated mode stays off.
+            }
+        }
+        try {
+            android.system.Os.setenv("GAMEPORT_XR_SEATED", seated, true);
+            android.system.Os.setenv("GAMEPORT_XR_EYE_CM", eyeCm, true);
+            // The player's controller mapping for this game (empty: the layer's defaults).
+            android.system.Os.setenv("GAMEPORT_XR_MAP", controls, true);
+            // The kind of controllers this device has, from GamePort's own platform detection.
+            android.system.Os.setenv("GAMEPORT_XR_FAMILY", family, true);
+            Log.i(TAG, "seated mode " + seated + ", eye height " + eyeCm + " cm, controller overrides " + (controls.isEmpty() ? "none" : controls));
+        } catch (Throwable t) {
+            Log.w(TAG, "could not pass the seated settings on", t);
+        }
+    }
+
+    /**
+     * Sends changes up when the game leaves the screen (home button, headset taken off) and when it
+     * is destroyed. On a headset a game is rarely closed for good, so leaving it stands for the exit
+     * Steam syncs on. Coming straight back cancels the upload.
+     */
+    private void watchForUploads(Context context) {
+        HandlerThread thread = new HandlerThread("gameport-sync");
+        thread.start();
+        background = new Handler(thread.getLooper());
+        final Runnable upload = new Runnable() {
+            @Override public void run() { sync.uploadIfChanged(); }
+        };
+        final Context appContext = context.getApplicationContext();
+        // The time the game is really on screen: GamePort is told when it comes, regularly while it stays, and when it leaves.
+        // A device asleep or a game left behind sends nothing, so that time is never counted.
+        final Runnable beat = new Runnable() {
+            @Override public void run() {
+                if (resumedActivities <= 0) return;
+                tellGamePort(appContext, "alive");
+                background.postDelayed(this, ALIVE_INTERVAL_MS);
+            }
+        };
+        Application application = (Application) appContext;
+        application.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
+            @Override public void onActivityResumed(Activity a) {
+                background.removeCallbacks(upload);
+                if (resumedActivities++ == 0) {
+                    background.post(new Runnable() { @Override public void run() { tellGamePort(appContext, "resumed"); } });
+                    background.removeCallbacks(beat);
+                    background.postDelayed(beat, ALIVE_INTERVAL_MS);
+                }
+            }
+            @Override public void onActivityPaused(Activity a) {
+                background.postDelayed(upload, UPLOAD_AFTER_PAUSE_MS);
+                if (resumedActivities > 0 && --resumedActivities == 0) {
+                    background.removeCallbacks(beat);
+                    background.post(new Runnable() { @Override public void run() { tellGamePort(appContext, "paused"); } });
+                }
+            }
+            @Override public void onActivityDestroyed(Activity a) {
+                background.post(upload);
+                // The game was closed (not just turned): bring GamePort back, which Horizon does not do by itself.
+                if (--liveActivities <= 0 && a.isFinishing() && returnToGamePort && launchedByGamePort) openGamePort(a);
+            }
+            @Override public void onActivityCreated(Activity a, Bundle b) {
+                liveActivities++;
+                if (a.getIntent() != null && a.getIntent().getBooleanExtra("app.gameport.launched", false)) launchedByGamePort = true;
+            }
+            @Override public void onActivityStarted(Activity a) {}
+            @Override public void onActivityStopped(Activity a) {}
+            @Override public void onActivitySaveInstanceState(Activity a, Bundle b) {}
+        });
+    }
+
+    private volatile int resumedActivities;
+
+    private static void openGamePort(Context context) {
+        try {
+            context.startActivity(new android.content.Intent(android.content.Intent.ACTION_MAIN)
+                    .setClassName("app.gameport", "app.gameport.MainActivity")
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (Throwable t) {
+            Log.w(TAG, "could not open GamePort again", t);
+        }
+    }
+
+    private static void tellGamePort(Context context, String method) {
+        try {
+            context.getContentResolver().call(Uri.parse("content://app.gameport.cloud"), method, context.getPackageName(), null);
+        } catch (Throwable t) {
+            Log.w(TAG, "could not tell GamePort: " + method, t);
+        }
+    }
+
+    @Override public Cursor query(Uri u, String[] p, String s, String[] a, String o) { return null; }
+    @Override public String getType(Uri u) { return null; }
+    @Override public Uri insert(Uri u, ContentValues v) { return null; }
+    @Override public int delete(Uri u, String s, String[] a) { return 0; }
+    @Override public int update(Uri u, ContentValues v, String s, String[] a) { return 0; }
+}

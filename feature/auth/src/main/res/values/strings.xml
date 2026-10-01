@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="auth_title">GamePort</string>
+    <string name="auth_sign_in">Sign in with Steam</string>
+    <string name="auth_confirm_in_app">Confirm the sign-in in the Steam mobile app</string>
+    <string name="auth_connecting">Connecting to Steam…</string>
+    <string name="auth_cancel">Cancel</string>
+    <string name="auth_failed">Sign-in failed</string>
+    <string name="auth_retry">Try again</string>
+    <string name="auth_qr_description">Steam sign-in QR code</string>
+</resources>

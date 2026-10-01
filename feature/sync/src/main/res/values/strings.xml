@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="conflict_title">Save conflict</string>
+    <string name="conflict_explanation">The saves on this device and the ones on the Steam account are different, and both changed since they were last in sync. One has to be chosen for the game to start with.</string>
+    <string name="conflict_this_headset">On this device</string>
+    <string name="conflict_steam_cloud">On Steam</string>
+    <string name="conflict_files">%1$d file(s) · %2$s</string>
+    <string name="conflict_last_change">Last change: %1$s</string>
+    <string name="conflict_safe">The version that is not chosen is kept in a backup, nothing is deleted.</string>
+    <string name="conflict_keep_local">Keep this device\'s saves</string>
+    <string name="conflict_use_cloud">Use Steam\'s saves</string>
+    <string name="conflict_later">Decide later</string>
+</resources>

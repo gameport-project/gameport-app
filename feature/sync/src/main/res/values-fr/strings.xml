@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="conflict_title">Conflit de sauvegarde</string>
+    <string name="conflict_explanation">Les sauvegardes de cet appareil et celles du compte Steam sont différentes, et les deux ont changé depuis leur dernière synchronisation. Il faut choisir celles avec lesquelles le jeu démarre.</string>
+    <string name="conflict_this_headset">Sur cet appareil</string>
+    <string name="conflict_steam_cloud">Sur Steam</string>
+    <string name="conflict_files">%1$d fichier(s) · %2$s</string>
+    <string name="conflict_last_change">Dernière modification : %1$s</string>
+    <string name="conflict_safe">La version non choisie est gardée dans une copie de sécurité, rien n\'est supprimé.</string>
+    <string name="conflict_keep_local">Garder celles de cet appareil</string>
+    <string name="conflict_use_cloud">Utiliser celles de Steam</string>
+    <string name="conflict_later">Décider plus tard</string>
+</resources>

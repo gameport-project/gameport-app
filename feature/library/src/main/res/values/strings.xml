@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_search_hint">Search games</string>
+    <string name="library_downloads">Downloads and installed games</string>
+    <string name="library_settings">Settings</string>
+    <string name="library_tab_vr">VR</string>
+    <string name="library_tab_flat">Flat</string>
+    <string name="library_kind_vr">VR</string>
+    <string name="library_family_shared">Family</string>
+    <string name="library_scanning">Looking for Android games…</string>
+    <string name="library_empty">No Android games found in the library.</string>
+    <string name="library_no_match">No game matches the search.</string>
+    <string name="library_update_one">%1$s has a new version</string>
+    <string name="library_update_many">%1$d games have an update</string>
+    <string name="library_row_continue">Continue</string>
+    <string name="library_row_favorites">Favorites</string>
+    <string name="library_row_all">All games</string>
+    <string name="library_play">Play</string>
+    <string name="library_open">Open</string>
+    <string name="library_sort">Sort: %1$s</string>
+    <string name="library_sort_name">A–Z</string>
+    <string name="library_sort_played">Recently played</string>
+    <string name="library_sort_installed">Recently installed</string>
+    <string name="library_row_continue_all">Continue · All</string>
+    <string name="library_row_continue_vr">Continue · VR</string>
+    <string name="library_row_continue_flat">Continue · Flat</string>
+</resources>
