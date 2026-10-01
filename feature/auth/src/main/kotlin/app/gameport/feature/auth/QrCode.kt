@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.stringResource
@@ -23,6 +24,8 @@ internal fun QrCode(content: String, size: Dp, modifier: Modifier = Modifier) {
         bitmap = bitmap,
         contentDescription = stringResource(R.string.auth_qr_description),
         modifier = modifier.size(size),
+        // The code is a few dozen pixels wide: enlarged with smoothing it turns blurry, with hard edges it stays sharp.
+        filterQuality = FilterQuality.None,
     )
 }
 
