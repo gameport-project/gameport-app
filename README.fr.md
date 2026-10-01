@@ -11,6 +11,22 @@ GamePort est une appli gratuite et open source. Elle se connecte à ton compte S
 
 > GamePort est un projet communautaire indépendant. Il n'est ni créé par Valve, Meta ou Pico, ni affilié à eux.
 
+## Un aperçu
+
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="L'accueil : des rangées de covers, avec le nom du jeu et un bouton de lecture quand l'une est pointée" width="49%">
+  <img src="docs/screenshots/game.png" alt="La fiche d'un jeu : taille, temps de jeu, favoris, sauvegardes et manettes" width="49%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/home-all-games.png" alt="Tous les jeux, triés" width="49%">
+  <img src="docs/screenshots/settings-appearance.png" alt="Les réglages d'apparence : couleurs, fond et covers" width="49%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/downloads.png" alt="Téléchargements et jeux installés" width="32%">
+  <img src="docs/screenshots/saves.png" alt="Sauvegardes : cet appareil et le cloud Steam côte à côte" width="32%">
+  <img src="docs/screenshots/controllers.png" alt="Le mappage des manettes d'un jeu" width="32%">
+</p>
+
 ## Ce qu'elle fait
 
 - **Ta bibliothèque, bien rangée.** Jeux VR et plats, recherche, favoris, une rangée « Continuer » avec les derniers jeux lancés, et une apparence à ton goût : taille des covers, couleurs, fond, langue.

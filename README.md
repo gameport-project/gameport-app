@@ -11,6 +11,22 @@ GamePort is a free, open-source app that signs in to your Steam account, shows t
 
 > GamePort is an independent community project. It is not made by, or affiliated with, Valve, Meta or Pico.
 
+## A look
+
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="The home: rows of covers, with the name of the game and a play button when one is pointed at" width="49%">
+  <img src="docs/screenshots/game.png" alt="A game page: size, play time, favorites, saves and controllers" width="49%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/home-all-games.png" alt="All the games, sorted" width="49%">
+  <img src="docs/screenshots/settings-appearance.png" alt="The appearance settings: colours, background and covers" width="49%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/downloads.png" alt="Downloads and installed games" width="32%">
+  <img src="docs/screenshots/saves.png" alt="Saves: this device and Steam Cloud side by side" width="32%">
+  <img src="docs/screenshots/controllers.png" alt="Controller mapping for a game" width="32%">
+</p>
+
 ## What it does
 
 - **Your library, nicely laid out.** VR and flat games, search, favorites, a "Continue" row with what you played last, and a look you can make yours: cover size, colours, background, language.
