@@ -23,6 +23,9 @@ import androidx.compose.ui.graphics.Color
 val DangerRed = Color(0xFFD32F2F)
 val OnDangerRed = Color.White
 
+/** Hiding a game is a removal from view, so it is red, but softer than [DangerRed]. */
+val HideRed = Color(0xFFE57373)
+
 /** Deleting or discarding something: a solid red button. */
 @Composable
 fun DangerButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {

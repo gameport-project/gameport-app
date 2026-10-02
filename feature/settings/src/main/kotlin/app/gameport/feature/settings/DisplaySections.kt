@@ -75,6 +75,20 @@ internal fun AppearanceSection(display: DisplaySettings, onChange: Change) {
         }
     }
 
+    GroupTitle(R.string.settings_group_game_page)
+    Setting(R.string.settings_game_artwork, R.string.settings_game_artwork_description, display.gameArtworkHeight == defaults.gameArtworkHeight, { onChange { it.copy(gameArtworkHeight = defaults.gameArtworkHeight) } }) { modifier ->
+        // The value is shown beside the slider, so the setting can be read, not only felt.
+        Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+            Slider(
+                value = display.gameArtworkHeight.toFloat(),
+                onValueChange = { value -> onChange { it.copy(gameArtworkHeight = value.toInt()) } },
+                valueRange = 0f..100f,
+                modifier = Modifier.weight(1f),
+            )
+            Text("${display.gameArtworkHeight} %", style = MaterialTheme.typography.titleMedium, modifier = Modifier.widthIn(min = 64.dp).padding(start = 12.dp))
+        }
+    }
+
     GroupTitle(R.string.settings_group_covers)
     ChoiceRow(
         R.string.settings_cover_size,

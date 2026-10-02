@@ -115,4 +115,7 @@
     <string name="settings_hidden_description">Jeux cachés de l\'application. Ils restent dans la bibliothèque Steam, où rien ne change.</string>
     <string name="settings_hidden_empty">Aucun jeu n\'est caché de l\'application.</string>
     <string name="settings_hidden_show">Réafficher</string>
+    <string name="settings_group_game_page">Fiche d\'un jeu</string>
+    <string name="settings_game_artwork">Hauteur de l\'image</string>
+    <string name="settings_game_artwork_description">Part de la hauteur de la fiche d\'un jeu que couvre son image. À 0 il n\'y a pas d\'image, à 100 elle remplit l\'écran.</string>
 </resources>

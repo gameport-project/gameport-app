@@ -40,6 +40,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.gameport.core.designsystem.BackdropDialog
 import app.gameport.core.designsystem.GlassButton
+import app.gameport.core.designsystem.HideRed
 import app.gameport.core.model.Game
 
 /** What the actions menu of a cover does. The library's buttons and this menu share them. */
@@ -98,8 +99,6 @@ internal fun GameMenu(
     )
 }
 
-/** Hiding is a removal from view, so it is red, but softer than the red of the uninstall button. */
-private val HideRed = Color(0xFFE57373)
 private val UpdateGreen = Color(0xFF66BB6A)
 private val AttentionOrange = Color(0xFFFF9800)
 

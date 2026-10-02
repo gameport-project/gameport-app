@@ -76,6 +76,7 @@ class UserSettings @Inject constructor(
         prefs.edit()
             .putBoolean(KEY_BACKDROP, updated.backdrop)
             .putInt(KEY_BACKDROP_STRENGTH, updated.backdropStrength)
+            .putInt(KEY_GAME_ARTWORK, updated.gameArtworkHeight)
             .putBoolean(KEY_COVER_TITLES, updated.coverTitles)
             .putString(KEY_COVER_SIZE, updated.coverSize.name)
             .putString(KEY_COVER_SPACING, updated.coverSpacing.name)
@@ -109,6 +110,7 @@ class UserSettings @Inject constructor(
         return DisplaySettings(
             backdrop = prefs.getBoolean(KEY_BACKDROP, defaults.backdrop),
             backdropStrength = prefs.getInt(KEY_BACKDROP_STRENGTH, defaults.backdropStrength).coerceIn(0, 100),
+            gameArtworkHeight = prefs.getInt(KEY_GAME_ARTWORK, defaults.gameArtworkHeight).coerceIn(0, 100),
             coverTitles = prefs.getBoolean(KEY_COVER_TITLES, defaults.coverTitles),
             coverSize = enumOf(KEY_COVER_SIZE, defaults.coverSize),
             coverSpacing = enumOf(KEY_COVER_SPACING, defaults.coverSpacing),
@@ -143,6 +145,7 @@ class UserSettings @Inject constructor(
         const val KEY_COUNT_PLAYTIME = "count_playtime_on_steam"
         const val KEY_BACKDROP = "library_backdrop"
         const val KEY_BACKDROP_STRENGTH = "backdrop_strength"
+        const val KEY_GAME_ARTWORK = "game_artwork_height"
         const val KEY_COVER_TITLES = "cover_titles"
         const val KEY_COVER_SIZE = "cover_size"
         const val KEY_COVER_SPACING = "cover_spacing"

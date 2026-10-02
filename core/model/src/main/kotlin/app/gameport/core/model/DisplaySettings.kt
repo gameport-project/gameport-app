@@ -77,6 +77,8 @@ data class DisplaySettings(
     val showFavorites: Boolean = true,
     val hideUninstalled: Boolean = false,
     val sort: LibrarySort = LibrarySort.NAME,
+    /** How much of the height of a game's page its artwork covers, from 0 (none) to 100 (all of it). */
+    val gameArtworkHeight: Int = DEFAULT_GAME_ARTWORK_HEIGHT,
 ) {
     /** The look settings, back to the creator's defaults; the home's own settings are kept. */
     fun withDefaultAppearance(): DisplaySettings {
@@ -84,6 +86,7 @@ data class DisplaySettings(
         return copy(
             backdrop = d.backdrop, backdropStrength = d.backdropStrength, gradientStart = d.gradientStart, gradientEnd = d.gradientEnd,
             coverSize = d.coverSize, coverSpacing = d.coverSpacing, hoverAnimation = d.hoverAnimation, accent = d.accent,
+            gameArtworkHeight = d.gameArtworkHeight,
         )
     }
 
@@ -99,5 +102,8 @@ data class DisplaySettings(
     companion object {
         /** The look before these settings existed. */
         const val DEFAULT_BACKDROP_STRENGTH = 50
+
+        /** Almost half of the page, as the game page has always shown it. */
+        const val DEFAULT_GAME_ARTWORK_HEIGHT = 50
     }
 }

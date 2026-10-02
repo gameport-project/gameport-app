@@ -34,7 +34,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -52,6 +54,11 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material3.Button
+import app.gameport.core.designsystem.HideRed
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Checkbox
@@ -73,6 +80,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import kotlin.math.abs
 import androidx.compose.runtime.mutableStateOf
@@ -81,6 +89,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import kotlin.math.pow
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
@@ -107,6 +123,7 @@ import app.gameport.core.designsystem.speedText
 import app.gameport.core.model.DlcContent
 import app.gameport.core.model.Game
 import app.gameport.core.model.GameIssue
+import app.gameport.core.model.DisplaySettings
 import app.gameport.core.model.InstallError
 import app.gameport.core.model.AchievementList
 import app.gameport.core.model.InstallState
@@ -119,6 +136,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
     val context = LocalContext.current
     val speedUnit by viewModel.speedUnit.collectAsStateWithLifecycle()
     val achievements by viewModel.achievements.collectAsStateWithLifecycle()
+    val artworkHeight by viewModel.artworkHeight.collectAsStateWithLifecycle()
     var explainingStorage by remember { mutableStateOf(false) }
     // Permissions are granted in the system's settings: check again when the player comes back.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -176,6 +194,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onOpenControllers = onOpenControllers,
         achievements = achievements,
         onOpenAchievements = onOpenAchievements,
+        artworkHeight = artworkHeight,
         onToggleFavorite = viewModel::onToggleFavorite,
         onSetHidden = viewModel::onSetHidden,
         onBack = onBack,
@@ -220,6 +239,7 @@ internal fun GameContent(
     onUpdate: () -> Unit,
     achievements: AchievementList? = null,
     onOpenAchievements: () -> Unit = {},
+    artworkHeight: Int = DisplaySettings.DEFAULT_GAME_ARTWORK_HEIGHT,
 ) {
     Scaffold { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
@@ -259,6 +279,7 @@ internal fun GameContent(
                     report = report,
                     achievements = achievements,
                     onOpenAchievements = onOpenAchievements,
+                    artworkHeight = artworkHeight,
                 )
             }
             Row(
@@ -305,6 +326,7 @@ private fun GameDetails(
     report: ReportActions,
     achievements: AchievementList? = null,
     onOpenAchievements: () -> Unit = {},
+    artworkHeight: Int = DisplaySettings.DEFAULT_GAME_ARTWORK_HEIGHT,
 ) {
     var reporting by remember { mutableStateOf(false) }
     var confirmingHide by remember { mutableStateOf(false) }
@@ -314,10 +336,14 @@ private fun GameDetails(
             title = { Text(stringResource(R.string.game_hide_title)) },
             text = { Text(stringResource(R.string.game_hide_text)) },
             confirmButton = {
-                GlassButton(onClick = {
-                    confirmingHide = false
-                    onSetHidden(true)
-                }) {
+                OutlinedButton(
+                    onClick = {
+                        confirmingHide = false
+                        onSetHidden(true)
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = HideRed.copy(alpha = 0.14f), contentColor = HideRed),
+                    border = BorderStroke(1.dp, HideRed.copy(alpha = 0.7f)),
+                ) {
                     Icon(Icons.Filled.VisibilityOff, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.game_hide))
@@ -343,23 +369,31 @@ private fun GameDetails(
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
         // The artwork fades out into the backdrop rather than into a colour.
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(HERO_HEIGHT)
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    drawRect(Brush.verticalGradient(listOf(Color.Black, Color.Transparent)), blendMode = BlendMode.DstIn)
-                },
-        ) {
-            GameImage(
-                url = game.heroUrl,
-                fallbackUrl = game.heroFallbacks.firstOrNull(),
-                moreFallbacks = game.heroFallbacks.drop(1),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-            )
+        // The page's layout does not depend on the setting: the artwork only fills more or less of what lies behind it. It covers
+        // [artworkHeight] percent of the screen's height and fades out at its bottom edge, going down behind the content when it is taller than the slot kept for it.
+        val artworkSize = (LocalConfiguration.current.screenHeightDp * artworkHeight.coerceIn(0, 100) / 100f).dp
+        Box(Modifier.fillMaxWidth().height(HERO_HEIGHT)) {
+            if (artworkSize > 0.dp) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight(Alignment.Top, unbounded = true)
+                        .height(artworkSize)
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .drawWithContent {
+                            drawContent()
+                            drawRect(Brush.verticalGradient(listOf(Color.Black, Color.Transparent)), blendMode = BlendMode.DstIn)
+                        },
+                ) {
+                    GameImage(
+                        url = game.heroUrl,
+                        fallbackUrl = game.heroFallbacks.firstOrNull(),
+                        moreFallbacks = game.heroFallbacks.drop(1),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
         }
         // The cover straddles the hero: half of it sits on the artwork, half below. On a narrow screen it is
         // centred above the details instead of beside them.
@@ -367,18 +401,27 @@ private fun GameDetails(
             val compact = maxWidth < COMPACT_WIDTH
             // Wide layout: the bottom of the cover is lined up with the bottom of the action buttons. The size card under the cover
             // then starts level with the first card beside it (patch panel or achievements), as far from the cover as that card is from the buttons.
-            val alignment = remember { CoverAlignment() }
+            val density = LocalDensity.current
+            val alignment = remember(density) { CoverAlignment(with(density) { (COVER_HEIGHT / 2).toPx() }) }
+            // Eased, so a change in the buttons moves the cover smoothly instead of jumping.
+            val coverShift by animateFloatAsState(alignment.shift, tween(250), label = "cover shift")
             val cover: @Composable (Modifier) -> Unit = { coverModifier ->
-                Box(coverModifier.width(COVER_WIDTH).height(COVER_HEIGHT)) {
+                // The cover floats above the page: three shadows stacked, as a real card would cast them, drawn by hand (no blur effect, which
+                // does not always render): a tight dark one where it would nearly touch, a wide soft one under it, and a very wide faint one.
+                Box(coverModifier.width(COVER_WIDTH).height(COVER_HEIGHT).liftedShadow(14.dp)) {
                     GameImage(
                         url = game.capsuleUrl,
                         fallbackUrl = game.capsuleFallbacks.firstOrNull(),
                         moreFallbacks = game.capsuleFallbacks.drop(1),
                         contentDescription = game.name,
-                        modifier = Modifier
+                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp)),
+                    )
+                    // A faint sheen across the top left, as light on a glossy card.
+                    Box(
+                        Modifier
                             .fillMaxSize()
-                            .shadow(16.dp, RoundedCornerShape(14.dp))
-                            .clip(RoundedCornerShape(14.dp)),
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Brush.linearGradient(0f to Color.White.copy(alpha = 0.16f), 0.45f to Color.Transparent)),
                     )
                     if (install is InstallState.Installed) {
                         // Orange for what needs attention, green when the only news is an update.
@@ -454,6 +497,8 @@ private fun GameDetails(
                         Icon(
                             if (hidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
                             contentDescription = stringResource(if (hidden) R.string.game_show_again else R.string.game_hide),
+                            // Hiding has the colour it has in the menu of a cover; showing again keeps the usual one.
+                            tint = if (hidden) LocalContentColor.current else HideRed,
                         )
                     }
                     GlassIconButton(onClick = onOpenSettings, enabled = repatch !is Repatch.Running) {
@@ -502,10 +547,10 @@ private fun GameDetails(
                 ) {
                     // The cover straddles the artwork; what is under it (size, play time) follows it up, and down by what lines it up with the buttons.
                     Column(
-                        Modifier.pullUp(COVER_HEIGHT / 2).padding(top = with(LocalDensity.current) { alignment.shift.toDp() }).width(COVER_WIDTH),
+                        Modifier.pullUp(COVER_HEIGHT / 2).padding(top = with(density) { coverShift.toDp() }).width(COVER_WIDTH),
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        cover(Modifier.onGloballyPositioned { alignment.coverPlaced(it) })
+                        cover(Modifier)
                         InfoCard(game, installed, playtime, Modifier.fillMaxWidth())
                     }
                     Column(Modifier.weight(1f).padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp), content = details)
@@ -517,11 +562,11 @@ private fun GameDetails(
 
 /** Below this width the details sit under the cover instead of beside it. */
 private val COMPACT_WIDTH = 600.dp
-/** The artwork takes almost half of the screen, fading into the page. */
-private val HERO_HEIGHT = 320.dp
-
 /** How far the content starts over the artwork's bottom edge. */
-private val CONTENT_OVERLAP = 64.dp
+private val CONTENT_OVERLAP = 98.dp
+
+/** The slot the artwork takes at the top of the page, whatever its height setting. */
+private val HERO_HEIGHT = 320.dp
 
 /** The height of the round buttons of the action row; the main button matches it so the row has one baseline. */
 private val ACTION_HEIGHT = 48.dp
@@ -815,32 +860,56 @@ internal fun sourceFamilyName(source: String): String =
     stringResource(if (source == "touch") R.string.controllers_family_touch else R.string.controllers_family_valve)
 
 /**
- * Keeps the cover's bottom edge level with the bottom of the action buttons. The three places are read once laid out, all in
- * the coordinates of the row that holds them, so scrolling the page changes nothing. [shift] is how far the cover has been lowered.
+ * Keeps the cover's bottom edge level with the bottom of the action buttons. The cover is placed [halfCoverPx] above the top of the row
+ * and straddles it, so how far it must be lowered follows from the bottom of the buttons alone: it does not depend on where the cover
+ * is, which is what keeps this from chasing itself while the buttons change (a download updates them all the time). The place of the
+ * buttons is read in the coordinates of the row, so scrolling the page changes nothing. [shift] is that distance, in pixels.
  */
-private class CoverAlignment {
+private class CoverAlignment(private val halfCoverPx: Float) {
     var shift by mutableFloatStateOf(0f)
         private set
     private var row: LayoutCoordinates? = null
-    private var cover: LayoutCoordinates? = null
     private var actions: LayoutCoordinates? = null
 
     fun rowPlaced(coordinates: LayoutCoordinates) { row = coordinates; update() }
-
-    fun coverPlaced(coordinates: LayoutCoordinates) { cover = coordinates; update() }
 
     fun actionsPlaced(coordinates: LayoutCoordinates) { actions = coordinates; update() }
 
     private fun update() {
         val inRow = row?.takeIf { it.isAttached } ?: return
-        val coverBox = cover?.takeIf { it.isAttached } ?: return
-        val actionsBox = actions?.takeIf { it.isAttached } ?: return
-        val coverBottom = inRow.localPositionOf(coverBox, Offset(0f, coverBox.size.height.toFloat())).y
-        val actionsBottom = inRow.localPositionOf(actionsBox, Offset(0f, actionsBox.size.height.toFloat())).y
-        val gap = actionsBottom - coverBottom
+        val buttons = actions?.takeIf { it.isAttached } ?: return
+        val bottom = inRow.localPositionOf(buttons, Offset(0f, buttons.size.height.toFloat())).y
         // Only ever lowered: when the buttons end above the cover's bottom the cover stays where it is.
-        if (abs(gap) > 0.5f) shift = (shift + gap).coerceAtLeast(0f)
+        val wanted = (bottom - halfCoverPx).coerceAtLeast(0f)
+        if (abs(wanted - shift) > 1f) shift = wanted
     }
+}
+
+/**
+ * A soft shadow drawn by stacking rounded rectangles that grow and fade, so it needs no blur. Three of them make a card
+ * float: a tight dark one right under its edge, a wide soft one lower down, and a very wide faint one lower still.
+ */
+private fun Modifier.liftedShadow(corner: Dp): Modifier = drawBehind {
+    fun layer(spread: Dp, drop: Dp, strength: Float) {
+        val steps = 24
+        val reach = spread.toPx()
+        val lower = drop.toPx()
+        val radius = corner.toPx()
+        // Each step alone is faint; together they reach [strength] under the card and fade out to nothing at [reach].
+        val each = 1f - (1f - strength).pow(1f / steps)
+        for (i in 0 until steps) {
+            val grow = reach * (1f - i / steps.toFloat()).pow(1.6f) - reach * 0.25f
+            drawRoundRect(
+                color = Color.Black.copy(alpha = each),
+                topLeft = Offset(-grow, -grow + lower),
+                size = Size(size.width + 2 * grow, size.height + 2 * grow),
+                cornerRadius = CornerRadius((radius + grow).coerceAtLeast(0f)),
+            )
+        }
+    }
+    layer(spread = 70.dp, drop = 34.dp, strength = 0.38f)
+    layer(spread = 30.dp, drop = 16.dp, strength = 0.5f)
+    layer(spread = 8.dp, drop = 3.dp, strength = 0.6f)
 }
 
 /** Moves its content up by [amount] and gives that space back to the layout, so what follows is not pushed down by it. */

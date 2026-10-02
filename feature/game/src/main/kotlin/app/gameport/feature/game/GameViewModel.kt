@@ -83,6 +83,11 @@ class GameViewModel @Inject constructor(
 
     val speedUnit: StateFlow<SpeedUnit> = settings.speedUnit
 
+    /** How much of the page's height the game's artwork covers, in percent (a look setting). */
+    val artworkHeight: StateFlow<Int> = settings.display
+        .map { it.gameArtworkHeight }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), app.gameport.core.model.DisplaySettings.DEFAULT_GAME_ARTWORK_HEIGHT)
+
     private val appId = savedStateHandle.toRoute<GameRoute>().appId
 
     private val baseState: StateFlow<GameUiState> = combine(
