@@ -30,6 +30,13 @@ import app.gameport.core.model.HoverAnimation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.runtime.remember
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
+import app.gameport.core.model.ReturnMode
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Switch
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -92,7 +99,7 @@ fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewMode
     val playerDefaults by viewModel.playerDefaults.collectAsStateWithLifecycle()
     val display by viewModel.display.collectAsStateWithLifecycle()
     val countPlaytime by viewModel.countPlaytimeOnSteam.collectAsStateWithLifecycle()
-    val returnToGamePort by viewModel.returnToGamePort.collectAsStateWithLifecycle()
+    val returnMode by viewModel.returnMode.collectAsStateWithLifecycle()
     val language by viewModel.language.collectAsStateWithLifecycle()
     val offline by viewModel.offline.collectAsStateWithLifecycle()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
@@ -121,7 +128,7 @@ fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewMode
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
                         when (category) {
-                            Category.ACCOUNT -> AccountSection(accountName, offline, viewModel::onOfflineModeChanged, countPlaytime, viewModel::onCountPlaytimeOnSteamChanged, returnToGamePort, viewModel::onReturnToGamePortChanged, viewModel::onSignOut)
+                            Category.ACCOUNT -> AccountSection(accountName, offline, viewModel::onOfflineModeChanged, countPlaytime, viewModel::onCountPlaytimeOnSteamChanged, returnMode, viewModel::onReturnModeChanged, viewModel::onSignOut)
                             Category.DOWNLOADS -> DownloadsSection(speedUnit, viewModel::onSpeedUnitSelected)
                             Category.APPEARANCE -> AppearanceSection(display, viewModel::onDisplayChanged)
                             Category.HOME -> HomeSection(display, viewModel.isHeadset, viewModel::onDisplayChanged)
@@ -166,8 +173,8 @@ private fun AccountSection(
     onOfflineChanged: (Boolean) -> Unit,
     countPlaytime: Boolean,
     onCountPlaytimeChanged: (Boolean) -> Unit,
-    returnToGamePort: Boolean,
-    onReturnToGamePortChanged: (Boolean) -> Unit,
+    returnMode: ReturnMode,
+    onReturnModeChanged: (ReturnMode) -> Unit,
     onSignOut: () -> Unit,
 ) {
     var confirming by rememberSaveable { mutableStateOf(false) }
@@ -205,12 +212,27 @@ private fun AccountSection(
         }
         Switch(checked = countPlaytime, onCheckedChange = onCountPlaytimeChanged)
     }
-    Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), verticalAlignment = Alignment.CenterVertically) {
+    var choosingReturn by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.weight(1f)) {
             Text(stringResource(R.string.settings_return), style = MaterialTheme.typography.titleMedium)
             Text(stringResource(R.string.settings_return_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(checked = returnToGamePort, onCheckedChange = onReturnToGamePortChanged)
+        Box {
+            OutlinedButton(onClick = { choosingReturn = true }, contentPadding = PaddingValues(start = 16.dp, end = 8.dp)) {
+                Text(stringResource(returnModeLabel(returnMode)))
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, modifier = Modifier.size(24.dp))
+            }
+            DropdownMenu(expanded = choosingReturn, onDismissRequest = { choosingReturn = false }) {
+                ReturnMode.entries.forEach { mode ->
+                    DropdownMenuItem(
+                        text = { Text(stringResource(returnModeLabel(mode))) },
+                        leadingIcon = { if (mode == returnMode) Icon(Icons.Filled.Check, contentDescription = null) },
+                        onClick = { onReturnModeChanged(mode); choosingReturn = false },
+                    )
+                }
+            }
+        }
     }
     Button(
         onClick = { confirming = true },
@@ -297,6 +319,13 @@ private fun HiddenSection(games: List<Game>, onShowAgain: (Int) -> Unit) {
             }
         }
     }
+}
+
+private fun returnModeLabel(mode: ReturnMode): Int = when (mode) {
+    ReturnMode.NEVER -> R.string.settings_return_never
+    ReturnMode.APP -> R.string.settings_return_app
+    ReturnMode.LIBRARY -> R.string.settings_return_library
+    ReturnMode.ALL -> R.string.settings_return_all
 }
 
 /** Below this width the categories move from the left to a row above the page. */

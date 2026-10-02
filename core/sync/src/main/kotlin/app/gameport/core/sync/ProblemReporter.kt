@@ -212,7 +212,7 @@ class ProblemReporter @Inject constructor(
         appendLine("controller mapping: $mapping")
         appendLine("layer config: ${controllers.layerConfig(appId).ifBlank { "(none)" }}")
         appendLine("save sync status: ${syncStatus.statuses.value[appId] ?: "unknown"}")
-        appendLine("returnToGamePort=${userSettings.returnToGamePort.value} countPlaytimeOnSteam=${userSettings.countPlaytimeOnSteam.value}")
+        appendLine("returnMode=${userSettings.returnMode.value.id} countPlaytimeOnSteam=${userSettings.countPlaytimeOnSteam.value}")
         appendLine("steam connection: ${auth.connection.value}")
     }
 

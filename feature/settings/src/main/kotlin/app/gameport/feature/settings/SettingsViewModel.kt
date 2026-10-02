@@ -82,9 +82,9 @@ class SettingsViewModel @Inject constructor(
 
     fun onCountPlaytimeOnSteamChanged(count: Boolean) = settings.setCountPlaytimeOnSteam(count)
 
-    val returnToGamePort: StateFlow<Boolean> = settings.returnToGamePort
+    val returnMode: StateFlow<app.gameport.core.model.ReturnMode> = settings.returnMode
 
-    fun onReturnToGamePortChanged(enabled: Boolean) = settings.setReturnToGamePort(enabled)
+    fun onReturnModeChanged(mode: app.gameport.core.model.ReturnMode) = settings.setReturnMode(mode)
 
     fun onSpeedUnitSelected(unit: SpeedUnit) = settings.setSpeedUnit(unit)
 

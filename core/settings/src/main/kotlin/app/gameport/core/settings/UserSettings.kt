@@ -3,6 +3,7 @@ package app.gameport.core.settings
 import android.content.Context
 import app.gameport.core.model.AccentPresets
 import app.gameport.core.model.AppLanguage
+import app.gameport.core.model.ReturnMode
 import app.gameport.core.model.CoverSize
 import app.gameport.core.model.CoverSpacing
 import app.gameport.core.model.DisplaySettings
@@ -46,14 +47,17 @@ class UserSettings @Inject constructor(
         _countPlaytimeOnSteam.value = count
     }
 
-    private val _returnToGamePort = MutableStateFlow(prefs.getBoolean(KEY_RETURN, true))
+    // Before this setting, a switch ("return_to_gameport") said whether a game started by GamePort opens it again: that is kept.
+    private val _returnMode = MutableStateFlow(
+        ReturnMode.ofId(prefs.getString(KEY_RETURN_MODE, null)) ?: if (prefs.getBoolean(KEY_RETURN, true)) ReturnMode.APP else ReturnMode.NEVER,
+    )
 
-    /** Whether a game started by GamePort opens GamePort again when it closes (Horizon would otherwise leave the player on its home). */
-    val returnToGamePort: StateFlow<Boolean> = _returnToGamePort.asStateFlow()
+    /** For which games GamePort opens again when the game closes (Horizon would otherwise leave the player on its home). */
+    val returnMode: StateFlow<ReturnMode> = _returnMode.asStateFlow()
 
-    fun setReturnToGamePort(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_RETURN, enabled).apply()
-        _returnToGamePort.value = enabled
+    fun setReturnMode(mode: ReturnMode) {
+        prefs.edit().putString(KEY_RETURN_MODE, mode.id).apply()
+        _returnMode.value = mode
     }
 
     private val _updateCheckHours = MutableStateFlow(prefs.getInt(KEY_UPDATE_HOURS, DEFAULT_UPDATE_HOURS))
@@ -142,6 +146,7 @@ class UserSettings @Inject constructor(
         const val KEY_UPDATE_HOURS = "update_check_hours"
         const val DEFAULT_UPDATE_HOURS = 4
         const val KEY_RETURN = "return_to_gameport"
+        const val KEY_RETURN_MODE = "return_mode"
         const val KEY_COUNT_PLAYTIME = "count_playtime_on_steam"
         const val KEY_BACKDROP = "library_backdrop"
         const val KEY_BACKDROP_STRENGTH = "backdrop_strength"

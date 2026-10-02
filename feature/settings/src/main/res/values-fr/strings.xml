@@ -83,7 +83,7 @@
     <string name="settings_group_rows">Rangées à afficher</string>
     <string name="settings_group_cover_names">Noms</string>
     <string name="settings_return">Revenir à GamePort quand un jeu se ferme</string>
-    <string name="settings_return_description">Un jeu lancé depuis GamePort rouvre GamePort une fois fermé, au lieu de laisser l\'appareil sur son écran d\'accueil.</string>
+    <string name="settings_return_description">Choisit pour quels jeux GamePort se rouvre une fois le jeu fermé. Un jeu lancé depuis la bibliothèque de l\'appareil laisse sinon GamePort tourner en arrière-plan, sans son écran. Un jeu patché avant doit être patché de nouveau pour suivre un changement.</string>
     <string name="settings_category_updates">Mises à jour</string>
     <string name="settings_updates_description">GamePort peut chercher une version plus récente d\'elle-même. Une nouvelle version n\'est téléchargée et installée qu\'après un appui sur le bouton de mise à jour, et Android demande une confirmation.</string>
     <string name="settings_updates_installed">Version installée : %1$s</string>
@@ -118,4 +118,8 @@
     <string name="settings_group_game_page">Fiche d\'un jeu</string>
     <string name="settings_game_artwork">Hauteur de l\'image</string>
     <string name="settings_game_artwork_description">Part de la hauteur de la fiche d\'un jeu que couvre son image. À 0 il n\'y a pas d\'image, à 100 elle remplit l\'écran.</string>
+    <string name="settings_return_never">Jamais</string>
+    <string name="settings_return_app">Jeux lancés depuis GamePort</string>
+    <string name="settings_return_library">Jeux lancés depuis la bibliothèque</string>
+    <string name="settings_return_all">Tous les jeux</string>
 </resources>

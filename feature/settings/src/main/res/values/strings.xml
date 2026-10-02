@@ -83,7 +83,7 @@
     <string name="settings_group_rows">Rows to show</string>
     <string name="settings_group_cover_names">Names</string>
     <string name="settings_return">Come back to GamePort when a game closes</string>
-    <string name="settings_return_description">A game started from GamePort opens GamePort again once it is closed, instead of leaving the device on its home screen.</string>
+    <string name="settings_return_description">Chooses for which games GamePort opens again once the game is closed. A game started from the headset\'s library otherwise leaves GamePort running in the background, without its screen. A game patched before needs to be patched again to follow a change.</string>
     <string name="settings_category_updates">Updates</string>
     <string name="settings_updates_description">GamePort can look for a newer version of itself. A new version is only downloaded and installed after a tap on the update button, and Android asks for a confirmation.</string>
     <string name="settings_updates_installed">Installed version: %1$s</string>
@@ -118,4 +118,8 @@
     <string name="settings_group_game_page">Game page</string>
     <string name="settings_game_artwork">Artwork height</string>
     <string name="settings_game_artwork_description">How much of the height of a game\'s page its artwork covers. At 0 there is no artwork, at 100 it fills the screen.</string>
+    <string name="settings_return_never">Never</string>
+    <string name="settings_return_app">Games started from GamePort</string>
+    <string name="settings_return_library">Games started from the library</string>
+    <string name="settings_return_all">All games</string>
 </resources>
