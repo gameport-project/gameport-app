@@ -36,6 +36,8 @@ internal interface CloudEntryPoint {
     fun userSettings(): app.gameport.core.settings.UserSettings
 
     fun reports(): ReportStore
+
+    fun achievementNotifier(): AchievementNotifier
 }
 
 /**
@@ -53,6 +55,7 @@ internal interface CloudEntryPoint {
  * - `end` -> the game is done
  * - `resumed`, `alive`, `paused` -> the game is on screen, still there, gone: its playing time
  * - `log` (its last log lines, how its last runs ended) -> kept for a problem report
+ * - `achievement` (the names) -> the game unlocked achievements: they are announced
  * - `closed` -> the game's process is ending
  *
  * Files travel through `openFile`: `fetch` reads a cloud file, `push` writes a file to upload.
@@ -91,8 +94,10 @@ class CloudProvider : ContentProvider() {
                 putString("xrMap", appId?.let { entryPoint.controllerMappings().layerConfig(it) }.orEmpty())
                 // The kind of headset (meta, pico, openxr), so the layer knows which controllers to translate onto.
                 putString("xrFamily", entryPoint.deviceProfile().vrPlatform?.id.orEmpty())
-                // Whether to open GamePort again when this game closes.
-                putBoolean("returnToGamePort", entryPoint.userSettings().returnToGamePort.value)
+                // For which games to open GamePort again when the game closes. Hooks from before the choice only know the first answer.
+                val mode = entryPoint.userSettings().returnMode.value
+                putString("returnMode", mode.id)
+                putBoolean("returnToGamePort", mode == app.gameport.core.model.ReturnMode.APP || mode == app.gameport.core.model.ReturnMode.ALL)
             }
         }
         // The Steam Frame controls the game used the last time it ran (left by the OpenXR layer).
@@ -110,6 +115,8 @@ class CloudProvider : ContentProvider() {
         "closed" -> okAfter { entryPoint.reports().left(packageName) }
         // What the game wrote to the system log lately and how it last ended, for a problem report.
         "log" -> okAfter { entryPoint.reports().saveGameData(packageName, extras) }
+        // The game unlocked achievements, which the shim recorded: they are announced with a notification.
+        "achievement" -> okAfter { entryPoint.achievementNotifier().unlocked(packageName, extras.getStringArray("names").orEmpty().toList(), extras.getLongArray("times")) }
         // Sent regularly by the running game so GamePort stays connected to Steam (see `ticket`).
         "warm" -> {
             runBlocking { coordinator.warmUp() }

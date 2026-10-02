@@ -26,10 +26,13 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var device: app.gameport.core.device.DeviceProfile
 
+    @Inject lateinit var achievements: app.gameport.core.sync.AchievementNotifier
+
     override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLocale.wrap(newBase))
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        acknowledgeAchievement(intent)
         // Looks for a newer GamePort when the last look is old enough (and the player has not turned it off).
         appUpdater.checkIfDue()
         // Logs kept for problem reports: a week at most, and not for a game that was uninstalled.
@@ -44,5 +47,15 @@ class MainActivity : ComponentActivity() {
                 GamePortApp()
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        acknowledgeAchievement(intent)
+    }
+
+    /** GamePort was opened from the notification of an achievement: it is not brought back any more. */
+    private fun acknowledgeAchievement(intent: android.content.Intent?) {
+        intent?.getStringExtra(app.gameport.core.sync.AchievementNotifier.EXTRA_OPENED)?.let(achievements::opened)
     }
 }

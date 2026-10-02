@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="achievement_channel">Achievements</string>
+    <string name="achievement_channel_description">Announces the achievements unlocked while playing a game.</string>
+    <string name="achievement_unlocked">Achievement unlocked</string>
+    <string name="achievement_channel_quiet">Achievements, silent</string>
+    <string name="achievement_channel_quiet_description">The same announcement shown again, without sound, so that it stays in view longer.</string>
+    <string name="achievement_channel_list">Achievements, kept</string>
+    <string name="achievement_channel_list_description">Brings back the achievements announced and not yet removed, with no pop-up, when GamePort starts again.</string>
+    <plurals name="achievement_group_count">
+        <item quantity="one">%d achievement unlocked</item>
+        <item quantity="other">%d achievements unlocked</item>
+    </plurals>
+</resources>

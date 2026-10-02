@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="achievement_channel">Succès</string>
+    <string name="achievement_channel_description">Annonce les succès débloqués en jouant à un jeu.</string>
+    <string name="achievement_unlocked">Succès débloqué</string>
+    <string name="achievement_channel_quiet">Succès, silencieux</string>
+    <string name="achievement_channel_quiet_description">La même annonce affichée de nouveau, sans son, pour qu\'elle reste plus longtemps visible.</string>
+    <string name="achievement_channel_list">Succès, conservés</string>
+    <string name="achievement_channel_list_description">Remet dans la liste les succès annoncés et pas encore supprimés, sans fenêtre, quand GamePort redémarre.</string>
+    <plurals name="achievement_group_count">
+        <item quantity="one">%d succès débloqué</item>
+        <item quantity="other">%d succès débloqués</item>
+    </plurals>
+</resources>

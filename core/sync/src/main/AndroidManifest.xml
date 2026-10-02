@@ -8,6 +8,11 @@
             android:name=".CloudProvider"
             android:authorities="app.gameport.cloud"
             android:exported="true" />
+
+        <!-- Told when the player removes the notification of an achievement (nothing outside GamePort may send to it). -->
+        <receiver
+            android:name=".AchievementDismissReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>
