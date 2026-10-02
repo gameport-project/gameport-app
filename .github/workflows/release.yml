@@ -55,6 +55,8 @@ jobs:
           # The text of the release is the notes file of this version, shown as it is, followed by how to check the APK.
           notes="docs/releases/${GITHUB_REF_NAME}.md"
           if [[ -f "$notes" ]]; then cp "$notes" "$body"; else echo "GamePort ${GITHUB_REF_NAME}" > "$body"; fi
+          # The notes point to their pictures relative to the file (so a preview shows them); on the release page those paths lead nowhere, so they become the tag's own addresses.
+          sed -i "s|\.\./screenshots/|https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_REF_NAME}/docs/screenshots/|g" "$body"
           {
             echo
             echo "---"
