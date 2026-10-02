@@ -145,4 +145,18 @@
     <string name="game_choose_version_waiting">Waiting for a choice…</string>
     <string name="game_version_headset">VR version</string>
     <string name="game_version_flat">Version without VR</string>
+    <string name="report_open">Report a problem</string>
+    <string name="report_title">Report a problem</string>
+    <string name="report_message">This creates a file that helps find why %1$s does not work. It is saved in the Downloads folder and nothing is sent anywhere: it can be attached to a ticket or sent to the developers.</string>
+    <string name="report_contents">It contains the versions of GamePort, of the game and of its patch.\nThe device and its system.\nThe player\'s choices for the game, and how it ran, frame rate included.\nThe game\'s files and everything inside its APK.\nThe Steam interfaces it asks for.\nThe game\'s log, its start and its latest lines, and GamePort\'s.\nHow its last runs ended, with the crash report Android kept.\nWhat GamePort did for it, such as the download, the patch and the install.\nAccount numbers, e-mail addresses, network addresses and the account name are removed from the text files.</string>
+    <string name="report_save">Save the report</string>
+    <string name="report_working">Preparing the report…</string>
+    <string name="report_saved">Saved in Downloads: %1$s</string>
+    <string name="report_failed">The report could not be saved.</string>
+    <string name="report_share">Share the file</string>
+    <string name="report_ticket">Create a ticket on GitHub</string>
+    <string name="report_close">Close</string>
+    <string name="issue_problem_short">This game closed almost right away. A report can help find out why.</string>
+    <string name="issue_problem_crash">This game seems to have crashed. A report can help find out why.</string>
+    <string name="issue_problem_action">Report it</string>
 </resources>

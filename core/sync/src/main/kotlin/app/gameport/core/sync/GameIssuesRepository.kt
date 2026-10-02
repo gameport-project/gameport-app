@@ -28,6 +28,7 @@ class GameIssuesRepository @Inject constructor(
     private val updates: GameUpdatesRepository,
     private val controllers: ControllerMappingStore,
     private val device: DeviceProfile,
+    private val reports: ReportStore,
 ) {
     // Permissions are granted outside GamePort, so the screens ask for a re-check when they come back.
     private val recheck = MutableStateFlow(0)
@@ -41,9 +42,10 @@ class GameIssuesRepository @Inject constructor(
         combine(recheck, updates.updates, controllers.observe(appId)) { _, list, mapping ->
             list.any { it.appId == appId } to mapping.takeIf { device.isHeadset && it.detected.isNotEmpty() && !it.noticeSeen }?.source
         },
-    ) { patchOutdated, conflicts, statuses, (updateAvailable, mappingNoticeSource) ->
+        reports.suspected,
+    ) { patchOutdated, conflicts, statuses, (updateAvailable, mappingNoticeSource), suspected ->
         // The controller notice is informative: it is listed on the game's page but never lights the cover badge.
-        issuesFor(appId, patchOutdated, conflicts.keys, statuses, updateAvailable) +
+        issuesFor(appId, patchOutdated, conflicts.keys, statuses, updateAvailable, suspected) +
             if (mappingNoticeSource != null) listOf(GameIssue.ControllerMappingAvailable(mappingNoticeSource)) else emptyList()
     }
 
@@ -53,9 +55,10 @@ class GameIssuesRepository @Inject constructor(
         coordinator.conflicts,
         syncStatus.statuses,
         combine(recheck, updates.updates) { _, list -> list.map { it.appId }.toSet() },
-    ) { outdated, conflicts, statuses, updatable ->
+        reports.suspected,
+    ) { outdated, conflicts, statuses, updatable, suspected ->
         installed.all().keys.filter { appId ->
-            issuesFor(appId, appId in outdated, conflicts.keys, statuses, appId in updatable).isNotEmpty()
+            issuesFor(appId, appId in outdated, conflicts.keys, statuses, appId in updatable, suspected).isNotEmpty()
         }.toSet()
     }
 
@@ -72,6 +75,7 @@ class GameIssuesRepository @Inject constructor(
         conflictPackages: Set<String>,
         statuses: Map<Int, SyncStatus>,
         updateAvailable: Boolean,
+        suspected: Map<String, Suspicion>,
     ): List<GameIssue> {
         val packageName = installed.all()[appId] ?: return emptyList()
         return buildList {
@@ -79,6 +83,7 @@ class GameIssuesRepository @Inject constructor(
             if (patchOutdated) add(GameIssue.PatchOutdated)
             if (installer.shouldExplainStoragePermission(appId)) add(GameIssue.StoragePermissionMissing)
             if (packageName in conflictPackages) add(GameIssue.SaveConflict)
+            suspected[packageName]?.let { add(GameIssue.ProblemSuspected(crash = it == Suspicion.CRASH)) }
             when (statuses[appId]) {
                 SyncStatus.OFFLINE -> add(GameIssue.SaveSyncFailed(offline = true))
                 SyncStatus.FAILED -> add(GameIssue.SaveSyncFailed(offline = false))

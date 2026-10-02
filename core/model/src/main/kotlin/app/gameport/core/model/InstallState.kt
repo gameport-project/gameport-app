@@ -54,3 +54,10 @@ sealed interface InstallError {
 
 /** One build of a game found in its download. [id] is the file name. */
 data class VersionOption(val id: String, val versionName: String?, val versionCode: Long, val forHeadset: Boolean)
+
+/**
+ * Whether a failed install is worth a problem report. Not for what the player can put right at once: not enough
+ * space (the message says how much), no Steam sign-in, no connection, or GamePort updating itself.
+ */
+val InstallError.reportable: Boolean
+    get() = this !is InstallError.NotEnoughSpace && this !is InstallError.NotSignedIn && this !is InstallError.Offline && this !is InstallError.AppUpdating

@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import app.gameport.core.designsystem.BackdropDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -61,7 +61,7 @@ fun ControllersScreen(onBack: () -> Unit, viewModel: ControllersViewModel = hilt
     var capturing by remember { mutableStateOf<ControlRef?>(null) }
 
     if (confirmingReset) {
-        AlertDialog(
+        BackdropDialog(
             onDismissRequest = { confirmingReset = false },
             title = { Text(stringResource(R.string.controllers_reset_title)) },
             text = { Text(stringResource(R.string.controllers_reset_message)) },
@@ -74,7 +74,7 @@ fun ControllersScreen(onBack: () -> Unit, viewModel: ControllersViewModel = hilt
 
     capturing?.let { source ->
         val assign = { target: ControlRef? -> viewModel.onTargetChosen(source, target); capturing = null }
-        AlertDialog(
+        BackdropDialog(
             onDismissRequest = { capturing = null },
             title = { Text(stringResource(R.string.controllers_choose_title, controlLabel(source.group))) },
             text = {

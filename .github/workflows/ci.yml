@@ -25,7 +25,7 @@ jobs:
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
       - name: Build the debug APK and run the unit tests
-        run: ./gradlew assembleDebug testDebugUnitTest --stacktrace
+        run: ./gradlew assembleDebug testDebugUnitTest :core:model:test --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: gameport-debug-apk

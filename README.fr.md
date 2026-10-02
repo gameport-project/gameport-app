@@ -62,6 +62,15 @@ La première fois qu'un jeu a besoin d'une permission, GamePort explique pourquo
 - **Un seul jeu à la fois par compte Steam.** Steam n'autorise qu'une partie à la fois sur un compte : lancer un jeu sur ton casque met en pause celui qui tourne sur ton PC. Tu peux couper le comptage du temps de jeu dans les réglages si tu préfères.
 - **Il faut posséder le jeu.** GamePort ne gère que les jeux de ton compte ou partagés par ta famille Steam.
 
+## Quand un jeu ne marche pas
+
+Ouvre la page du jeu et appuie sur le bouton bug, ou sur **Signaler un problème** qui apparaît quand une installation échoue. GamePort le signale aussi pour un jeu qui s'est fermé tout de suite ou qui a planté.
+
+- **Enregistre le rapport.** Il crée un zip dans le dossier Téléchargements de ton appareil. Il contient les versions, l'appareil, les fichiers du jeu, son journal et celui de GamePort, la façon dont ses dernières exécutions se sont terminées, et ce que GamePort a fait pour lui.
+- **GamePort n'envoie rien.** Tu choisis quoi faire du fichier : le joindre à un [ticket](https://github.com/gameport-project/gameport-app/issues/new?template=game-problem.md), ou l'envoyer aux développeurs par n'importe quel moyen.
+- **Ton identité reste dehors.** Les numéros de compte, les adresses e-mail, les adresses réseau et le nom de ton compte sont retirés des fichiers texte. Le rapport de plantage gardé par Android, quand il y en a un, est un fichier binaire et n'est pas filtré.
+- **Il fait le ménage.** Ce que GamePort garde pour les rapports est supprimé après une semaine, et quand le jeu est désinstallé. Les zips que tu as enregistrés t'appartiennent et ne sont jamais touchés.
+
 ## Ta vie privée
 
 - Ta connexion reste sur ton appareil. Elle n'est envoyée qu'à Steam.

@@ -33,7 +33,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import app.gameport.core.designsystem.BackdropDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -162,7 +162,7 @@ private fun AccountSection(
 ) {
     var confirming by rememberSaveable { mutableStateOf(false) }
     if (confirming) {
-        AlertDialog(
+        BackdropDialog(
             onDismissRequest = { confirming = false },
             title = { Text(stringResource(R.string.settings_sign_out_confirm_title)) },
             text = { Text(stringResource(R.string.settings_sign_out_confirm_message)) },

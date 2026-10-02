@@ -17,6 +17,9 @@ sealed interface GameIssue {
     /** The saves on the headset and in Steam Cloud differ and the player has not chosen yet. */
     data object SaveConflict : GameIssue
 
+    /** The game closed within seconds of starting, or crashed: a problem report can help. [crash] tells which. */
+    data class ProblemSuspected(val crash: Boolean) : GameIssue
+
     /** The last save sync could not reach Steam ([offline]) or could not send the saves. */
     data class SaveSyncFailed(val offline: Boolean) : GameIssue
 }

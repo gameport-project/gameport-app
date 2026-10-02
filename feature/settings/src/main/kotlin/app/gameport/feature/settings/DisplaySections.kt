@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.AlertDialog
+import app.gameport.core.designsystem.BackdropDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -263,7 +263,7 @@ private fun ResetButton(isDefault: Boolean, onClick: () -> Unit) {
 private fun ResetSectionButton(label: Int, message: Int, onConfirm: () -> Unit) {
     var confirming by rememberSaveable { mutableStateOf(false) }
     if (confirming) {
-        AlertDialog(
+        BackdropDialog(
             onDismissRequest = { confirming = false },
             title = { Text(stringResource(label)) },
             text = { Text(stringResource(message)) },

@@ -34,6 +34,7 @@ public final class GamePortHookProvider extends ContentProvider {
     private volatile boolean launchedByGamePort;
     private int liveActivities;
     private Handler background;
+    private SessionLog sessionLog;
 
     @Override
     public boolean onCreate() {
@@ -57,6 +58,17 @@ public final class GamePortHookProvider extends ContentProvider {
             reportControllerProfile(context);
 
             watchForUploads(context);
+            // What the game says in the system log, for a problem report.
+            sessionLog = new SessionLog(context);
+            sessionLog.start();
+            // A game that quits by itself (System.exit) leaves no activity callback: this still tells GamePort it is gone.
+            final Context closing = context.getApplicationContext();
+            Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+                @Override public void run() {
+                    if (sessionLog != null) sessionLog.flushNow();
+                    tellGamePort(closing, "closed");
+                }
+            }, "gameport-closed"));
         } catch (Throwable t) {
             Log.w(TAG, "save sync unavailable; the game runs without it", t);
         }
@@ -280,15 +292,17 @@ public final class GamePortHookProvider extends ContentProvider {
                 if (resumedActivities > 0 && --resumedActivities == 0) {
                     background.removeCallbacks(beat);
                     background.post(new Runnable() { @Override public void run() { tellGamePort(appContext, "paused"); } });
+                    if (sessionLog != null) sessionLog.flushSoon();
                 }
             }
             @Override public void onActivityDestroyed(Activity a) {
                 background.post(upload);
+                if (sessionLog != null) sessionLog.flushSoon();
                 // The game was closed (not just turned): bring GamePort back, which Horizon does not do by itself.
                 if (--liveActivities <= 0 && a.isFinishing() && returnToGamePort && launchedByGamePort) openGamePort(a);
             }
             @Override public void onActivityCreated(Activity a, Bundle b) {
-                liveActivities++;
+                if (liveActivities++ == 0 && sessionLog != null) sessionLog.setLaunchInfo(describe(a));
                 if (a.getIntent() != null && a.getIntent().getBooleanExtra("app.gameport.launched", false)) launchedByGamePort = true;
             }
             @Override public void onActivityStarted(Activity a) {}
@@ -298,6 +312,22 @@ public final class GamePortHookProvider extends ContentProvider {
     }
 
     private volatile int resumedActivities;
+
+    /** How the game's first screen was started: its class, the intent's action, categories, flags and the names of its extras. */
+    private static String describe(Activity a) {
+        StringBuilder out = new StringBuilder("activity=").append(a.getClass().getName()).append('\n');
+        android.content.Intent intent = a.getIntent();
+        if (intent == null) return out.append("intent=none\n").toString();
+        out.append("action=").append(intent.getAction()).append('\n');
+        out.append("categories=").append(intent.getCategories()).append('\n');
+        out.append("flags=0x").append(Integer.toHexString(intent.getFlags())).append('\n');
+        out.append("launchedByGamePort=").append(intent.getBooleanExtra("app.gameport.launched", false)).append('\n');
+        Bundle extras = intent.getExtras();
+        StringBuilder names = new StringBuilder();
+        if (extras != null) for (String key : extras.keySet()) names.append(key).append(' ');
+        out.append("extras=").append(names.toString().trim()).append('\n');
+        return out.toString();
+    }
 
     private static void openGamePort(Context context) {
         try {

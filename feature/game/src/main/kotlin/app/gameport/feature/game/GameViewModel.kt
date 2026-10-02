@@ -1,5 +1,7 @@
 package app.gameport.feature.game
 
+import app.gameport.core.model.reportable
+import kotlinx.coroutines.flow.map
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -70,6 +72,8 @@ class GameViewModel @Inject constructor(
     playtimeStore: app.gameport.core.settings.PlaytimeStore,
     private val playtimeTracker: app.gameport.core.sync.PlaytimeTracker,
     auth: app.gameport.core.steam.SteamAuthRepository,
+    private val reports: app.gameport.core.sync.ReportStore,
+    private val reporter: app.gameport.core.sync.ProblemReporter,
 ) : ViewModel() {
     /** How GamePort stands with Steam. */
     val connection: StateFlow<app.gameport.core.model.SteamConnection> = auth.connection
@@ -129,6 +133,37 @@ class GameViewModel @Inject constructor(
     }
 
     fun onCancel() = installer.cancel(appId)
+
+    /** Whether this game looks like it had a problem (it closed at once, or crashed). */
+    val suspicion: StateFlow<app.gameport.core.sync.Suspicion?> = reports.suspected
+        .map { installer.installedPackage(appId)?.let(it::get) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    private val _reportProgress = MutableStateFlow<ReportProgress>(ReportProgress.Idle)
+    internal val reportProgress: StateFlow<ReportProgress> = _reportProgress
+
+    internal fun onSaveReport(game: Game) {
+        if (_reportProgress.value == ReportProgress.Working) return
+        viewModelScope.launch {
+            _reportProgress.value = ReportProgress.Working
+            val failure = ((uiState.value as? GameUiState.Content)?.install as? InstallState.Failed)?.error?.takeIf { it.reportable }?.toString()
+            val saved = reporter.save(game, failure)
+            _reportProgress.value = if (saved != null) ReportProgress.Saved(saved.fileName, saved.uri) else ReportProgress.Failed
+            // The report said why it was made; the notice has done its job.
+            if (saved != null) onDismissProblem()
+        }
+    }
+
+    internal fun ticketUri(game: Game): android.net.Uri =
+        reporter.ticketUrl(game, (_reportProgress.value as? ReportProgress.Saved)?.fileName)
+
+    fun onDismissProblem() {
+        installer.installedPackage(appId)?.let(reports::dismiss)
+    }
+
+    internal fun onResetReport() {
+        _reportProgress.value = ReportProgress.Idle
+    }
 
     fun onVersionChosen(optionId: String?) = installer.chooseVersion(appId, optionId)
 

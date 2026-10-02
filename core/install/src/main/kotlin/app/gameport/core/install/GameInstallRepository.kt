@@ -64,6 +64,7 @@ class GameInstallRepository @Inject constructor(
     private val library: app.gameport.core.steam.SteamLibraryRepository,
     private val playHistory: app.gameport.core.settings.PlayHistoryStore,
     private val gate: UpdateGate,
+    private val events: GameEventLog,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val operations = MutableStateFlow<Map<Int, InstallState>>(emptyMap())
@@ -74,6 +75,10 @@ class GameInstallRepository @Inject constructor(
 
     /** True while a game is being downloaded, patched or installed. */
     val isBusy: StateFlow<Boolean> = _isBusy.asStateFlow()
+    private val _uninstalled = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 8)
+
+    /** The package name of each game that was just uninstalled, for what is kept about it elsewhere. */
+    val uninstalled: kotlinx.coroutines.flow.SharedFlow<String> = _uninstalled
     private val downloadSlots = Semaphore(MAX_CONCURRENT_DOWNLOADS)
     private val patchLock = Mutex()
 
@@ -111,6 +116,7 @@ class GameInstallRepository @Inject constructor(
         if (jobs[game.appId]?.isActive == true) return
         if (gate.updating.value) return fail(game.appId, InstallError.AppUpdating)
         if (auth.offline.value) return fail(game.appId, InstallError.Offline)
+        events.note(game.appId, "install requested for ${game.name} (dlc: ${dlc ?: "same as before"})")
         val directory = downloadDirectory(game.appId)
         val chosen = dlc ?: readChosenDlc(directory)
         val depots = game.androidBuild?.depotsFor(chosen).orEmpty()
@@ -142,10 +148,13 @@ class GameInstallRepository @Inject constructor(
                         return@launch fail(game.appId, InstallError.NoApk)
                     }
 
+                    events.note(game.appId, "download complete: ${everything.joinToString { it.name }}")
                     val downloaded = chooseBuild(game.appId, everything) ?: return@launch clearState(game.appId).also { directory.deleteRecursively() }
+                    events.note(game.appId, "build chosen: ${downloaded.joinToString { it.name }}")
                     val account = (auth.authState.value as? AuthState.SignedIn)?.account
                         ?: return@launch fail(game.appId, InstallError.NotSignedIn)
                     setState(game.appId, InstallState.Patching)
+                    events.note(game.appId, "patching ${downloaded.size} file(s)")
                     // Patching rewrites multi-gigabyte files, so one game at a time.
                     patchedDirectory(directory).deleteRecursively()
                     apks = patchLock.withLock { downloaded.map { original ->
@@ -166,6 +175,7 @@ class GameInstallRepository @Inject constructor(
                 setState(game.appId, InstallState.Installing)
                 when (val outcome = packages.install(apks)) {
                     PackageGateway.Outcome.Success -> {
+                        events.note(game.appId, "installed $packageName")
                         placeObb(directory, packageName)
                         installed.put(game.appId, packageName)
                         // What this install came from, to recognise a newer build later.
@@ -188,6 +198,7 @@ class GameInstallRepository @Inject constructor(
                 clearState(game.appId)
                 throw e
             } catch (e: Exception) {
+                events.failure(game.appId, "install", e)
                 fail(game.appId, InstallError.Other(e.message))
             }
         }
@@ -261,6 +272,7 @@ class GameInstallRepository @Inject constructor(
         if (jobs[appId]?.isActive == true) return
         if (gate.updating.value) return fail(appId, InstallError.AppUpdating)
         val packageName = installed.all()[appId]?.takeIf(packages::isInstalled) ?: return
+        events.note(appId, "re-patch requested for $packageName (${patches.joinToString { it.id }})")
         val account = (auth.authState.value as? AuthState.SignedIn)?.account ?: return fail(appId, InstallError.NotSignedIn)
         val sources = packages.apkFilesOf(packageName).filter { it.isFile }
         if (sources.isEmpty()) return fail(appId, InstallError.UnreadableApk)
@@ -289,7 +301,9 @@ class GameInstallRepository @Inject constructor(
                     }
                 }
                 setState(appId, InstallState.Installing)
-                when (val outcome = packages.install(patched)) {
+                val outcome = packages.install(patched)
+                events.note(appId, "re-patch install outcome: $outcome")
+                when (outcome) {
                     PackageGateway.Outcome.Success, PackageGateway.Outcome.Cancelled -> clearState(appId)
                     PackageGateway.Outcome.Conflict -> fail(appId, InstallError.VersionConflict)
                     is PackageGateway.Outcome.Failure -> fail(appId, InstallError.Other(outcome.reason))
@@ -298,6 +312,7 @@ class GameInstallRepository @Inject constructor(
                 clearState(appId)
                 throw e
             } catch (e: Exception) {
+                events.failure(appId, "re-patch", e)
                 fail(appId, InstallError.Other(e.message))
             } finally {
                 directory.deleteRecursively()
@@ -334,6 +349,8 @@ class GameInstallRepository @Inject constructor(
                 if (packages.uninstall(packageName) != PackageGateway.Outcome.Success) return@launch
             }
             installed.remove(appId)
+            events.forget(appId)
+            packageName?.let { _uninstalled.tryEmit(it) }
             playHistory.forget(appId)
             builds.remove(appId)
             downloadDirectory(appId).deleteRecursively()
@@ -390,6 +407,18 @@ class GameInstallRepository @Inject constructor(
     private fun downloadsRoot(): File = context.getExternalFilesDir("downloads") ?: File(context.filesDir, "downloads")
 
     private fun downloadDirectory(appId: Int): File = File(downloadsRoot(), appId.toString())
+
+    /** What is in the game's download folder and what its APKs say about themselves, for a problem report. */
+    fun downloadReport(appId: Int): String = buildString {
+        val directory = downloadDirectory(appId)
+        appendLine("download folder exists=${directory.exists()} freeSpace=${directory.usableSpace / (1024 * 1024)} MiB")
+        directory.walkTopDown().filter { it.isFile }.take(500).forEach { appendLine("  ${it.relativeTo(directory).path}  ${it.length()} bytes") }
+        appendLine("APKs found in the download:")
+        (findApks(directory) + patchedApks(directory)).forEach { file ->
+            val info = packages.inspect(file)
+            appendLine("  ${file.relativeTo(directory).path}: package=${info?.packageName} versionCode=${info?.versionCode} versionName=${info?.versionName} watch=${info?.forWatch} headset=${info?.forHeadset}")
+        }
+    }
 
     private fun readChosenDlc(directory: File): Set<Int> =
         runCatching { File(directory, CHOICE_FILE).readText().split(',').mapNotNull { it.trim().toIntOrNull() }.toSet() }
@@ -494,7 +523,10 @@ class GameInstallRepository @Inject constructor(
 
     private fun clearState(appId: Int) = operations.update { it - appId }
 
-    private fun fail(appId: Int, error: InstallError) = setState(appId, InstallState.Failed(error))
+    private fun fail(appId: Int, error: InstallError): Unit {
+        events.note(appId, "failed: $error")
+        setState(appId, InstallState.Failed(error))
+    }
 }
 
 private const val PATCHED_DIR = "patched"

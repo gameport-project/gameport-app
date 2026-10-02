@@ -22,7 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import app.gameport.core.designsystem.BackdropDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -54,7 +54,7 @@ internal fun AccentPickerDialog(initial: Long, title: Int, minBrightness: Float 
     var saturation by remember { mutableFloatStateOf(start[1]) }
     var brightness by remember { mutableFloatStateOf(start[2]) }
     val picked = Color(AndroidColor.HSVToColor(floatArrayOf(hue, saturation, brightness)))
-    AlertDialog(
+    BackdropDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(title)) },
         text = {

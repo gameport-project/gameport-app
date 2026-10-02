@@ -144,4 +144,18 @@
     <string name="game_choose_version_waiting">En attente d\'un choix…</string>
     <string name="game_version_headset">Version VR</string>
     <string name="game_version_flat">Version sans VR</string>
+    <string name="report_open">Signaler un problème</string>
+    <string name="report_title">Signaler un problème</string>
+    <string name="report_message">Cela crée un fichier qui aide à comprendre pourquoi %1$s ne fonctionne pas. Il est enregistré dans le dossier Téléchargements et rien n\'est envoyé : il peut être joint à un ticket ou transmis aux développeurs.</string>
+    <string name="report_contents">Il contient les versions de GamePort, du jeu et de son patch.\nL\'appareil et son système.\nLes choix du joueur pour le jeu, et la façon dont il a tourné, images par seconde comprises.\nLes fichiers du jeu et tout ce que contient son APK.\nLes interfaces Steam qu\'il demande.\nLe journal du jeu, son démarrage et ses dernières lignes, et celui de GamePort.\nLa façon dont ses dernières exécutions se sont terminées, avec le rapport de plantage gardé par Android.\nCe que GamePort a fait pour lui, comme le téléchargement, le patch et l\'installation.\nLes numéros de compte, les adresses e-mail, les adresses réseau et le nom du compte sont retirés des fichiers texte.</string>
+    <string name="report_save">Enregistrer le rapport</string>
+    <string name="report_working">Préparation du rapport…</string>
+    <string name="report_saved">Enregistré dans Téléchargements : %1$s</string>
+    <string name="report_failed">Le rapport n\'a pas pu être enregistré.</string>
+    <string name="report_share">Partager le fichier</string>
+    <string name="report_ticket">Créer un ticket sur GitHub</string>
+    <string name="report_close">Fermer</string>
+    <string name="issue_problem_short">Ce jeu s\'est fermé presque tout de suite. Un rapport aide à comprendre pourquoi.</string>
+    <string name="issue_problem_crash">Ce jeu semble avoir planté. Un rapport aide à comprendre pourquoi.</string>
+    <string name="issue_problem_action">Signaler</string>
 </resources>

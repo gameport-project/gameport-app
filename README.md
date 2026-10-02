@@ -62,6 +62,15 @@ The first time a game needs a permission, GamePort explains why before asking.
 - **One game at a time per Steam account.** Steam only allows a single game to be played on an account at once, so starting a game on your headset pauses one running on your PC. You can switch off play-time counting in the settings if you prefer.
 - **You must own the game.** GamePort only handles games on your account or shared with your Steam family.
 
+## When a game does not work
+
+Open the game's page and press the bug button, or the **Report a problem** button that appears when an install fails. GamePort also points it out on a game that closed right away or crashed.
+
+- **Save the report.** It makes a zip in the Downloads folder of your device. It holds the versions, the device, the game's files, its log and GamePort's, how its last runs ended, and what GamePort did for it.
+- **Nothing is sent by GamePort.** You choose what to do with the file: attach it to a [ticket](https://github.com/gameport-project/gameport-app/issues/new?template=game-problem.md), or send it to the developers by any means.
+- **Your identity stays out.** Account numbers, e-mail addresses, network addresses and your account name are removed from the text files. The crash report Android keeps, when there is one, is a binary file and is not filtered.
+- **It cleans up after itself.** What GamePort keeps for reports is deleted after a week, and when the game is uninstalled. The zips you saved are yours and are never touched.
+
 ## Your privacy
 
 - Your sign-in stays on your device. It is never sent anywhere except to Steam.

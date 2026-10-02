@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import app.gameport.core.designsystem.BackdropDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.TextButton
@@ -51,7 +51,7 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
     val patchRemoved by viewModel.patchRemoved.collectAsStateWithLifecycle()
     var confirmingRemoval by remember { mutableStateOf(false) }
     if (confirmingRemoval) {
-        AlertDialog(
+        BackdropDialog(
             onDismissRequest = { confirmingRemoval = false },
             title = { Text(stringResource(R.string.game_settings_remove_patch)) },
             text = { Text(stringResource(R.string.game_settings_remove_patch_confirm)) },

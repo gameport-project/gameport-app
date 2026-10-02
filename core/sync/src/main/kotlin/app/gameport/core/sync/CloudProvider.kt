@@ -34,6 +34,8 @@ internal interface CloudEntryPoint {
     fun playtime(): PlaytimeTracker
 
     fun userSettings(): app.gameport.core.settings.UserSettings
+
+    fun reports(): ReportStore
 }
 
 /**
@@ -50,6 +52,8 @@ internal interface CloudEntryPoint {
  * - `ack` (local files after a download) and `commit` (after uploading) -> finish a sync
  * - `end` -> the game is done
  * - `resumed`, `alive`, `paused` -> the game is on screen, still there, gone: its playing time
+ * - `log` (its last log lines, how its last runs ended) -> kept for a problem report
+ * - `closed` -> the game's process is ending
  *
  * Files travel through `openFile`: `fetch` reads a cloud file, `push` writes a file to upload.
  */
@@ -102,6 +106,10 @@ class CloudProvider : ContentProvider() {
         "resumed" -> okAfter { entryPoint.playtime().resumed(packageName) }
         "alive" -> okAfter { entryPoint.playtime().alive(packageName) }
         "paused" -> okAfter { entryPoint.playtime().paused(packageName) }
+        // The game's process is ending (it quit by itself, or its last screen closed): how long it lasted shows a problem.
+        "closed" -> okAfter { entryPoint.reports().left(packageName) }
+        // What the game wrote to the system log lately and how it last ended, for a problem report.
+        "log" -> okAfter { entryPoint.reports().saveGameData(packageName, extras) }
         // Sent regularly by the running game so GamePort stays connected to Steam (see `ticket`).
         "warm" -> {
             runBlocking { coordinator.warmUp() }
@@ -137,6 +145,7 @@ class CloudProvider : ContentProvider() {
     private fun noteLaunch(packageName: String) {
         val appId = entryPoint.installedGames().all().entries.firstOrNull { it.value == packageName }?.key ?: return
         entryPoint.playHistory().markPlayed(appId)
+        entryPoint.reports().launched(packageName)
     }
 
     private inline fun okAfter(action: () -> Unit): Bundle {

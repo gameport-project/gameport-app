@@ -2,6 +2,9 @@
 
 package app.gameport.feature.game
 
+import app.gameport.core.model.reportable
+import android.content.Intent
+import androidx.compose.material.icons.filled.BugReport
 import app.gameport.core.designsystem.ConnectionNotice
 import app.gameport.core.model.SteamConnection
 import app.gameport.core.designsystem.installErrorText
@@ -35,7 +38,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AlertDialog
+import app.gameport.core.designsystem.BackdropDialog
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Delete
@@ -111,7 +114,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
     val openPermissions = { viewModel.appSettingsIntent()?.let { runCatching { context.startActivity(it) } }; Unit }
     val play = { viewModel.launchIntent()?.let(context::startActivity); Unit }
     if (explainingStorage) {
-        AlertDialog(
+        BackdropDialog(
             onDismissRequest = { explainingStorage = false },
             title = { Text(stringResource(R.string.game_storage_title)) },
             text = { Text(stringResource(R.string.game_storage_text)) },
@@ -131,10 +134,28 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         )
     }
     val connection by viewModel.connection.collectAsStateWithLifecycle()
+    val suspicion by viewModel.suspicion.collectAsStateWithLifecycle()
+    val reportProgress by viewModel.reportProgress.collectAsStateWithLifecycle()
+    val shownGame = (uiState as? GameUiState.Content)?.game
+    val report = ReportActions(
+        suspicion = suspicion,
+        progress = reportProgress,
+        onSave = { shownGame?.let(viewModel::onSaveReport) },
+        onTicket = { shownGame?.let { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, viewModel.ticketUri(it))) } } },
+        onShare = {
+            (reportProgress as? ReportProgress.Saved)?.let { saved ->
+                val send = Intent(Intent.ACTION_SEND).setType("application/zip").putExtra(Intent.EXTRA_STREAM, saved.uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                runCatching { context.startActivity(Intent.createChooser(send, null)) }
+            }
+        },
+        onDismissProblem = viewModel::onDismissProblem,
+        onResetProgress = viewModel::onResetReport,
+    )
     GameContent(
         uiState = uiState,
         connection = connection,
         onOpenSteamSettings = onOpenSteamSettings,
+        report = report,
         speedUnit = speedUnit,
         onOpenSettings = onOpenSettings,
         onOpenSaves = onOpenSaves,
@@ -161,6 +182,7 @@ internal fun GameContent(
     uiState: GameUiState,
     connection: SteamConnection = SteamConnection.ONLINE,
     onOpenSteamSettings: () -> Unit = {},
+    report: ReportActions = ReportActions.None,
     speedUnit: SpeedUnit,
     onOpenSettings: () -> Unit,
     onOpenSaves: () -> Unit,
@@ -212,6 +234,7 @@ internal fun GameContent(
                     playtime = uiState.playtime,
                     onOpenPermissions = onOpenPermissions,
                     onResolveConflict = onResolveConflict,
+                    report = report,
                 )
             }
             Row(
@@ -253,7 +276,10 @@ private fun GameDetails(
     onToggleFavorite: () -> Unit,
     onOpenPermissions: () -> Unit,
     onResolveConflict: () -> Unit,
+    report: ReportActions,
 ) {
+    var reporting by remember { mutableStateOf(false) }
+    if (reporting) ReportDialog(game.name, report) { reporting = false; report.onResetProgress() }
     // Owned extra content is offered when installing; what the account lacks cannot be installed.
     val ownedDlc = game.androidBuild?.dlc.orEmpty().filter { it.owned }
     var choosingDlc by remember { mutableStateOf(false) }
@@ -336,10 +362,16 @@ private fun GameDetails(
                         onUninstall = onUninstall,
                         onPlay = onPlay,
                         busy = repatch is Repatch.Running,
+                        onReport = { reporting = true },
                     )
                     if (install is InstallState.Installed) {
                         GlassIconButton(onClick = onOpenSaves, enabled = repatch !is Repatch.Running) {
                             Icon(Icons.Filled.CloudSync, contentDescription = stringResource(R.string.saves_title))
+                        }
+                    }
+                    if (install is InstallState.Installed) {
+                        GlassIconButton(onClick = { reporting = true }) {
+                            Icon(Icons.Filled.BugReport, contentDescription = stringResource(R.string.report_open))
                         }
                     }
                     if (install is InstallState.Installed && controllerProfile) {
@@ -369,6 +401,8 @@ private fun GameDetails(
                         onPermissions = onOpenPermissions,
                         onConflict = onResolveConflict,
                         onControllers = onOpenControllers,
+                        onReport = { reporting = true },
+                        onDismissProblem = report.onDismissProblem,
                     )
                 }
             }
@@ -425,6 +459,7 @@ private fun InstallActions(
     onUninstall: () -> Unit,
     onPlay: () -> Unit,
     busy: Boolean = false,
+    onReport: () -> Unit = {},
 ) {
     when (install) {
         InstallState.NotInstalled -> Button(onClick = onInstall, modifier = Modifier.widthIn(min = 240.dp)) {
@@ -459,6 +494,8 @@ private fun InstallActions(
                 Button(onClick = onInstall) { Text(stringResource(R.string.game_retry)) }
                 // Removes whatever was downloaded, so a failed attempt never has to keep gigabytes.
                 DangerButton(onClick = onDiscard) { Text(stringResource(R.string.game_discard)) }
+                // Not offered when the player can put it right at once (space, sign-in, connection): the message says what to do.
+                if (install.error.reportable) OutlinedButton(onClick = onReport) { Text(stringResource(R.string.report_open)) }
             }
         }
     }
@@ -517,7 +554,7 @@ private fun Progress(step: Step, fraction: Float?, speed: Long, speedUnit: Speed
 /** Asked when a download holds several builds and none clearly fits this device. */
 @Composable
 private fun VersionDialog(options: List<VersionOption>, onChosen: (String?) -> Unit) {
-    AlertDialog(
+    BackdropDialog(
         onDismissRequest = {},
         title = { Text(stringResource(R.string.game_choose_version_title)) },
         text = {
@@ -544,7 +581,7 @@ private fun DlcDialog(game: Game, dlc: List<DlcContent>, onDismiss: () -> Unit, 
     val build = game.androidBuild
     val download = (build?.downloadBytes ?: 0L) + dlc.filter { it.appId in selected }.sumOf { it.downloadBytes }
     val installed = (build?.installBytes ?: 0L) + dlc.filter { it.appId in selected }.sumOf { it.installBytes }
-    AlertDialog(
+    BackdropDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.game_dlc_title)) },
         text = {
@@ -599,6 +636,8 @@ private fun IssuesPanel(
     onPermissions: () -> Unit,
     onConflict: () -> Unit,
     onControllers: () -> Unit,
+    onReport: () -> Unit,
+    onDismissProblem: () -> Unit,
 ) {
     val busy = repatch is Repatch.Running
     val updateAvailable = GameIssue.UpdateAvailable in issues
@@ -633,6 +672,14 @@ private fun IssuesPanel(
                 GameIssue.PatchOutdated ->
                     // An update patches the game again, so the two are not offered together.
                     if (repatch == Repatch.None && !updateAvailable) IssueRow(stringResource(R.string.issue_patch_outdated), stringResource(R.string.issue_patch_outdated_action), onRepatch)
+                is GameIssue.ProblemSuspected ->
+                    IssueRow(
+                        stringResource(if (issue.crash) R.string.issue_problem_crash else R.string.issue_problem_short),
+                        stringResource(R.string.issue_problem_action),
+                        onReport,
+                        secondAction = stringResource(R.string.issue_dismiss),
+                        onSecondAction = onDismissProblem,
+                    )
                 GameIssue.StoragePermissionMissing ->
                     IssueRow(stringResource(R.string.issue_storage_permission), stringResource(R.string.game_storage_open), onPermissions, enabled = !busy)
                 GameIssue.SaveConflict ->

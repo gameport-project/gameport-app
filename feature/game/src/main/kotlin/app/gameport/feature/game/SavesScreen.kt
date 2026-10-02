@@ -15,7 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.AlertDialog
+import app.gameport.core.designsystem.BackdropDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -61,7 +61,7 @@ fun SavesScreen(onBack: () -> Unit, viewModel: SavesViewModel = hiltViewModel())
 
     confirming?.let { action ->
         val restore = action == Confirming.RESTORE
-        AlertDialog(
+        BackdropDialog(
             onDismissRequest = { confirming = null },
             title = { Text(stringResource(if (restore) R.string.saves_restore_title else R.string.saves_send_title)) },
             text = { Text(stringResource(if (restore) R.string.saves_restore_message else R.string.saves_send_message)) },
