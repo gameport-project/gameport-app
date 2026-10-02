@@ -26,6 +26,10 @@ GamePort is a free, open-source app that signs in to your Steam account, shows t
   <img src="docs/screenshots/downloads.png" alt="Downloads and installed games" width="49%">
 </p>
 <p align="center">
+  <img src="docs/screenshots/menu.png" alt="Staying on a cover opens its actions: play, update, patch again, settings, favorite, hide" width="49%">
+  <img src="docs/screenshots/hidden-games.png" alt="Hidden games, listed in the settings with a button to show each again" width="49%">
+</p>
+<p align="center">
   <img src="docs/screenshots/saves.png" alt="Saves: this device and Steam Cloud side by side" width="49%">
   <img src="docs/screenshots/controllers.png" alt="Controller mapping for a game" width="49%">
 </p>
