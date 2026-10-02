@@ -17,6 +17,9 @@ import kotlinx.coroutines.flow.map
 interface UpdatesSource {
     fun observe(): Flow<List<String>>
 
+    /** The ids of those games, to mark their covers. */
+    fun observeIds(): Flow<Set<Int>> = flowOf(emptySet())
+
     /** The version of GamePort itself that can be installed, if a newer one exists. */
     fun observeApp(): Flow<String?> = flowOf(null)
 
@@ -37,6 +40,8 @@ internal class InstalledGamesUpdatesSource @Inject constructor(
     override fun observeApp(): Flow<String?> = app.state.map { state ->
         (state as? AppUpdateState.Available)?.release?.version?.takeIf { app.canUpdateInPlace }
     }
+
+    override fun observeIds(): Flow<Set<Int>> = updates.updates.map { list -> list.map { it.appId }.toSet() }
 
     override fun observeConnection(): Flow<SteamConnection> = auth.connection
 

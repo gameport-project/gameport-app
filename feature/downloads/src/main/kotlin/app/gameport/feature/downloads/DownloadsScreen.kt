@@ -2,6 +2,8 @@
 
 package app.gameport.feature.downloads
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.lazy.rememberLazyListState
 import app.gameport.core.designsystem.installErrorText
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -76,8 +78,16 @@ fun DownloadsScreen(
                 Text(stringResource(R.string.downloads_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             val waiting = entries.filter { it.appId in updatable && it.state is InstallState.Installed && it.game != null }
-            LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (waiting.isNotEmpty()) {
+            // The list is ordered by what needs doing first, and the order changes once Steam has answered about
+            // updates. A list that keeps its place on the item it showed would leave the new first row above the
+            // top, so a list still near the top follows the change.
+            val listState = rememberLazyListState()
+            LaunchedEffect(entries.firstOrNull()?.appId, waiting.size > 1) {
+                if (listState.firstVisibleItemIndex <= 2) listState.scrollToItem(0)
+            }
+            LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // One game with an update has its own line and button below; the summary is only for several.
+                if (waiting.size > 1) {
                     item(key = "updates") {
                         Row(
                             Modifier.fillMaxWidth().glass(RoundedCornerShape(18.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
@@ -85,13 +95,12 @@ fun DownloadsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                if (waiting.size == 1) stringResource(R.string.downloads_update_one, waiting.first().game?.name.orEmpty())
-                                else stringResource(R.string.downloads_update_many, waiting.size),
+                                stringResource(R.string.downloads_update_many, waiting.size),
                                 modifier = Modifier.weight(1f),
                                 style = MaterialTheme.typography.titleMedium,
                             )
                             Button(onClick = { waiting.forEach(viewModel::onUpdate) }) {
-                                Text(stringResource(if (waiting.size == 1) R.string.downloads_update else R.string.downloads_update_all))
+                                Text(stringResource(R.string.downloads_update_all))
                             }
                         }
                     }

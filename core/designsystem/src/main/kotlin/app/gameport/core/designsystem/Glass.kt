@@ -14,6 +14,9 @@ import androidx.compose.ui.unit.dp
 
 // The translucent "glass" look shared by the tabs, the search field and the cards.
 val GlassFill = Color.White.copy(alpha = 0.10f)
+
+/** The blue of a demo or a playtest: not the full game. Soft and slightly see-through, like the other labels. */
+val KindBlue = Color(0xFF4FA8E8)
 val GlassBorder = Color.White.copy(alpha = 0.14f)
 
 fun Modifier.glass(shape: Shape): Modifier = this.clip(shape).background(GlassFill).border(1.dp, GlassBorder, shape)

@@ -19,7 +19,6 @@
     <string name="downloads_update">Mettre à jour</string>
     <string name="downloads_update_all">Tout mettre à jour</string>
     <string name="downloads_update_available">Mise à jour disponible</string>
-    <string name="downloads_update_one">%1$s a une nouvelle version</string>
     <string name="downloads_update_many">%1$d jeux ont une mise à jour</string>
     <string name="downloads_verifying">Vérification des fichiers déjà téléchargés… %1$d %%</string>
     <string name="downloads_pause">Pause</string>

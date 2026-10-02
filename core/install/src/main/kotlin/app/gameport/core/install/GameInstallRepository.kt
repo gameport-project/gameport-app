@@ -221,6 +221,9 @@ class GameInstallRepository @Inject constructor(
         gate.setGamesBusy(_isBusy.value)
     }
 
+    /** When the game was last installed or updated on this device, in milliseconds, or null if it is not installed. */
+    fun installedAt(appId: Int): Long? = installed.all()[appId]?.let(packages::lastUpdateTimeOf)
+
     /** The Android package of the game if it is installed on this device. */
     fun installedPackage(appId: Int): String? = installed.all()[appId]?.takeIf(packages::isInstalled)
 

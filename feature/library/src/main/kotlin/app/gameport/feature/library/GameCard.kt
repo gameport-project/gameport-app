@@ -1,5 +1,7 @@
 package app.gameport.feature.library
 
+import androidx.compose.foundation.border
+import app.gameport.core.designsystem.KindBlue
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
@@ -53,6 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.gameport.core.designsystem.AttentionBadge
+import app.gameport.core.designsystem.UpdateBadge
 import app.gameport.core.designsystem.GameImage
 import app.gameport.core.designsystem.glass
 import app.gameport.core.model.AppKind
@@ -75,6 +78,7 @@ internal fun GameCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     needsAttention: Boolean = false,
+    hasUpdate: Boolean = false,
     showTitle: Boolean = true,
     favorite: Boolean = false,
     hover: HoverAnimation = HoverAnimation.FULL,
@@ -159,7 +163,13 @@ internal fun GameCard(
                 Icon(Icons.Filled.Favorite, contentDescription = null, tint = FavoriteRed, modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).size(18.dp))
             }
             Badges(game, Modifier.align(Alignment.TopEnd).padding(8.dp))
-            if (needsAttention) AttentionBadge(Modifier.align(Alignment.TopStart).padding(8.dp))
+            // Small, so they do not hide the artwork: orange for what needs attention, green for an update.
+            if (needsAttention || hasUpdate) {
+                Row(Modifier.align(Alignment.TopStart).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (needsAttention) AttentionBadge(size = 18.dp)
+                    if (hasUpdate) UpdateBadge(size = 18.dp)
+                }
+            }
         }
     }
 }
@@ -200,27 +210,38 @@ internal fun PlayPill(name: String, size: PillSize, canPlay: Boolean, onPlay: ()
 
 @Composable
 internal fun Badges(game: Game, modifier: Modifier = Modifier) {
-    val labels = listOfNotNull(
-        when {
-            game.androidBuild?.isVr == true -> stringResource(R.string.library_kind_vr)
-            game.ownership == Ownership.FAMILY_SHARED -> stringResource(R.string.library_family_shared)
-            else -> null
-        },
-        // A demo or a beta says so: it is not the full game.
-        when (game.kind) {
-            AppKind.DEMO -> stringResource(R.string.library_label_demo)
-            AppKind.BETA -> stringResource(R.string.library_label_beta)
-            AppKind.GAME -> null
-        },
-    )
-    if (labels.isEmpty()) return
+    val kind = when {
+        game.androidBuild?.isVr == true -> stringResource(R.string.library_kind_vr)
+        game.ownership == Ownership.FAMILY_SHARED -> stringResource(R.string.library_family_shared)
+        else -> null
+    }
+    // A demo or a beta says so, in blue: it is not the full game.
+    val notFull = when (game.kind) {
+        AppKind.DEMO -> stringResource(R.string.library_label_demo)
+        AppKind.BETA -> stringResource(R.string.library_label_beta)
+        AppKind.GAME -> null
+    }
+    if (kind == null && notFull == null) return
     Column(modifier, horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        labels.forEach { label ->
+        kind?.let {
             Text(
-                text = label,
+                text = it,
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White,
                 modifier = Modifier.glass(RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 2.dp),
+            )
+        }
+        notFull?.let {
+            val shape = RoundedCornerShape(50)
+            Text(
+                text = it,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFFD6ECFB),
+                modifier = Modifier
+                    .clip(shape)
+                    .background(KindBlue.copy(alpha = 0.30f))
+                    .border(1.dp, KindBlue.copy(alpha = 0.60f), shape)
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
             )
         }
     }

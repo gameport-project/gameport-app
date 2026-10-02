@@ -10,8 +10,8 @@
     <string name="library_scanning">Looking for Android games…</string>
     <string name="library_empty">No Android games found in the library.</string>
     <string name="library_no_match">No game matches the search or the filters.</string>
-    <string name="library_update_one">%1$s has a new version</string>
-    <string name="library_update_many">%1$d games have an update</string>
+    <string name="library_game_update_one">Update: %1$s</string>
+    <string name="library_game_update_many">%1$d updates</string>
     <string name="library_row_continue">Continue</string>
     <string name="library_row_favorites">Favorites</string>
     <string name="library_row_all">All games</string>

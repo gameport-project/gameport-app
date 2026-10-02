@@ -8,8 +8,8 @@
     <string name="library_scanning">Recherche des jeux Android…</string>
     <string name="library_empty">Aucun jeu Android trouvé dans la bibliothèque.</string>
     <string name="library_no_match">Aucun jeu ne correspond à la recherche ou aux filtres.</string>
-    <string name="library_update_one">%1$s a une nouvelle version</string>
-    <string name="library_update_many">%1$d jeux ont une mise à jour</string>
+    <string name="library_game_update_one">Mise à jour : %1$s</string>
+    <string name="library_game_update_many">%1$d mises à jour</string>
     <string name="library_row_continue">Continuer</string>
     <string name="library_row_favorites">Favoris</string>
     <string name="library_row_all">Tous les jeux</string>

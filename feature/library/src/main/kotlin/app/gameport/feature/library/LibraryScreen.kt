@@ -1,5 +1,7 @@
 package app.gameport.feature.library
 
+import androidx.compose.material.icons.rounded.Download
+import app.gameport.core.designsystem.NoticeTone
 import app.gameport.core.designsystem.StatusNoticeWidth
 import app.gameport.core.designsystem.StatusNotice
 import app.gameport.core.designsystem.ConnectionNotice
@@ -324,6 +326,7 @@ private fun Rail(
                         game = game,
                         onClick = { onGameClick(game.appId) },
                         needsAttention = game.appId in state.attention,
+                        hasUpdate = game.appId in state.updatable,
                         showTitle = display.coverTitles,
                         favorite = game.appId in state.favoriteIds,
                         hover = display.hoverAnimation,
@@ -455,7 +458,7 @@ private fun Header(
                 Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.library_settings))
             }
         }
-        if (state.showTabs || state.appUpdate != null || state.connection != SteamConnection.ONLINE) {
+        if (state.showTabs || state.appUpdate != null || state.updates.isNotEmpty() || state.connection != SteamConnection.ONLINE) {
             val tabs: @Composable () -> Unit = {
                 PillTabs(
                     labels = listOf(stringResource(R.string.library_tab_vr), stringResource(R.string.library_tab_flat)),
@@ -466,33 +469,41 @@ private fun Header(
             }
             val offline: @Composable () -> Unit = { ConnectionNotice(state.connection, onClick = onOpenSteamSettings) }
             val update: @Composable () -> Unit = {
-                state.appUpdate?.let { StatusNotice(stringResource(R.string.library_app_update, it), onClick = onOpenSettings) }
+                state.appUpdate?.let { StatusNotice(stringResource(R.string.library_app_update, it), icon = Icons.Rounded.Download, onClick = onOpenSettings, tone = NoticeTone.UPDATE) }
+            }
+            // Installed games with a newer build, in green; a name too long for the notice is cut.
+            val gameUpdates: @Composable () -> Unit = {
+                if (state.updates.isNotEmpty()) {
+                    StatusNotice(
+                        label = if (state.updates.size == 1) stringResource(R.string.library_game_update_one, state.updates.first())
+                        else stringResource(R.string.library_game_update_many, state.updates.size),
+                        icon = Icons.Rounded.Download,
+                        onClick = onOpenDownloads,
+                        tone = NoticeTone.UPDATE,
+                    )
+                }
             }
             androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
-                // Wide enough, the tabs stay centred, the offline notice sits at the left and the update one at the
-                // right; otherwise they go below the tabs.
+                // Wide enough, the tabs stay centred, the offline notice sits at the left and the updates at the
+                // right (the app's above the games'); otherwise everything goes below the tabs.
                 if (maxWidth >= StatusNoticeWidth * 3 + 64.dp) {
-                    Box(Modifier.fillMaxWidth().height(44.dp)) {
-                        Box(Modifier.align(Alignment.CenterStart)) { offline() }
-                        if (state.showTabs) Box(Modifier.align(Alignment.Center)) { tabs() }
-                        Box(Modifier.align(Alignment.CenterEnd)) { update() }
+                    Box(Modifier.fillMaxWidth()) {
+                        Box(Modifier.align(Alignment.TopStart)) { offline() }
+                        if (state.showTabs) Box(Modifier.align(Alignment.TopCenter)) { tabs() }
+                        Column(Modifier.align(Alignment.TopEnd), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.End) {
+                            update()
+                            gameUpdates()
+                        }
                     }
                 } else {
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         if (state.showTabs) tabs()
                         offline()
                         update()
+                        gameUpdates()
                     }
                 }
             }
-        }
-        if (state.updates.isNotEmpty()) {
-            GlassChip(
-                label = if (state.updates.size == 1) stringResource(R.string.library_update_one, state.updates.first())
-                else stringResource(R.string.library_update_many, state.updates.size),
-                onClick = onOpenDownloads,
-                accent = Color(0xFF66BB6A),
-            )
         }
     }
 }

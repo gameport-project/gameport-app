@@ -31,15 +31,25 @@ import app.gameport.core.model.SteamConnection
 /** The width of a status notice, which is also the width of the VR / flat tabs it sits beside. */
 val StatusNoticeWidth = 260.dp
 
-/** A notice in a warm colour that catches the eye: as tall and wide as the tabs. */
+/** The colour of a notice: a warm one that catches the eye, or a green one for an update. */
+enum class NoticeTone(val accent: Color, val text: Color) {
+    ATTENTION(Color(0xFFFFA83D), Color(0xFFFFD9A8)),
+    UPDATE(Color(0xFF66BB6A), Color(0xFFD3EDD5)),
+}
+
+/**
+ * A notice as tall and wide as the tabs. A label too long for the room is cut with an ellipsis, so the name of a
+ * game never pushes the notice wider.
+ */
 @Composable
 fun StatusNotice(
     label: String,
     modifier: Modifier = Modifier,
     icon: ImageVector = Icons.Rounded.ErrorOutline,
     onClick: (() -> Unit)? = null,
+    tone: NoticeTone = NoticeTone.ATTENTION,
 ) {
-    val warm = Color(0xFFFFA83D)
+    val warm = tone.accent
     val shape = RoundedCornerShape(50)
     Row(
         modifier
@@ -54,7 +64,7 @@ fun StatusNotice(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, contentDescription = null, tint = warm, modifier = Modifier.size(20.dp))
-        Text(label, color = Color(0xFFFFD9A8), style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, color = tone.text, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
     }
 }
 

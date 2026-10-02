@@ -2,6 +2,7 @@
 
 package app.gameport.feature.game
 
+import app.gameport.core.designsystem.KindBlue
 import app.gameport.core.model.reportable
 import android.content.Intent
 import androidx.compose.material.icons.filled.BugReport
@@ -87,6 +88,7 @@ import app.gameport.core.designsystem.DangerButton
 import app.gameport.core.designsystem.DangerTextButton
 import app.gameport.core.designsystem.DangerTrashButton
 import app.gameport.core.designsystem.AttentionBadge
+import app.gameport.core.designsystem.UpdateBadge
 import app.gameport.core.designsystem.GameImage
 import app.gameport.core.designsystem.GlassButton
 import app.gameport.core.designsystem.glass
@@ -330,8 +332,16 @@ private fun GameDetails(
                             .shadow(16.dp, RoundedCornerShape(14.dp))
                             .clip(RoundedCornerShape(14.dp)),
                     )
-                    if (issues.any { it !is GameIssue.ControllerMappingAvailable } && install is InstallState.Installed) {
-                        AttentionBadge(Modifier.align(Alignment.TopStart).padding(8.dp))
+                    if (install is InstallState.Installed) {
+                        // Orange for what needs attention, green when the only news is an update.
+                        val attention = issues.any { it !is GameIssue.ControllerMappingAvailable && it !is GameIssue.UpdateAvailable }
+                        val update = GameIssue.UpdateAvailable in issues
+                        if (attention || update) {
+                            Row(Modifier.align(Alignment.TopStart).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                if (attention) AttentionBadge(size = 22.dp)
+                                if (update) UpdateBadge(size = 22.dp)
+                            }
+                        }
                     }
                 }
             }
@@ -346,8 +356,8 @@ private fun GameDetails(
                         stringResource(if (game.ownership == Ownership.OWNED) R.string.game_owned else R.string.game_family_shared),
                     )
                     when (game.kind) {
-                        AppKind.DEMO -> GlassChip(stringResource(R.string.game_kind_demo))
-                        AppKind.BETA -> GlassChip(stringResource(R.string.game_kind_beta))
+                        AppKind.DEMO -> GlassChip(stringResource(R.string.game_kind_demo), accent = KindBlue)
+                        AppKind.BETA -> GlassChip(stringResource(R.string.game_kind_beta), accent = KindBlue)
                         AppKind.GAME -> Unit
                     }
                 }
@@ -670,7 +680,7 @@ private fun IssuesPanel(
         issues.forEach { issue ->
             when (issue) {
                 GameIssue.UpdateAvailable ->
-                    if (repatch == Repatch.None) IssueRow(stringResource(R.string.issue_update_available), stringResource(R.string.issue_update_action), onUpdate)
+                    if (repatch == Repatch.None) IssueRow(stringResource(R.string.issue_update_available), stringResource(R.string.issue_update_action), onUpdate, update = true)
                 GameIssue.PatchOutdated ->
                     // An update patches the game again, so the two are not offered together.
                     if (repatch == Repatch.None && !updateAvailable) IssueRow(stringResource(R.string.issue_patch_outdated), stringResource(R.string.issue_patch_outdated_action), onRepatch)
@@ -705,12 +715,18 @@ private fun IssueRow(
     progressFraction: Float? = null,
     /** A notice rather than a problem: a calm icon instead of the orange warning. */
     info: Boolean = false,
+    /** A new version: a green arrow instead of the orange warning. */
+    update: Boolean = false,
     secondAction: String? = null,
     onSecondAction: () -> Unit = {},
 ) {
     Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(16.dp)).padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (info) Icon(Icons.Filled.SportsEsports, contentDescription = null, tint = Color(0xFF90CAF9)) else AttentionBadge()
+            when {
+                info -> Icon(Icons.Filled.SportsEsports, contentDescription = null, tint = Color(0xFF90CAF9))
+                update -> UpdateBadge()
+                else -> AttentionBadge()
+            }
             Text(message, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
             if (secondAction != null) GlassButton(onClick = onSecondAction) { Text(secondAction) }
             if (action != null) GlassButton(onClick = onAction, enabled = enabled) { Text(action) }

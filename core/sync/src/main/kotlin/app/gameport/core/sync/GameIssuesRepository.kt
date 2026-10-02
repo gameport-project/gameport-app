@@ -49,7 +49,7 @@ class GameIssuesRepository @Inject constructor(
             if (mappingNoticeSource != null) listOf(GameIssue.ControllerMappingAvailable(mappingNoticeSource)) else emptyList()
     }
 
-    /** Ids of the installed games with at least one issue. */
+    /** Ids of the installed games with at least one issue that needs attention. A newer version is good news and is not one. */
     fun observeAttention(): Flow<Set<Int>> = combine(
         installer.observeOutdatedPatches(),
         coordinator.conflicts,
@@ -58,7 +58,7 @@ class GameIssuesRepository @Inject constructor(
         reports.suspected,
     ) { outdated, conflicts, statuses, updatable, suspected ->
         installed.all().keys.filter { appId ->
-            issuesFor(appId, appId in outdated, conflicts.keys, statuses, appId in updatable, suspected).isNotEmpty()
+            issuesFor(appId, appId in outdated, conflicts.keys, statuses, updateAvailable = false, suspected = suspected).isNotEmpty()
         }.toSet()
     }
 

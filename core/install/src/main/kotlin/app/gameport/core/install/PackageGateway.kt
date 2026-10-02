@@ -57,6 +57,9 @@ class PackageGateway @Inject constructor(
     fun installTimeOf(packageName: String): Long? = runCatching { packageManager.getPackageInfo(packageName, 0).firstInstallTime }.getOrNull()
 
     /** The version code of the installed package, or null when it is not installed. */
+    /** When the package was last installed or updated (a patch counts), in milliseconds, or null if it is not installed. */
+    fun lastUpdateTimeOf(packageName: String): Long? = runCatching { packageManager.getPackageInfo(packageName, 0).lastUpdateTime }.getOrNull()
+
     fun versionCodeOf(packageName: String): Long? = runCatching { packageManager.getPackageInfo(packageName, 0).longVersionCode }.getOrNull()
 
     fun isInstalled(packageName: String): Boolean = runCatching {

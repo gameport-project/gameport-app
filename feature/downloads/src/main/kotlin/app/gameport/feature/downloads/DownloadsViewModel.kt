@@ -19,7 +19,17 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** One line of the page: a game and where its install stands. [game] is null if the library lacks it. */
-data class DownloadEntry(val appId: Int, val game: Game?, val state: InstallState)
+data class DownloadEntry(val appId: Int, val game: Game?, val state: InstallState, val installedAt: Long? = null)
+
+/** Work in progress first, then the games with an update, then what needs attention, then what is installed; the latest installed or updated first in each. */
+internal fun downloadsOrder(withUpdate: Set<Int>): Comparator<DownloadEntry> = compareBy<DownloadEntry> {
+    when (it.state) {
+        is InstallState.Downloading, InstallState.Patching, InstallState.Installing, InstallState.Queued, is InstallState.ChoosingVersion -> 0
+        is InstallState.Installed -> if (it.appId in withUpdate) 1 else 3
+        is InstallState.Interrupted, is InstallState.Failed -> 2
+        else -> 3
+    }
+}.thenByDescending { it.installedAt ?: 0L }.thenBy { it.game?.name?.lowercase() ?: "~" }
 
 @HiltViewModel
 class DownloadsViewModel @Inject constructor(
@@ -30,15 +40,15 @@ class DownloadsViewModel @Inject constructor(
 ) : ViewModel() {
     val speedUnit: StateFlow<SpeedUnit> = settings.speedUnit
 
-    val entries: StateFlow<List<DownloadEntry>> = combine(library.observeLibrary(), installer.observeAll()) { lib, states ->
-        val games = lib.games.associateBy { it.appId }
-        states.map { (appId, state) -> DownloadEntry(appId, games[appId], state) }.sortedWith(ORDER)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
-
     /** Installed games Steam has a newer build for. */
     val updatable: StateFlow<Set<Int>> = updatesRepository.updates
         .map { list -> list.map { it.appId }.toSet() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptySet())
+
+    val entries: StateFlow<List<DownloadEntry>> = combine(library.observeLibrary(), installer.observeAll(), updatable) { lib, states, withUpdate ->
+        val games = lib.games.associateBy { it.appId }
+        states.map { (appId, state) -> DownloadEntry(appId, games[appId], state, installer.installedAt(appId)) }.sortedWith(downloadsOrder(withUpdate))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     init {
         // The page that lists updates asks Steam again when it opens.
@@ -65,14 +75,5 @@ class DownloadsViewModel @Inject constructor(
 
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
-
-        /** Work in progress first, then what needs attention, then what is installed. */
-        val ORDER = compareBy<DownloadEntry> {
-            when (it.state) {
-                is InstallState.Downloading, InstallState.Patching, InstallState.Installing, InstallState.Queued, is InstallState.ChoosingVersion -> 0
-                is InstallState.Interrupted, is InstallState.Failed -> 1
-                else -> 2
-            }
-        }.thenBy { it.game?.name?.lowercase() ?: "~" }
     }
 }
