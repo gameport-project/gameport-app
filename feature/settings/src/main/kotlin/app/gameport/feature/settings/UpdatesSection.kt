@@ -32,7 +32,9 @@ import androidx.compose.ui.unit.dp
 import app.gameport.core.install.UpdateGate
 import app.gameport.core.model.AppUpdateFailure
 import app.gameport.core.model.AppUpdateState
+import app.gameport.core.model.NoteBlock
 import app.gameport.core.model.ReleaseNotes
+import app.gameport.core.designsystem.NoteImage
 
 /** The installed version, the state of the search for a newer one, and the switch for the automatic search. */
 @Composable
@@ -83,10 +85,15 @@ internal fun UpdatesSection(
         is AppUpdateState.Failed -> state.release
         else -> null
     }
-    release?.notes?.let { ReleaseNotes.whatsNew(it, french) }?.takeIf { it.isNotEmpty() }?.let { notes ->
-        Column(Modifier.widthIn(max = 720.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    release?.notes?.let { ReleaseNotes.whatsNewBlocks(it, french, "https://raw.githubusercontent.com/gameport-project/gameport-app/${release.tag}") }?.takeIf { it.isNotEmpty() }?.let { blocks ->
+        Column(Modifier.widthIn(max = 720.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.settings_updates_whats_new), style = MaterialTheme.typography.titleMedium)
-            Text(notes, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            blocks.forEach { block ->
+                when (block) {
+                    is NoteBlock.Line -> Text(block.text, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    is NoteBlock.Image -> NoteImage(block.url, block.description)
+                }
+            }
         }
     }
 

@@ -56,4 +56,35 @@ class AppUpdateTest {
     fun `a file without a list gives nothing`() {
         assertNull(ReleaseNotes.whatsNew("just words", french = false))
     }
+
+    @Test
+    fun `release notes give their lines and the project images in order`() {
+        val notes = """
+            ## GamePort 1.0.0
+
+            ### What's new in this version
+            - **One.** First.
+
+            <img src="../screenshots/menu.png" alt="A menu" width="360">
+
+            - **Two.** Second.
+            ![Elsewhere](https://example.com/x.png)
+            ![Plain](../screenshots/plain.png)
+
+            ---
+
+            ### Install
+            - not shown
+        """.trimIndent()
+        val blocks = ReleaseNotes.whatsNewBlocks(notes, french = false, imageBase = "https://raw.githubusercontent.com/gameport-project/gameport-app/v1.0.0")
+        assertEquals(
+            listOf(
+                NoteBlock.Line("• One. First."),
+                NoteBlock.Image("https://raw.githubusercontent.com/gameport-project/gameport-app/v1.0.0/docs/screenshots/menu.png", "A menu"),
+                NoteBlock.Line("• Two. Second."),
+                NoteBlock.Image("https://raw.githubusercontent.com/gameport-project/gameport-app/v1.0.0/docs/screenshots/plain.png", "Plain"),
+            ),
+            blocks,
+        )
+    }
 }

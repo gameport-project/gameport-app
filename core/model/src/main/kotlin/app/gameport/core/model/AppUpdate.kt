@@ -62,4 +62,55 @@ object ReleaseNotes {
             .joinToString("\n") { "• " + it.trimStart().removePrefix("- ").replace("**", "") }
             .ifBlank { null }
     }
+
+    /**
+     * The same list as [whatsNew], cut into the pieces to show: a line of text per bullet and, where the notes have a line
+     * `![description](address)` of their own, an image. Only images served by this project's own GitHub address are kept.
+     */
+    fun whatsNewBlocks(text: String, french: Boolean, imageBase: String = ""): List<NoteBlock> {
+        val halves = text.split(Regex("(?m)^## GamePort")).drop(1)
+        val half = (if (french) halves.getOrNull(1) else null) ?: halves.firstOrNull() ?: return emptyList()
+        val lines = half.lines()
+        val start = lines.indexOfFirst { it.startsWith("### ") }
+        if (start < 0) return emptyList()
+        return lines.drop(start + 1)
+            .takeWhile { !it.startsWith("#") && !it.startsWith("---") }
+            .mapNotNull { line ->
+                val trimmed = line.trim()
+                val image = IMAGE.matchEntire(trimmed)?.let { it.groupValues[1] to it.groupValues[2] } ?: htmlImage(trimmed)
+                when {
+                    image != null -> resolveImage(image.second, imageBase)?.let { NoteBlock.Image(it, image.first) }
+                    trimmed.startsWith("- ") -> NoteBlock.Line("• " + trimmed.removePrefix("- ").replace("**", ""))
+                    else -> null
+                }
+            }
+    }
+
+    /**
+     * The notes point to their pictures as `../screenshots/name.png`, which a preview of the file shows as it is. In the app
+     * that path is read from [imageBase], the project's address for the release's tag. A full address is kept only when it is the project's own.
+     */
+    private fun resolveImage(address: String, imageBase: String): String? = when {
+        address.startsWith(RELATIVE_IMAGES) && imageBase.isNotBlank() -> imageBase.trimEnd('/') + "/docs/screenshots/" + address.removePrefix(RELATIVE_IMAGES)
+        address.startsWith(TRUSTED_IMAGES) -> address
+        else -> null
+    }
+
+    /** A picture written as `<img src="..." alt="..." width="...">`, which lets a preview of the file show it smaller. */
+    private fun htmlImage(line: String): Pair<String, String>? {
+        if (!line.startsWith("<img ")) return null
+        val src = Regex("""src="([^"]+)"""").find(line)?.groupValues?.get(1) ?: return null
+        return (Regex("""alt="([^"]*)"""").find(line)?.groupValues?.get(1) ?: "") to src
+    }
+
+    private const val RELATIVE_IMAGES = "../screenshots/"
+    private val IMAGE = Regex("""!\[(.*)]\((\S+)\)""")
+    private const val TRUSTED_IMAGES = "https://raw.githubusercontent.com/gameport-project/"
+}
+
+/** A piece of the release notes shown in the app. */
+sealed interface NoteBlock {
+    data class Line(val text: String) : NoteBlock
+
+    data class Image(val url: String, val description: String) : NoteBlock
 }
