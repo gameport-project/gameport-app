@@ -362,7 +362,7 @@ class GameInstallRepository @Inject constructor(
 
     /** The intent that starts the installed game, or null when it is not installed. */
     /** [isVr] false starts a flat game as a normal window, without the immersive categories of a headset. */
-    fun launchIntent(appId: Int, isVr: Boolean? = null) = installed.all()[appId]?.let { packages.launchIntent(it, immersive = isVr != false) }
+    fun launchIntent(appId: Int, isVr: Boolean? = null) = installed.all()[appId]?.also(::alignObbVersion)?.let { packages.launchIntent(it, immersive = isVr != false) }
         // The patched game reads this mark to know GamePort started it, so it can open GamePort again when it closes.
         ?.also { it.putExtra("app.gameport.launched", true); playHistory.markPlayed(appId) }
 
@@ -463,6 +463,26 @@ class GameInstallRepository @Inject constructor(
         runCatching {
             val target = File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName").apply { mkdirs() }
             obbs.forEach { it.copyTo(File(target, it.name), overwrite = true) }
+        }
+        alignObbVersion(packageName)
+    }
+
+    /**
+     * An expansion file is named after the version code of the APK it belongs to (main.<code>.<package>.obb), and
+     * the game looks for exactly that name. Patching raises the version code, so the files are renamed to follow it;
+     * otherwise the game starts its expansion downloader and never gets going. Best effort, like placing them.
+     */
+    private fun alignObbVersion(packageName: String) {
+        runCatching {
+            val code = packages.versionCodeOf(packageName) ?: return
+            val directory = File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName")
+            val pattern = Regex("^(main|patch)\\.(\\d+)\\.${Regex.escape(packageName)}\\.obb$")
+            directory.listFiles()?.forEach { file ->
+                val match = pattern.matchEntire(file.name) ?: return@forEach
+                if (match.groupValues[2] == code.toString()) return@forEach
+                val renamed = File(directory, "${match.groupValues[1]}.$code.$packageName.obb")
+                if (!renamed.exists()) file.renameTo(renamed)
+            }
         }
     }
 
