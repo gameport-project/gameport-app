@@ -63,21 +63,41 @@ data class AndroidBuild(
 /** What kind of Steam app it is: a full game, a demo, or a beta (a playtest or a beta app of its own). */
 enum class AppKind { GAME, DEMO, BETA }
 
+/**
+ * The artwork file names Steam publishes for an app, relative to its folder on the CDN (`<hash>/library_capsule.jpg`).
+ * Recent apps, demos and playtests among them, only have their artwork under such a hashed name.
+ */
+data class Artwork(val capsule: String? = null, val hero: String? = null, val header: String? = null)
+
 data class Game(
     val appId: Int,
     val name: String,
     val ownership: Ownership,
     val androidBuild: AndroidBuild?,
     val kind: AppKind = AppKind.GAME,
+    val artwork: Artwork = Artwork(),
+    /** For a demo or a playtest, the full game: its artwork stands in when the app has none of its own. */
+    val parentAppId: Int? = null,
 ) {
     /** Portrait capsule, used in grids. */
-    val capsuleUrl: String get() = SteamImages.asset(appId, "library_600x900.jpg")
+    val capsuleUrl: String get() = artwork.capsule?.let { SteamImages.asset(appId, it) } ?: SteamImages.asset(appId, "library_600x900.jpg")
 
     /** Wide hero artwork, used in the carousel and on the game page. */
-    val heroUrl: String get() = SteamImages.asset(appId, "library_hero.jpg")
+    val heroUrl: String get() = artwork.hero?.let { SteamImages.asset(appId, it) } ?: SteamImages.asset(appId, "library_hero.jpg")
 
     /** Landscape header, a fallback when the other artwork is missing. */
-    val headerUrl: String get() = SteamImages.asset(appId, "header.jpg")
+    val headerUrl: String get() = artwork.header?.let { SteamImages.asset(appId, it) } ?: SteamImages.asset(appId, "header.jpg")
+
+    /** What to try after [capsuleUrl], in order: the old file name, the header, then the full game's artwork. */
+    val capsuleFallbacks: List<String>
+        get() = listOf(SteamImages.asset(appId, "library_600x900.jpg"), headerUrl, SteamImages.asset(appId, "header.jpg")) + parentArtwork("library_600x900.jpg")
+
+    /** What to try after [heroUrl], in order. */
+    val heroFallbacks: List<String>
+        get() = listOf(SteamImages.asset(appId, "library_hero.jpg"), headerUrl, SteamImages.asset(appId, "header.jpg")) + parentArtwork("library_hero.jpg")
+
+    private fun parentArtwork(file: String): List<String> =
+        parentAppId?.let { listOf(SteamImages.asset(it, file), SteamImages.asset(it, "header.jpg")) }.orEmpty()
 }
 
 /** Public artwork served by Steam's CDN. */

@@ -143,7 +143,7 @@ internal fun GameCard(
                 .clip(RoundedCornerShape(COVER_CORNER))
                 .clickable(onClick = onClick),
         ) {
-            GameImage(url = game.capsuleUrl, fallbackUrl = game.headerUrl, contentDescription = null, modifier = Modifier.fillMaxSize())
+            GameImage(url = game.capsuleUrl, fallbackUrl = game.capsuleFallbacks.firstOrNull(), moreFallbacks = game.capsuleFallbacks.drop(1), contentDescription = null, modifier = Modifier.fillMaxSize())
             if (titleOnCover) {
                 Box(Modifier.matchParentSizeBottomFade())
                 Text(

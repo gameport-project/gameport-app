@@ -253,7 +253,7 @@ private fun Backdrop(game: Game?, strength: Int) {
     val blur = (((50 - strength).coerceAtLeast(0)) * 0.4f).dp
     Crossfade(targetState = game, label = "backdrop", modifier = Modifier.fillMaxSize()) { shown ->
         if (shown != null) {
-            GameImage(url = shown.heroUrl, fallbackUrl = shown.headerUrl, contentDescription = null, modifier = Modifier.fillMaxSize().blur(blur))
+            GameImage(url = shown.heroUrl, fallbackUrl = shown.heroFallbacks.firstOrNull(), moreFallbacks = shown.heroFallbacks.drop(1), contentDescription = null, modifier = Modifier.fillMaxSize().blur(blur))
         }
     }
     fun shade(alpha: Float) = Color(0xFF101418).copy(alpha = (alpha * dim).coerceIn(0f, 1f))

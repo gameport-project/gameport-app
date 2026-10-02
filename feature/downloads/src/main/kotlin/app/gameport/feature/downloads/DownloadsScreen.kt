@@ -134,7 +134,7 @@ private fun EntryRow(
         val compact = maxWidth < COMPACT_WIDTH
         val cover: @Composable () -> Unit = {
             Box(Modifier.width(54.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(10.dp))) {
-                entry.game?.let { GameImage(it.capsuleUrl, null, Modifier.fillMaxSize(), fallbackUrl = it.headerUrl) }
+                entry.game?.let { GameImage(it.capsuleUrl, null, Modifier.fillMaxSize(), fallbackUrl = it.capsuleFallbacks.firstOrNull(), moreFallbacks = it.capsuleFallbacks.drop(1)) }
             }
         }
         val info: @Composable ColumnScope.() -> Unit = {

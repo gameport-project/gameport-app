@@ -34,6 +34,12 @@ data class CachedGame(
     val saveRules: List<CachedSaveRule> = emptyList(),
     /** `game`, `demo` or `beta`: the app type Steam gives it. */
     val kind: String = "game",
+    /** The artwork file names Steam publishes for the app (`<hash>/library_capsule.jpg`); null when it publishes none. */
+    val capsule: String? = null,
+    val hero: String? = null,
+    val header: String? = null,
+    /** The full game a demo or playtest belongs to. */
+    val parent: Int? = null,
 )
 
 /** What a previous scan learned, so the next launch only asks Steam about what is new. */
@@ -59,8 +65,8 @@ interface LibraryCacheStore {
     fun clear()
 }
 
-/** Version 4 adds the save rules used for the cloud sync, version 6 the build id of each depot. */
-const val CACHE_VERSION = 7
+/** Version 4 adds the save rules used for the cloud sync, version 6 the build id of each depot, version 8 the artwork names and the parent app. */
+const val CACHE_VERSION = 8
 
 @Singleton
 class FileLibraryCacheStore @Inject constructor(

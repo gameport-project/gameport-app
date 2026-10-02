@@ -1,5 +1,6 @@
 package app.gameport.core.steam.session
 
+import app.gameport.core.model.Artwork
 import kotlinx.coroutines.flow.flow
 import android.util.Log
 import app.gameport.core.model.AndroidBuild
@@ -157,6 +158,8 @@ internal fun libraryOf(shown: Collection<CachedGame>, owned: Set<Int>, visible: 
                 "beta" -> AppKind.BETA
                 else -> AppKind.GAME
             },
+            artwork = Artwork(game.capsule, game.hero, game.header),
+            parentAppId = game.parent,
             androidBuild = AndroidBuild(
                 packageName = null,
                 isVr = game.isVr,
@@ -207,6 +210,10 @@ private fun KeyValue.toAndroidGame(appId: Int): CachedGame? {
         depots = depots,
         saveRules = SaveRulesParser.parse(this["ufs"]),
         kind = kind,
+        capsule = common["library_assets_full"]["library_capsule"]["image"]["english"].value?.takeIf { it.isNotBlank() },
+        hero = common["library_assets_full"]["library_hero"]["image"]["english"].value?.takeIf { it.isNotBlank() },
+        header = (common["header_image"]["english"].value ?: common["library_assets_full"]["library_header"]["image"]["english"].value)?.takeIf { it.isNotBlank() },
+        parent = if (kind != "game") common["parent"].asInteger(0).takeIf { it > 0 } else null,
     )
 }
 

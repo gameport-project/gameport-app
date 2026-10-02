@@ -31,10 +31,14 @@ fun GameImage(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     fallbackUrl: String? = null,
+    /** More to try, in order, after [fallbackUrl]. */
+    moreFallbacks: List<String> = emptyList(),
     contentScale: ContentScale = ContentScale.Crop,
 ) {
-    var current by remember(url) { mutableStateOf(url) }
-    var failed by remember(url) { mutableStateOf(false) }
+    val candidates = remember(url, fallbackUrl, moreFallbacks) { listOfNotNull(url, fallbackUrl).plus(moreFallbacks).distinct() }
+    var index by remember(candidates) { mutableStateOf(0) }
+    val current = candidates[index]
+    var failed by remember(candidates) { mutableStateOf(false) }
     Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
         if (failed) {
             Placeholder()
@@ -44,7 +48,7 @@ fun GameImage(
                 contentDescription = contentDescription,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = contentScale,
-                onError = { if (fallbackUrl != null && current != fallbackUrl) current = fallbackUrl else failed = true },
+                onError = { if (index < candidates.lastIndex) index++ else failed = true },
             )
         }
     }

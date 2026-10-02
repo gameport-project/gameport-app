@@ -308,7 +308,8 @@ private fun GameDetails(
         ) {
             GameImage(
                 url = game.heroUrl,
-                fallbackUrl = game.headerUrl,
+                fallbackUrl = game.heroFallbacks.firstOrNull(),
+                moreFallbacks = game.heroFallbacks.drop(1),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -321,7 +322,8 @@ private fun GameDetails(
                 Box(coverModifier.width(COVER_WIDTH).height(COVER_HEIGHT)) {
                     GameImage(
                         url = game.capsuleUrl,
-                        fallbackUrl = game.headerUrl,
+                        fallbackUrl = game.capsuleFallbacks.firstOrNull(),
+                        moreFallbacks = game.capsuleFallbacks.drop(1),
                         contentDescription = game.name,
                         modifier = Modifier
                             .fillMaxSize()
