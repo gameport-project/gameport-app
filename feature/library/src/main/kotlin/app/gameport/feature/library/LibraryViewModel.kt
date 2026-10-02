@@ -50,6 +50,8 @@ sealed interface LibraryUiState {
         val lastPlayed: Game? = null,
         /** Names of the installed games Steam has a newer build for. */
         val updates: List<String> = emptyList(),
+        /** The version of GamePort itself that can be installed, when a newer one exists. */
+        val appUpdate: String? = null,
         /** How GamePort stands with Steam; a notice shows when it is not connected. */
         val connection: SteamConnection = SteamConnection.ONLINE,
     ) : LibraryUiState
@@ -74,8 +76,8 @@ class LibraryViewModel @Inject constructor(
         combine(repository.observeLibrary(), query, tab, attention.observe(), combine(appearance.observe(), history.observe(), filters) { shown, played, narrowed -> Triple(shown, played, narrowed) }) { library, query, tab, outdated, (shown, played, narrowed) ->
             library.toUiState(query, tab, showTabs).copy(attention = outdated).arranged(shown, played, narrowed)
         },
-        combine(updates.observe(), updates.observeConnection()) { games, connection -> games to connection },
-    ) { state, (updatable, connection) -> state.copy(updates = updatable, connection = connection) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LibraryUiState.Loading)
+        combine(updates.observe(), updates.observeApp(), updates.observeConnection()) { games, app, connection -> Triple(games, app, connection) },
+    ) { state, (updatable, app, connection) -> state.copy(updates = updatable, appUpdate = app, connection = connection) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LibraryUiState.Loading)
 
     init {
         // Asked when the library opens (that is, when the app starts).

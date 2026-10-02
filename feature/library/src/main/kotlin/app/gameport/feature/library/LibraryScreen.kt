@@ -1,6 +1,7 @@
 package app.gameport.feature.library
 
 import app.gameport.core.designsystem.StatusNoticeWidth
+import app.gameport.core.designsystem.StatusNotice
 import app.gameport.core.designsystem.ConnectionNotice
 import app.gameport.core.model.SteamConnection
 import androidx.compose.ui.draw.clip
@@ -104,6 +105,7 @@ fun LibraryScreen(
     onGameClick: (Int) -> Unit,
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSteamSettings: () -> Unit,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -119,6 +121,7 @@ fun LibraryScreen(
         onGameClick = onGameClick,
         onOpenDownloads = onOpenDownloads,
         onOpenSettings = onOpenSettings,
+        onOpenSteamSettings = onOpenSteamSettings,
     )
 }
 
@@ -133,11 +136,12 @@ internal fun LibraryContent(
     onGameClick: (Int) -> Unit,
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSteamSettings: () -> Unit,
 ) {
     Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
         when (uiState) {
             LibraryUiState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-            is LibraryUiState.Content -> Shelf(uiState, onQueryChanged, onTabSelected, onSortSelected, onFiltersChanged, onPlay, onGameClick, onOpenDownloads, onOpenSettings)
+            is LibraryUiState.Content -> Shelf(uiState, onQueryChanged, onTabSelected, onSortSelected, onFiltersChanged, onPlay, onGameClick, onOpenDownloads, onOpenSettings, onOpenSteamSettings)
         }
     }
 }
@@ -160,6 +164,7 @@ private fun Shelf(
     onGameClick: (Int) -> Unit,
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSteamSettings: () -> Unit,
 ) {
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
@@ -192,7 +197,7 @@ private fun Shelf(
         if (display.backdrop) Backdrop(highlighted, display.backdropStrength)
 
         Column(Modifier.fillMaxSize()) {
-            Header(state, onQueryChanged, onTabSelected, { filtersOpen = true }, onOpenDownloads, onOpenSettings)
+            Header(state, onQueryChanged, onTabSelected, { filtersOpen = true }, onOpenDownloads, onOpenSettings, onOpenSteamSettings)
 
             LazyColumn(
                 state = listState,
@@ -409,6 +414,7 @@ private fun Header(
     onOpenFilters: () -> Unit,
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSteamSettings: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 16.dp),
@@ -449,7 +455,7 @@ private fun Header(
                 Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.library_settings))
             }
         }
-        if (state.showTabs || state.connection != SteamConnection.ONLINE) {
+        if (state.showTabs || state.appUpdate != null || state.connection != SteamConnection.ONLINE) {
             val tabs: @Composable () -> Unit = {
                 PillTabs(
                     labels = listOf(stringResource(R.string.library_tab_vr), stringResource(R.string.library_tab_flat)),
@@ -458,18 +464,24 @@ private fun Header(
                     modifier = Modifier.width(StatusNoticeWidth),
                 )
             }
-            val offline: @Composable () -> Unit = { ConnectionNotice(state.connection, onClick = onOpenSettings) }
+            val offline: @Composable () -> Unit = { ConnectionNotice(state.connection, onClick = onOpenSteamSettings) }
+            val update: @Composable () -> Unit = {
+                state.appUpdate?.let { StatusNotice(stringResource(R.string.library_app_update, it), onClick = onOpenSettings) }
+            }
             androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
-                // Wide enough, the tabs stay centred and the notice sits at the left; otherwise it goes below the tabs.
+                // Wide enough, the tabs stay centred, the offline notice sits at the left and the update one at the
+                // right; otherwise they go below the tabs.
                 if (maxWidth >= StatusNoticeWidth * 3 + 64.dp) {
                     Box(Modifier.fillMaxWidth().height(44.dp)) {
                         Box(Modifier.align(Alignment.CenterStart)) { offline() }
                         if (state.showTabs) Box(Modifier.align(Alignment.Center)) { tabs() }
+                        Box(Modifier.align(Alignment.CenterEnd)) { update() }
                     }
                 } else {
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         if (state.showTabs) tabs()
                         offline()
+                        update()
                     }
                 }
             }

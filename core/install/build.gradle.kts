@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":core:steam"))
     implementation(project(":core:patch"))
     implementation(libs.androidx.core.ktx)
+    implementation(libs.okhttp)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
 

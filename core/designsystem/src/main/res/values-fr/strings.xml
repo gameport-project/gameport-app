@@ -7,6 +7,7 @@
     <string name="game_error_space">Pas assez d\'espace libre : environ %1$s nécessaires, %2$s disponibles.</string>
     <string name="game_error_signed_out">Connexion à Steam requise.</string>
     <string name="game_error_offline">GamePort est hors ligne : un jeu ne peut pas être téléchargé sans connexion à Steam.</string>
+    <string name="game_error_app_updating">GamePort est en train de se mettre à jour. Réessaie une fois qu\'elle aura redémarré.</string>
     <string name="game_error_no_apk">La version Android de ce jeu sur Steam ne contient aucun APK.</string>
     <string name="game_error_unreadable">L\'APK téléchargé est illisible.</string>
     <string name="game_error_conflict">Une autre version de ce jeu est déjà installée (par exemple celle du Meta Store). Désinstallez-la d\'abord.</string>

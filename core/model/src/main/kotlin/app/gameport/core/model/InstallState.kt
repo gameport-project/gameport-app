@@ -38,6 +38,9 @@ sealed interface InstallError {
     /** Offline mode, or Steam cannot be reached: nothing can be downloaded. */
     data object Offline : InstallError
 
+    /** GamePort is replacing itself: nothing else is started until it is done. */
+    data object AppUpdating : InstallError
+
     /** Steam's Android build held no APK, so nothing could be installed. */
     data object NoApk : InstallError
 

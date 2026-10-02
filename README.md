@@ -66,6 +66,7 @@ The first time a game needs a permission, GamePort explains why before asking.
 
 - Your sign-in stays on your device. It is never sent anywhere except to Steam.
 - GamePort shows no ads that track you and collects nothing about you.
+- When it opens, GamePort can look at the latest release page on GitHub to tell you a newer version exists (every 4 hours by default; the delay, or Never, is a setting). It only looks: nothing is downloaded or installed without a tap, and GitHub sees your IP address like for any web page.
 - It is free and will stay free: no paid app, no paywall.
 
 ## Open source

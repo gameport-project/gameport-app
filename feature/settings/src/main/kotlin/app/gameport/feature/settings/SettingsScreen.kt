@@ -61,6 +61,7 @@ import app.gameport.core.designsystem.BackButton
 import app.gameport.core.designsystem.DangerRed
 import app.gameport.core.designsystem.OnDangerRed
 import app.gameport.core.model.AppLanguage
+import app.gameport.core.model.AppUpdateState
 import app.gameport.core.model.PlayerDefaults
 import app.gameport.core.model.SpeedUnit
 
@@ -70,12 +71,13 @@ private enum class Category(val title: Int) {
     APPEARANCE(R.string.settings_category_appearance),
     HOME(R.string.settings_category_home),
     LANGUAGE(R.string.settings_category_language),
+    UPDATES(R.string.settings_category_updates),
     GAMES(R.string.settings_category_games),
 }
 
 /** A full settings page: categories on the left, the selected one on the right. */
 @Composable
-fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewModel: SettingsViewModel = hiltViewModel()) {
     val speedUnit by viewModel.speedUnit.collectAsStateWithLifecycle()
     val accountName by viewModel.accountName.collectAsStateWithLifecycle()
     val playerDefaults by viewModel.playerDefaults.collectAsStateWithLifecycle()
@@ -84,8 +86,11 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
     val returnToGamePort by viewModel.returnToGamePort.collectAsStateWithLifecycle()
     val language by viewModel.language.collectAsStateWithLifecycle()
     val offline by viewModel.offline.collectAsStateWithLifecycle()
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+    val updateBlocker by viewModel.updateBlocker.collectAsStateWithLifecycle(null)
+    val checkHours by viewModel.updateCheckHours.collectAsStateWithLifecycle()
     val activity = LocalContext.current as? Activity
-    var category by rememberSaveable { mutableStateOf(Category.ACCOUNT) }
+    var category by rememberSaveable { mutableStateOf(if (!startOnAccount && viewModel.updateState.value is AppUpdateState.Available) Category.UPDATES else Category.ACCOUNT) }
 
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp)) {
@@ -116,6 +121,10 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                                 // The texts are read again in the new language.
                                 activity?.recreate()
                             }
+                            Category.UPDATES -> UpdatesSection(
+                                viewModel.installedVersion, updateState, updateBlocker, viewModel.canUpdateInPlace,
+                                checkHours, viewModel::onUpdateCheckHoursChanged, viewModel::onCheckForUpdate, viewModel::onUpdate,
+                            )
                             Category.GAMES -> GamesSection(playerDefaults.heightCm, viewModel::onDefaultHeightChanged)
                     }
                     }

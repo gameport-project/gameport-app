@@ -18,12 +18,16 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
     @Inject lateinit var settings: UserSettings
 
+    @Inject lateinit var appUpdater: app.gameport.core.install.AppUpdater
+
     @Inject lateinit var device: app.gameport.core.device.DeviceProfile
 
     override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLocale.wrap(newBase))
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Looks for a newer GamePort when the last look is old enough (and the player has not turned it off).
+        appUpdater.checkIfDue()
         // The manifest starts every device in landscape, which is what a headset's panel needs (it cuts a portrait one off);
         // a phone or a tablet is then let turn as it is held.
         if (!device.isHeadset) requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_USER

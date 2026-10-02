@@ -43,4 +43,5 @@
     <string name="library_kind_beta">Betas</string>
     <string name="library_label_demo">Demo</string>
     <string name="library_label_beta">Beta</string>
+    <string name="library_app_update">Update %1$s available</string>
 </resources>

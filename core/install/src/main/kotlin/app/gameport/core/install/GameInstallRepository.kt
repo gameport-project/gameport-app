@@ -63,6 +63,7 @@ class GameInstallRepository @Inject constructor(
     private val updates: GameUpdatesRepository,
     private val library: app.gameport.core.steam.SteamLibraryRepository,
     private val playHistory: app.gameport.core.settings.PlayHistoryStore,
+    private val gate: UpdateGate,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val operations = MutableStateFlow<Map<Int, InstallState>>(emptyMap())
@@ -108,6 +109,7 @@ class GameInstallRepository @Inject constructor(
      */
     fun install(game: Game, dlc: Set<Int>? = null) {
         if (jobs[game.appId]?.isActive == true) return
+        if (gate.updating.value) return fail(game.appId, InstallError.AppUpdating)
         if (auth.offline.value) return fail(game.appId, InstallError.Offline)
         val directory = downloadDirectory(game.appId)
         val chosen = dlc ?: readChosenDlc(directory)
@@ -205,6 +207,7 @@ class GameInstallRepository @Inject constructor(
             context.stopService(intent)
         }
         _isBusy.value = activeJobs.get() > 0
+        gate.setGamesBusy(_isBusy.value)
     }
 
     /** The Android package of the game if it is installed on this device. */
@@ -256,6 +259,7 @@ class GameInstallRepository @Inject constructor(
 
     private fun reinstall(appId: Int, patches: List<ApkPatch>) {
         if (jobs[appId]?.isActive == true) return
+        if (gate.updating.value) return fail(appId, InstallError.AppUpdating)
         val packageName = installed.all()[appId]?.takeIf(packages::isInstalled) ?: return
         val account = (auth.authState.value as? AuthState.SignedIn)?.account ?: return fail(appId, InstallError.NotSignedIn)
         val sources = packages.apkFilesOf(packageName).filter { it.isFile }

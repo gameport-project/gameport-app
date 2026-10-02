@@ -71,6 +71,7 @@ class CloudSyncCoordinator @Inject constructor(
     private val syncStatus: SyncStatusStore,
     private val snapshots: SaveSnapshotStore,
     private val pending: PendingSyncStore,
+    private val gate: app.gameport.core.install.UpdateGate,
 ) {
     private class Active(
         val packageName: String,
@@ -177,6 +178,7 @@ class CloudSyncCoordinator @Inject constructor(
                 ?.let { changeNumber = it }
         }
         active[packageName] = Active(packageName, appId, game.name, session, paths, cloud, changeNumber)
+        gate.setSyncing(true)
         snapshots.saveCloud(appId, cloud.values.map { SnapFile(it.rel, it.size, it.timestamp, it.sha1) })
         syncStatus.record(appId, SyncStatus.OK)
         return BeginResult.Ready(paths.expandedRules())
@@ -314,6 +316,7 @@ class CloudSyncCoordinator @Inject constructor(
     /** The game is done (or gone) for this launch. */
     fun end(packageName: String) {
         active.remove(packageName)?.pushed?.values?.forEach { it.delete() }
+        gate.setSyncing(active.isNotEmpty())
         clearConflict(packageName)
     }
 

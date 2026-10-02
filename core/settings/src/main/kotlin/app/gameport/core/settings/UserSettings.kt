@@ -56,6 +56,16 @@ class UserSettings @Inject constructor(
         _returnToGamePort.value = enabled
     }
 
+    private val _updateCheckHours = MutableStateFlow(prefs.getInt(KEY_UPDATE_HOURS, DEFAULT_UPDATE_HOURS))
+
+    /** Hours between two looks for a newer GamePort when it opens; 0 means never. Nothing is installed without a tap. */
+    val updateCheckHours: StateFlow<Int> = _updateCheckHours.asStateFlow()
+
+    fun setUpdateCheckHours(hours: Int) {
+        prefs.edit().putInt(KEY_UPDATE_HOURS, hours).apply()
+        _updateCheckHours.value = hours
+    }
+
     private val _display = MutableStateFlow(readDisplay())
 
     /** How the app looks and what the library shows. */
@@ -127,6 +137,8 @@ class UserSettings @Inject constructor(
         const val PREFS = "gameport_settings"
         const val KEY_SPEED_UNIT = "speed_unit"
         const val KEY_LANGUAGE = "language"
+        const val KEY_UPDATE_HOURS = "update_check_hours"
+        const val DEFAULT_UPDATE_HOURS = 4
         const val KEY_RETURN = "return_to_gameport"
         const val KEY_COUNT_PLAYTIME = "count_playtime_on_steam"
         const val KEY_BACKDROP = "library_backdrop"

@@ -3,7 +3,9 @@ package app.gameport.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.gameport.core.device.DeviceProfile
+import app.gameport.core.install.AppUpdater
 import app.gameport.core.install.GameInstallRepository
+import app.gameport.core.model.AppUpdateState
 import app.gameport.core.model.AppLanguage
 import app.gameport.core.model.AuthState
 import app.gameport.core.model.DisplaySettings
@@ -28,6 +30,7 @@ class SettingsViewModel @Inject constructor(
     private val installer: GameInstallRepository,
     private val cloudSync: CloudSyncCoordinator,
     private val gameSettings: GameSettingsStore,
+    private val updater: AppUpdater,
     device: DeviceProfile,
 ) : ViewModel() {
     /** Height and seated defaults only exist on a VR device. */
@@ -80,6 +83,23 @@ class SettingsViewModel @Inject constructor(
             auth.signOut()
         }
     }
+
+    val installedVersion: String = updater.installedVersion
+
+    val canUpdateInPlace: Boolean = updater.canUpdateInPlace
+
+    val updateState: StateFlow<AppUpdateState> = updater.state
+
+    /** What stops an update from starting now, if anything. */
+    val updateBlocker = updater.blocker.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    val updateCheckHours: StateFlow<Int> = settings.updateCheckHours
+
+    fun onUpdateCheckHoursChanged(hours: Int) = settings.setUpdateCheckHours(hours)
+
+    fun onCheckForUpdate() = updater.check(manual = true)
+
+    fun onUpdate() = updater.update()
 
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L

@@ -66,6 +66,7 @@ La première fois qu'un jeu a besoin d'une permission, GamePort explique pourquo
 
 - Ta connexion reste sur ton appareil. Elle n'est envoyée qu'à Steam.
 - GamePort n'affiche aucune publicité qui te suit et ne collecte rien sur toi.
+- À son ouverture, GamePort peut consulter la page de la dernière version sur GitHub pour te dire qu'une version plus récente existe (toutes les 4 heures par défaut ; le délai, ou Jamais, est un réglage). Il ne fait que regarder : rien n'est téléchargé ni installé sans un appui, et GitHub voit ton adresse IP comme pour n'importe quelle page web.
 - Elle est gratuite et le restera : pas d'appli payante, pas de mur payant.
 
 ## Open source

@@ -18,6 +18,7 @@ fun installErrorText(error: InstallError): String {
         )
         InstallError.NotSignedIn -> stringResource(R.string.game_error_signed_out)
         InstallError.Offline -> stringResource(R.string.game_error_offline)
+        InstallError.AppUpdating -> stringResource(R.string.game_error_app_updating)
         InstallError.NoApk -> stringResource(R.string.game_error_no_apk)
         InstallError.UnreadableApk -> stringResource(R.string.game_error_unreadable)
         InstallError.VersionConflict -> stringResource(R.string.game_error_conflict)
