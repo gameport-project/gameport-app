@@ -69,6 +69,12 @@ import androidx.compose.runtime.Composable
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import kotlin.math.abs
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -357,8 +363,11 @@ private fun GameDetails(
         }
         // The cover straddles the hero: half of it sits on the artwork, half below. On a narrow screen it is
         // centred above the details instead of beside them.
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
+        BoxWithConstraints(Modifier.fillMaxWidth().pullUp(CONTENT_OVERLAP)) {
             val compact = maxWidth < COMPACT_WIDTH
+            // Wide layout: the bottom of the cover is lined up with the bottom of the action buttons. The size card under the cover
+            // then starts level with the first card beside it (patch panel or achievements), as far from the cover as that card is from the buttons.
+            val alignment = remember { CoverAlignment() }
             val cover: @Composable (Modifier) -> Unit = { coverModifier ->
                 Box(coverModifier.width(COVER_WIDTH).height(COVER_HEIGHT)) {
                     GameImage(
@@ -400,7 +409,11 @@ private fun GameDetails(
                         AppKind.GAME -> Unit
                     }
                 }
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(
+                    modifier = Modifier.onGloballyPositioned { alignment.actionsPlaced(it) },
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     InstallActions(
                         install = install,
                         speedUnit = speedUnit,
@@ -483,13 +496,16 @@ private fun GameDetails(
                 }
             } else {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp).onGloballyPositioned { alignment.rowPlaced(it) },
                     horizontalArrangement = Arrangement.spacedBy(28.dp),
                     verticalAlignment = Alignment.Top,
                 ) {
-                    // The cover straddles the artwork; what is under it (size, play time) follows it up.
-                    Column(Modifier.pullUp(COVER_HEIGHT / 2).width(COVER_WIDTH), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        cover(Modifier)
+                    // The cover straddles the artwork; what is under it (size, play time) follows it up, and down by what lines it up with the buttons.
+                    Column(
+                        Modifier.pullUp(COVER_HEIGHT / 2).padding(top = with(LocalDensity.current) { alignment.shift.toDp() }).width(COVER_WIDTH),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        cover(Modifier.onGloballyPositioned { alignment.coverPlaced(it) })
                         InfoCard(game, installed, playtime, Modifier.fillMaxWidth())
                     }
                     Column(Modifier.weight(1f).padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp), content = details)
@@ -501,7 +517,14 @@ private fun GameDetails(
 
 /** Below this width the details sit under the cover instead of beside it. */
 private val COMPACT_WIDTH = 600.dp
-private val HERO_HEIGHT = 280.dp
+/** The artwork takes almost half of the screen, fading into the page. */
+private val HERO_HEIGHT = 320.dp
+
+/** How far the content starts over the artwork's bottom edge. */
+private val CONTENT_OVERLAP = 64.dp
+
+/** The height of the round buttons of the action row; the main button matches it so the row has one baseline. */
+private val ACTION_HEIGHT = 48.dp
 private val COVER_WIDTH = 190.dp
 private val COVER_HEIGHT = 285.dp
 
@@ -521,7 +544,7 @@ private fun InstallActions(
     onReport: () -> Unit = {},
 ) {
     when (install) {
-        InstallState.NotInstalled -> Button(onClick = onInstall, modifier = Modifier.widthIn(min = 240.dp)) {
+        InstallState.NotInstalled -> Button(onClick = onInstall, modifier = Modifier.widthIn(min = 240.dp).height(ACTION_HEIGHT)) {
             Text(stringResource(R.string.game_install))
         }
         InstallState.Interrupted -> FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -541,7 +564,7 @@ private fun InstallActions(
         InstallState.Patching -> Progress(step = Step.PATCH, fraction = null, speed = 0, speedUnit = speedUnit, onCancel = null)
         InstallState.Installing -> Progress(step = Step.INSTALL, fraction = null, speed = 0, speedUnit = speedUnit, onCancel = null)
         is InstallState.Installed -> FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onPlay, enabled = !busy) { Text(stringResource(R.string.game_play)) }
+            Button(onClick = onPlay, enabled = !busy, modifier = Modifier.height(ACTION_HEIGHT)) { Text(stringResource(R.string.game_play)) }
             DangerTrashButton(onClick = onUninstall, contentDescription = stringResource(R.string.game_uninstall), enabled = !busy)
         }
         is InstallState.Failed -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -790,6 +813,35 @@ private fun IssueRow(
 @Composable
 internal fun sourceFamilyName(source: String): String =
     stringResource(if (source == "touch") R.string.controllers_family_touch else R.string.controllers_family_valve)
+
+/**
+ * Keeps the cover's bottom edge level with the bottom of the action buttons. The three places are read once laid out, all in
+ * the coordinates of the row that holds them, so scrolling the page changes nothing. [shift] is how far the cover has been lowered.
+ */
+private class CoverAlignment {
+    var shift by mutableFloatStateOf(0f)
+        private set
+    private var row: LayoutCoordinates? = null
+    private var cover: LayoutCoordinates? = null
+    private var actions: LayoutCoordinates? = null
+
+    fun rowPlaced(coordinates: LayoutCoordinates) { row = coordinates; update() }
+
+    fun coverPlaced(coordinates: LayoutCoordinates) { cover = coordinates; update() }
+
+    fun actionsPlaced(coordinates: LayoutCoordinates) { actions = coordinates; update() }
+
+    private fun update() {
+        val inRow = row?.takeIf { it.isAttached } ?: return
+        val coverBox = cover?.takeIf { it.isAttached } ?: return
+        val actionsBox = actions?.takeIf { it.isAttached } ?: return
+        val coverBottom = inRow.localPositionOf(coverBox, Offset(0f, coverBox.size.height.toFloat())).y
+        val actionsBottom = inRow.localPositionOf(actionsBox, Offset(0f, actionsBox.size.height.toFloat())).y
+        val gap = actionsBottom - coverBottom
+        // Only ever lowered: when the buttons end above the cover's bottom the cover stays where it is.
+        if (abs(gap) > 0.5f) shift = (shift + gap).coerceAtLeast(0f)
+    }
+}
 
 /** Moves its content up by [amount] and gives that space back to the layout, so what follows is not pushed down by it. */
 private fun Modifier.pullUp(amount: Dp): Modifier = layout { measurable, constraints ->
