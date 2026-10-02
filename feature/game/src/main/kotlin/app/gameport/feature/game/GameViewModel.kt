@@ -76,6 +76,7 @@ class GameViewModel @Inject constructor(
     auth: app.gameport.core.steam.SteamAuthRepository,
     private val reports: app.gameport.core.sync.ReportStore,
     private val reporter: app.gameport.core.sync.ProblemReporter,
+    achievementsRepository: app.gameport.core.steam.AchievementsRepository,
 ) : ViewModel() {
     /** How GamePort stands with Steam. */
     val connection: StateFlow<app.gameport.core.model.SteamConnection> = auth.connection
@@ -110,6 +111,10 @@ class GameViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), GameUiState.Loading)
 
     private val steamMinutes = MutableStateFlow<Int?>(null)
+
+    /** The account's achievements for the game: what was kept at once, then what Steam says. Null while unknown. */
+    val achievements: StateFlow<app.gameport.core.model.AchievementList?> = achievementsRepository.observe(appId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     val uiState: StateFlow<GameUiState> = combine(
         baseState,

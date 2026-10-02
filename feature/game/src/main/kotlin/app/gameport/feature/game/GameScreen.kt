@@ -102,15 +102,17 @@ import app.gameport.core.model.DlcContent
 import app.gameport.core.model.Game
 import app.gameport.core.model.GameIssue
 import app.gameport.core.model.InstallError
+import app.gameport.core.model.AchievementList
 import app.gameport.core.model.InstallState
 import app.gameport.core.model.SpeedUnit
 import app.gameport.core.model.Ownership
 
 @Composable
-fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -> Unit, onOpenControllers: () -> Unit, onOpenSteamSettings: () -> Unit, viewModel: GameViewModel = hiltViewModel()) {
+fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -> Unit, onOpenControllers: () -> Unit, onOpenAchievements: () -> Unit, onOpenSteamSettings: () -> Unit, viewModel: GameViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val speedUnit by viewModel.speedUnit.collectAsStateWithLifecycle()
+    val achievements by viewModel.achievements.collectAsStateWithLifecycle()
     var explainingStorage by remember { mutableStateOf(false) }
     // Permissions are granted in the system's settings: check again when the player comes back.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -166,6 +168,8 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onOpenSettings = onOpenSettings,
         onOpenSaves = onOpenSaves,
         onOpenControllers = onOpenControllers,
+        achievements = achievements,
+        onOpenAchievements = onOpenAchievements,
         onToggleFavorite = viewModel::onToggleFavorite,
         onSetHidden = viewModel::onSetHidden,
         onBack = onBack,
@@ -208,6 +212,8 @@ internal fun GameContent(
     onResolveConflict: () -> Unit,
     onRepatch: () -> Unit,
     onUpdate: () -> Unit,
+    achievements: AchievementList? = null,
+    onOpenAchievements: () -> Unit = {},
 ) {
     Scaffold { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
@@ -245,6 +251,8 @@ internal fun GameContent(
                     onOpenPermissions = onOpenPermissions,
                     onResolveConflict = onResolveConflict,
                     report = report,
+                    achievements = achievements,
+                    onOpenAchievements = onOpenAchievements,
                 )
             }
             Row(
@@ -289,6 +297,8 @@ private fun GameDetails(
     onOpenPermissions: () -> Unit,
     onResolveConflict: () -> Unit,
     report: ReportActions,
+    achievements: AchievementList? = null,
+    onOpenAchievements: () -> Unit = {},
 ) {
     var reporting by remember { mutableStateOf(false) }
     var confirmingHide by remember { mutableStateOf(false) }
@@ -452,6 +462,8 @@ private fun GameDetails(
                         onDismissProblem = report.onDismissProblem,
                     )
                 }
+                // A game without achievements, or one Steam has not answered for yet, shows nothing here.
+                achievements?.takeIf { it.items.isNotEmpty() }?.let { AchievementsCard(it, onOpenAchievements) }
             }
             val installed = install is InstallState.Installed
             if (compact) {
@@ -688,7 +700,8 @@ private fun IssuesPanel(
 ) {
     val busy = repatch is Repatch.Running
     val updateAvailable = GameIssue.UpdateAvailable in issues
-    Column(Modifier.widthIn(max = 640.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    // As wide as the achievements card beside it in the column.
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (repatch is Repatch.Running) {
             val percent = ((repatch.fraction ?: 0f) * 100).toInt()
             IssueRow(

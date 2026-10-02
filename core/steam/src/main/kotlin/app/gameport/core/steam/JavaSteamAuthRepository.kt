@@ -35,6 +35,7 @@ class JavaSteamAuthRepository @Inject constructor(
     private val sessions: SteamSessionHolder,
     private val libraryCache: LibraryCacheStore,
     private val identities: SteamIdentityStore,
+    private val achievementCache: app.gameport.core.steam.cache.AchievementCache,
 ) : SteamAuthRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val state = MutableStateFlow<AuthState>(AuthState.Connecting)
@@ -158,6 +159,7 @@ class JavaSteamAuthRepository @Inject constructor(
     override suspend fun signOut() = withContext(Dispatchers.IO) {
         tokenStore.clear()
         libraryCache.clear()
+        achievementCache.clear()
         identities.clear()
         reconnectJob?.cancel()
         setConnection(SteamConnection.ONLINE)

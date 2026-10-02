@@ -20,6 +20,8 @@ import app.gameport.feature.downloads.DownloadsRoute
 import app.gameport.feature.downloads.downloadsScreen
 import app.gameport.feature.game.gameScreen
 import app.gameport.feature.game.gameControllersScreen
+import app.gameport.feature.game.gameAchievementsScreen
+import app.gameport.feature.game.navigateToGameAchievements
 import app.gameport.feature.game.gameSavesScreen
 import app.gameport.feature.game.gameSettingsScreen
 import app.gameport.feature.game.navigateToGameControllers
@@ -68,8 +70,9 @@ fun GamePortApp(viewModel: AppViewModel = hiltViewModel()) {
         )
         settingsScreen(onBack = navController::goBack)
         downloadsScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame)
-        gameScreen(onBack = navController::goBack, onOpenSettings = navController::navigateToGameSettings, onOpenSaves = navController::navigateToGameSaves, onOpenControllers = navController::navigateToGameControllers, onOpenSteamSettings = { navController.navigate(SettingsRoute(account = true)) })
+        gameScreen(onBack = navController::goBack, onOpenSettings = navController::navigateToGameSettings, onOpenSaves = navController::navigateToGameSaves, onOpenControllers = navController::navigateToGameControllers, onOpenAchievements = navController::navigateToGameAchievements, onOpenSteamSettings = { navController.navigate(SettingsRoute(account = true)) })
         gameControllersScreen(onBack = navController::goBack)
+        gameAchievementsScreen(onBack = navController::goBack)
         gameSavesScreen(onBack = navController::goBack)
         gameSettingsScreen(onBack = navController::goBack)
     }

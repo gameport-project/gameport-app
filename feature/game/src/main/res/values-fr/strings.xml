@@ -163,4 +163,12 @@
     <string name="game_hide_title">Cacher ce jeu</string>
     <string name="game_hide_text">Le jeu disparaît de l\'application uniquement. Rien ne change sur Steam, et un jeu installé reste installé.\nLes jeux cachés se retrouvent dans Réglages, sous Jeux cachés, où chacun peut être réaffiché.</string>
     <string name="game_hide_cancel">Annuler</string>
+    <string name="achievements_title">Succès</string>
+    <string name="achievements_count">%1$d / %2$d</string>
+    <string name="achievements_latest">Derniers débloqués</string>
+    <string name="achievements_none_yet">Aucun succès débloqué pour l\'instant.</string>
+    <string name="achievements_see_all">Tous les succès</string>
+    <string name="achievements_hidden">Succès caché, affiché une fois débloqué.</string>
+    <string name="achievements_empty">Ce jeu n\'a pas de succès.</string>
+    <string name="achievements_source">Lu depuis le compte Steam. Rien n\'est modifié sur Steam depuis ici.</string>
 </resources>
