@@ -15,7 +15,7 @@ GamePort est une appli gratuite et open source. Elle se connecte à ton compte S
 
 <p align="center">
   <img src="docs/screenshots/home.png" alt="L'accueil : des rangées de covers, avec le nom du jeu et un bouton de lecture quand l'une est pointée" width="49%">
-  <img src="docs/screenshots/game.png" alt="La fiche d'un jeu : taille, temps de jeu, favoris, sauvegardes et manettes" width="49%">
+  <img src="docs/screenshots/game.png" alt="La fiche d'un jeu : la cover détachée de l'image, les succès, la taille et le temps de jeu, et les actions" width="49%">
 </p>
 <p align="center">
   <img src="docs/screenshots/home-all-games.png" alt="Tous les jeux, triés" width="49%">
@@ -24,6 +24,9 @@ GamePort est une appli gratuite et open source. Elle se connecte à ton compte S
 <p align="center">
   <img src="docs/screenshots/settings-appearance.png" alt="Les réglages d'apparence : couleurs, fond et covers" width="49%">
   <img src="docs/screenshots/downloads.png" alt="Téléchargements et jeux installés" width="49%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/achievements.png" alt="Les succès d'un jeu, avec leurs images, dans la langue de l'appareil" width="49%">
 </p>
 <p align="center">
   <img src="docs/screenshots/menu.png" alt="Maintenir une cover ouvre ses actions : jouer, mettre à jour, patcher de nouveau, réglages, favori, cacher" width="49%">

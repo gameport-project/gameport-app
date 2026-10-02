@@ -15,7 +15,7 @@ GamePort is a free, open-source app that signs in to your Steam account, shows t
 
 <p align="center">
   <img src="docs/screenshots/home.png" alt="The home: rows of covers, with the name of the game and a play button when one is pointed at" width="49%">
-  <img src="docs/screenshots/game.png" alt="A game page: size, play time, favorites, saves and controllers" width="49%">
+  <img src="docs/screenshots/game.png" alt="A game page: the cover lifted off the artwork, the achievements, size and play time, and the actions" width="49%">
 </p>
 <p align="center">
   <img src="docs/screenshots/home-all-games.png" alt="All the games, sorted" width="49%">
@@ -24,6 +24,9 @@ GamePort is a free, open-source app that signs in to your Steam account, shows t
 <p align="center">
   <img src="docs/screenshots/settings-appearance.png" alt="The appearance settings: colours, background and covers" width="49%">
   <img src="docs/screenshots/downloads.png" alt="Downloads and installed games" width="49%">
+</p>
+<p align="center">
+  <img src="docs/screenshots/achievements.png" alt="The achievements of a game, with their pictures, in the language of the device" width="49%">
 </p>
 <p align="center">
   <img src="docs/screenshots/menu.png" alt="Staying on a cover opens its actions: play, update, patch again, settings, favorite, hide" width="49%">

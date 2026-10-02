@@ -40,7 +40,10 @@ class AchievementsRepository @Inject constructor(
         emit(fresh)
     }
 
-    /** The language of the player: the one chosen for GamePort, or the device's when none is, as Steam names it. */
+    /**
+     * The language of the device, as Steam names it, even when GamePort is not translated into it: the texts of the achievements
+     * come from the game, in as many languages as it has, so they follow the device and not the few languages of GamePort.
+     */
     private fun steamLanguage(): String = Locale.getDefault().let { SteamLanguage.of(it.language, it.country, it.script) }
 
     private companion object {
