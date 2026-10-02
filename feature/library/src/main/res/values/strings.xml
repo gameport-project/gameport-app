@@ -44,4 +44,14 @@
     <string name="library_label_demo">Demo</string>
     <string name="library_label_beta">Beta</string>
     <string name="library_app_update">Update %1$s available</string>
+    <string name="menu_play">Play</string>
+    <string name="menu_open">Open the game page</string>
+    <string name="menu_update">Update</string>
+    <string name="menu_repatch">Patch again</string>
+    <string name="menu_settings">Game settings</string>
+    <string name="menu_favorite">Add to favorites</string>
+    <string name="menu_unfavorite">Remove from favorites</string>
+    <string name="menu_hide">Hide the game</string>
+    <string name="menu_hide_note">Hiding only concerns the app, nothing changes on Steam. Hidden games are listed in Settings, under Hidden games.</string>
+    <string name="menu_close">Close</string>
 </resources>

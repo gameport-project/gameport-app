@@ -8,6 +8,7 @@ import app.gameport.core.model.LibrarySort
 import app.gameport.core.model.Ownership
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ArrangedTest {
@@ -75,6 +76,13 @@ class ArrangedTest {
         val shown = content.arranged(DisplaySettings(showContinue = false, showFavorites = false), history)
         assertEquals(emptyList<Game>(), shown.continueGames)
         assertEquals(emptyList<Game>(), shown.favoriteGames)
+    }
+
+    @Test
+    fun `a game hidden in GamePort shows in no row`() {
+        val shown = content.arranged(DisplaySettings(), history.copy(hidden = setOf(1), favorites = setOf(1)))
+        val rows = shown.allGames + shown.continueGames + shown.favoriteGames
+        assertTrue(rows.none { it.appId == 1 })
     }
 
     @Test

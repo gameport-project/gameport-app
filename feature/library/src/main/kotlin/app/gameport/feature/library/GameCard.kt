@@ -7,6 +7,8 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -72,11 +74,14 @@ internal val FavoriteRed = Color(0xFFE53935)
  * Portrait capsule with the title on a gradient, so games without artwork stay readable. When
  * [showPill] is on, room is kept above the cover for the pill that names the game while it is highlighted.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun GameCard(
     game: Game,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Staying pressed on the cover opens the menu of the game's actions. */
+    onLongClick: (() -> Unit)? = null,
     needsAttention: Boolean = false,
     hasUpdate: Boolean = false,
     showTitle: Boolean = true,
@@ -145,7 +150,7 @@ internal fun GameCard(
                     }
                 }
                 .clip(RoundedCornerShape(COVER_CORNER))
-                .clickable(onClick = onClick),
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         ) {
             GameImage(url = game.capsuleUrl, fallbackUrl = game.capsuleFallbacks.firstOrNull(), moreFallbacks = game.capsuleFallbacks.drop(1), contentDescription = null, modifier = Modifier.fillMaxSize())
             if (titleOnCover) {

@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
@@ -35,18 +36,21 @@ fun BackdropDialog(
     modifier: Modifier = Modifier,
     title: (@Composable () -> Unit)? = null,
     text: (@Composable () -> Unit)? = null,
-    confirmButton: @Composable () -> Unit,
+    confirmButton: (@Composable () -> Unit)? = null,
     dismissButton: (@Composable () -> Unit)? = null,
+    minWidth: Dp = 280.dp,
+    maxWidth: Dp = 560.dp,
+    padding: Dp = 24.dp,
 ) {
     BasicAlertDialog(onDismissRequest = onDismissRequest, modifier = modifier) {
         val shape = RoundedCornerShape(28.dp)
         Surface(shape = shape, color = Color.Transparent, contentColor = MaterialTheme.colorScheme.onSurface) {
             Column(
                 Modifier
-                    .widthIn(min = 280.dp, max = 560.dp)
+                    .widthIn(min = minWidth, max = maxWidth)
                     .clip(shape)
                     .background(Brush.linearGradient(LocalBackdropColors.current.toList()))
-                    .padding(24.dp),
+                    .padding(padding),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 title?.let { ProvideTextStyle(MaterialTheme.typography.headlineSmall) { it() } }
@@ -55,9 +59,11 @@ fun BackdropDialog(
                         ProvideTextStyle(MaterialTheme.typography.bodyMedium) { it() }
                     }
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
-                    dismissButton?.invoke()
-                    confirmButton()
+                if (confirmButton != null || dismissButton != null) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
+                        dismissButton?.invoke()
+                        confirmButton?.invoke()
+                    }
                 }
             }
         }

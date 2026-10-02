@@ -44,6 +44,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material.icons.filled.SportsEsports
@@ -163,6 +167,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onOpenSaves = onOpenSaves,
         onOpenControllers = onOpenControllers,
         onToggleFavorite = viewModel::onToggleFavorite,
+        onSetHidden = viewModel::onSetHidden,
         onBack = onBack,
         onInstall = viewModel::onInstall,
         onCancel = viewModel::onCancel,
@@ -190,6 +195,7 @@ internal fun GameContent(
     onOpenSaves: () -> Unit,
     onOpenControllers: () -> Unit,
     onToggleFavorite: () -> Unit,
+    onSetHidden: (Boolean) -> Unit,
     onBack: () -> Unit,
     onInstall: (Game, Set<Int>?) -> Unit,
     onCancel: () -> Unit,
@@ -232,6 +238,8 @@ internal fun GameContent(
                     vrDevice = uiState.vrDevice,
                     onOpenControllers = onOpenControllers,
                     onToggleFavorite = onToggleFavorite,
+                    onSetHidden = onSetHidden,
+                    hidden = uiState.hidden,
                     favorite = uiState.favorite,
                     playtime = uiState.playtime,
                     onOpenPermissions = onOpenPermissions,
@@ -272,15 +280,36 @@ private fun GameDetails(
     onOpenSaves: () -> Unit,
     controllerProfile: Boolean,
     favorite: Boolean,
+    hidden: Boolean,
     playtime: Playtime,
     vrDevice: Boolean,
     onOpenControllers: () -> Unit,
     onToggleFavorite: () -> Unit,
+    onSetHidden: (Boolean) -> Unit,
     onOpenPermissions: () -> Unit,
     onResolveConflict: () -> Unit,
     report: ReportActions,
 ) {
     var reporting by remember { mutableStateOf(false) }
+    var confirmingHide by remember { mutableStateOf(false) }
+    if (confirmingHide) {
+        BackdropDialog(
+            onDismissRequest = { confirmingHide = false },
+            title = { Text(stringResource(R.string.game_hide_title)) },
+            text = { Text(stringResource(R.string.game_hide_text)) },
+            confirmButton = {
+                GlassButton(onClick = {
+                    confirmingHide = false
+                    onSetHidden(true)
+                }) {
+                    Icon(Icons.Filled.VisibilityOff, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.game_hide))
+                }
+            },
+            dismissButton = { GlassButton(onClick = { confirmingHide = false }) { Text(stringResource(R.string.game_hide_cancel)) } },
+        )
+    }
     if (reporting) ReportDialog(game.name, report) { reporting = false; report.onResetProgress() }
     // Owned extra content is offered when installing; what the account lacks cannot be installed.
     val ownedDlc = game.androidBuild?.dlc.orEmpty().filter { it.owned }
@@ -396,6 +425,12 @@ private fun GameDetails(
                             Icons.Filled.Favorite,
                             contentDescription = stringResource(if (favorite) R.string.game_unfavorite else R.string.game_favorite),
                             tint = if (favorite) Color(0xFFE53935) else LocalContentColor.current,
+                        )
+                    }
+                    GlassIconButton(onClick = { if (hidden) onSetHidden(false) else confirmingHide = true }) {
+                        Icon(
+                            if (hidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                            contentDescription = stringResource(if (hidden) R.string.game_show_again else R.string.game_hide),
                         )
                     }
                     GlassIconButton(onClick = onOpenSettings, enabled = repatch !is Repatch.Running) {

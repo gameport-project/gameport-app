@@ -159,4 +159,9 @@
     <string name="issue_problem_short">This game closed almost right away. A report can help find out why.</string>
     <string name="issue_problem_crash">This game seems to have crashed. A report can help find out why.</string>
     <string name="issue_problem_action">Report it</string>
+    <string name="game_hide">Hide the game</string>
+    <string name="game_show_again">Show the game again</string>
+    <string name="game_hide_title">Hide this game</string>
+    <string name="game_hide_text">The game disappears from the app only. Nothing changes on Steam, and an installed game stays installed.\nHidden games are listed in Settings, under Hidden games, where each can be shown again.</string>
+    <string name="game_hide_cancel">Cancel</string>
 </resources>

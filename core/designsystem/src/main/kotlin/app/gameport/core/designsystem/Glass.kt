@@ -58,13 +58,14 @@ fun GlassChip(
 
 /** A button with the glass look: a translucent fill and a fine outline instead of a bare label. */
 @Composable
-fun GlassButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+fun GlassButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, contentPadding: androidx.compose.foundation.layout.PaddingValues = androidx.compose.material3.ButtonDefaults.ContentPadding, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
     androidx.compose.material3.OutlinedButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
         colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(containerColor = GlassFill, contentColor = Color.White),
         border = androidx.compose.foundation.BorderStroke(1.dp, GlassBorder),
+        contentPadding = contentPadding,
         content = content,
     )
 }

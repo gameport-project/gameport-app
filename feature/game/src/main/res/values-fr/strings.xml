@@ -158,4 +158,9 @@
     <string name="issue_problem_short">Ce jeu s\'est fermé presque tout de suite. Un rapport aide à comprendre pourquoi.</string>
     <string name="issue_problem_crash">Ce jeu semble avoir planté. Un rapport aide à comprendre pourquoi.</string>
     <string name="issue_problem_action">Signaler</string>
+    <string name="game_hide">Cacher le jeu</string>
+    <string name="game_show_again">Réafficher le jeu</string>
+    <string name="game_hide_title">Cacher ce jeu</string>
+    <string name="game_hide_text">Le jeu disparaît de l\'application uniquement. Rien ne change sur Steam, et un jeu installé reste installé.\nLes jeux cachés se retrouvent dans Réglages, sous Jeux cachés, où chacun peut être réaffiché.</string>
+    <string name="game_hide_cancel">Annuler</string>
 </resources>

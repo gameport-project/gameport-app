@@ -111,4 +111,8 @@
     <string name="settings_updates_never_check">Jamais</string>
     <string name="settings_offline">Mode hors ligne</string>
     <string name="settings_offline_description">GamePort reste hors de Steam : pas de connexion, pas de synchronisation des sauvegardes, pas de temps de jeu envoyé, pas de téléchargement. La bibliothèque affiche ce qui a été enregistré en dernier et les jeux installés se lancent toujours. Le désactiver rétablit la connexion. Les sauvegardes faites entre-temps sont synchronisées au prochain lancement d\'un jeu en ligne.</string>
+    <string name="settings_category_hidden">Jeux cachés</string>
+    <string name="settings_hidden_description">Jeux cachés de l\'application. Ils restent dans la bibliothèque Steam, où rien ne change.</string>
+    <string name="settings_hidden_empty">Aucun jeu n\'est caché de l\'application.</string>
+    <string name="settings_hidden_show">Réafficher</string>
 </resources>

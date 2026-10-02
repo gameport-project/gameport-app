@@ -111,4 +111,8 @@
     <string name="settings_updates_never_check">Never</string>
     <string name="settings_offline">Offline mode</string>
     <string name="settings_offline_description">GamePort stays off Steam: no connection, no save sync, no play time sent, no download. The library shows what was last saved and installed games still start. Turning it off reconnects. Saves made meanwhile are synced the next time a game starts online.</string>
+    <string name="settings_category_hidden">Hidden games</string>
+    <string name="settings_hidden_description">Games hidden from the app. They stay in the Steam library and nothing changes there.</string>
+    <string name="settings_hidden_empty">No game is hidden from the app.</string>
+    <string name="settings_hidden_show">Show again</string>
 </resources>

@@ -64,6 +64,7 @@ fun GamePortApp(viewModel: AppViewModel = hiltViewModel()) {
             onOpenDownloads = { navController.navigate(DownloadsRoute) },
             onOpenSettings = { navController.navigate(SettingsRoute()) },
             onOpenSteamSettings = { navController.navigate(SettingsRoute(account = true)) },
+            onOpenGameSettings = navController::navigateToGameSettings,
         )
         settingsScreen(onBack = navController::goBack)
         downloadsScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame)

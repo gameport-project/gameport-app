@@ -11,7 +11,11 @@ import app.gameport.core.model.AuthState
 import app.gameport.core.model.DisplaySettings
 import app.gameport.core.model.SpeedUnit
 import app.gameport.core.model.PlayerDefaults
+import app.gameport.core.model.Game
 import app.gameport.core.settings.GameSettingsStore
+import app.gameport.core.settings.PlayHistoryStore
+import app.gameport.core.steam.SteamLibraryRepository
+import kotlinx.coroutines.flow.combine
 import app.gameport.core.settings.UserSettings
 import app.gameport.core.steam.SteamAuthRepository
 import app.gameport.core.sync.CloudSyncCoordinator
@@ -31,8 +35,17 @@ class SettingsViewModel @Inject constructor(
     private val cloudSync: CloudSyncCoordinator,
     private val gameSettings: GameSettingsStore,
     private val updater: AppUpdater,
+    library: SteamLibraryRepository,
+    private val history: PlayHistoryStore,
     device: DeviceProfile,
 ) : ViewModel() {
+    /** The games hidden in GamePort's library (Steam's own library is untouched), by name. */
+    val hiddenGames: StateFlow<List<Game>> = combine(library.observeLibrary(), history.hidden) { loaded, hidden ->
+        loaded.games.filter { it.appId in hidden }.sortedBy { it.name.lowercase() }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
+    fun onShowAgain(appId: Int) = history.setHidden(appId, false)
+
     /** Height and seated defaults only exist on a VR device. */
     val isHeadset: Boolean = device.isHeadset
 

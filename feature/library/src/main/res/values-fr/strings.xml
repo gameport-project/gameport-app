@@ -42,4 +42,14 @@
     <string name="library_label_demo">Démo</string>
     <string name="library_label_beta">Bêta</string>
     <string name="library_app_update">Mise à jour %1$s dispo</string>
+    <string name="menu_play">Jouer</string>
+    <string name="menu_open">Ouvrir la page du jeu</string>
+    <string name="menu_update">Mettre à jour</string>
+    <string name="menu_repatch">Patcher de nouveau</string>
+    <string name="menu_settings">Réglages du jeu</string>
+    <string name="menu_favorite">Ajouter aux favoris</string>
+    <string name="menu_unfavorite">Retirer des favoris</string>
+    <string name="menu_hide">Cacher le jeu</string>
+    <string name="menu_hide_note">Cacher ne concerne que l\'application, rien ne change sur Steam. Les jeux cachés se retrouvent dans Réglages, sous Jeux cachés.</string>
+    <string name="menu_close">Fermer</string>
 </resources>

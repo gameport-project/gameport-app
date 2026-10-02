@@ -108,6 +108,7 @@ fun LibraryScreen(
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSteamSettings: () -> Unit,
+    onOpenGameSettings: (Int) -> Unit,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -124,6 +125,15 @@ fun LibraryScreen(
         onOpenDownloads = onOpenDownloads,
         onOpenSettings = onOpenSettings,
         onOpenSteamSettings = onOpenSteamSettings,
+        menu = GameMenuActions(
+            onOpen = onGameClick,
+            onPlay = { game -> viewModel.playIntent(game)?.let(context::startActivity) ?: onGameClick(game.appId) },
+            onSettings = onOpenGameSettings,
+            onToggleFavorite = viewModel::onToggleFavorite,
+            onUpdate = viewModel::onUpdate,
+            onRepatch = viewModel::onRepatch,
+            onHide = viewModel::onHide,
+        ),
     )
 }
 
@@ -139,11 +149,12 @@ internal fun LibraryContent(
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSteamSettings: () -> Unit,
+    menu: GameMenuActions = GameMenuActions(),
 ) {
     Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
         when (uiState) {
             LibraryUiState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-            is LibraryUiState.Content -> Shelf(uiState, onQueryChanged, onTabSelected, onSortSelected, onFiltersChanged, onPlay, onGameClick, onOpenDownloads, onOpenSettings, onOpenSteamSettings)
+            is LibraryUiState.Content -> Shelf(uiState, onQueryChanged, onTabSelected, onSortSelected, onFiltersChanged, onPlay, onGameClick, onOpenDownloads, onOpenSettings, onOpenSteamSettings, menu)
         }
     }
 }
@@ -167,7 +178,9 @@ private fun Shelf(
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSteamSettings: () -> Unit,
+    menu: GameMenuActions,
 ) {
+    var menuGame by remember { mutableStateOf<Game?>(null) }
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
     var highlightedId by remember(state.tab, state.query) { mutableStateOf<Int?>(null) }
@@ -208,10 +221,10 @@ private fun Shelf(
                 contentPadding = PaddingValues(bottom = 24.dp),
             ) {
                 if (state.continueGames.isNotEmpty()) {
-                    item(key = "continue") { Rail(RowKind.CONTINUE, state.continueGames, state, onGameClick, onPlay) { highlightedId = it } }
+                    item(key = "continue") { Rail(RowKind.CONTINUE, state.continueGames, state, onGameClick, onPlay, onMenu = { menuGame = it }) { highlightedId = it } }
                 }
                 if (state.favoriteGames.isNotEmpty()) {
-                    item(key = "favorites") { Rail(RowKind.FAVORITES, state.favoriteGames, state, onGameClick, onPlay) { highlightedId = it } }
+                    item(key = "favorites") { Rail(RowKind.FAVORITES, state.favoriteGames, state, onGameClick, onPlay, onMenu = { menuGame = it }) { highlightedId = it } }
                 }
                 if (state.allGames.isEmpty()) {
                     item(key = "empty") {
@@ -230,6 +243,7 @@ private fun Shelf(
                             state = state,
                             onGameClick = onGameClick,
                             onPlay = onPlay,
+                            onMenu = { menuGame = it },
                             trailing = { SortPill(display.sort, onSortSelected) },
                             onHighlight = { highlightedId = it },
                         )
@@ -241,6 +255,18 @@ private fun Shelf(
         // Over the top edge, so showing or hiding it never moves the content below.
         if (state.isScanning) {
             LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter))
+        }
+
+        menuGame?.let { game ->
+            GameMenu(
+                game = game,
+                installed = game.appId in state.installedIds,
+                hasUpdate = game.appId in state.updatable,
+                needsAttention = game.appId in state.attention,
+                favorite = game.appId in state.favoriteIds,
+                actions = menu,
+                onDismiss = { menuGame = null },
+            )
         }
 
         FilterOverlay(open = filtersOpen, filters = state.filters, onChange = onFiltersChanged, onClose = { filtersOpen = false })
@@ -270,6 +296,7 @@ private fun Rail(
     state: LibraryUiState.Content,
     onGameClick: (Int) -> Unit,
     onPlay: (Game) -> Unit,
+    onMenu: (Game) -> Unit,
     trailing: (@Composable () -> Unit)? = null,
     onHighlight: (Int) -> Unit,
 ) {
@@ -325,6 +352,7 @@ private fun Rail(
                     GameCard(
                         game = game,
                         onClick = { onGameClick(game.appId) },
+                        onLongClick = { onMenu(game) },
                         needsAttention = game.appId in state.attention,
                         hasUpdate = game.appId in state.updatable,
                         showTitle = display.coverTitles,

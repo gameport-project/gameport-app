@@ -98,6 +98,14 @@ class LibraryViewModel @Inject constructor(
 
     fun playIntent(game: Game): Intent? = actions.playIntent(game)
 
+    fun onHide(appId: Int) = actions.hide(appId)
+
+    fun onToggleFavorite(appId: Int) = actions.toggleFavorite(appId)
+
+    fun onUpdate(game: Game) = actions.update(game)
+
+    fun onRepatch(appId: Int) = actions.repatch(appId)
+
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
     }
@@ -137,7 +145,8 @@ private const val CONTINUE_LIMIT = 12
  */
 internal fun LibraryUiState.Content.arranged(display: DisplaySettings, history: PlayHistory, filters: LibraryFilters = LibraryFilters()): LibraryUiState.Content {
     val installedIds = history.installedAt.keys
-    val allowed = { game: Game -> filters.accepts(game, installedIds, history.favorites) }
+    // A game hidden in GamePort shows nowhere, search included.
+    val allowed = { game: Game -> game.appId !in history.hidden && filters.accepts(game, installedIds, history.favorites) }
     val visible = games.filter { (!display.hideUninstalled || it.appId in installedIds) && allowed(it) }
     val byName = compareBy<Game> { it.name.lowercase() }
     val newestInstall = compareByDescending<Game> { history.installedAt[it.appId] ?: 0L }

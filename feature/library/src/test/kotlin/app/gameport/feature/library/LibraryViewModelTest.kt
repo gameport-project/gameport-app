@@ -99,4 +99,12 @@ private object NoActions : LibraryActions {
     override fun setSort(sort: LibrarySort) = Unit
 
     override fun playIntent(game: Game): android.content.Intent? = null
+
+    override fun hide(appId: Int) = Unit
+
+    override fun toggleFavorite(appId: Int) = Unit
+
+    override fun update(game: Game) = Unit
+
+    override fun repatch(appId: Int) = Unit
 }

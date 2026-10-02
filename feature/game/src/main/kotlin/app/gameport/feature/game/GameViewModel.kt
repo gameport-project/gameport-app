@@ -40,6 +40,8 @@ sealed interface GameUiState {
         val controllerProfile: Boolean = false,
         /** The player starred the game: it is listed in the library's favorites. */
         val favorite: Boolean = false,
+        /** The player hid the game in GamePort (Steam is not concerned). */
+        val hidden: Boolean = false,
         /** Time played on this device and, once Steam answered, on the whole account. */
         val playtime: app.gameport.core.model.Playtime = app.gameport.core.model.Playtime(),
         /** False on a device without VR: nothing that belongs to VR is shown. */
@@ -87,8 +89,8 @@ class GameViewModel @Inject constructor(
         installer.observe(appId),
         issuesRepository.observe(appId),
         controllerMappings.observe(appId),
-        playHistory.favorites,
-    ) { game, install, issues, controllers, favorites ->
+        combine(playHistory.favorites, playHistory.hidden) { starred, hidden -> starred to hidden },
+    ) { game, install, issues, controllers, (favorites, hidden) ->
         if (game !is GameUiState.Content) return@combine game
         // Patching or updating a game that is already installed is not a first install: the game
         // keeps its Play and uninstall buttons, and the panel shows the progress.
@@ -103,7 +105,7 @@ class GameViewModel @Inject constructor(
             else -> Repatch.None
         }
         val shown = if (repatch != Repatch.None && installedPackage != null) InstallState.Installed(installedPackage) else install
-        game.copy(install = shown, issues = issues, repatch = repatch, controllerProfile = device.isHeadset && controllers.detected.isNotEmpty(), favorite = appId in favorites, vrDevice = device.isHeadset)
+        game.copy(install = shown, issues = issues, repatch = repatch, controllerProfile = device.isHeadset && controllers.detected.isNotEmpty(), favorite = appId in favorites, hidden = appId in hidden, vrDevice = device.isHeadset)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), GameUiState.Loading)
 
@@ -172,6 +174,8 @@ class GameViewModel @Inject constructor(
     fun onDiscard() = installer.discard(appId)
 
     fun onUninstall() = installer.uninstall(appId)
+
+    fun onSetHidden(hide: Boolean) = playHistory.setHidden(appId, hide)
 
     fun onToggleFavorite() = playHistory.toggleFavorite(appId)
 

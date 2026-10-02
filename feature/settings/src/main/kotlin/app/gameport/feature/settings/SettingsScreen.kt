@@ -1,6 +1,14 @@
 package app.gameport.feature.settings
 
 import app.gameport.core.designsystem.DangerTextButton
+import app.gameport.core.designsystem.GameImage
+import app.gameport.core.designsystem.GlassButton
+import app.gameport.core.model.Game
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.Icons
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.Spacer
 import android.app.Activity
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -73,6 +81,7 @@ private enum class Category(val title: Int) {
     LANGUAGE(R.string.settings_category_language),
     UPDATES(R.string.settings_category_updates),
     GAMES(R.string.settings_category_games),
+    HIDDEN(R.string.settings_category_hidden),
 }
 
 /** A full settings page: categories on the left, the selected one on the right. */
@@ -126,6 +135,7 @@ fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewMode
                                 checkHours, viewModel::onUpdateCheckHoursChanged, viewModel::onCheckForUpdate, viewModel::onUpdate,
                             )
                             Category.GAMES -> GamesSection(playerDefaults.heightCm, viewModel::onDefaultHeightChanged)
+                            Category.HIDDEN -> HiddenSection(viewModel.hiddenGames.collectAsStateWithLifecycle().value, viewModel::onShowAgain)
                     }
                     }
                 }
@@ -256,6 +266,37 @@ private fun GamesSection(heightCm: Int, onHeightChanged: (Int) -> Unit) {
         modifier = Modifier.widthIn(max = 720.dp),
     )
     Text(stringResource(R.string.settings_games_height_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+/** The games hidden in GamePort, each with a button to show it again. Steam's own hidden games are another matter and stay as they are. */
+@Composable
+private fun HiddenSection(games: List<Game>, onShowAgain: (Int) -> Unit) {
+    Text(stringResource(R.string.settings_category_hidden), style = MaterialTheme.typography.headlineSmall)
+    Text(stringResource(R.string.settings_hidden_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (games.isEmpty()) {
+        Text(stringResource(R.string.settings_hidden_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    games.forEach { game ->
+        Row(
+            Modifier.fillMaxWidth().widthIn(max = 720.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GameImage(
+                url = game.capsuleUrl,
+                fallbackUrl = game.capsuleFallbacks.firstOrNull(),
+                moreFallbacks = game.capsuleFallbacks.drop(1),
+                contentDescription = null,
+                modifier = Modifier.width(48.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(6.dp)),
+            )
+            Text(game.name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, maxLines = 2)
+            GlassButton(onClick = { onShowAgain(game.appId) }) {
+                Icon(Icons.Filled.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.settings_hidden_show))
+            }
+        }
+    }
 }
 
 /** Below this width the categories move from the left to a row above the page. */

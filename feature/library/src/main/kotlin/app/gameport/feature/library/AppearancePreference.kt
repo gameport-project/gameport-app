@@ -31,6 +31,8 @@ data class PlayHistory(
     val lastPlayed: Map<Int, Long> = emptyMap(),
     val favorites: Set<Int> = emptySet(),
     val installedAt: Map<Int, Long> = emptyMap(),
+    /** Hidden in GamePort's library (not on Steam). */
+    val hidden: Set<Int> = emptySet(),
 )
 
 fun interface HistorySource {
@@ -43,6 +45,14 @@ interface LibraryActions {
 
     /** The intent that starts [game] now, or null when it is not installed or its page has something to explain first (a missing permission). */
     fun playIntent(game: Game): Intent?
+
+    fun hide(appId: Int)
+
+    fun toggleFavorite(appId: Int)
+
+    fun update(game: Game)
+
+    fun repatch(appId: Int)
 }
 
 internal class UserAppearancePreference @Inject constructor(
@@ -61,14 +71,23 @@ internal class StoredHistorySource @Inject constructor(
             .onStart { emit(Unit) }
             .map { installed.all().mapNotNull { (appId, packageName) -> packages.installTimeOf(packageName)?.let { appId to it } }.toMap() }
             .flowOn(Dispatchers.IO)
-        return combine(history.lastPlayed, history.favorites, installedAt, ::PlayHistory)
+        return combine(history.lastPlayed, history.favorites, installedAt, history.hidden) { played, starred, at, hidden -> PlayHistory(played, starred, at, hidden) }
     }
 }
 
 internal class InstallerLibraryActions @Inject constructor(
     private val settings: UserSettings,
     private val installer: GameInstallRepository,
+    private val history: PlayHistoryStore,
 ) : LibraryActions {
+    override fun hide(appId: Int) = history.setHidden(appId, true)
+
+    override fun toggleFavorite(appId: Int) = history.toggleFavorite(appId)
+
+    override fun update(game: Game) = installer.update(game)
+
+    override fun repatch(appId: Int) = installer.repatch(appId)
+
     override fun setSort(sort: LibrarySort) = settings.updateDisplay { it.copy(sort = sort) }
 
     override fun playIntent(game: Game): Intent? =

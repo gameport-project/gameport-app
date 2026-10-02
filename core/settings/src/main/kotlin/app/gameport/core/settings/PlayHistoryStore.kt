@@ -19,11 +19,15 @@ class PlayHistoryStore @Inject constructor(
     private val prefs = context.getSharedPreferences("gameport_play_history", Context.MODE_PRIVATE)
     private val _lastPlayed = MutableStateFlow(readLastPlayed())
     private val _favorites = MutableStateFlow(readFavorites())
+    private val _hidden = MutableStateFlow(readHidden())
 
     /** Start time (epoch millis) by Steam app id. */
     val lastPlayed: StateFlow<Map<Int, Long>> = _lastPlayed.asStateFlow()
 
     val favorites: StateFlow<Set<Int>> = _favorites.asStateFlow()
+
+    /** Games the player hid in GamePort. Only GamePort's library is concerned, nothing changes on Steam. */
+    val hidden: StateFlow<Set<Int>> = _hidden.asStateFlow()
 
     fun markPlayed(appId: Int, now: Long = System.currentTimeMillis()) {
         prefs.edit().putLong("$PLAYED$appId", now).apply()
@@ -42,6 +46,14 @@ class PlayHistoryStore @Inject constructor(
         _favorites.value = updated
     }
 
+    fun setHidden(appId: Int, hide: Boolean) {
+        val updated = if (hide) _hidden.value + appId else _hidden.value - appId
+        prefs.edit().putStringSet(HIDDEN, updated.map(Int::toString).toSet()).apply()
+        _hidden.value = updated
+    }
+
+    private fun readHidden(): Set<Int> = prefs.getStringSet(HIDDEN, emptySet()).orEmpty().mapNotNull(String::toIntOrNull).toSet()
+
     private fun readLastPlayed(): Map<Int, Long> = prefs.all.mapNotNull { (key, value) ->
         if (key.startsWith(PLAYED) && value is Long) key.removePrefix(PLAYED).toIntOrNull()?.let { it to value } else null
     }.toMap()
@@ -51,5 +63,6 @@ class PlayHistoryStore @Inject constructor(
     private companion object {
         const val PLAYED = "played_"
         const val FAVORITES = "favorites"
+        const val HIDDEN = "hidden"
     }
 }
