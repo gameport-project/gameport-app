@@ -1,5 +1,6 @@
 package app.gameport.core.steam.session
 
+import kotlinx.coroutines.flow.flow
 import android.util.Log
 import app.gameport.core.model.AndroidBuild
 import app.gameport.core.model.AppKind
@@ -67,29 +68,7 @@ internal fun SteamSession.androidGames(
             visible += apps
             if (pkg in ownedPackages) owned += apps
         }
-        val list = games.values.filter { it.appId in visible }.map { game ->
-            val depots = game.depots.map { AndroidDepot(it.id, it.dlcAppId, it.installBytes, it.downloadBytes, it.manifestId) }
-            Game(
-                appId = game.appId,
-                name = game.name,
-                ownership = if (game.appId in owned) Ownership.OWNED else Ownership.FAMILY_SHARED,
-                kind = when (game.kind) {
-                    "demo" -> AppKind.DEMO
-                    "beta" -> AppKind.BETA
-                    else -> AppKind.GAME
-                },
-                androidBuild = AndroidBuild(
-                    packageName = null,
-                    isVr = game.isVr,
-                    baseDepots = depots.filter { it.dlcAppId == null },
-                    saveRules = game.saveRules.map { SaveRule(it.localDir, it.pattern, it.recursive, it.cloudPrefix) },
-                    dlc = depots.filter { it.dlcAppId != null }.groupBy { it.dlcAppId!! }.map { (dlcAppId, dlcDepots) ->
-                        DlcContent(dlcAppId, dlcNames[dlcAppId] ?: "DLC $dlcAppId", owned = dlcAppId in visible, depots = dlcDepots)
-                    }.sortedBy { it.name.lowercase() },
-                ),
-            )
-        }.sortedBy { it.name.lowercase() }
-        return Library(list, scanning)
+        return libraryOf(games.values.filter { it.appId in visible }, owned, visible, dlcNames, scanning)
     }
 
     fun persist() = cacheStore.save(
@@ -163,6 +142,41 @@ internal fun SteamSession.androidGames(
         send(snapshot(scanning = false))
     }
     awaitClose()
+}
+
+/** The library as the screens see it, from the cached games. [owned] and [visible] are app ids. */
+internal fun libraryOf(shown: Collection<CachedGame>, owned: Set<Int>, visible: Set<Int>, dlcNames: Map<Int, String>, scanning: Boolean): Library {
+    val list = shown.map { game ->
+        val depots = game.depots.map { AndroidDepot(it.id, it.dlcAppId, it.installBytes, it.downloadBytes, it.manifestId) }
+        Game(
+            appId = game.appId,
+            name = game.name,
+            ownership = if (game.appId in owned) Ownership.OWNED else Ownership.FAMILY_SHARED,
+            kind = when (game.kind) {
+                "demo" -> AppKind.DEMO
+                "beta" -> AppKind.BETA
+                else -> AppKind.GAME
+            },
+            androidBuild = AndroidBuild(
+                packageName = null,
+                isVr = game.isVr,
+                baseDepots = depots.filter { it.dlcAppId == null },
+                saveRules = game.saveRules.map { SaveRule(it.localDir, it.pattern, it.recursive, it.cloudPrefix) },
+                dlc = depots.filter { it.dlcAppId != null }.groupBy { it.dlcAppId!! }.map { (dlcAppId, dlcDepots) ->
+                    DlcContent(dlcAppId, dlcNames[dlcAppId] ?: "DLC $dlcAppId", owned = dlcAppId in visible, depots = dlcDepots)
+                }.sortedBy { it.name.lowercase() },
+            ),
+        )
+    }.sortedBy { it.name.lowercase() }
+    return Library(list, scanning)
+}
+
+/** The library from the last scan, for when Steam is not reachable: every cached game counts as owned. */
+internal fun offlineLibrary(cacheStore: LibraryCacheStore, accountId: Long): Flow<Library> = flow {
+    val cached = cacheStore.load(accountId)
+    val everything = cached?.games.orEmpty()
+    val ids = everything.map { it.appId }.toSet()
+    emit(libraryOf(everything, ids, ids, cached?.dlcNames.orEmpty(), scanning = false))
 }
 
 private fun KeyValue.toAndroidGame(appId: Int): CachedGame? {

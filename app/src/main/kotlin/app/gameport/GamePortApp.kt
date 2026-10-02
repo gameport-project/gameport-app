@@ -66,7 +66,7 @@ fun GamePortApp(viewModel: AppViewModel = hiltViewModel()) {
         )
         settingsScreen(onBack = navController::goBack)
         downloadsScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame)
-        gameScreen(onBack = navController::goBack, onOpenSettings = navController::navigateToGameSettings, onOpenSaves = navController::navigateToGameSaves, onOpenControllers = navController::navigateToGameControllers)
+        gameScreen(onBack = navController::goBack, onOpenSettings = navController::navigateToGameSettings, onOpenSaves = navController::navigateToGameSaves, onOpenControllers = navController::navigateToGameControllers, onOpenSteamSettings = { navController.navigate(SettingsRoute) })
         gameControllersScreen(onBack = navController::goBack)
         gameSavesScreen(onBack = navController::goBack)
         gameSettingsScreen(onBack = navController::goBack)

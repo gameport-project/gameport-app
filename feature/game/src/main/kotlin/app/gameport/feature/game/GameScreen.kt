@@ -2,6 +2,9 @@
 
 package app.gameport.feature.game
 
+import app.gameport.core.designsystem.ConnectionNotice
+import app.gameport.core.model.SteamConnection
+import app.gameport.core.designsystem.installErrorText
 import app.gameport.core.model.VersionOption
 import app.gameport.core.designsystem.GlassIconButton
 import android.text.format.Formatter
@@ -95,7 +98,7 @@ import app.gameport.core.model.SpeedUnit
 import app.gameport.core.model.Ownership
 
 @Composable
-fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -> Unit, onOpenControllers: () -> Unit, viewModel: GameViewModel = hiltViewModel()) {
+fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -> Unit, onOpenControllers: () -> Unit, onOpenSteamSettings: () -> Unit, viewModel: GameViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val speedUnit by viewModel.speedUnit.collectAsStateWithLifecycle()
@@ -127,8 +130,11 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
             },
         )
     }
+    val connection by viewModel.connection.collectAsStateWithLifecycle()
     GameContent(
         uiState = uiState,
+        connection = connection,
+        onOpenSteamSettings = onOpenSteamSettings,
         speedUnit = speedUnit,
         onOpenSettings = onOpenSettings,
         onOpenSaves = onOpenSaves,
@@ -153,6 +159,8 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
 @Composable
 internal fun GameContent(
     uiState: GameUiState,
+    connection: SteamConnection = SteamConnection.ONLINE,
+    onOpenSteamSettings: () -> Unit = {},
     speedUnit: SpeedUnit,
     onOpenSettings: () -> Unit,
     onOpenSaves: () -> Unit,
@@ -206,7 +214,14 @@ internal fun GameContent(
                     onResolveConflict = onResolveConflict,
                 )
             }
-            BackButton(onClick = onBack, modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 32.dp, top = 16.dp))
+            Row(
+                Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 32.dp, top = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                BackButton(onClick = onBack)
+                ConnectionNotice(connection, onClick = onOpenSteamSettings)
+            }
 
         }
     }
@@ -567,23 +582,6 @@ private fun DlcDialog(game: Game, dlc: List<DlcContent>, onDismiss: () -> Unit, 
         },
         dismissButton = { DangerTextButton(onClick = onDismiss) { Text(stringResource(R.string.game_cancel)) } },
     )
-}
-
-@Composable
-private fun installErrorText(error: InstallError): String {
-    val context = LocalContext.current
-    return when (error) {
-        is InstallError.NotEnoughSpace -> stringResource(
-            R.string.game_error_space,
-            Formatter.formatFileSize(context, error.neededBytes),
-            Formatter.formatFileSize(context, error.freeBytes),
-        )
-        InstallError.NotSignedIn -> stringResource(R.string.game_error_signed_out)
-        InstallError.NoApk -> stringResource(R.string.game_error_no_apk)
-        InstallError.UnreadableApk -> stringResource(R.string.game_error_unreadable)
-        InstallError.VersionConflict -> stringResource(R.string.game_error_conflict)
-        is InstallError.Other -> stringResource(R.string.game_install_failed, error.message.orEmpty())
-    }
 }
 
 /**

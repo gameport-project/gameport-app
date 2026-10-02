@@ -83,6 +83,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
     val countPlaytime by viewModel.countPlaytimeOnSteam.collectAsStateWithLifecycle()
     val returnToGamePort by viewModel.returnToGamePort.collectAsStateWithLifecycle()
     val language by viewModel.language.collectAsStateWithLifecycle()
+    val offline by viewModel.offline.collectAsStateWithLifecycle()
     val activity = LocalContext.current as? Activity
     var category by rememberSaveable { mutableStateOf(Category.ACCOUNT) }
 
@@ -106,7 +107,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
                         when (category) {
-                            Category.ACCOUNT -> AccountSection(accountName, countPlaytime, viewModel::onCountPlaytimeOnSteamChanged, returnToGamePort, viewModel::onReturnToGamePortChanged, viewModel::onSignOut)
+                            Category.ACCOUNT -> AccountSection(accountName, offline, viewModel::onOfflineModeChanged, countPlaytime, viewModel::onCountPlaytimeOnSteamChanged, returnToGamePort, viewModel::onReturnToGamePortChanged, viewModel::onSignOut)
                             Category.DOWNLOADS -> DownloadsSection(speedUnit, viewModel::onSpeedUnitSelected)
                             Category.APPEARANCE -> AppearanceSection(display, viewModel::onDisplayChanged)
                             Category.HOME -> HomeSection(display, viewModel.isHeadset, viewModel::onDisplayChanged)
@@ -142,6 +143,8 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
 @Composable
 private fun AccountSection(
     accountName: String?,
+    offline: Boolean,
+    onOfflineChanged: (Boolean) -> Unit,
     countPlaytime: Boolean,
     onCountPlaytimeChanged: (Boolean) -> Unit,
     returnToGamePort: Boolean,
@@ -169,6 +172,13 @@ private fun AccountSection(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     accountName?.let { Text(stringResource(R.string.settings_signed_in_as, it), style = MaterialTheme.typography.titleMedium) }
+    Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.settings_offline), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_offline_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = offline, onCheckedChange = onOfflineChanged)
+    }
     Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(stringResource(R.string.settings_playtime), style = MaterialTheme.typography.titleMedium)

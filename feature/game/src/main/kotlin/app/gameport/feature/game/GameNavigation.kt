@@ -26,10 +26,10 @@ fun NavController.navigateToGameSaves(appId: Int) = navigate(GameSavesRoute(appI
 
 fun NavController.navigateToGameControllers(appId: Int) = navigate(GameControllersRoute(appId))
 
-fun NavGraphBuilder.gameScreen(onBack: () -> Unit, onOpenSettings: (Int) -> Unit, onOpenSaves: (Int) -> Unit, onOpenControllers: (Int) -> Unit) {
+fun NavGraphBuilder.gameScreen(onBack: () -> Unit, onOpenSettings: (Int) -> Unit, onOpenSaves: (Int) -> Unit, onOpenControllers: (Int) -> Unit, onOpenSteamSettings: () -> Unit) {
     composable<GameRoute> { entry ->
         val appId = entry.toRoute<GameRoute>().appId
-        GameScreen(onBack = onBack, onOpenSettings = { onOpenSettings(appId) }, onOpenSaves = { onOpenSaves(appId) }, onOpenControllers = { onOpenControllers(appId) })
+        GameScreen(onBack = onBack, onOpenSettings = { onOpenSettings(appId) }, onOpenSaves = { onOpenSaves(appId) }, onOpenControllers = { onOpenControllers(appId) }, onOpenSteamSettings = onOpenSteamSettings)
     }
 }
 

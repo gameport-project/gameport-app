@@ -108,6 +108,7 @@ class GameInstallRepository @Inject constructor(
      */
     fun install(game: Game, dlc: Set<Int>? = null) {
         if (jobs[game.appId]?.isActive == true) return
+        if (auth.offline.value) return fail(game.appId, InstallError.Offline)
         val directory = downloadDirectory(game.appId)
         val chosen = dlc ?: readChosenDlc(directory)
         val depots = game.androidBuild?.depotsFor(chosen).orEmpty()

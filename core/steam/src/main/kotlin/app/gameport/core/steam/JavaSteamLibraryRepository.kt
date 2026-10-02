@@ -1,5 +1,9 @@
 package app.gameport.core.steam
 
+import app.gameport.core.steam.session.offlineLibrary
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.combine
+import app.gameport.core.model.AuthState
 import app.gameport.core.model.Game
 import app.gameport.core.model.Library
 import app.gameport.core.steam.cache.LibraryCacheStore
@@ -23,12 +27,21 @@ import kotlinx.coroutines.flow.shareIn
 class JavaSteamLibraryRepository @Inject constructor(
     sessions: SteamSessionHolder,
     private val cacheStore: LibraryCacheStore,
+    auth: SteamAuthRepository,
 ) : SteamLibraryRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val library: Flow<Library> = sessions.current
-        .flatMapLatest { session -> session?.androidGames(cacheStore) ?: emptyFlow() }
+    private val library: Flow<Library> = combine(sessions.current, auth.offline, auth.authState) { session, offline, state -> Triple(session, offline, state) }
+        .distinctUntilChanged()
+        .flatMapLatest { (session, offline, state) ->
+            when {
+                session != null -> session.androidGames(cacheStore)
+                // Without a connection the library is what the last scan saved.
+                offline && state is AuthState.SignedIn -> offlineLibrary(cacheStore, state.account.steamId and 0xFFFFFFFFL)
+                else -> emptyFlow()
+            }
+        }
         .shareIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), replay = 1)
 
     override fun observeLibrary(): Flow<Library> = library

@@ -117,6 +117,7 @@ class PlaytimeTracker @Inject constructor(
 
     private suspend fun withSession(block: suspend (SteamSession) -> Unit) {
         runCatching { auth.restoreSession() }
+        if (auth.offline.value) return
         val session = withTimeoutOrNull(SESSION_WAIT_MS) { sessions.current.filterNotNull().first() } ?: return
         runCatching { block(session) }.onFailure { Log.w(TAG, "could not tell Steam about the game", it) }
     }
@@ -124,6 +125,7 @@ class PlaytimeTracker @Inject constructor(
     /** The total time Steam counts for [appId] on the account, in minutes, or null when it cannot be read now. */
     suspend fun steamMinutes(appId: Int): Int? {
         runCatching { auth.restoreSession() }
+        if (auth.offline.value) return null
         val session = withTimeoutOrNull(SESSION_WAIT_MS) { sessions.current.filterNotNull().first() } ?: return null
         return runCatching { session.playtimeMinutes(appId) }.getOrNull()
     }

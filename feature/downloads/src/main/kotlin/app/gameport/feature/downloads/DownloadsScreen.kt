@@ -2,6 +2,7 @@
 
 package app.gameport.feature.downloads
 
+import app.gameport.core.designsystem.installErrorText
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -157,7 +158,7 @@ private fun EntryRow(
                 InstallState.Patching -> Text(stringResource(R.string.downloads_patching))
                 InstallState.Installing -> Text(stringResource(R.string.downloads_installing))
                 InstallState.Interrupted -> Text(stringResource(R.string.downloads_interrupted))
-                is InstallState.Failed -> Text(stringResource(R.string.downloads_failed), color = MaterialTheme.colorScheme.error)
+                is InstallState.Failed -> Text(installErrorText(state.error), color = MaterialTheme.colorScheme.error)
                 is InstallState.Installed ->
                     if (updateAvailable) GlassChip(stringResource(R.string.downloads_update_available), accent = Color(0xFF66BB6A))
                     else Text(stringResource(R.string.downloads_installed))

@@ -7,6 +7,7 @@ import app.gameport.core.model.ContinueScope
 import app.gameport.core.model.DisplaySettings
 import app.gameport.core.model.Game
 import app.gameport.core.model.LibrarySort
+import app.gameport.core.model.SteamConnection
 import app.gameport.core.model.Library
 import app.gameport.core.steam.SteamLibraryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -49,6 +50,8 @@ sealed interface LibraryUiState {
         val lastPlayed: Game? = null,
         /** Names of the installed games Steam has a newer build for. */
         val updates: List<String> = emptyList(),
+        /** How GamePort stands with Steam; a notice shows when it is not connected. */
+        val connection: SteamConnection = SteamConnection.ONLINE,
     ) : LibraryUiState
 }
 
@@ -71,8 +74,8 @@ class LibraryViewModel @Inject constructor(
         combine(repository.observeLibrary(), query, tab, attention.observe(), combine(appearance.observe(), history.observe(), filters) { shown, played, narrowed -> Triple(shown, played, narrowed) }) { library, query, tab, outdated, (shown, played, narrowed) ->
             library.toUiState(query, tab, showTabs).copy(attention = outdated).arranged(shown, played, narrowed)
         },
-        updates.observe(),
-    ) { state, updatable -> state.copy(updates = updatable) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LibraryUiState.Loading)
+        combine(updates.observe(), updates.observeConnection()) { games, connection -> games to connection },
+    ) { state, (updatable, connection) -> state.copy(updates = updatable, connection = connection) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LibraryUiState.Loading)
 
     init {
         // Asked when the library opens (that is, when the app starts).

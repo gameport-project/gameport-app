@@ -35,6 +35,9 @@ sealed interface InstallError {
 
     data object NotSignedIn : InstallError
 
+    /** Offline mode, or Steam cannot be reached: nothing can be downloaded. */
+    data object Offline : InstallError
+
     /** Steam's Android build held no APK, so nothing could be installed. */
     data object NoApk : InstallError
 

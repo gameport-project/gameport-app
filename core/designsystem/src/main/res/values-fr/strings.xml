@@ -4,4 +4,14 @@
     <string name="speed_megabits">%1$s Mb/s</string>
     <string name="back">Retour</string>
     <string name="clear">Effacer</string>
+    <string name="game_error_space">Pas assez d\'espace libre : environ %1$s nécessaires, %2$s disponibles.</string>
+    <string name="game_error_signed_out">Connexion à Steam requise.</string>
+    <string name="game_error_offline">GamePort est hors ligne : un jeu ne peut pas être téléchargé sans connexion à Steam.</string>
+    <string name="game_error_no_apk">La version Android de ce jeu sur Steam ne contient aucun APK.</string>
+    <string name="game_error_unreadable">L\'APK téléchargé est illisible.</string>
+    <string name="game_error_conflict">Une autre version de ce jeu est déjà installée (par exemple celle du Meta Store). Désinstallez-la d\'abord.</string>
+    <string name="game_install_failed">Échec de l\'installation : %1$s</string>
+    <string name="status_offline">Non connecté à Steam</string>
+    <string name="status_connecting">Connexion à Steam en cours…</string>
+    <string name="status_offline_mode">Mode hors ligne</string>
 </resources>

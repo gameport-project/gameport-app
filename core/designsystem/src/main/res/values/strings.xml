@@ -4,4 +4,14 @@
     <string name="speed_megabits">%1$s Mb/s</string>
     <string name="back">Back</string>
     <string name="clear">Clear</string>
+    <string name="game_error_space">Not enough free space: about %1$s needed, %2$s available.</string>
+    <string name="game_error_signed_out">Steam sign-in required.</string>
+    <string name="game_error_offline">GamePort is offline: a game cannot be downloaded without a connection to Steam.</string>
+    <string name="game_error_no_apk">Steam\'s Android build of this game contains no APK.</string>
+    <string name="game_error_unreadable">The downloaded APK could not be read.</string>
+    <string name="game_error_conflict">A different version of this game is already installed (for example the Meta Store one). Uninstall it first.</string>
+    <string name="game_install_failed">Install failed: %1$s</string>
+    <string name="status_offline">Not connected to Steam</string>
+    <string name="status_connecting">Connecting to Steam…</string>
+    <string name="status_offline_mode">Offline mode</string>
 </resources>

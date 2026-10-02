@@ -84,4 +84,6 @@
     <string name="settings_group_cover_names">Names</string>
     <string name="settings_return">Come back to GamePort when a game closes</string>
     <string name="settings_return_description">A game started from GamePort opens GamePort again once it is closed, instead of leaving the device on its home screen.</string>
+    <string name="settings_offline">Offline mode</string>
+    <string name="settings_offline_description">GamePort stays off Steam: no connection, no save sync, no play time sent, no download. The library shows what was last saved and installed games still start. Turning it off reconnects. Saves made meanwhile are synced the next time a game starts online.</string>
 </resources>

@@ -101,6 +101,7 @@ class CloudSyncCoordinator @Inject constructor(
     suspend fun authTicket(packageName: String): ByteArray? {
         val appId = installed.all().entries.firstOrNull { it.value == packageName }?.key ?: return null
         runCatching { auth.restoreSession() }
+        if (auth.offline.value) return null
         val session = withTimeoutOrNull(SESSION_WAIT_MS) { sessions.current.filterNotNull().first() } ?: return null
         return runCatching { session.authSessionTicket(appId) }
             .onFailure { android.util.Log.w("GPSync", "no session ticket for $packageName", it) }
@@ -130,6 +131,7 @@ class CloudSyncCoordinator @Inject constructor(
     suspend fun refreshCloudSnapshot(appId: Int): Boolean {
         val packageName = installed.all()[appId] ?: return false
         runCatching { auth.restoreSession() }
+        if (auth.offline.value) return false
         val session = withTimeoutOrNull(SESSION_WAIT_MS) { sessions.current.filterNotNull().first() } ?: return false
         val account = (auth.authState.value as? AuthState.SignedIn)?.account ?: return false
         val game = library.load(session.accountId)?.games?.firstOrNull { it.appId == appId } ?: return false
@@ -147,6 +149,7 @@ class CloudSyncCoordinator @Inject constructor(
     suspend fun begin(packageName: String): BeginResult {
         val appId = installed.all().entries.firstOrNull { it.value == packageName }?.key ?: return BeginResult.Unsupported
         runCatching { auth.restoreSession() }
+        if (auth.offline.value) return BeginResult.Offline.also { syncStatus.record(appId, SyncStatus.OFFLINE) }
         val session = withTimeoutOrNull(SESSION_WAIT_MS) { sessions.current.filterNotNull().first() }
             ?: return BeginResult.Offline.also { syncStatus.record(appId, SyncStatus.OFFLINE) }
         val account = (auth.authState.value as? AuthState.SignedIn)?.account

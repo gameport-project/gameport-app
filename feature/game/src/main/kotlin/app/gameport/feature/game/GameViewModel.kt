@@ -69,7 +69,11 @@ class GameViewModel @Inject constructor(
     private val playHistory: app.gameport.core.settings.PlayHistoryStore,
     playtimeStore: app.gameport.core.settings.PlaytimeStore,
     private val playtimeTracker: app.gameport.core.sync.PlaytimeTracker,
+    auth: app.gameport.core.steam.SteamAuthRepository,
 ) : ViewModel() {
+    /** How GamePort stands with Steam. */
+    val connection: StateFlow<app.gameport.core.model.SteamConnection> = auth.connection
+
     val speedUnit: StateFlow<SpeedUnit> = settings.speedUnit
 
     private val appId = savedStateHandle.toRoute<GameRoute>().appId

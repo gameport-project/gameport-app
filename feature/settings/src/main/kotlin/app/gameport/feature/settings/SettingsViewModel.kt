@@ -53,6 +53,15 @@ class SettingsViewModel @Inject constructor(
         .map { (it as? AuthState.SignedIn)?.account?.displayName }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
+    /** True when the player chose offline mode. */
+    val offline: StateFlow<Boolean> = auth.connection
+        .map { it == app.gameport.core.model.SteamConnection.OFFLINE_MODE }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
+
+    fun onOfflineModeChanged(enabled: Boolean) {
+        viewModelScope.launch { auth.setOfflineMode(enabled) }
+    }
+
     val countPlaytimeOnSteam: StateFlow<Boolean> = settings.countPlaytimeOnSteam
 
     fun onCountPlaytimeOnSteamChanged(count: Boolean) = settings.setCountPlaytimeOnSteam(count)

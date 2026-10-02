@@ -158,6 +158,17 @@ class SteamSession {
     @Volatile var accountId: Long = 0L
         private set
 
+    /** Set once Steam dropped the connection: the session is then dead and cannot be used again. */
+    @Volatile private var lost = false
+
+    @Volatile private var closedOnPurpose = false
+
+    /** False once the connection to Steam is gone (network change, sleep, Steam closing it): requests would fail at once. */
+    val isAlive: Boolean get() = !lost && client.isConnected
+
+    /** Called when Steam drops the connection on its own, not when GamePort closes the session. */
+    @Volatile var onLost: (() -> Unit)? = null
+
     @Volatile private var connected: CompletableDeferred<Unit>? = null
     @Volatile private var loggedOn: CompletableDeferred<LoggedOnCallback>? = null
     @Volatile private var accountName: CompletableDeferred<String>? = null
@@ -168,6 +179,8 @@ class SteamSession {
         callbacks.subscribe(DisconnectedCallback::class.java) {
             connected?.completeExceptionally(IllegalStateException("Disconnected from Steam"))
             loggedOn?.completeExceptionally(IllegalStateException("Disconnected from Steam"))
+            lost = true
+            if (!closedOnPurpose) onLost?.invoke()
         }
         callbacks.subscribe(LoggedOnCallback::class.java) { loggedOn?.complete(it) }
         callbacks.subscribe(LicenseListCallback::class.java) { _licenses.value = it.licenseList }
@@ -234,6 +247,7 @@ class SteamSession {
     }
 
     fun disconnect() {
+        closedOnPurpose = true
         if (client.isConnected) client.disconnect()
     }
 

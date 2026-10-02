@@ -84,4 +84,6 @@
     <string name="settings_group_cover_names">Noms</string>
     <string name="settings_return">Revenir à GamePort quand un jeu se ferme</string>
     <string name="settings_return_description">Un jeu lancé depuis GamePort rouvre GamePort une fois fermé, au lieu de laisser l\'appareil sur son écran d\'accueil.</string>
+    <string name="settings_offline">Mode hors ligne</string>
+    <string name="settings_offline_description">GamePort reste hors de Steam : pas de connexion, pas de synchronisation des sauvegardes, pas de temps de jeu envoyé, pas de téléchargement. La bibliothèque affiche ce qui a été enregistré en dernier et les jeux installés se lancent toujours. Le désactiver rétablit la connexion. Les sauvegardes faites entre-temps sont synchronisées au prochain lancement d\'un jeu en ligne.</string>
 </resources>

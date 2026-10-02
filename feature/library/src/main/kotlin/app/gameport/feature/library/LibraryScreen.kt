@@ -1,5 +1,11 @@
 package app.gameport.feature.library
 
+import app.gameport.core.designsystem.StatusNoticeWidth
+import app.gameport.core.designsystem.ConnectionNotice
+import app.gameport.core.model.SteamConnection
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.rounded.ErrorOutline
 import app.gameport.core.designsystem.GlassIconButton
 import android.view.KeyEvent as AndroidKeyEvent
 import android.content.Intent
@@ -443,13 +449,30 @@ private fun Header(
                 Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.library_settings))
             }
         }
-        if (state.showTabs) {
-            PillTabs(
-                labels = listOf(stringResource(R.string.library_tab_vr), stringResource(R.string.library_tab_flat)),
-                selectedIndex = state.tab.ordinal,
-                onSelect = { onTabSelected(LibraryTab.entries[it]) },
-                modifier = Modifier.width(260.dp),
-            )
+        if (state.showTabs || state.connection != SteamConnection.ONLINE) {
+            val tabs: @Composable () -> Unit = {
+                PillTabs(
+                    labels = listOf(stringResource(R.string.library_tab_vr), stringResource(R.string.library_tab_flat)),
+                    selectedIndex = state.tab.ordinal,
+                    onSelect = { onTabSelected(LibraryTab.entries[it]) },
+                    modifier = Modifier.width(StatusNoticeWidth),
+                )
+            }
+            val offline: @Composable () -> Unit = { ConnectionNotice(state.connection, onClick = onOpenSettings) }
+            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+                // Wide enough, the tabs stay centred and the notice sits at the left; otherwise it goes below the tabs.
+                if (maxWidth >= StatusNoticeWidth * 3 + 64.dp) {
+                    Box(Modifier.fillMaxWidth().height(44.dp)) {
+                        Box(Modifier.align(Alignment.CenterStart)) { offline() }
+                        if (state.showTabs) Box(Modifier.align(Alignment.Center)) { tabs() }
+                    }
+                } else {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (state.showTabs) tabs()
+                        offline()
+                    }
+                }
+            }
         }
         if (state.updates.isNotEmpty()) {
             GlassChip(

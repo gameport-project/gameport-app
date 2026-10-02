@@ -17,3 +17,18 @@ sealed interface AuthState {
 
     data class SignedIn(val account: SteamAccount) : AuthState
 }
+
+/** How GamePort stands with Steam while someone is signed in. */
+enum class SteamConnection {
+    /** Connected. */
+    ONLINE,
+
+    /** Not connected, and trying again by itself. */
+    CONNECTING,
+
+    /** The player chose offline mode: GamePort stays off Steam. */
+    OFFLINE_MODE,
+
+    /** Not connected, and the attempts to reconnect ran out for now. */
+    UNREACHABLE,
+}
