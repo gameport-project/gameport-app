@@ -62,6 +62,7 @@ class GameInstallRepository @Inject constructor(
     private val builds: InstalledBuilds,
     private val updates: GameUpdatesRepository,
     private val library: app.gameport.core.steam.SteamLibraryRepository,
+    private val achievements: app.gameport.core.steam.AchievementsRepository,
     private val playHistory: app.gameport.core.settings.PlayHistoryStore,
     private val gate: UpdateGate,
     private val events: GameEventLog,
@@ -155,6 +156,8 @@ class GameInstallRepository @Inject constructor(
                         ?: return@launch fail(game.appId, InstallError.NotSignedIn)
                     setState(game.appId, InstallState.Patching)
                     events.note(game.appId, "patching ${downloaded.size} file(s)")
+                    // Read before waiting for the lock, so the network is never asked while another game is being patched.
+                    val shimFiles = shimAchievements(game.appId)
                     // Patching rewrites multi-gigabyte files, so one game at a time.
                     patchedDirectory(directory).deleteRecursively()
                     apks = patchLock.withLock { downloaded.map { original ->
@@ -163,7 +166,7 @@ class GameInstallRepository @Inject constructor(
                         // Written under another name and renamed when complete, so an interrupted
                         // patch is never mistaken for a finished one.
                         val partial = File(patched.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf)))
+                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second))
                         check(partial.renameTo(patched)) { "Could not finish the patched APK." }
                         // Keep only one copy of a multi-gigabyte game on disk.
                         original.delete()
@@ -292,13 +295,14 @@ class GameInstallRepository @Inject constructor(
                 // Whether the game is VR decides which patches apply (a flat game gets none of the VR ones).
                 val game = kotlinx.coroutines.withTimeoutOrNull(3_000) { library.observeGame(appId).first() }
                 val isVr = game?.androidBuild?.isVr?.let { it && packages.isHeadset }
+                val shimFiles = shimAchievements(appId)
                 val patched = patchLock.withLock {
                     patchedDirectory(directory).deleteRecursively()
                     sources.map { original ->
                         val result = File(patchedDirectory(directory), original.name)
                         result.parentFile?.mkdirs()
                         val partial = File(result.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf)), patches)
+                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second), patches)
                         check(partial.renameTo(result)) { "Could not finish the patched APK." }
                         result
                     }
@@ -429,6 +433,16 @@ class GameInstallRepository @Inject constructor(
 
     private fun writeChosenDlc(directory: File, dlc: Set<Int>) {
         runCatching { File(directory, CHOICE_FILE).writeText(dlc.joinToString(",")) }
+    }
+
+    /**
+     * The achievements of the game for its Steamworks shim, as the two JSON texts baked into the patched game (definitions, then what the
+     * account already unlocked), or nothing. Reading them never fails a patch and never holds it up for long: a game patched without them
+     * only has no achievements recorded.
+     */
+    private suspend fun shimAchievements(appId: Int): Pair<String?, String?> {
+        val list = runCatching { kotlinx.coroutines.withTimeoutOrNull(20_000) { achievements.forShim(appId) } }.getOrNull() ?: return null to null
+        return app.gameport.core.model.ShimAchievements.definitions(list.items) to app.gameport.core.model.ShimAchievements.earned(list.items)
     }
 
     private fun patchedDirectory(directory: File) = File(directory, PATCHED_DIR)

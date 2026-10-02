@@ -17,6 +17,10 @@ data class PatchContext(
     val installedVersionCode: Long? = null,
     /** The patch version to record in the game ([PatchVersioning.current]). */
     val patchVersion: Int = PatchVersioning.GENERATION * 1_000,
+    /** The game's achievements (JSON, see [app.gameport.core.model.ShimAchievements]) for the Steamworks shim; null to bake none. */
+    val achievementDefinitions: String? = null,
+    /** The achievements the account already unlocked, to seed the shim's own record with. */
+    val achievementsEarned: String? = null,
 )
 
 /** The APK being patched: its manifest can be edited and files can be added. */

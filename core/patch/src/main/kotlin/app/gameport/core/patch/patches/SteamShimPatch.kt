@@ -17,6 +17,8 @@ object SteamShimPatch : ApkPatch {
 
     const val SHIM_PATH = "lib/arm64-v8a/libsteamclient.so"
     const val CONFIG_PATH = "assets/gameport/steam.cfg"
+    const val ACHIEVEMENTS_PATH = "assets/gameport/achievements.json"
+    const val ACHIEVEMENTS_EARNED_PATH = "assets/gameport/achievements_earned.json"
 
     override fun apply(session: PatchSession, context: PatchContext, assets: PatchAssets) {
         session.addFile(SHIM_PATH, assets.shim.open().use { it.readBytes() })
@@ -25,6 +27,14 @@ object SteamShimPatch : ApkPatch {
         // turns it into the settings files Steamworks expects, at every launch.
         val config = "appid=${context.steamAppId}\nsteamid=${context.steamId}\nname=${context.personaName.oneLine()}\n"
         session.addFile(CONFIG_PATH, config.toByteArray())
+
+        // The achievements are a bonus: a shim that does not know them ignores these files, and a failure here never fails the patch.
+        runCatching {
+            context.achievementDefinitions?.takeIf { it.isNotEmpty() }?.let { definitions ->
+                session.addFile(ACHIEVEMENTS_PATH, definitions.toByteArray())
+                context.achievementsEarned?.takeIf { it.isNotEmpty() }?.let { session.addFile(ACHIEVEMENTS_EARNED_PATH, it.toByteArray()) }
+            }
+        }
     }
 }
 

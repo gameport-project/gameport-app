@@ -41,6 +41,17 @@ class AchievementsRepository @Inject constructor(
     }
 
     /**
+     * The achievements of [appId] in English, read from Steam now, to be baked into a game being patched for its Steamworks shim. Null when
+     * Steam cannot be asked (offline mode, no connection, no answer in time) or the game has none: the patch then simply goes without them.
+     */
+    suspend fun forShim(appId: Int): AchievementList? {
+        runCatching { auth.restoreSession() }
+        if (auth.offline.value) return null
+        val session = withTimeoutOrNull(SESSION_WAIT_MS) { sessions.current.filterNotNull().first() } ?: return null
+        return runCatching { session.achievements(appId, "english") }.getOrNull()?.takeIf { it.items.isNotEmpty() }
+    }
+
+    /**
      * The language of the device, as Steam names it, even when GamePort is not translated into it: the texts of the achievements
      * come from the game, in as many languages as it has, so they follow the device and not the few languages of GamePort.
      */
