@@ -2,6 +2,7 @@
 
 package app.gameport.feature.game
 
+import app.gameport.core.model.VersionOption
 import app.gameport.core.designsystem.GlassIconButton
 import android.text.format.Formatter
 import androidx.compose.foundation.background
@@ -136,6 +137,8 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onBack = onBack,
         onInstall = viewModel::onInstall,
         onCancel = viewModel::onCancel,
+        onPause = viewModel::onPause,
+        onVersionChosen = viewModel::onVersionChosen,
         onDiscard = viewModel::onDiscard,
         onUninstall = viewModel::onUninstall,
         onPlay = { if (viewModel.shouldExplainStoragePermission()) explainingStorage = true else play() },
@@ -158,6 +161,8 @@ internal fun GameContent(
     onBack: () -> Unit,
     onInstall: (Game, Set<Int>?) -> Unit,
     onCancel: () -> Unit,
+    onPause: () -> Unit,
+    onVersionChosen: (String?) -> Unit,
     onDiscard: () -> Unit,
     onUninstall: () -> Unit,
     onPlay: () -> Unit,
@@ -184,6 +189,8 @@ internal fun GameContent(
                     speedUnit = speedUnit,
                     onInstall = { dlc -> onInstall(uiState.game, dlc) },
                     onCancel = onCancel,
+                    onPause = onPause,
+                    onVersionChosen = onVersionChosen,
                     onDiscard = onDiscard,
                     onUninstall = onUninstall,
                     onPlay = onPlay,
@@ -216,6 +223,8 @@ private fun GameDetails(
     speedUnit: SpeedUnit,
     onInstall: (Set<Int>?) -> Unit,
     onCancel: () -> Unit,
+    onPause: () -> Unit,
+    onVersionChosen: (String?) -> Unit,
     onDiscard: () -> Unit,
     onUninstall: () -> Unit,
     onPlay: () -> Unit,
@@ -306,6 +315,8 @@ private fun GameDetails(
                         onInstall = { if (ownedDlc.isEmpty()) onInstall(emptySet()) else choosingDlc = true },
                         onResume = { onInstall(null) },
                         onCancel = onCancel,
+                    onPause = onPause,
+                    onVersionChosen = onVersionChosen,
                         onDiscard = onDiscard,
                         onUninstall = onUninstall,
                         onPlay = onPlay,
@@ -393,6 +404,8 @@ private fun InstallActions(
     onInstall: () -> Unit,
     onResume: () -> Unit,
     onCancel: () -> Unit,
+    onPause: () -> Unit,
+    onVersionChosen: (String?) -> Unit,
     onDiscard: () -> Unit,
     onUninstall: () -> Unit,
     onPlay: () -> Unit,
@@ -411,7 +424,11 @@ private fun InstallActions(
             LinearProgressIndicator(Modifier.fillMaxWidth())
             DangerTextButton(onClick = onCancel) { Text(stringResource(R.string.game_cancel)) }
         }
-        is InstallState.Downloading -> Progress(step = Step.DOWNLOAD, fraction = install.progress, speed = install.bytesPerSecond, speedUnit = speedUnit, onCancel = onCancel)
+        is InstallState.Downloading -> Progress(step = Step.DOWNLOAD, fraction = install.progress, speed = install.bytesPerSecond, speedUnit = speedUnit, onCancel = onCancel, verifying = install.verifying, onPause = onPause)
+        is InstallState.ChoosingVersion -> {
+            VersionDialog(install.options, onChosen = onVersionChosen)
+            Text(stringResource(R.string.game_choose_version_waiting), style = MaterialTheme.typography.bodyMedium)
+        }
         InstallState.Patching -> Progress(step = Step.PATCH, fraction = null, speed = 0, speedUnit = speedUnit, onCancel = null)
         InstallState.Installing -> Progress(step = Step.INSTALL, fraction = null, speed = 0, speedUnit = speedUnit, onCancel = null)
         is InstallState.Installed -> FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -440,7 +457,7 @@ private enum class Step(val label: Int) {
 
 /** The three stages an install goes through, with the current one highlighted. */
 @Composable
-private fun Progress(step: Step, fraction: Float?, speed: Long, speedUnit: SpeedUnit, onCancel: (() -> Unit)?) {
+private fun Progress(step: Step, fraction: Float?, speed: Long, speedUnit: SpeedUnit, onCancel: (() -> Unit)?, verifying: Boolean = false, onPause: (() -> Unit)? = null) {
     Column(Modifier.widthIn(max = 460.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Step.entries.forEach { entry ->
@@ -461,7 +478,11 @@ private fun Progress(step: Step, fraction: Float?, speed: Long, speedUnit: Speed
             LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
             val percent = "${(fraction * 100).toInt()}%"
             Text(
-                if (speed > 0) "$percent · ${speedText(speed, speedUnit)}" else percent,
+                when {
+                    verifying -> stringResource(R.string.game_verifying, (fraction * 100).toInt())
+                    speed > 0 -> "$percent · ${speedText(speed, speedUnit)}"
+                    else -> percent
+                },
                 style = MaterialTheme.typography.bodyMedium,
             )
         } else {
@@ -471,8 +492,33 @@ private fun Progress(step: Step, fraction: Float?, speed: Long, speedUnit: Speed
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
-        onCancel?.let { DangerTextButton(onClick = it) { Text(stringResource(R.string.game_cancel)) } }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            onPause?.let { androidx.compose.material3.OutlinedButton(onClick = it) { Text(stringResource(R.string.game_pause)) } }
+            onCancel?.let { DangerTextButton(onClick = it) { Text(stringResource(R.string.game_cancel)) } }
+        }
     }
+}
+
+/** Asked when a download holds several builds and none clearly fits this device. */
+@Composable
+private fun VersionDialog(options: List<VersionOption>, onChosen: (String?) -> Unit) {
+    AlertDialog(
+        onDismissRequest = {},
+        title = { Text(stringResource(R.string.game_choose_version_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.game_choose_version_message))
+                options.forEach { option ->
+                    val kind = stringResource(if (option.forHeadset) R.string.game_version_headset else R.string.game_version_flat)
+                    OutlinedButton(onClick = { onChosen(option.id) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("$kind · ${option.versionName ?: option.versionCode}")
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { DangerTextButton(onClick = { onChosen(null) }) { Text(stringResource(R.string.game_cancel)) } },
+    )
 }
 
 /** Asked when Install is pressed: which owned extras to add. Nothing is ticked by default. */

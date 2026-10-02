@@ -20,11 +20,11 @@ class JavaSteamGameDownloader @Inject constructor(
     override suspend fun download(appId: Int, depotIds: List<Int>, directory: File, onProgress: (Float, Long) -> Unit) {
         withContext(Dispatchers.IO) {
             val session = sessions.current.value ?: error("Not signed in to Steam")
+            val startBytes = session.receivedBytes(depotIds)
             directory.mkdirs()
             val failure = AtomicReference<Throwable?>()
             // Each depot reports the fraction of its own download; the overall figure is their mean.
             val fractionByDepot = ConcurrentHashMap<Int, Float>()
-            val receivedByDepot = ConcurrentHashMap<Int, Long>()
 
             session.newDepotDownloader().use { downloader ->
                 downloader.addListener(object : IDownloadListener {
@@ -35,8 +35,8 @@ class JavaSteamGameDownloader @Inject constructor(
                         uncompressedBytes: Long,
                     ) {
                         fractionByDepot[depotId] = depotPercentComplete
-                        receivedByDepot[depotId] = compressedBytes
-                        onProgress(fractionByDepot.values.average().toFloat().coerceIn(0f, 1f), receivedByDepot.values.sum())
+                        // What came over the network, so files checked on disk (a resumed download) do not count.
+                        onProgress(fractionByDepot.values.average().toFloat().coerceIn(0f, 1f), session.receivedBytes(depotIds) - startBytes)
                     }
 
                     override fun onDownloadFailed(item: DownloadItem, error: Throwable) {

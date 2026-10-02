@@ -143,4 +143,11 @@
     <string name="game_info_played_steam">Sur Steam</string>
     <string name="game_kind_demo">Démo</string>
     <string name="game_kind_beta">Bêta</string>
+    <string name="game_verifying">Vérification des fichiers déjà téléchargés… %1$d %%</string>
+    <string name="game_pause">Pause</string>
+    <string name="game_choose_version_title">Quelle version ?</string>
+    <string name="game_choose_version_message">Ce jeu existe en plusieurs versions et aucune ne convient clairement à cet appareil. Choisir celle à installer.</string>
+    <string name="game_choose_version_waiting">En attente d\'un choix…</string>
+    <string name="game_version_headset">Version VR</string>
+    <string name="game_version_flat">Version sans VR</string>
 </resources>

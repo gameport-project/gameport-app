@@ -126,6 +126,10 @@ class GameViewModel @Inject constructor(
 
     fun onCancel() = installer.cancel(appId)
 
+    fun onVersionChosen(optionId: String?) = installer.chooseVersion(appId, optionId)
+
+    fun onPause() = installer.pause(appId)
+
     fun onDiscard() = installer.discard(appId)
 
     fun onUninstall() = installer.uninstall(appId)

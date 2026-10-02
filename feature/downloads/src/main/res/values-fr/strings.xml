@@ -21,4 +21,7 @@
     <string name="downloads_update_available">Mise à jour disponible</string>
     <string name="downloads_update_one">%1$s a une nouvelle version</string>
     <string name="downloads_update_many">%1$d jeux ont une mise à jour</string>
+    <string name="downloads_verifying">Vérification des fichiers déjà téléchargés… %1$d %%</string>
+    <string name="downloads_pause">Pause</string>
+    <string name="downloads_choose_version">Une version est à choisir : ouvrir le jeu</string>
 </resources>

@@ -6,11 +6,17 @@ sealed interface InstallState {
     /** Waiting for a free download slot behind other games. */
     data object Queued : InstallState
 
-    /** [progress] is 0..1 of the download. */
-    data class Downloading(val progress: Float, val bytesPerSecond: Long = 0L) : InstallState
+    /**
+     * [progress] is 0..1 of the download. [verifying] is true while it moves on by checking files already on disk
+     * (a resumed download) rather than by fetching anything.
+     */
+    data class Downloading(val progress: Float, val bytesPerSecond: Long = 0L, val verifying: Boolean = false) : InstallState
 
     /** A download was started earlier and left files behind; it can be resumed or discarded. */
     data object Interrupted : InstallState
+
+    /** The download holds several builds of the game and none fits this device clearly: the player picks one. */
+    data class ChoosingVersion(val options: List<VersionOption>) : InstallState
 
     /** The downloaded APK is being prepared: Steam shim, VR entry, signature. */
     data object Patching : InstallState
@@ -39,3 +45,6 @@ sealed interface InstallError {
 
     data class Other(val message: String?) : InstallError
 }
+
+/** One build of a game found in its download. [id] is the file name. */
+data class VersionOption(val id: String, val versionName: String?, val versionCode: Long, val forHeadset: Boolean)

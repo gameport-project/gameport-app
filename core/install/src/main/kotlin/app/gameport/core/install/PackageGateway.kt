@@ -94,6 +94,20 @@ class PackageGateway @Inject constructor(
         return awaitStatus(sessionId) { intentSender -> installer.openSession(sessionId).use { it.commit(intentSender) } }
     }
 
+    /** What an APK says about itself, enough to tell the builds of one game apart. Null when it cannot be read. */
+    fun inspect(apk: java.io.File): ApkInfo? {
+        val info = packageManager.getPackageArchiveInfo(apk.absolutePath, PackageManager.GET_CONFIGURATIONS) ?: return null
+        val features = info.reqFeatures.orEmpty().mapNotNull { it.name }
+        return ApkInfo(
+            file = apk,
+            packageName = info.packageName,
+            versionCode = info.longVersionCode,
+            versionName = info.versionName,
+            forWatch = "android.hardware.type.watch" in features,
+            forHeadset = "android.hardware.vr.headtracking" in features,
+        )
+    }
+
     suspend fun uninstall(packageName: String): Outcome =
         awaitStatus(packageName.hashCode()) { intentSender -> packageManager.packageInstaller.uninstall(packageName, intentSender) }
 
@@ -169,3 +183,13 @@ class PackageGateway @Inject constructor(
         awaitClose { context.unregisterReceiver(receiver) }
     }
 }
+
+/** The facts about an APK that decide which build of a game suits a device. */
+data class ApkInfo(
+    val file: java.io.File,
+    val packageName: String,
+    val versionCode: Long,
+    val versionName: String?,
+    val forWatch: Boolean,
+    val forHeadset: Boolean,
+)

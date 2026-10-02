@@ -21,4 +21,7 @@
     <string name="downloads_update_available">Update available</string>
     <string name="downloads_update_one">%1$s has a new version</string>
     <string name="downloads_update_many">%1$d games have an update</string>
+    <string name="downloads_verifying">Checking files already downloaded… %1$d%%</string>
+    <string name="downloads_pause">Pause</string>
+    <string name="downloads_choose_version">A version must be chosen: open the game</string>
 </resources>

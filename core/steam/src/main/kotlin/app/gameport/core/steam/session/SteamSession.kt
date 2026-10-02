@@ -38,6 +38,17 @@ import `in`.dragonbra.javasteam.steam.handlers.steamapps.callback.LicenseListCal
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import okhttp3.ConnectionPool
+import okhttp3.Dispatcher
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.ResponseBody.Companion.asResponseBody
+import okio.Buffer
+import okio.ForwardingSource
+import okio.buffer
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.TimeUnit
 
 /** Identity of a signed-in Steam session. */
 data class SessionIdentity(val steamId: Long, val displayName: String)
@@ -48,8 +59,19 @@ data class SessionIdentity(val steamId: Long, val displayName: String)
  */
 class SteamSession {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val traffic = ConcurrentHashMap<Int, AtomicLong>()
+
+    /**
+     * Bytes received from the network so far for these depots: what a download really fetched, not what it verified
+     * on disk. Counted per depot, so two games downloading at once each see their own figure.
+     */
+    fun receivedBytes(depotIds: Collection<Int>): Long = depotIds.sumOf { traffic[it]?.get() ?: 0L }
+
     internal val client = SteamClient(
-        SteamConfiguration.create { it.withProtocolTypes(EnumSet.of(ProtocolTypes.WEB_SOCKET)) },
+        SteamConfiguration.create {
+            it.withProtocolTypes(EnumSet.of(ProtocolTypes.WEB_SOCKET))
+            it.withHttpClient(httpClient(traffic))
+        },
     )
     private val callbacks = CallbackManager(client)
     private val user = client.getHandler(SteamUser::class.java)!!
@@ -159,8 +181,8 @@ class SteamSession {
 
     /** A depot downloader bound to this session; the caller closes it. */
     fun newDepotDownloader(): DepotDownloader =
-        // Fewer parallel chunks than the library default: every one holds megabytes in memory, and
-        // eight of them plus their decompression starve a phone-sized heap.
+        // More parallel chunks than before: a slow cache server held a slot until it timed out, and four slots
+        // left the link idle (measured on device: 2.8 MB/s on a connection above 400 Mbit/s, CPU mostly idle).
         DepotDownloader(client, _licenses.value.orEmpty(), maxDownloads = MAX_PARALLEL_DOWNLOADS, maxDecompress = MAX_PARALLEL_DECOMPRESS)
 
     suspend fun connect() {
@@ -219,8 +241,8 @@ class SteamSession {
         const val PUMP_TIMEOUT_MS = 1_000L
         const val PLAYING_SETTLE_MS = 700L
         const val PLAYING_TIMEOUT_MS = 3 * 60 * 1_000L
-        const val MAX_PARALLEL_DOWNLOADS = 4
-        const val MAX_PARALLEL_DECOMPRESS = 2
+        const val MAX_PARALLEL_DOWNLOADS = 12
+        const val MAX_PARALLEL_DECOMPRESS = 3
         const val CONNECT_TIMEOUT_MS = 30_000L
         const val ACCOUNT_INFO_TIMEOUT_MS = 5_000L
     }
@@ -246,3 +268,42 @@ private object SteamLogging : LogListener {
 
     private const val TAG = "JavaSteam"
 }
+
+/**
+ * The HTTP client JavaSteam downloads depot chunks with. Over HTTP/2 every chunk of a cache server shares one
+ * connection, and a few requests per host are allowed at once: a single slow stream then holds the whole
+ * link back. One connection per request, and room for many at once, lets the parallel chunks fill the line.
+ */
+private fun httpClient(traffic: ConcurrentHashMap<Int, AtomicLong>): OkHttpClient {
+    val dispatcher = Dispatcher().apply {
+        maxRequests = HTTP_MAX_REQUESTS
+        maxRequestsPerHost = HTTP_MAX_REQUESTS_PER_HOST
+    }
+    return OkHttpClient.Builder()
+        .protocols(listOf(Protocol.HTTP_1_1))
+        .addNetworkInterceptor { chain ->
+            val response = chain.proceed(chain.request())
+            val body = response.body ?: return@addNetworkInterceptor response
+            // Cache servers address a depot as /depot/<id>/...
+            val segments = chain.request().url.pathSegments
+            val depot = segments.getOrNull(1)?.toIntOrNull()?.takeIf { segments.firstOrNull() == "depot" }
+                ?: return@addNetworkInterceptor response
+            val counter = traffic.getOrPut(depot) { AtomicLong() }
+            val counting = object : ForwardingSource(body.source()) {
+                override fun read(sink: Buffer, byteCount: Long): Long =
+                    super.read(sink, byteCount).also { if (it > 0) counter.addAndGet(it) }
+            }
+            response.newBuilder().body(counting.buffer().asResponseBody(body.contentType(), body.contentLength())).build()
+        }
+        .dispatcher(dispatcher)
+        .connectionPool(ConnectionPool(HTTP_MAX_REQUESTS, 1, TimeUnit.MINUTES))
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        // Keeps the Steam websocket alive while nothing is downloading.
+        .pingInterval(15, TimeUnit.SECONDS)
+        .build()
+}
+
+private const val HTTP_MAX_REQUESTS = 64
+private const val HTTP_MAX_REQUESTS_PER_HOST = 16

@@ -8,6 +8,7 @@ import app.gameport.core.model.AndroidDepot
 import app.gameport.core.model.Game
 import app.gameport.core.model.InstallError
 import app.gameport.core.model.InstallState
+import app.gameport.core.model.VersionOption
 import app.gameport.core.model.AuthState
 import app.gameport.core.patch.GamePatcher
 import app.gameport.core.patch.ApkPatch
@@ -66,6 +67,7 @@ class GameInstallRepository @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val operations = MutableStateFlow<Map<Int, InstallState>>(emptyMap())
     private val jobs = HashMap<Int, Job>()
+    private val paused = java.util.Collections.synchronizedSet(HashSet<Int>())
     private val activeJobs = AtomicInteger()
     private val _isBusy = MutableStateFlow(false)
 
@@ -116,7 +118,7 @@ class GameInstallRepository @Inject constructor(
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 // A previous run may have got as far as the patched APK; then nothing is left to fetch.
-                var apks = patchedApks(directory)
+                var apks = patchedApks(directory).let { patched -> if (patched.isEmpty()) patched else chooseBuild(game.appId, patched) ?: return@launch clearState(game.appId) }
                 if (apks.isEmpty()) {
                     // Only a couple of games download at once, the rest wait their turn: several
                     // at a time would each keep buffers in memory and starve the app.
@@ -124,18 +126,20 @@ class GameInstallRepository @Inject constructor(
                     downloadSlots.withPermit {
                         setState(game.appId, InstallState.Downloading(0f))
                         val speed = SpeedMeter()
+                        val check = VerifyingDetector()
                         downloader.download(game.appId, depots.map { it.id }, directory) { progress, received ->
-                            setState(game.appId, InstallState.Downloading(progress, speed.update(received)))
+                            setState(game.appId, InstallState.Downloading(progress, speed.update(received), check.update(received)))
                         }
                     }
 
-                    val downloaded = findApks(directory)
-                    if (downloaded.isEmpty()) {
+                    val everything = findApks(directory)
+                    if (everything.isEmpty()) {
                         // Nothing installable came down; do not leave gigabytes of it behind.
                         directory.deleteRecursively()
                         return@launch fail(game.appId, InstallError.NoApk)
                     }
 
+                    val downloaded = chooseBuild(game.appId, everything) ?: return@launch clearState(game.appId).also { directory.deleteRecursively() }
                     val account = (auth.authState.value as? AuthState.SignedIn)?.account
                         ?: return@launch fail(game.appId, InstallError.NotSignedIn)
                     setState(game.appId, InstallState.Patching)
@@ -172,6 +176,11 @@ class GameInstallRepository @Inject constructor(
                     is PackageGateway.Outcome.Failure -> fail(game.appId, InstallError.Other(outcome.reason))
                 }
             } catch (e: CancellationException) {
+                // A pause keeps what was downloaded; a cancel throws it away.
+                if (paused.remove(game.appId)) {
+                    clearState(game.appId)
+                    throw e
+                }
                 directory.deleteRecursively()
                 clearState(game.appId)
                 throw e
@@ -298,6 +307,13 @@ class GameInstallRepository @Inject constructor(
         jobs[appId]?.cancel()
     }
 
+    /** Stops a download but keeps the files, so it can be resumed later (it then shows as interrupted). */
+    fun pause(appId: Int) {
+        val job = jobs[appId]?.takeIf { it.isActive } ?: return
+        paused.add(appId)
+        job.cancel()
+    }
+
     /** Throws away an interrupted download. */
     fun discard(appId: Int) {
         scope.launch {
@@ -383,6 +399,52 @@ class GameInstallRepository @Inject constructor(
     private fun patchedApks(directory: File): List<File> =
         patchedDirectory(directory).listFiles { file -> file.extension.equals("apk", ignoreCase = true) }?.toList().orEmpty()
 
+    /**
+     * A download can hold several builds of one game (phone, headset, watch), all with the same package: Android
+     * refuses to install them together. APKs of one package with different version codes are such builds; APKs
+     * with the same version code are the parts of one build and go together. A watch build is never wanted. Among
+     * the rest, the one made for this device wins; if that does not settle it, the player is asked.
+     * Returns null when the player is asked and cancels.
+     */
+    private suspend fun chooseBuild(appId: Int, apks: List<File>): List<File>? {
+        val infos = apks.map { file -> packages.inspect(file) ?: return apks }
+        val builds = infos.filterNot { it.forWatch }.ifEmpty { infos }
+            .groupBy { it.packageName }.values.flatMap { sameApp ->
+                // One entry per build: the parts of a build share a version code.
+                sameApp.groupBy { it.versionCode }.values
+            }
+        val byApp = builds.groupBy { it.first().packageName }
+        val kept = byApp.values.flatMap { candidates ->
+            if (candidates.size == 1) return@flatMap candidates.single()
+            val suited = candidates.filter { build -> build.any { it.forHeadset } == packages.isHeadset }
+            val pick = suited.singleOrNull() ?: askWhichBuild(appId, candidates) ?: return null
+            pick
+        }
+        return kept.map { it.file }
+    }
+
+    private val choices = java.util.concurrent.ConcurrentHashMap<Int, kotlinx.coroutines.CompletableDeferred<String?>>()
+
+    private suspend fun askWhichBuild(appId: Int, candidates: List<List<ApkInfo>>): List<ApkInfo>? {
+        val deferred = kotlinx.coroutines.CompletableDeferred<String?>()
+        choices[appId] = deferred
+        setState(appId, InstallState.ChoosingVersion(candidates.map { build ->
+            val main = build.first()
+            VersionOption(main.file.name, main.versionName, main.versionCode, build.any { it.forHeadset })
+        }))
+        try {
+            val chosen = deferred.await() ?: return null
+            return candidates.firstOrNull { it.first().file.name == chosen }
+        } finally {
+            choices.remove(appId)
+        }
+    }
+
+    /** The player's answer to [InstallState.ChoosingVersion]: the id of the build, or null to give up. */
+    fun chooseVersion(appId: Int, optionId: String?) {
+        choices[appId]?.complete(optionId)
+    }
+
     /** APKs still to patch: the ones outside the folder that holds the patched results. */
     private fun findApks(directory: File): List<File> =
         directory.walkTopDown()
@@ -413,6 +475,39 @@ class GameInstallRepository @Inject constructor(
 private const val PATCHED_DIR = "patched"
 private const val STORAGE_PERMISSION = "android.permission.READ_EXTERNAL_STORAGE"
 private const val MAX_CONCURRENT_DOWNLOADS = 2
+
+/**
+ * Tells the check of files already on disk (progress moves, nothing comes from the network) from a download.
+ * It only switches after a few seconds without data, and back after a real flow, so the label does not flicker
+ * when two chunks happen to finish without a byte in between.
+ */
+internal class VerifyingDetector(private val now: () -> Long = System::currentTimeMillis) {
+    private var lastReceived = 0L
+    private var lastGrowth = now()
+    private var fetchedSince = 0L
+    private var verifying = false
+
+    fun update(received: Long): Boolean {
+        val delta = received - lastReceived
+        lastReceived = received
+        if (delta > 0) lastGrowth = now()
+        if (!verifying) {
+            if (now() - lastGrowth > IDLE_MS) {
+                verifying = true
+                fetchedSince = 0L
+            }
+        } else {
+            fetchedSince += delta.coerceAtLeast(0)
+            if (fetchedSince > BACK_TO_DOWNLOAD_BYTES) verifying = false
+        }
+        return verifying
+    }
+
+    private companion object {
+        const val IDLE_MS = 4_000L
+        const val BACK_TO_DOWNLOAD_BYTES = 512 * 1024L
+    }
+}
 private const val CHOICE_FILE = ".gameport-dlc"
 
 /** Smooths the network rate over a few seconds so the figure on screen does not jump around. */

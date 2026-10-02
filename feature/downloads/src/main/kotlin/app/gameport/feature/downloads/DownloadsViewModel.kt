@@ -51,6 +51,8 @@ class DownloadsViewModel @Inject constructor(
 
     fun onCancel(appId: Int) = installer.cancel(appId)
 
+    fun onPause(appId: Int) = installer.pause(appId)
+
     fun onDiscard(appId: Int) = installer.discard(appId)
 
     fun onUninstall(appId: Int) = installer.uninstall(appId)
@@ -67,7 +69,7 @@ class DownloadsViewModel @Inject constructor(
         /** Work in progress first, then what needs attention, then what is installed. */
         val ORDER = compareBy<DownloadEntry> {
             when (it.state) {
-                is InstallState.Downloading, InstallState.Patching, InstallState.Installing, InstallState.Queued -> 0
+                is InstallState.Downloading, InstallState.Patching, InstallState.Installing, InstallState.Queued, is InstallState.ChoosingVersion -> 0
                 is InstallState.Interrupted, is InstallState.Failed -> 1
                 else -> 2
             }

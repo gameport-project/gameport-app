@@ -103,6 +103,7 @@ fun DownloadsScreen(
                         onUpdate = { viewModel.onUpdate(entry) },
                         onOpen = { onGameClick(entry.appId) },
                         onCancel = { viewModel.onCancel(entry.appId) },
+                        onPause = { viewModel.onPause(entry.appId) },
                         onDiscard = { viewModel.onDiscard(entry.appId) },
                         onUninstall = { viewModel.onUninstall(entry.appId) },
                         onResume = { viewModel.onResume(entry) },
@@ -122,6 +123,7 @@ private fun EntryRow(
     onUpdate: () -> Unit,
     onOpen: () -> Unit,
     onCancel: () -> Unit,
+    onPause: () -> Unit,
     onDiscard: () -> Unit,
     onUninstall: () -> Unit,
     onResume: () -> Unit,
@@ -147,9 +149,11 @@ private fun EntryRow(
                 InstallState.Queued -> Text(stringResource(R.string.downloads_queued))
                 is InstallState.Downloading -> {
                     val percent = stringResource(R.string.downloads_downloading, (state.progress * 100).toInt())
-                    Text(if (state.bytesPerSecond > 0) "$percent · ${speedText(state.bytesPerSecond, speedUnit)}" else percent)
+                    if (state.verifying) Text(stringResource(R.string.downloads_verifying, (state.progress * 100).toInt()))
+                    else Text(if (state.bytesPerSecond > 0) "$percent · ${speedText(state.bytesPerSecond, speedUnit)}" else percent)
                     LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
                 }
+                is InstallState.ChoosingVersion -> Text(stringResource(R.string.downloads_choose_version))
                 InstallState.Patching -> Text(stringResource(R.string.downloads_patching))
                 InstallState.Installing -> Text(stringResource(R.string.downloads_installing))
                 InstallState.Interrupted -> Text(stringResource(R.string.downloads_interrupted))
@@ -162,8 +166,10 @@ private fun EntryRow(
         }
         val actions: @Composable () -> Unit = {
             when (entry.state) {
-                InstallState.Queued, is InstallState.Downloading ->
+                InstallState.Queued, is InstallState.Downloading -> {
+                    if (entry.state is InstallState.Downloading) GlassButton(onClick = onPause) { Text(stringResource(R.string.downloads_pause)) }
                     DangerButton(onClick = onCancel) { Text(stringResource(R.string.downloads_cancel)) }
+                }
                 InstallState.Interrupted, is InstallState.Failed -> {
                     if (entry.game != null) Button(onClick = onResume) { Text(stringResource(R.string.downloads_resume)) }
                     DangerButton(onClick = onDiscard) { Text(stringResource(R.string.downloads_discard)) }
