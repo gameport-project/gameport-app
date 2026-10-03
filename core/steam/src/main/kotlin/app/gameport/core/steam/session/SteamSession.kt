@@ -81,6 +81,7 @@ class SteamSession {
     val cloud: SteamCloud = client.getHandler(SteamCloud::class.java)!!
 
     internal val connectTokens = GameConnectTokens().also { client.addHandler(it) }
+    internal val storeStatsResponses = StoreStatsResponses().also { client.addHandler(it) }
 
     @Volatile internal var loggedOnAtMillis: Long = System.currentTimeMillis()
         private set

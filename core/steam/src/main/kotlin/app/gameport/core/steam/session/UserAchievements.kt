@@ -25,8 +25,9 @@ suspend fun SteamSession.achievements(appId: Int, language: String): Achievement
         ?: return@withContext null.also { Log.w(TAG, "app $appId: no answer") }
     if (response.result != EResult.OK) return@withContext null.also { Log.w(TAG, "app $appId: Steam answered ${response.result}") }
 
-    val times = response.achievementBlocks.associate { it.achievementId to it.unlockTime }
-    val items = parseAchievements(response.schemaKeyValues, language) { statId, bit -> times[statId]?.getOrNull(bit)?.toLong() ?: 0L }
+    val times = response.achievementBlocks.associate { block -> block.achievementId to block.unlockTime.toList() }
+    val values = response.stats.associate { it.statId to it.statValue }
+    val items = parseAchievements(response.schemaKeyValues, language) { statId, bit -> unlockedAt(values, times, statId, bit) }
     Log.i(TAG, "app $appId: ${response.schema.size()} bytes of schema, ${response.achievementBlocks.size} blocks, ${response.stats.size} stats, ${items.size} achievements in $language, ${items.count { it.unlocked }} unlocked")
     AchievementList(appId, language, items)
 }

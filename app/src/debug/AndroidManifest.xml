@@ -9,6 +9,10 @@
         <receiver
             android:name="app.gameport.debug.PatchDebugReceiver"
             android:exported="true" />
+        <!-- Development only: works out (and, when asked, really does) the adding of achievements to the Steam account. -->
+        <receiver
+            android:name="app.gameport.debug.AchievementDebugReceiver"
+            android:exported="true" />
     </application>
 
 </manifest>

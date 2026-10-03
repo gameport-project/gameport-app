@@ -56,6 +56,7 @@ public final class GamePortHookProvider extends ContentProvider {
             Log.i(TAG, "launch sync finished after " + (SystemClock.elapsedRealtime() - start) + " ms");
             prepareSteamTicket(context);
             watchTicketRequests(context);
+            pullAchievementsFromSteam(context);
             watchAchievements(context);
             reportControllerProfile(context);
 
@@ -185,6 +186,51 @@ public final class GamePortHookProvider extends ContentProvider {
         }, "gameport-ticket");
         watcher.setDaemon(true);
         watcher.start();
+    }
+
+    /**
+     * Before the game reads its record of unlocked achievements, GamePort adds to it what the Steam account has: achievements earned on
+     * another device are then known here and the game does not unlock them again. Nothing is ever taken out of the record. If Steam
+     * cannot be asked in time, or the account has nothing more, the file is left as it is.
+     */
+    private void pullAchievementsFromSteam(Context context) {
+        try {
+            File files = context.getExternalFilesDir(null);
+            File dir = new File(files != null ? files : context.getFilesDir(), "gameport");
+            String appId = readLine(new File(dir, "appid.txt"));
+            if (appId == null || appId.trim().isEmpty()) appId = configValue(readAsset(context, "gameport/steam.cfg"), "appid");
+            if (appId == null || appId.trim().isEmpty()) return;
+            File record = new File(dir, "Goldberg SteamEmu Saves/" + appId.trim() + "/achievements.json");
+            String current = record.isFile() ? readText(record) : "";
+            // A call carries little: a record too big, or one that cannot be read, is not touched.
+            if (current == null || current.length() > 400_000) return;
+            Bundle extras = new Bundle();
+            extras.putString("current", current);
+            Bundle result = context.getContentResolver().call(Uri.parse("content://app.gameport.cloud"), "earned", context.getPackageName(), extras);
+            String merged = result == null ? null : result.getString("merged");
+            if (merged == null || merged.isEmpty()) return;
+            File parent = record.getParentFile();
+            if (parent != null) parent.mkdirs();
+            File temp = new File(parent, "achievements.json.gameport");
+            writeAll(temp, merged.getBytes("UTF-8"));
+            if (!temp.renameTo(record)) {
+                temp.delete();
+                return;
+            }
+            Log.i(TAG, "the achievements of the Steam account were added to the game's record");
+        } catch (Throwable t) {
+            Log.w(TAG, "could not bring the achievements of the Steam account", t);
+        }
+    }
+
+    /** The value of [key] in a `key=value` per line text, or null. */
+    private static String configValue(String text, String key) {
+        if (text == null) return null;
+        for (String line : text.split("\\r?\\n")) {
+            int at = line.indexOf('=');
+            if (at > 0 && line.substring(0, at).trim().equals(key)) return line.substring(at + 1).trim();
+        }
+        return null;
     }
 
     /**

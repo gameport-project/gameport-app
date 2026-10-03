@@ -50,3 +50,24 @@ internal fun parseAchievements(schema: KeyValue, language: String, unlockTime: (
     }
     return found.sortedWith(compareBy({ it.first }, { it.second })).map { it.third }
 }
+
+/**
+ * Where each achievement sits in the stats of the account: its name (in lower case) gives the stat that holds it
+ * and the bit of that stat. Steam stores up to 32 achievements in one stat, one bit each.
+ */
+internal fun achievementPositions(schema: KeyValue): Map<String, Pair<Int, Int>> {
+    val stats = schema.child("stats") ?: schema.children.firstNotNullOfOrNull { it.child("stats") } ?: return emptyMap()
+    val positions = linkedMapOf<String, Pair<Int, Int>>()
+    for (block in stats.children) {
+        val statId = block.name?.toIntOrNull() ?: continue
+        val bits = block.child("bits") ?: continue
+        for (bit in bits.children) {
+            val index = bit.name?.toIntOrNull()?.takeIf { it in 0..MAX_BIT } ?: continue
+            val name = bit.child("name")?.value?.takeIf { it.isNotEmpty() } ?: continue
+            positions[name.lowercase()] = statId to index
+        }
+    }
+    return positions
+}
+
+private const val MAX_BIT = 31

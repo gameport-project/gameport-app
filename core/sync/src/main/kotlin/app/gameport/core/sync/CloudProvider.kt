@@ -38,6 +38,8 @@ internal interface CloudEntryPoint {
     fun reports(): ReportStore
 
     fun achievementNotifier(): AchievementNotifier
+
+    fun steamAchievements(): SteamAchievementSync
 }
 
 /**
@@ -116,7 +118,20 @@ class CloudProvider : ContentProvider() {
         // What the game wrote to the system log lately and how it last ended, for a problem report.
         "log" -> okAfter { entryPoint.reports().saveGameData(packageName, extras) }
         // The game unlocked achievements, which the shim recorded: they are announced with a notification.
-        "achievement" -> okAfter { entryPoint.achievementNotifier().unlocked(packageName, extras.getStringArray("names").orEmpty().toList(), extras.getLongArray("times")) }
+        // They are also added to the Steam account when the player chose so (see [SteamAchievementSync]).
+        "achievement" -> okAfter {
+            val names = extras.getStringArray("names").orEmpty().toList()
+            entryPoint.achievementNotifier().unlocked(packageName, names, extras.getLongArray("times"))
+            entryPoint.steamAchievements().unlocked(packageName, names)
+        }
+        // The game is starting: its record of unlocked achievements, in return with what the Steam account has added to it.
+        "earned" -> {
+            val merged = runBlocking { entryPoint.steamAchievements().mergedRecord(packageName, extras.getString("current").orEmpty()) }
+            Bundle().apply {
+                putString(STATUS, OK)
+                if (merged != null) putString("merged", merged)
+            }
+        }
         // Sent regularly by the running game so GamePort stays connected to Steam (see `ticket`).
         "warm" -> {
             runBlocking { coordinator.warmUp() }
