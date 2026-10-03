@@ -147,7 +147,7 @@ private fun PendingCard(direction: SaveDirection, onCancel: () -> Unit) {
             stringResource(if (direction == SaveDirection.RESTORE_FROM_CLOUD) R.string.saves_pending_restore else R.string.saves_pending_send),
             modifier = Modifier.weight(1f),
         )
-        DangerTextButton(onClick = onCancel) { Text(stringResource(R.string.game_settings_cancel)) }
+        DangerButton(onClick = onCancel) { Text(stringResource(R.string.game_settings_cancel)) }
     }
 }
 

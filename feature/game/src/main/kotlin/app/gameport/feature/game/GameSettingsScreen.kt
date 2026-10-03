@@ -56,8 +56,8 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
             title = { Text(stringResource(R.string.game_settings_remove_patch)) },
             text = { Text(stringResource(R.string.game_settings_remove_patch_confirm)) },
             confirmButton = {
-                DangerTextButton(onClick = { confirmingRemoval = false; viewModel.onRemovePatch() }) {
-                    Text(stringResource(R.string.game_settings_remove_patch), color = DangerRed)
+                DangerButton(onClick = { confirmingRemoval = false; viewModel.onRemovePatch() }) {
+                    Text(stringResource(R.string.game_settings_remove_patch))
                 }
             },
             dismissButton = { DangerTextButton(onClick = { confirmingRemoval = false }) { Text(stringResource(R.string.game_settings_cancel)) } },

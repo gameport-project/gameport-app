@@ -56,8 +56,9 @@ fun DangerTrashButton(onClick: () -> Unit, contentDescription: String, modifier:
     IconButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.clip(CircleShape).background(DangerRed.copy(alpha = 0.14f)).border(1.dp, DangerRed.copy(alpha = 0.55f), CircleShape),
-        colors = IconButtonDefaults.iconButtonColors(contentColor = DangerRed),
+        // Solid red, like the other buttons that remove something.
+        modifier = modifier.clip(CircleShape).background(DangerRed),
+        colors = IconButtonDefaults.iconButtonColors(contentColor = OnDangerRed),
     ) {
         Icon(Icons.Filled.Delete, contentDescription = contentDescription)
     }

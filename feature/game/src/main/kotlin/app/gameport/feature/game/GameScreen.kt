@@ -615,7 +615,7 @@ private fun InstallActions(
         InstallState.Queued -> Column(Modifier.widthIn(max = 460.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.game_queued))
             LinearProgressIndicator(Modifier.fillMaxWidth())
-            DangerTextButton(onClick = onCancel) { Text(stringResource(R.string.game_cancel)) }
+            DangerButton(onClick = onCancel) { Text(stringResource(R.string.game_cancel)) }
         }
         is InstallState.Downloading -> Progress(step = Step.DOWNLOAD, fraction = install.progress, speed = install.bytesPerSecond, speedUnit = speedUnit, onCancel = onCancel, verifying = install.verifying, onPause = onPause)
         is InstallState.ChoosingVersion -> {
@@ -699,7 +699,7 @@ private fun Progress(step: Step, fraction: Float?, speed: Long, speedUnit: Speed
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             onPause?.let { androidx.compose.material3.OutlinedButton(onClick = it) { Text(stringResource(R.string.game_pause)) } }
-            onCancel?.let { DangerTextButton(onClick = it) { Text(stringResource(R.string.game_cancel)) } }
+            onCancel?.let { DangerButton(onClick = it) { Text(stringResource(R.string.game_cancel)) } }
         }
     }
 }
