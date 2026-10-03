@@ -3,6 +3,9 @@
 
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- From Android 12 an installer may update, without asking, a game it installed itself, but only if it declares this; without it
+         the system ignores the request and asks to confirm every update. -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
     <!-- Downloads and patching last minutes; without a foreground service Android kills the app
          as soon as it leaves the screen. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

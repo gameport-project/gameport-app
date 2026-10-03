@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.core.content.ContextCompat
 import app.gameport.core.device.DeviceProfile
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -81,7 +82,12 @@ class PackageGateway @Inject constructor(
     suspend fun install(apks: List<File>): Outcome {
         val installer = packageManager.packageInstaller
         val sessionId = withContext(Dispatchers.IO) {
-            val id = installer.createSession(PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL))
+            val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+            // From Android 12, an installer may update, without asking, an app it installed itself, when the system's conditions are met
+            // (the app is not running, among others). If they are not, the system asks as before, which is also what Android 11 always does
+            // (the Nvidia Shield): the confirmation is handled below either way.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+            val id = installer.createSession(params)
             installer.openSession(id).use { session ->
                 apks.forEach { apk ->
                     apk.inputStream().use { input ->
