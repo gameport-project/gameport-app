@@ -54,6 +54,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.foundation.layout.wrapContentSize
@@ -125,6 +126,9 @@ fun LibraryScreen(
         onOpenDownloads = onOpenDownloads,
         onOpenSettings = onOpenSettings,
         onOpenSteamSettings = onOpenSteamSettings,
+        onPatchAll = viewModel::onPatchAll,
+        onStopPatchAll = viewModel::onStopPatchAll,
+        onClosePatchAll = viewModel::onClosePatchAll,
         menu = GameMenuActions(
             onOpen = onGameClick,
             onPlay = { game -> viewModel.playIntent(game)?.let(context::startActivity) ?: onGameClick(game.appId) },
@@ -150,11 +154,14 @@ internal fun LibraryContent(
     onOpenSettings: () -> Unit,
     onOpenSteamSettings: () -> Unit,
     menu: GameMenuActions = GameMenuActions(),
+    onPatchAll: () -> Unit = {},
+    onStopPatchAll: () -> Unit = {},
+    onClosePatchAll: () -> Unit = {},
 ) {
     Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
         when (uiState) {
             LibraryUiState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-            is LibraryUiState.Content -> Shelf(uiState, onQueryChanged, onTabSelected, onSortSelected, onFiltersChanged, onPlay, onGameClick, onOpenDownloads, onOpenSettings, onOpenSteamSettings, menu)
+            is LibraryUiState.Content -> Shelf(uiState, onQueryChanged, onTabSelected, onSortSelected, onFiltersChanged, onPlay, onGameClick, onOpenDownloads, onOpenSettings, onOpenSteamSettings, menu, onPatchAll, onStopPatchAll, onClosePatchAll)
         }
     }
 }
@@ -179,9 +186,14 @@ private fun Shelf(
     onOpenSettings: () -> Unit,
     onOpenSteamSettings: () -> Unit,
     menu: GameMenuActions,
+    onPatchAll: () -> Unit,
+    onStopPatchAll: () -> Unit,
+    onClosePatchAll: () -> Unit,
 ) {
     var menuGame by remember { mutableStateOf<Game?>(null) }
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
+    // The window of "patch all": opened by the button that starts it, and by the same button while it runs. Closing it stops nothing.
+    var patchWindow by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
     var highlightedId by remember(state.tab, state.query) { mutableStateOf<Int?>(null) }
     val highlighted = remember(state, highlightedId) {
@@ -212,7 +224,10 @@ private fun Shelf(
         if (display.backdrop) Backdrop(highlighted, display.backdropStrength)
 
         Column(Modifier.fillMaxSize()) {
-            Header(state, onQueryChanged, onTabSelected, { filtersOpen = true }, onOpenDownloads, onOpenSettings, onOpenSteamSettings)
+            Header(state, onQueryChanged, onTabSelected, { filtersOpen = true }, onOpenDownloads, onOpenSettings, onOpenSteamSettings) {
+                if (!state.patchAll.running) onPatchAll()
+                patchWindow = true
+            }
 
             LazyColumn(
                 state = listState,
@@ -269,6 +284,19 @@ private fun Shelf(
             )
         }
 
+        if (patchWindow) {
+            state.patchAll.progress?.let { progress ->
+                app.gameport.core.designsystem.PatchAllDialog(
+                    state = progress,
+                    names = state.anyKind.associate { it.appId to it.name },
+                    onClose = {
+                        patchWindow = false
+                        if (progress.finished) onClosePatchAll()
+                    },
+                    onStop = onStopPatchAll,
+                )
+            }
+        }
         FilterOverlay(open = filtersOpen, filters = state.filters, onChange = onFiltersChanged, onClose = { filtersOpen = false })
     }
 }
@@ -446,6 +474,7 @@ private fun Header(
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSteamSettings: () -> Unit,
+    onPatchAll: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 16.dp),
@@ -486,7 +515,8 @@ private fun Header(
                 Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.library_settings))
             }
         }
-        if (state.showTabs || state.appUpdate != null || state.updates.isNotEmpty() || state.connection != SteamConnection.ONLINE) {
+        val patchAllVisible = state.patchAll.behind > 0 || state.patchAll.running
+        if (state.showTabs || state.appUpdate != null || state.updates.isNotEmpty() || state.connection != SteamConnection.ONLINE || patchAllVisible) {
             val tabs: @Composable () -> Unit = {
                 PillTabs(
                     labels = listOf(stringResource(R.string.library_tab_vr), stringResource(R.string.library_tab_flat)),
@@ -511,6 +541,19 @@ private fun Header(
                     )
                 }
             }
+            // Games patched by an older GamePort: one press patches them all, and the notice shows how far it is.
+            val patchAll: @Composable () -> Unit = {
+                if (patchAllVisible) {
+                    val progress = state.patchAll.progress
+                    StatusNotice(
+                        label = if (state.patchAll.running && progress != null) stringResource(R.string.library_patch_all_running, (progress.done + 1).coerceAtMost(progress.total), progress.total)
+                        else stringResource(R.string.library_patch_all, state.patchAll.behind),
+                        icon = Icons.Filled.Build,
+                        onClick = onPatchAll,
+                        tone = NoticeTone.ATTENTION,
+                    )
+                }
+            }
             androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
                 // Wide enough, the tabs stay centred, the offline notice sits at the left and the updates at the
                 // right (the app's above the games'); otherwise everything goes below the tabs.
@@ -521,6 +564,7 @@ private fun Header(
                         Column(Modifier.align(Alignment.TopEnd), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.End) {
                             update()
                             gameUpdates()
+                            patchAll()
                         }
                     }
                 } else {
@@ -529,6 +573,7 @@ private fun Header(
                         offline()
                         update()
                         gameUpdates()
+                        patchAll()
                     }
                 }
             }

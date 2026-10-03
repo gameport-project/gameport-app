@@ -208,6 +208,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onDiscard = viewModel::onDiscard,
         onUninstall = viewModel::onUninstall,
         onPlay = { if (viewModel.shouldExplainStoragePermission()) explainingStorage = true else play() },
+        onPatchAndPlay = { viewModel.onPatchAndPlay { if (viewModel.shouldExplainStoragePermission()) explainingStorage = true else play() } },
         onOpenPermissions = openPermissions,
         onRepatch = viewModel::onRepatch,
         onUpdate = viewModel::onUpdate,
@@ -237,6 +238,7 @@ internal fun GameContent(
     onDiscard: () -> Unit,
     onUninstall: () -> Unit,
     onPlay: () -> Unit,
+    onPatchAndPlay: () -> Unit,
     onOpenPermissions: () -> Unit,
     onResolveConflict: () -> Unit,
     onRepatch: () -> Unit,
@@ -269,6 +271,7 @@ internal fun GameContent(
                     onDiscard = onDiscard,
                     onUninstall = onUninstall,
                     onPlay = onPlay,
+                    onPatchAndPlay = onPatchAndPlay,
                     onOpenSettings = onOpenSettings,
                     onOpenSaves = onOpenSaves,
                     controllerProfile = uiState.controllerProfile,
@@ -317,6 +320,7 @@ private fun GameDetails(
     onDiscard: () -> Unit,
     onUninstall: () -> Unit,
     onPlay: () -> Unit,
+    onPatchAndPlay: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSaves: () -> Unit,
     controllerProfile: Boolean,
@@ -475,6 +479,8 @@ private fun GameDetails(
                         onDiscard = onDiscard,
                         onUninstall = onUninstall,
                         onPlay = onPlay,
+                        onPatchAndPlay = onPatchAndPlay,
+                        patchOutdated = GameIssue.PatchOutdated in issues,
                         busy = repatch is Repatch.Running,
                         onReport = { reporting = true },
                     )
@@ -593,6 +599,8 @@ private fun InstallActions(
     onDiscard: () -> Unit,
     onUninstall: () -> Unit,
     onPlay: () -> Unit,
+    onPatchAndPlay: () -> Unit = {},
+    patchOutdated: Boolean = false,
     busy: Boolean = false,
     onReport: () -> Unit = {},
 ) {
@@ -621,7 +629,13 @@ private fun InstallActions(
         InstallState.Patching -> Progress(step = Step.PATCH, fraction = null, speed = 0, speedUnit = speedUnit, onCancel = null)
         InstallState.Installing -> Progress(step = Step.INSTALL, fraction = null, speed = 0, speedUnit = speedUnit, onCancel = null)
         is InstallState.Installed -> FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onPlay, enabled = !busy, modifier = Modifier.height(ACTION_HEIGHT)) { Text(stringResource(R.string.game_play)) }
+            Button(onClick = if (patchOutdated) onPatchAndPlay else onPlay, enabled = !busy, modifier = Modifier.height(ACTION_HEIGHT)) {
+                if (patchOutdated) {
+                    Icon(Icons.Filled.Build, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(stringResource(if (patchOutdated) R.string.game_patch_and_play else R.string.game_play))
+            }
             DangerTrashButton(onClick = onUninstall, contentDescription = stringResource(R.string.game_uninstall), enabled = !busy)
         }
         is InstallState.Failed -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

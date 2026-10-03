@@ -10,6 +10,8 @@
     <string name="library_no_match">Aucun jeu ne correspond à la recherche ou aux filtres.</string>
     <string name="library_game_update_one">Mise à jour : %1$s</string>
     <string name="library_game_update_many">%1$d mises à jour</string>
+    <string name="library_patch_all">Tout patcher (%1$d)</string>
+    <string name="library_patch_all_running">Patch %1$d sur %2$d</string>
     <string name="library_row_continue">Continuer</string>
     <string name="library_row_favorites">Favoris</string>
     <string name="library_row_all">Tous les jeux</string>

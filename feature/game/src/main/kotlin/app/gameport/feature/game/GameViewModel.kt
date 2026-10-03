@@ -181,6 +181,11 @@ class GameViewModel @Inject constructor(
 
     fun onDuplicateChosen(replace: Boolean) = installer.chooseDuplicate(appId, replace)
 
+    /** Patches the game again, then starts it ([then]) once it is up to date. A patch that fails or is cancelled does not start it. */
+    fun onPatchAndPlay(then: () -> Unit) {
+        viewModelScope.launch { if (installer.repatchAndAwait(appId)) then() }
+    }
+
     fun onPause() = installer.pause(appId)
 
     fun onDiscard() = installer.discard(appId)

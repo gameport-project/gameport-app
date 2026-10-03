@@ -17,6 +17,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +43,8 @@ fun BackdropDialog(
     minWidth: Dp = 280.dp,
     maxWidth: Dp = 560.dp,
     padding: Dp = 24.dp,
+    maxTextHeight: Dp = 480.dp,
+    maxHeight: Dp = Dp.Unspecified,
 ) {
     BasicAlertDialog(onDismissRequest = onDismissRequest, modifier = modifier) {
         val shape = RoundedCornerShape(28.dp)
@@ -50,12 +54,15 @@ fun BackdropDialog(
                     .widthIn(min = minWidth, max = maxWidth)
                     .clip(shape)
                     .background(Brush.linearGradient(LocalBackdropColors.current.toList()))
+                    .then(if (maxHeight != Dp.Unspecified) Modifier.heightIn(max = maxHeight) else Modifier)
                     .padding(padding),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 title?.let { ProvideTextStyle(MaterialTheme.typography.headlineSmall) { it() } }
                 text?.let {
-                    Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState())) {
+                    // With a maximum height for the whole dialog, the text takes what the title and the buttons leave and scrolls; without one, it has its own maximum.
+                    val room = if (maxHeight != Dp.Unspecified) Modifier.weight(1f, fill = false) else Modifier.heightIn(max = maxTextHeight)
+                    Column(room.verticalScroll(rememberScrollState())) {
                         ProvideTextStyle(MaterialTheme.typography.bodyMedium) { it() }
                     }
                 }
@@ -68,4 +75,37 @@ fun BackdropDialog(
             }
         }
     }
+}
+
+/** The height in pixels of the window of the app, set once at its root: a dialog window is smaller than the app's (it leaves out the bars). */
+val LocalAppWindowHeightPx = androidx.compose.runtime.compositionLocalOf { 0 }
+
+/** Gives everything inside the height of the app's window, which [dialogMaxHeight] reads. */
+@Composable
+fun ProvideAppWindowHeight(content: @Composable () -> Unit) {
+    // The root view of the window, which is what is on screen; the window info and the configuration both leave out part of it.
+    val view = androidx.compose.ui.platform.LocalView.current
+    var height by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(view.rootView.height) }
+    androidx.compose.runtime.DisposableEffect(view) {
+        val listener = android.view.View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> height = view.rootView.height }
+        view.rootView.addOnLayoutChangeListener(listener)
+        // Read now too: the window may already have been laid out, and then no change is ever reported.
+        height = view.rootView.height
+        onDispose { view.rootView.removeOnLayoutChangeListener(listener) }
+    }
+    androidx.compose.runtime.CompositionLocalProvider(LocalAppWindowHeightPx provides height, content = content)
+}
+
+/**
+ * The most height a dialog may take: about 70 % of the window of the app, whatever its size. What does not fit scrolls. For dialogs whose
+ * content can be long.
+ */
+@Composable
+fun dialogMaxHeight(): Dp {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val windowHeight = LocalAppWindowHeightPx.current
+    // The dialog window keeps about 56 dp of margin around the card, which counts in the height it is given: it is added so the card itself is 70 %.
+    val margin = 56.dp
+    if (windowHeight <= 0) return (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.7f).dp + margin
+    return with(density) { (windowHeight * 0.7f).toDp() } + margin
 }

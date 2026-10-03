@@ -107,6 +107,12 @@
     <string name="settings_updates_blocked_sync">Saves are being synchronised. The update waits until it is done.</string>
     <string name="settings_updates_update">Update to %1$s</string>
     <string name="settings_updates_check">Check for updates</string>
+    <string name="settings_patch_all">Games to patch again</string>
+    <string name="settings_patch_all_description">Games patched by an older version: %1$d. Patching them again brings the latest features.</string>
+    <string name="settings_patch_all_none">All the games are up to date.</string>
+    <string name="settings_patch_all_running">Patching %1$d of %2$d</string>
+    <string name="settings_patch_all_button">Patch all</string>
+    <string name="settings_patch_all_show">Show progress</string>
     <string name="settings_updates_auto">Look for updates when GamePort opens</string>
     <string name="settings_updates_auto_description">GamePort looks at the latest release page on GitHub as it opens, if the last look is older than the chosen time. It only looks: nothing is downloaded or installed without a tap on the update button. GitHub can see this device\'s IP address, like for any web page. With Never, updates are only searched with the button above.</string>
     <string name="settings_updates_every">Every %1$d h</string>

@@ -67,3 +67,19 @@ data class VersionOption(val id: String, val versionName: String?, val versionCo
  */
 val InstallError.reportable: Boolean
     get() = this !is InstallError.NotEnoughSpace && this !is InstallError.NotSignedIn && this !is InstallError.Offline && this !is InstallError.AppUpdating
+
+/** Where "patch all" stands: [done] of [total] games handled, [current] being patched, and the games that could not be patched. */
+data class PatchAllState(
+    val total: Int,
+    val done: Int,
+    val current: Int?,
+    val failed: List<Int>,
+    val finished: Boolean,
+    /** Every game of the run, in the order they are patched. */
+    val ids: List<Int> = emptyList(),
+)
+
+/** How many installed games were patched by an older patcher, and where "patch all" stands, for the buttons that start it. */
+data class PatchAllInfo(val behind: Int, val progress: PatchAllState?) {
+    val running: Boolean get() = progress != null && !progress.finished
+}

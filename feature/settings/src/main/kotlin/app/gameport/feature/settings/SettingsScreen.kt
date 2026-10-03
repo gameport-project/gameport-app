@@ -107,6 +107,8 @@ fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewMode
     val updateBlocker by viewModel.updateBlocker.collectAsStateWithLifecycle(null)
     val checkHours by viewModel.updateCheckHours.collectAsStateWithLifecycle()
     val activity = LocalContext.current as? Activity
+    // The window of "patch all", opened by its button; closing it stops nothing.
+    var patchWindow by rememberSaveable { mutableStateOf(false) }
     var category by rememberSaveable { mutableStateOf(if (!startOnAccount && viewModel.updateState.value is AppUpdateState.Available) Category.UPDATES else Category.ACCOUNT) }
 
     Scaffold { padding ->
@@ -138,10 +140,30 @@ fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewMode
                                 // The texts are read again in the new language.
                                 activity?.recreate()
                             }
-                            Category.UPDATES -> UpdatesSection(
-                                viewModel.installedVersion, updateState, updateBlocker, viewModel.canUpdateInPlace,
-                                checkHours, viewModel::onUpdateCheckHoursChanged, viewModel::onCheckForUpdate, viewModel::onUpdate,
-                            )
+                            Category.UPDATES -> {
+                                UpdatesSection(
+                                    viewModel.installedVersion, updateState, updateBlocker, viewModel.canUpdateInPlace,
+                                    checkHours, viewModel::onUpdateCheckHoursChanged, viewModel::onCheckForUpdate, viewModel::onUpdate,
+                                )
+                                val patchAll = viewModel.patchAll.collectAsStateWithLifecycle().value
+                                PatchAllRow(patchAll) {
+                                    if (!patchAll.running) viewModel.onPatchAll()
+                                    patchWindow = true
+                                }
+                                if (patchWindow) {
+                                    patchAll.progress?.let { progress ->
+                                        app.gameport.core.designsystem.PatchAllDialog(
+                                            state = progress,
+                                            names = viewModel.gameNames.collectAsStateWithLifecycle().value,
+                                            onClose = {
+                                                patchWindow = false
+                                                if (progress.finished) viewModel.onClosePatchAll()
+                                            },
+                                            onStop = viewModel::onStopPatchAll,
+                                        )
+                                    }
+                                }
+                            }
                             Category.GAMES -> GamesSection(playerDefaults.heightCm, viewModel::onDefaultHeightChanged)
                             Category.HIDDEN -> HiddenSection(viewModel.hiddenGames.collectAsStateWithLifecycle().value, viewModel::onShowAgain)
                     }

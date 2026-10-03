@@ -36,6 +36,12 @@ class InstallForegroundService : Service() {
         return START_NOT_STICKY
     }
 
+    /** The player closed GamePort (not just left it): the run of "patch all" stops with it. Downloads and single installs go on, as they are meant to. */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        onClosed?.invoke()
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
         wakeLock?.takeIf { it.isHeld }?.release()
         wifiLock?.takeIf { it.isHeld }?.release()
@@ -57,9 +63,12 @@ class InstallForegroundService : Service() {
         }
     }
 
-    private companion object {
-        const val CHANNEL_ID = "installs"
-        const val NOTIFICATION_ID = 1
-        const val MAX_HOLD_MS = 3L * 60 * 60 * 1000
+    companion object {
+        /** Set by [GameInstallRepository], which is what runs "patch all". */
+        @Volatile internal var onClosed: (() -> Unit)? = null
+
+        private const val CHANNEL_ID = "installs"
+        private const val NOTIFICATION_ID = 1
+        private const val MAX_HOLD_MS = 3L * 60 * 60 * 1000
     }
 }

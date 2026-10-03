@@ -35,6 +35,7 @@ class SettingsViewModel @Inject constructor(
     private val cloudSync: CloudSyncCoordinator,
     private val gameSettings: GameSettingsStore,
     private val updater: AppUpdater,
+    private val patching: app.gameport.core.sync.PatchAllCoordinator,
     library: SteamLibraryRepository,
     private val history: PlayHistoryStore,
     device: DeviceProfile,
@@ -45,6 +46,20 @@ class SettingsViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     fun onShowAgain(appId: Int) = history.setHidden(appId, false)
+
+    /** How many installed games are behind on patches, and where the run that patches them stands. */
+    val patchAll: StateFlow<app.gameport.core.model.PatchAllInfo> = patching.observe()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), app.gameport.core.model.PatchAllInfo(0, null))
+
+    fun onPatchAll() = patching.patchAll()
+
+    fun onStopPatchAll() = patching.stop()
+
+    fun onClosePatchAll() = patching.clear()
+
+    /** The names of the games, to say which one is being patched. */
+    val gameNames: StateFlow<Map<Int, String>> = library.observeLibrary().map { loaded -> loaded.games.associate { it.appId to it.name } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyMap())
 
     /** Height and seated defaults only exist on a VR device. */
     val isHeadset: Boolean = device.isHeadset

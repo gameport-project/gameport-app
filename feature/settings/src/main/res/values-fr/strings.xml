@@ -107,6 +107,12 @@
     <string name="settings_updates_blocked_sync">Des sauvegardes sont en cours de synchronisation. La mise à jour attend la fin.</string>
     <string name="settings_updates_update">Mettre à jour vers %1$s</string>
     <string name="settings_updates_check">Rechercher des mises à jour</string>
+    <string name="settings_patch_all">Jeux à patcher de nouveau</string>
+    <string name="settings_patch_all_description">Jeux patchés par une version plus ancienne : %1$d. Les patcher de nouveau apporte les dernières fonctionnalités.</string>
+    <string name="settings_patch_all_none">Tous les jeux sont à jour.</string>
+    <string name="settings_patch_all_running">Patch %1$d sur %2$d</string>
+    <string name="settings_patch_all_button">Tout patcher</string>
+    <string name="settings_patch_all_show">Voir la progression</string>
     <string name="settings_updates_auto">Chercher des mises à jour à l\'ouverture de GamePort</string>
     <string name="settings_updates_auto_description">GamePort consulte la page de la dernière release sur GitHub à son ouverture, si la dernière consultation date de plus que le délai choisi. Il ne fait que regarder : rien n\'est téléchargé ni installé sans un appui sur le bouton de mise à jour. GitHub voit l\'adresse IP de cet appareil, comme pour n\'importe quelle page web. Avec Jamais, les mises à jour ne sont cherchées qu\'avec le bouton ci-dessus.</string>
     <string name="settings_updates_every">Toutes les %1$d h</string>

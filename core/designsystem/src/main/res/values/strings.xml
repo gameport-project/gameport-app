@@ -15,4 +15,15 @@
     <string name="status_offline">Not connected to Steam</string>
     <string name="status_connecting">Connecting to Steam…</string>
     <string name="status_offline_mode">Offline mode</string>
+    <string name="patch_all_title">Patching games</string>
+    <string name="patch_all_running">Patching %1$d of %2$d</string>
+    <string name="patch_all_background">Closing this window does not stop the patching. Some games are patched without any confirmation and others ask for one: it is a constraint of the game, not of GamePort.</string>
+    <string name="patch_all_done">All the games are patched.</string>
+    <string name="patch_all_partial">Not patched: %1$d.</string>
+    <string name="patch_all_failed_hint">A game left unconfirmed, or without room, can be patched again from its page.</string>
+    <string name="patch_all_patched">Patched</string>
+    <string name="patch_all_failed">Not patched</string>
+    <string name="patch_all_waiting">Waiting</string>
+    <string name="patch_all_close">Close</string>
+    <string name="patch_all_stop">Stop</string>
 </resources>

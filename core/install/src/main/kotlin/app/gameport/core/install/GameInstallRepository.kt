@@ -81,6 +81,11 @@ class GameInstallRepository @Inject constructor(
 
     /** The package name of each game that was just uninstalled, for what is kept about it elsewhere. */
     val uninstalled: kotlinx.coroutines.flow.SharedFlow<String> = _uninstalled
+    init {
+        // Closing GamePort stops "patch all": nobody is looking at it any more.
+        InstallForegroundService.onClosed = ::cancelPatchAll
+    }
+
     private val downloadSlots = Semaphore(MAX_CONCURRENT_DOWNLOADS)
     private val patchLock = Mutex()
 
@@ -243,6 +248,61 @@ class GameInstallRepository @Inject constructor(
     fun observeOutdatedPatches(): Flow<Set<Int>> =
         packages.packageChanges().map { installed.all().keys.filter(::isPatchOutdated).toSet() }
 
+    private val _patchAll = MutableStateFlow<app.gameport.core.model.PatchAllState?>(null)
+    private var patchAllJob: Job? = null
+
+    /** Where "patch all" stands, null when none has run. */
+    val patchAll: StateFlow<app.gameport.core.model.PatchAllState?> = _patchAll.asStateFlow()
+
+    /**
+     * Patches [appIds] again, one after the other: they rewrite whole games and Android installs one at a time, and the player may be asked
+     * to confirm each update. A game that fails (no room, refused update) is noted and the others go on. Games that are not outdated
+     * any more are skipped.
+     */
+    fun repatchAll(appIds: List<Int>) {
+        if (patchAllJob?.isActive == true) return
+        _patchAll.value = app.gameport.core.model.PatchAllState(total = appIds.size, done = 0, current = null, failed = emptyList(), finished = appIds.isEmpty(), ids = appIds)
+        patchAllJob = scope.launch {
+            val failed = mutableListOf<Int>()
+            var done = 0
+            try {
+                for ((index, appId) in appIds.withIndex()) {
+                    done = index
+                    _patchAll.value = app.gameport.core.model.PatchAllState(appIds.size, index, appId, failed.toList(), finished = false, ids = appIds)
+                    if (!isPatchOutdated(appId)) continue
+                    repatchInRun(appId)
+                    jobs[appId]?.join()
+                    if (isPatchOutdated(appId)) failed += appId
+                }
+                done = appIds.size
+            } finally {
+                // Whether it ended or was stopped, the run is over; the games not reached count as not patched.
+                val left = appIds.drop(done).filter(::isPatchOutdated)
+                _patchAll.value = app.gameport.core.model.PatchAllState(appIds.size, done, null, (failed + left).distinct(), finished = true, ids = appIds)
+            }
+        }
+    }
+
+    /** Stops "patch all": the game being patched is stopped too, the ones after it are not started. */
+    fun cancelPatchAll() {
+        val current = _patchAll.value?.current
+        patchAllJob?.cancel()
+        current?.let { jobs[it]?.cancel() }
+    }
+
+    /** Closes the report of "patch all". */
+    fun clearPatchAll() {
+        if (patchAllJob?.isActive != true) _patchAll.value = null
+    }
+
+    /** Patches [appId] again and waits for it: true when the game is up to date afterwards. */
+    suspend fun repatchAndAwait(appId: Int): Boolean {
+        if (!isPatchOutdated(appId)) return true
+        repatch(appId)
+        jobs[appId]?.join()
+        return !isPatchOutdated(appId)
+    }
+
     private fun isPatchOutdated(appId: Int): Boolean {
         val packageName = installed.all()[appId]?.takeIf(packages::isInstalled) ?: return false
         val version = packages.metaDataInt(packageName, PatchVersionPatch.META_KEY) ?: 0
@@ -262,6 +322,8 @@ class GameInstallRepository @Inject constructor(
      */
     fun repatch(appId: Int) = reinstall(appId, PatchCatalog.recommended)
 
+    private fun repatchInRun(appId: Int) = reinstall(appId, PatchCatalog.recommended, confirmTimeoutMs = RUN_CONFIRM_TIMEOUT_MS)
+
     /**
      * Takes GamePort's patch off an installed game, from the installed APK as well. The game then
      * knows nothing of the Steam account, the cloud saves or the OpenXR layer.
@@ -279,7 +341,11 @@ class GameInstallRepository @Inject constructor(
             PatchVersionPatch,
     )
 
-    private fun reinstall(appId: Int, patches: List<ApkPatch>) {
+    /**
+     * [confirmTimeoutMs], when given, bounds the wait for the player to confirm the update: a game left unconfirmed is given up (and counts as
+     * not patched), so the ones after it are not held up by a window nobody answers.
+     */
+    private fun reinstall(appId: Int, patches: List<ApkPatch>, confirmTimeoutMs: Long? = null) {
         if (jobs[appId]?.isActive == true) return
         if (gate.updating.value) return fail(appId, InstallError.AppUpdating)
         val packageName = installed.all()[appId]?.takeIf(packages::isInstalled) ?: return
@@ -313,7 +379,8 @@ class GameInstallRepository @Inject constructor(
                     }
                 }
                 setState(appId, InstallState.Installing)
-                val outcome = packages.install(patched)
+                val outcome = if (confirmTimeoutMs == null) packages.install(patched) else kotlinx.coroutines.withTimeoutOrNull(confirmTimeoutMs) { packages.install(patched) }
+                    ?: PackageGateway.Outcome.Cancelled.also { events.note(appId, "the update was not confirmed in time: given up") }
                 events.note(appId, "re-patch install outcome: $outcome")
                 when (outcome) {
                     PackageGateway.Outcome.Success, PackageGateway.Outcome.Cancelled -> clearState(appId)
@@ -583,6 +650,9 @@ class GameInstallRepository @Inject constructor(
 }
 
 private const val PATCHED_DIR = "patched"
+
+/** How long "patch all" waits for a confirmation of the system before it gives a game up and goes on. */
+private const val RUN_CONFIRM_TIMEOUT_MS = 3 * 60_000L
 
 /** How many of the files placed for a game its event log names. */
 private const val MAX_PLACED_LISTED = 12

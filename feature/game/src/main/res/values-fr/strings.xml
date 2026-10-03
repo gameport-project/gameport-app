@@ -12,6 +12,7 @@
     <string name="game_resume">Reprendre le téléchargement</string>
     <string name="game_discard">Supprimer</string>
     <string name="game_play">Jouer</string>
+    <string name="game_patch_and_play">Patcher et jouer</string>
     <string name="game_uninstall">Désinstaller</string>
     <string name="game_retry">Réessayer</string>
     <string name="game_owned">Possédé</string>

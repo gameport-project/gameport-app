@@ -15,4 +15,15 @@
     <string name="status_offline">Non connecté à Steam</string>
     <string name="status_connecting">Connexion à Steam en cours…</string>
     <string name="status_offline_mode">Mode hors ligne</string>
+    <string name="patch_all_title">Patch des jeux</string>
+    <string name="patch_all_running">Patch %1$d sur %2$d</string>
+    <string name="patch_all_background">Fermer cette fenêtre n\'arrête pas le patch. Certains jeux sont patchés sans confirmation et d\'autres en demandent une : c\'est une contrainte du jeu, pas de GamePort.</string>
+    <string name="patch_all_done">Tous les jeux sont patchés.</string>
+    <string name="patch_all_partial">Non patchés : %1$d.</string>
+    <string name="patch_all_failed_hint">Un jeu non confirmé, ou sans place, peut être patché de nouveau depuis sa page.</string>
+    <string name="patch_all_patched">Patché</string>
+    <string name="patch_all_failed">Pas patché</string>
+    <string name="patch_all_waiting">En attente</string>
+    <string name="patch_all_close">Fermer</string>
+    <string name="patch_all_stop">Arrêter</string>
 </resources>

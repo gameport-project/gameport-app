@@ -11,6 +11,7 @@ import app.gameport.core.model.SteamConnection
 import app.gameport.core.model.Library
 import app.gameport.core.steam.SteamLibraryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import app.gameport.core.model.PatchAllInfo
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -56,10 +57,12 @@ sealed interface LibraryUiState {
         val updatable: Set<Int> = emptySet(),
         /** How GamePort stands with Steam; a notice shows when it is not connected. */
         val connection: SteamConnection = SteamConnection.ONLINE,
+        /** How many installed games are behind on patches, and the run that patches them. */
+        val patchAll: PatchAllInfo = PatchAllInfo(0, null),
     ) : LibraryUiState
 }
 
-private class HeaderInfo(val games: List<String>, val app: String?, val connection: SteamConnection, val ids: Set<Int>)
+private class HeaderInfo(val games: List<String>, val app: String?, val connection: SteamConnection, val ids: Set<Int>, val patchAll: PatchAllInfo)
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
@@ -80,8 +83,8 @@ class LibraryViewModel @Inject constructor(
         combine(repository.observeLibrary(), query, tab, attention.observe(), combine(appearance.observe(), history.observe(), filters) { shown, played, narrowed -> Triple(shown, played, narrowed) }) { library, query, tab, outdated, (shown, played, narrowed) ->
             library.toUiState(query, tab, showTabs).copy(attention = outdated).arranged(shown, played, narrowed)
         },
-        combine(updates.observe(), updates.observeApp(), updates.observeConnection(), updates.observeIds()) { games, app, connection, ids -> HeaderInfo(games, app, connection, ids) },
-    ) { state, info -> state.copy(updates = info.games, appUpdate = info.app, connection = info.connection, updatable = info.ids) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LibraryUiState.Loading)
+        combine(updates.observe(), updates.observeApp(), updates.observeConnection(), updates.observeIds(), updates.observePatchAll()) { games, app, connection, ids, patchAll -> HeaderInfo(games, app, connection, ids, patchAll) },
+    ) { state, info -> state.copy(updates = info.games, appUpdate = info.app, connection = info.connection, updatable = info.ids, patchAll = info.patchAll) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LibraryUiState.Loading)
 
     init {
         // Asked when the library opens (that is, when the app starts).
@@ -105,6 +108,12 @@ class LibraryViewModel @Inject constructor(
     fun onUpdate(game: Game) = actions.update(game)
 
     fun onRepatch(appId: Int) = actions.repatch(appId)
+
+    fun onPatchAll() = updates.patchAll()
+
+    fun onStopPatchAll() = updates.stopPatchAll()
+
+    fun onClosePatchAll() = updates.clearPatchAll()
 
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
