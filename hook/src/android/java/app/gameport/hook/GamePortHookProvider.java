@@ -30,7 +30,8 @@ public final class GamePortHookProvider extends ContentProvider {
 
     private SaveSync sync;
     // Whether GamePort asked to be opened again when the game it started closes, and whether it started this game.
-    private volatile boolean returnToGamePort;
+    // For which games to open GamePort again when the game closes: "never", "app" (started from GamePort), "library" (started from elsewhere) or "all".
+    private volatile String returnMode = "app";
     private volatile boolean launchedByGamePort;
     private int liveActivities;
     private Handler background;
@@ -55,6 +56,7 @@ public final class GamePortHookProvider extends ContentProvider {
             Log.i(TAG, "launch sync finished after " + (SystemClock.elapsedRealtime() - start) + " ms");
             prepareSteamTicket(context);
             watchTicketRequests(context);
+            watchAchievements(context);
             reportControllerProfile(context);
 
             watchForUploads(context);
@@ -185,6 +187,123 @@ public final class GamePortHookProvider extends ContentProvider {
         watcher.start();
     }
 
+    /**
+     * The Steamworks shim records the achievements a game unlocks in a file of its own, which is read every couple of seconds. GamePort is told
+     * of the ones that are new, to announce them. What was unlocked before the game started does not count: that is the file as it was found,
+     * and what GamePort baked into the game from the account's own unlocks.
+     */
+    private void watchAchievements(final Context context) {
+        File files = context.getExternalFilesDir(null);
+        final File dir = new File(files != null ? files : context.getFilesDir(), "gameport");
+        final java.util.Set<String> known = new java.util.HashSet<>();
+        known.addAll(earnedTimes(readAsset(context, "gameport/achievements_earned.json")).keySet());
+        Thread watcher = new Thread(new Runnable() {
+            @Override public void run() {
+                long modified = -1;
+                long length = -1;
+                boolean existedAtStart = achievementsFile(dir) != null && achievementsFile(dir).isFile();
+                boolean baselined = false;
+                while (!Thread.currentThread().isInterrupted()) {
+                    try {
+                        File file = achievementsFile(dir);
+                        if (file != null && file.isFile() && (file.lastModified() != modified || file.length() != length)) {
+                            modified = file.lastModified();
+                            length = file.length();
+                            java.util.Map<String, Long> earned = earnedTimes(readText(file));
+                            if (!baselined && existedAtStart) {
+                                known.addAll(earned.keySet());
+                            } else {
+                                java.util.List<String> fresh = new java.util.ArrayList<>();
+                                for (String name : earned.keySet()) if (!known.contains(name)) fresh.add(name);
+                                if (!fresh.isEmpty() && tellAchievements(context, fresh, earned)) known.addAll(fresh);
+                            }
+                            baselined = true;
+                        }
+                        Thread.sleep(2_000);
+                    } catch (InterruptedException e) {
+                        return;
+                    } catch (Throwable t) {
+                        Log.w(TAG, "could not read the achievements", t);
+                        try { Thread.sleep(5_000); } catch (InterruptedException e) { return; }
+                    }
+                }
+            }
+        }, "gameport-achievements");
+        watcher.setDaemon(true);
+        watcher.start();
+    }
+
+    /** The file of the unlocked achievements of the shim, once the game's app id is known; null before. */
+    private static File achievementsFile(File gameportDir) {
+        String appId = readLine(new File(gameportDir, "appid.txt"));
+        if (appId == null || appId.trim().isEmpty()) return null;
+        return new File(gameportDir, "Goldberg SteamEmu Saves/" + appId.trim() + "/achievements.json");
+    }
+
+    private static boolean tellAchievements(Context context, java.util.List<String> names, java.util.Map<String, Long> earned) {
+        try {
+            Bundle extras = new Bundle();
+            extras.putStringArray("names", names.toArray(new String[0]));
+            // When each was unlocked, in seconds, as the shim recorded it, so the notification shows the real time.
+            long[] times = new long[names.size()];
+            for (int i = 0; i < times.length; i++) {
+                Long at = earned.get(names.get(i));
+                times[i] = at == null ? 0L : at;
+            }
+            extras.putLongArray("times", times);
+            Bundle result = context.getContentResolver().call(Uri.parse("content://app.gameport.cloud"), "achievement", context.getPackageName(), extras);
+            Log.i(TAG, "told GamePort about " + names.size() + " unlocked achievement(s)");
+            return result != null && "OK".equals(result.getString("status"));
+        } catch (Throwable t) {
+            Log.w(TAG, "could not tell GamePort about the achievements", t);
+            return false;
+        }
+    }
+
+    /** The achievements marked as earned in a JSON object of `{"name": {"earned": true, "earned_time": seconds}}`, with their times (0 when unknown). */
+    private static java.util.Map<String, Long> earnedTimes(String json) {
+        java.util.Map<String, Long> earned = new java.util.LinkedHashMap<>();
+        if (json == null || json.trim().isEmpty()) return earned;
+        try {
+            org.json.JSONObject all = new org.json.JSONObject(json);
+            java.util.Iterator<String> keys = all.keys();
+            while (keys.hasNext()) {
+                String name = keys.next();
+                org.json.JSONObject entry = all.optJSONObject(name);
+                if (entry != null && entry.optBoolean("earned", false)) earned.put(name, entry.optLong("earned_time", 0L));
+            }
+        } catch (Throwable t) {
+            // A file being written, or not ours: nothing to read yet.
+        }
+        return earned;
+    }
+
+    private static String readAsset(Context context, String path) {
+        try {
+            java.io.InputStream in = context.getAssets().open(path);
+            try { return readAll(in); } finally { in.close(); }
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private static String readText(File file) {
+        try {
+            java.io.InputStream in = new java.io.FileInputStream(file);
+            try { return readAll(in); } finally { in.close(); }
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private static String readAll(java.io.InputStream in) throws java.io.IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        byte[] buffer = new byte[4096];
+        int count;
+        while ((count = in.read(buffer)) > 0) out.write(buffer, 0, count);
+        return out.toString("UTF-8");
+    }
+
     private static String readLine(File file) {
         try {
             java.io.BufferedReader in = new java.io.BufferedReader(new java.io.FileReader(file));
@@ -224,7 +343,9 @@ public final class GamePortHookProvider extends ContentProvider {
             controls = map == null ? "" : map;
             String platform = config.getString("xrFamily");
             family = platform == null ? "" : platform;
-            returnToGamePort = config.getBoolean("returnToGamePort");
+            String mode = config.getString("returnMode");
+            // A GamePort from before the choice only says whether to come back for a game it started.
+            returnMode = mode != null ? mode : (config.getBoolean("returnToGamePort") ? "app" : "never");
             java.io.FileWriter out = new java.io.FileWriter(cache);
             out.write(seated + "\n" + eyeCm + "\n" + controls + "\n" + family + "\n");
             out.close();
@@ -299,7 +420,12 @@ public final class GamePortHookProvider extends ContentProvider {
                 background.post(upload);
                 if (sessionLog != null) sessionLog.flushSoon();
                 // The game was closed (not just turned): bring GamePort back, which Horizon does not do by itself.
-                if (--liveActivities <= 0 && a.isFinishing() && returnToGamePort && launchedByGamePort) openGamePort(a);
+                boolean last = --liveActivities <= 0;
+                boolean byGamePort = launchedByGamePort;
+                boolean returning = last && a.isFinishing() && ("all".equals(returnMode) || ("app".equals(returnMode) && byGamePort) || ("library".equals(returnMode) && !byGamePort));
+                Log.i(TAG, "activity destroyed: last=" + last + " finishing=" + a.isFinishing() + " returnMode=" + returnMode
+                        + " byGamePort=" + byGamePort + " -> " + (returning ? "opening GamePort" : "staying away"));
+                if (returning) openGamePort(a);
             }
             @Override public void onActivityCreated(Activity a, Bundle b) {
                 if (liveActivities++ == 0 && sessionLog != null) sessionLog.setLaunchInfo(describe(a));
