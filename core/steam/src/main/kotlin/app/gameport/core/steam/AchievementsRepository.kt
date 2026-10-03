@@ -6,7 +6,6 @@ import app.gameport.core.model.SteamLanguage
 import app.gameport.core.steam.cache.AchievementCache
 import app.gameport.core.steam.session.SteamSessionHolder
 import app.gameport.core.steam.session.achievements
-import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -24,6 +23,7 @@ class AchievementsRepository @Inject constructor(
     private val auth: SteamAuthRepository,
     private val sessions: SteamSessionHolder,
     private val cache: AchievementCache,
+    private val language: app.gameport.core.model.AchievementLanguage,
 ) {
     /**
      * What was kept first (when there is something), then what Steam says now. Offline mode, a missing connection or
@@ -31,13 +31,34 @@ class AchievementsRepository @Inject constructor(
      */
     fun observe(appId: Int): Flow<AchievementList?> = flow {
         val steamId = (auth.authState.value as? AuthState.SignedIn)?.account?.steamId ?: return@flow
-        cache.read(appId, steamId)?.let { emit(it) }
+        val wanted = steamLanguage()
+        val kept = cache.read(appId, steamId)
+        // What was kept is shown at once when it is in the language asked for; otherwise it only serves if Steam cannot be asked.
+        if (kept != null && kept.language == wanted) emit(kept)
         runCatching { auth.restoreSession() }
-        if (auth.offline.value) return@flow
-        val session = withTimeoutOrNull(SESSION_WAIT_MS) { sessions.current.filterNotNull().first() } ?: return@flow
-        val fresh = runCatching { session.achievements(appId, steamLanguage()) }.getOrNull() ?: return@flow
+        val session = if (auth.offline.value) null else withTimeoutOrNull(SESSION_WAIT_MS) { sessions.current.filterNotNull().first() }
+        val fresh = session?.let { runCatching { it.achievements(appId, wanted) }.getOrNull() }
+        if (fresh == null) {
+            if (kept != null && kept.language != wanted) emit(kept)
+            return@flow
+        }
         cache.write(fresh, steamId)
         emit(fresh)
+    }
+
+    /**
+     * What the account has for [appId], to give to the game as it starts: read from Steam within [timeoutMs], else what was kept.
+     * Null when neither is available. The texts do not matter here, only which achievements are unlocked, and nothing is kept.
+     */
+    suspend fun forSync(appId: Int, timeoutMs: Long): AchievementList? {
+        val steamId = (auth.authState.value as? AuthState.SignedIn)?.account?.steamId ?: return null
+        val fresh = withTimeoutOrNull(timeoutMs) {
+            runCatching { auth.restoreSession() }
+            if (auth.offline.value) return@withTimeoutOrNull null
+            val session = sessions.current.filterNotNull().first()
+            runCatching { session.achievements(appId, "english") }.getOrNull()
+        }
+        return fresh ?: cache.read(appId, steamId)
     }
 
     /**
@@ -51,11 +72,8 @@ class AchievementsRepository @Inject constructor(
         return runCatching { session.achievements(appId, "english") }.getOrNull()?.takeIf { it.items.isNotEmpty() }
     }
 
-    /**
-     * The language of the device, as Steam names it, even when GamePort is not translated into it: the texts of the achievements
-     * come from the game, in as many languages as it has, so they follow the device and not the few languages of GamePort.
-     */
-    private fun steamLanguage(): String = Locale.getDefault().let { SteamLanguage.of(it.language, it.country, it.script) }
+    /** The texts come from the game, in as many languages as it has: they are asked in the language chosen in GamePort. */
+    private fun steamLanguage(): String = language.steamName()
 
     private companion object {
         const val SESSION_WAIT_MS = 10_000L

@@ -59,3 +59,8 @@ object SteamLanguage {
         else -> byCode[language.lowercase()] ?: "english"
     }
 }
+
+/** The language the texts of the achievements are asked in, as Steam names it: the one chosen in GamePort, or the device's when the choice is automatic. */
+fun interface AchievementLanguage {
+    fun steamName(): String
+}
