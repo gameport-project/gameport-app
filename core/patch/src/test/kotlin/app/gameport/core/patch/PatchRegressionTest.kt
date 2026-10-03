@@ -86,12 +86,11 @@ class PatchRegressionTest {
     private fun differences(before: Summary, now: Summary): List<String> {
         val result = mutableListOf<String>()
         if (before.manifest != now.manifest) {
-            val nowLines = now.manifest.toSet()
-            val beforeLines = before.manifest.toSet()
-            val removed = before.manifest.filter { it !in nowLines }
-            val added = now.manifest.filter { it !in beforeLines }
-            result += "manifest: ${removed.size} line(s) gone, ${added.size} new" +
-                (removed.take(3).map { " - ${it.trim()}" } + added.take(3).map { " + ${it.trim()}" }).joinToString("")
+            // Line by line, since a value that changes (false to true) leaves the same lines elsewhere in the manifest.
+            val moved = (0 until minOf(before.manifest.size, now.manifest.size)).filter { before.manifest[it] != now.manifest[it] }
+            val sizes = if (before.manifest.size != now.manifest.size) ", ${now.manifest.size - before.manifest.size} line(s) more" else ""
+            result += "manifest: ${moved.size} line(s) differ$sizes" +
+                moved.take(3).joinToString("") { " [line ${it + 1}: ${before.manifest[it].trim()} -> ${now.manifest[it].trim()}]" }
         }
         val gone = before.entries.keys - now.entries.keys
         val new = now.entries.keys - before.entries.keys
