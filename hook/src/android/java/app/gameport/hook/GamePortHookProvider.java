@@ -37,20 +37,46 @@ public final class GamePortHookProvider extends ContentProvider {
     private Handler background;
     private SessionLog sessionLog;
 
+    // Set when GamePort started this process only to send the game's saves (see [calledByGamePort] and the `catchup` call).
+    private volatile boolean catchUpMode;
+    private boolean startedUp;
+    private final Object startLock = new Object();
+
     @Override
     public boolean onCreate() {
         Context context = getContext();
         if (context == null) return false;
-        long start = SystemClock.elapsedRealtime();
         try {
-            applyXrSettings(context);
             File root = Environment.getExternalStorageDirectory();
             File files = context.getExternalFilesDir(null);
             File backups = new File(files != null ? files : context.getFilesDir(), "gameport-backup");
             sync = new SaveSync(root, backups, new ProviderLink(context), new SaveSync.Log() {
                 @Override public void info(String message) { Log.i(TAG, message); }
             }, CONFLICT_WAIT_MS);
+            if (startedToSendSaves(context)) {
+                // GamePort wants the saves of a game it is not playing sent. Nothing else is set up: the account must not be said to play
+                // the game, and no time is counted. If a screen of the game opens meanwhile, the usual start-up happens before it does.
+                catchUpMode = true;
+                Log.i(TAG, "started by GamePort to send the saves");
+                startUpWhenAScreenOpens(context);
+                return true;
+            }
+            startUp(context);
+        } catch (Throwable t) {
+            Log.w(TAG, "save sync unavailable; the game runs without it", t);
+        }
+        return true;
+    }
 
+    /** Everything that is done when a game starts: sync the saves before it reads them, then the Steam ticket, the achievements and the watchers. */
+    private void startUp(Context context) {
+        synchronized (startLock) {
+            if (startedUp) return;
+            startedUp = true;
+        }
+        long start = SystemClock.elapsedRealtime();
+        try {
+            applyXrSettings(context);
             // Before the game reads its saves.
             sync.syncAtLaunch();
             Log.i(TAG, "launch sync finished after " + (SystemClock.elapsedRealtime() - start) + " ms");
@@ -75,7 +101,80 @@ public final class GamePortHookProvider extends ContentProvider {
         } catch (Throwable t) {
             Log.w(TAG, "save sync unavailable; the game runs without it", t);
         }
-        return true;
+    }
+
+    /** True when GamePort asked for this process to be started to send the game's saves, and not for the game to be played. */
+    private static boolean startedToSendSaves(Context context) {
+        try {
+            Bundle result = context.getContentResolver().call(Uri.parse("content://app.gameport.cloud"), "catchup", context.getPackageName(), null);
+            return result != null && result.getBoolean("catchup", false);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** The usual start-up runs just before the game's first screen is created, so a game started while the saves were being sent is complete. */
+    private void startUpWhenAScreenOpens(final Context context) {
+        final Application application = (Application) context.getApplicationContext();
+        application.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
+            @Override public void onActivityPreCreated(Activity a, Bundle b) {
+                application.unregisterActivityLifecycleCallbacks(this);
+                Log.i(TAG, "a screen of the game is opening: the usual start-up");
+                catchUpMode = false;
+                startUp(context);
+            }
+            @Override public void onActivityCreated(Activity a, Bundle b) {}
+            @Override public void onActivityStarted(Activity a) {}
+            @Override public void onActivityResumed(Activity a) {}
+            @Override public void onActivityPaused(Activity a) {}
+            @Override public void onActivityStopped(Activity a) {}
+            @Override public void onActivitySaveInstanceState(Activity a, Bundle b) {}
+            @Override public void onActivityDestroyed(Activity a) {}
+        });
+    }
+
+    /**
+     * GamePort asks the game to send its saves: only the sending that exists (it never downloads, and leaves a conflict for the player
+     * to decide when the game is next started). Nobody else may ask.
+     */
+    @Override
+    public Bundle call(String method, String arg, Bundle extras) {
+        if (!"catchup".equals(method)) return super.call(method, arg, extras);
+        Context context = getContext();
+        if (context == null || sync == null || !calledByGamePort(context)) return null;
+        Bundle out = new Bundle();
+        try {
+            sync.uploadIfChanged();
+            out.putString("status", "OK");
+        } catch (Throwable t) {
+            Log.w(TAG, "could not send the saves", t);
+            out.putString("status", "ERROR");
+        }
+        if (catchUpMode) {
+            tellGamePort(context, "catchup_done");
+            exitIfNobodyPlays();
+        }
+        return out;
+    }
+
+    private static boolean calledByGamePort(Context context) {
+        String[] packages = context.getPackageManager().getPackagesForUid(android.os.Binder.getCallingUid());
+        if (packages != null) for (String name : packages) if ("app.gameport".equals(name)) return true;
+        return false;
+    }
+
+    /** The saves are sent: the process was only started for that, so it goes away, unless a screen of the game has opened since. */
+    private void exitIfNobodyPlays() {
+        new Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() {
+            @Override public void run() {
+                synchronized (startLock) {
+                    if (startedUp) return;
+                }
+                Log.i(TAG, "saves sent, nobody plays: leaving");
+                // A normal exit, so it is not mistaken for a crash.
+                System.exit(0);
+            }
+        }, 3_000);
     }
 
     /**

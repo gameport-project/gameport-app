@@ -77,6 +77,10 @@ class PlaytimeTracker @Inject constructor(
         scheduleRelease(game)
     }
 
+    /** True while the game is on screen. */
+    @Synchronized
+    fun isOnScreen(packageName: String): Boolean = games[packageName]?.meter?.running == true
+
     /** True once the game said it left the screen and has not come back. */
     @Synchronized
     fun isPaused(packageName: String): Boolean = games[packageName]?.let { !it.meter.running } ?: false

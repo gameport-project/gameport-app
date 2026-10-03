@@ -141,7 +141,13 @@ class CloudProvider : ContentProvider() {
         "ticket" -> runBlocking { coordinator.authTicket(packageName) }
             ?.let { Bundle().apply { putByteArray("ticket", it) } }
             ?: Bundle().apply { putString(STATUS, ERROR) }
-        "begin" -> when (val result = runBlocking { noteLaunch(packageName); coordinator.begin(packageName) }) {
+        // Did GamePort start this game's process only to send its saves? Then it is not played: nothing else is set up (no ticket, no time counted).
+        "catchup" -> Bundle().apply {
+            putString(STATUS, OK)
+            putBoolean("catchup", coordinator.isCatchUp(packageName))
+        }
+        "catchup_done" -> okAfter { coordinator.finishCatchUp(packageName) }
+        "begin" -> when (val result = runBlocking { if (!coordinator.isCatchUp(packageName)) noteLaunch(packageName); coordinator.begin(packageName) }) {
             is BeginResult.Ready -> Bundle().apply {
                 putString(STATUS, READY)
                 putStringArray(RULES, result.rules.map { listOf(it.localDir, it.pattern, if (it.recursive) "1" else "0", it.cloudPrefix).joinToString("\t") }.toTypedArray())

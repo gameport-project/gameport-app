@@ -89,6 +89,21 @@ class CloudSyncCoordinator @Inject constructor(
     }
 
     private val active = ConcurrentHashMap<String, Active>()
+
+    // Games whose process GamePort started itself, only to send their saves (see [SaveCatchUp]): the hook asks before it starts.
+    private val catchUps = ConcurrentHashMap<String, Long>()
+
+    /** GamePort is about to start [packageName]'s process to send its saves, not to play it. */
+    fun requestCatchUp(packageName: String) {
+        catchUps[packageName] = System.currentTimeMillis()
+    }
+
+    /** True while [packageName]'s process was started by GamePort for [requestCatchUp]; a game the player launches is never one. */
+    fun isCatchUp(packageName: String): Boolean = catchUps[packageName]?.let { System.currentTimeMillis() - it < CATCH_UP_WINDOW_MS } == true
+
+    fun finishCatchUp(packageName: String) {
+        catchUps.remove(packageName)
+    }
     private val _conflicts = MutableStateFlow<Map<String, PendingConflict>>(emptyMap())
 
     /** Conflicts waiting for a decision, by package name. */
@@ -347,6 +362,9 @@ class CloudSyncCoordinator @Inject constructor(
     private companion object {
         const val TAG = "GPSync"
         const val SESSION_WAIT_MS = 25_000L
+
+        /** A request to send a game's saves stays valid this long; the hook says when it is done. */
+        const val CATCH_UP_WINDOW_MS = 60_000L
     }
 }
 

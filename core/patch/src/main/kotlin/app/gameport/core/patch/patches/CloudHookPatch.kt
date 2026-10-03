@@ -80,7 +80,8 @@ object CloudHookPatch : ApkPatch {
                             "provider",
                             ManifestAttr("name", ATTR_NAME, "STRING", HOOK_PROVIDER),
                             ManifestAttr("authorities", ATTR_AUTHORITIES, "STRING", hookAuthority),
-                            ManifestAttr("exported", ATTR_EXPORTED, "BOOLEAN", false),
+                            // GamePort calls it to send the saves of a game that is not running; the hook accepts no other caller.
+                            ManifestAttr("exported", ATTR_EXPORTED, "BOOLEAN", true),
                             // Runs before the game's other providers and its Application.
                             ManifestAttr("initOrder", ATTR_INIT_ORDER, "DEC", Int.MAX_VALUE),
                         ),
