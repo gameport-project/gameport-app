@@ -70,6 +70,30 @@ Le jeu utilise Steamworks.NET et appelle `SteamAPI_Init()` au démarrage, qui ch
 - **Multijoueur : non résolu.** Le jeu appelle `AuthenticationAPI-AuthenticateSteam` (fonction Firebase du studio) avec `hexEncodedSessionTicket` = ticket `GetAuthSessionTicket`. Avec le faux ticket du shim le serveur répond 500. Avec un **vrai ticket** fabriqué par GamePort (jeton de connexion + en-tête de session de 24 octets + ticket de propriété, 234 octets, déclaré à Steam par `ClientAuthList`, acquitté par Steam) il répond toujours 500 « Internal Server Error », y compris pour une requête complète et valide envoyée à la main (`createAccountIfNotExists: false`, avec les six champs `userSessionDetails`). Le serveur plante donc après la validation des arguments, au moment de vérifier le ticket. Cause inconnue : ticket refusé par Valve, ou fonction qui plante pour autre chose.
 - Essayé sans effet : marquer le compte « en jeu » (`ClientGamesPlayed`) pendant que le jeu tient un ticket.
 
+## Space Pirate Trainer (AppID 418650, package `com.iillusions.spacepiratetrainerframe`)
+
+- **Fonctionne parfaitement** (2026-10-02, Quest 3) : téléchargé et installé par GamePort, puis lancé, sans défaut relevé.
+
+## Richie's Plank Experience
+
+- **Fonctionne** (2026-10-02) : retour d'un utilisateur, non testé par nous.
+
+## Cubism VR
+
+- **Fonctionne** (2026-10-02, Quest 3).
+
+## The Last Clockwinder (AppID 1755100, package `com.asg.clockworkdev`)
+
+- **Fonctionne** (2026-10-03, Quest 3). Lancé depuis GamePort : la couche OpenXR de GamePort est chargée, la swapchain est créée à 1680x1760 par œil et la boucle de rendu tourne, sans erreur du chargeur OpenXR.
+- Son chargeur OpenXR est récent : le patch `xr_loader` n'y touche pas.
+
+## Moss 2
+
+- **Fonctionne** (2026-10-03, Quest 3), image, son et manettes, depuis le remplacement du chargeur OpenXR.
+- Cause du problème : le jeu embarque un ancien chargeur OpenXR (compilé avec le NDK r21, sans la chaîne `LoaderInitData not initialized`). Sur le Quest il ne trouve pas le runtime : il interroge les courtiers Khronos (« Null cursor »), puis lit `/odm/etc/openxr/1/active_runtime.aarch64.json`, dont la bibliothèque est dans un APK (`...VrDriver.apk!/lib/...`) et que cet ancien chargeur déclare inexistante. Le jeu démarre alors sans VR : le son joue, l'écran de lancement de Meta reste.
+- Correction : le patch `xr_loader` remplace le chargeur du jeu par celui de Khronos (1.1.63) quand il n'a pas cette chaîne. Les huit autres jeux de la bibliothèque ont un chargeur récent et ne sont pas touchés.
+- Piste écartée : déclarer les permissions OpenXR et les courtiers dans le manifeste ne changeait rien (les courtiers répondent « Null cursor » même sur un jeu qui fonctionne).
+
 ## Tickets Steam pour les services en ligne des jeux
 
 **État (2026-09-30) : les services en ligne des jeux refusent le ticket fabriqué par GamePort. Non supporté.**
