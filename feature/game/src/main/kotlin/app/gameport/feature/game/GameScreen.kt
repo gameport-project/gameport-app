@@ -44,6 +44,8 @@ import androidx.compose.material3.AssistChip
 import app.gameport.core.designsystem.BackdropDialog
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
@@ -202,6 +204,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onCancel = viewModel::onCancel,
         onPause = viewModel::onPause,
         onVersionChosen = viewModel::onVersionChosen,
+        onDuplicateChosen = viewModel::onDuplicateChosen,
         onDiscard = viewModel::onDiscard,
         onUninstall = viewModel::onUninstall,
         onPlay = { if (viewModel.shouldExplainStoragePermission()) explainingStorage = true else play() },
@@ -230,6 +233,7 @@ internal fun GameContent(
     onCancel: () -> Unit,
     onPause: () -> Unit,
     onVersionChosen: (String?) -> Unit,
+    onDuplicateChosen: (Boolean) -> Unit,
     onDiscard: () -> Unit,
     onUninstall: () -> Unit,
     onPlay: () -> Unit,
@@ -261,6 +265,7 @@ internal fun GameContent(
                     onCancel = onCancel,
                     onPause = onPause,
                     onVersionChosen = onVersionChosen,
+                    onDuplicateChosen = onDuplicateChosen,
                     onDiscard = onDiscard,
                     onUninstall = onUninstall,
                     onPlay = onPlay,
@@ -308,6 +313,7 @@ private fun GameDetails(
     onCancel: () -> Unit,
     onPause: () -> Unit,
     onVersionChosen: (String?) -> Unit,
+    onDuplicateChosen: (Boolean) -> Unit,
     onDiscard: () -> Unit,
     onUninstall: () -> Unit,
     onPlay: () -> Unit,
@@ -465,6 +471,7 @@ private fun GameDetails(
                         onCancel = onCancel,
                     onPause = onPause,
                     onVersionChosen = onVersionChosen,
+                    onDuplicateChosen = onDuplicateChosen,
                         onDiscard = onDiscard,
                         onUninstall = onUninstall,
                         onPlay = onPlay,
@@ -582,6 +589,7 @@ private fun InstallActions(
     onCancel: () -> Unit,
     onPause: () -> Unit,
     onVersionChosen: (String?) -> Unit,
+    onDuplicateChosen: (Boolean) -> Unit,
     onDiscard: () -> Unit,
     onUninstall: () -> Unit,
     onPlay: () -> Unit,
@@ -604,6 +612,10 @@ private fun InstallActions(
         is InstallState.Downloading -> Progress(step = Step.DOWNLOAD, fraction = install.progress, speed = install.bytesPerSecond, speedUnit = speedUnit, onCancel = onCancel, verifying = install.verifying, onPause = onPause)
         is InstallState.ChoosingVersion -> {
             VersionDialog(install.options, onChosen = onVersionChosen)
+            Text(stringResource(R.string.game_choose_version_waiting), style = MaterialTheme.typography.bodyMedium)
+        }
+        is InstallState.ChoosingDuplicate -> {
+            DuplicateDialog(onChosen = onDuplicateChosen)
             Text(stringResource(R.string.game_choose_version_waiting), style = MaterialTheme.typography.bodyMedium)
         }
         InstallState.Patching -> Progress(step = Step.PATCH, fraction = null, speed = 0, speedUnit = speedUnit, onCancel = null)
@@ -697,6 +709,30 @@ private fun VersionDialog(options: List<VersionOption>, onChosen: (String?) -> U
         },
         confirmButton = {},
         dismissButton = { DangerTextButton(onClick = { onChosen(null) }) { Text(stringResource(R.string.game_cancel)) } },
+    )
+}
+
+/** A copy of the game that GamePort did not install is on the device: keep it, or uninstall it so this version can be installed. */
+@Composable
+private fun DuplicateDialog(onChosen: (Boolean) -> Unit) {
+    BackdropDialog(
+        onDismissRequest = {},
+        title = { Text(stringResource(R.string.game_duplicate_title)) },
+        text = { Text(stringResource(R.string.game_duplicate_message)) },
+        confirmButton = {
+            DangerButton(onClick = { onChosen(true) }) {
+                Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.game_duplicate_replace))
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = { onChosen(false) }) {
+                Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.game_duplicate_keep))
+            }
+        },
     )
 }
 

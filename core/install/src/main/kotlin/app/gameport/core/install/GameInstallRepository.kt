@@ -175,6 +175,10 @@ class GameInstallRepository @Inject constructor(
                     } }
                 }
                 val packageName = packages.packageNameOf(apks.first()) ?: return@launch fail(game.appId, InstallError.UnreadableApk)
+                if (!settleDuplicate(game.appId, packageName)) {
+                    directory.deleteRecursively()
+                    return@launch clearState(game.appId)
+                }
 
                 setState(game.appId, InstallState.Installing)
                 when (val outcome = packages.install(apks)) {
@@ -490,6 +494,38 @@ class GameInstallRepository @Inject constructor(
         } finally {
             choices.remove(appId)
         }
+    }
+
+    private val duplicateChoices = java.util.concurrent.ConcurrentHashMap<Int, kotlinx.coroutines.CompletableDeferred<Boolean>>()
+
+    /**
+     * True when the install can go on. A copy of the game that GamePort did not install is signed with another key, so Android would refuse
+     * the install: the player is asked whether to keep that copy (nothing is installed, the download is dropped) or to uninstall it first.
+     * Nothing is uninstalled without that answer, and Android asks to confirm the uninstall as well.
+     */
+    private suspend fun settleDuplicate(appId: Int, packageName: String): Boolean {
+        if (!packages.isInstalled(packageName) || installed.all()[appId] == packageName) return true
+        events.note(appId, "$packageName is already on the device and was not installed by GamePort: the player is asked")
+        val deferred = kotlinx.coroutines.CompletableDeferred<Boolean>()
+        duplicateChoices[appId] = deferred
+        setState(appId, InstallState.ChoosingDuplicate(packageName))
+        val replace = try {
+            deferred.await()
+        } finally {
+            duplicateChoices.remove(appId)
+        }
+        if (!replace) {
+            events.note(appId, "the player kept the copy that was installed")
+            return false
+        }
+        val outcome = packages.uninstall(packageName)
+        events.note(appId, "uninstall of the other copy: $outcome")
+        return outcome == PackageGateway.Outcome.Success
+    }
+
+    /** The player's answer to [InstallState.ChoosingDuplicate]: true to uninstall the copy that is there and install this one, false to keep it. */
+    fun chooseDuplicate(appId: Int, replace: Boolean) {
+        duplicateChoices[appId]?.complete(replace)
     }
 
     /** The player's answer to [InstallState.ChoosingVersion]: the id of the build, or null to give up. */

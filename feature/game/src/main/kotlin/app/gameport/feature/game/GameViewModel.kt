@@ -179,6 +179,8 @@ class GameViewModel @Inject constructor(
 
     fun onVersionChosen(optionId: String?) = installer.chooseVersion(appId, optionId)
 
+    fun onDuplicateChosen(replace: Boolean) = installer.chooseDuplicate(appId, replace)
+
     fun onPause() = installer.pause(appId)
 
     fun onDiscard() = installer.discard(appId)

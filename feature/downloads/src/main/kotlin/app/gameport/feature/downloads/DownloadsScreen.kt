@@ -164,6 +164,7 @@ private fun EntryRow(
                     LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
                 }
                 is InstallState.ChoosingVersion -> Text(stringResource(R.string.downloads_choose_version))
+                is InstallState.ChoosingDuplicate -> Text(stringResource(R.string.downloads_choose_duplicate))
                 InstallState.Patching -> Text(stringResource(R.string.downloads_patching))
                 InstallState.Installing -> Text(stringResource(R.string.downloads_installing))
                 InstallState.Interrupted -> Text(stringResource(R.string.downloads_interrupted))

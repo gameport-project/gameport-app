@@ -23,4 +23,5 @@
     <string name="downloads_verifying">Checking files already downloaded… %1$d%%</string>
     <string name="downloads_pause">Pause</string>
     <string name="downloads_choose_version">A version must be chosen: open the game</string>
+    <string name="downloads_choose_duplicate">A copy is already installed: open the game to choose</string>
 </resources>

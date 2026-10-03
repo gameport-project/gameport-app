@@ -18,6 +18,12 @@ sealed interface InstallState {
     /** The download holds several builds of the game and none fits this device clearly: the player picks one. */
     data class ChoosingVersion(val options: List<VersionOption>) : InstallState
 
+    /**
+     * A copy of the game that GamePort did not install (the Meta store's, for instance) is already on the device. It is signed with another
+     * key, so the two cannot be installed together: the player chooses between keeping it and replacing it with this one.
+     */
+    data class ChoosingDuplicate(val packageName: String) : InstallState
+
     /** The downloaded APK is being prepared: Steam shim, VR entry, signature. */
     data object Patching : InstallState
 

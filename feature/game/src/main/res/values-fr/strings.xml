@@ -142,6 +142,10 @@
     <string name="game_choose_version_title">Quelle version ?</string>
     <string name="game_choose_version_message">Ce jeu existe en plusieurs versions et aucune ne convient clairement à cet appareil. Choisir celle à installer.</string>
     <string name="game_choose_version_waiting">En attente d\'un choix…</string>
+    <string name="game_duplicate_title">Déjà installé</string>
+    <string name="game_duplicate_message">Une copie de ce jeu est déjà installée sur cet appareil, probablement celle du store Meta. Les deux ne peuvent pas être installées ensemble. Utiliser cette version demande de désinstaller l\'autre, et ses sauvegardes sur cet appareil sont perdues avec elle.</string>
+    <string name="game_duplicate_keep">Garder la copie installée</string>
+    <string name="game_duplicate_replace">La désinstaller et installer cette version</string>
     <string name="game_version_headset">Version VR</string>
     <string name="game_version_flat">Version sans VR</string>
     <string name="report_open">Signaler un problème</string>
