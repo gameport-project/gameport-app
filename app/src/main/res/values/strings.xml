@@ -1,4 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">GamePort</string>
+    <string name="whatsnew_title">What\'s new in GamePort %1$s</string>
+    <string name="whatsnew_preview">Preview: the games are made up and nothing is patched.</string>
+    <string name="whatsnew_games">Games concerned:</string>
+    <plurals name="whatsnew_alert_title">
+        <item quantity="one">%1$d game must be patched again to benefit from these new features.</item>
+        <item quantity="other">%1$d games must be patched again to benefit from these new features.</item>
+    </plurals>
+    <string name="whatsnew_in_this_version">In this version:</string>
+    <string name="whatsnew_achievements">Achievements are finally here, synced with Steam: the ones earned here show up on Steam, and the ones earned elsewhere show up here.</string>
+    <string name="whatsnew_offline">Offline mode is supported: games can be played without a connection, and their saves are sent as soon as the network is back.</string>
+    <string name="whatsnew_sign_in">Sign-in with an account name and a password, besides the QR code.</string>
+    <string name="whatsnew_compat_title">Wider compatibility, new games supported</string>
+    <string name="whatsnew_compat_tested">Tested and confirmed: %1$s.</string>
+    <string name="whatsnew_compat_others">Other games are supported too without having been tried, among them Unreal games that were blocked by their expansion files.</string>
+    <string name="whatsnew_on_screen">Not patched now because they are on screen: %1$s.</string>
+    <string name="whatsnew_android_note">Some games are patched without any confirmation and others ask for one: it is a constraint of the game, not of GamePort.</string>
+    <string name="whatsnew_patch_all">Patch all</string>
+    <string name="whatsnew_later">See later</string>
+    <string name="whatsnew_got_it">Got it</string>
+    <string name="whatsnew_close">Close</string>
+    <string name="whatsnew_running">Patching %1$d of %2$d</string>
+    <string name="whatsnew_done">All the games are patched.</string>
+    <string name="whatsnew_partial">Some games were not patched and can be patched from their page: %1$s.</string>
+    <string name="whatsnew_stop">Stop</string>
 </resources>

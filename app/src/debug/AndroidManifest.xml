@@ -9,6 +9,10 @@
         <receiver
             android:name="app.gameport.debug.PatchDebugReceiver"
             android:exported="true" />
+        <!-- Development only: shows the news window of a version, with made-up games. -->
+        <receiver
+            android:name="app.gameport.debug.WhatsNewPreviewReceiver"
+            android:exported="true" />
         <!-- Development only: works out (and, when asked, really does) the adding of achievements to the Steam account. -->
         <receiver
             android:name="app.gameport.debug.AchievementDebugReceiver"

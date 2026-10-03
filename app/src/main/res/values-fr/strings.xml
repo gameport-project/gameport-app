@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="whatsnew_title">Nouveautés de GamePort %1$s</string>
+    <string name="whatsnew_preview">Aperçu : les jeux sont inventés et rien n\'est patché.</string>
+    <string name="whatsnew_games">Jeux concernés :</string>
+    <plurals name="whatsnew_alert_title">
+        <item quantity="one">%1$d jeu doit être patché de nouveau pour profiter de ces nouveautés.</item>
+        <item quantity="many">%1$d jeux doivent être patchés de nouveau pour profiter de ces nouveautés.</item>
+        <item quantity="other">%1$d jeux doivent être patchés de nouveau pour profiter de ces nouveautés.</item>
+    </plurals>
+    <string name="whatsnew_in_this_version">Dans cette version :</string>
+    <string name="whatsnew_achievements">Les succès sont enfin là, synchronisés avec Steam : ceux gagnés ici apparaissent sur Steam, et ceux gagnés ailleurs apparaissent ici.</string>
+    <string name="whatsnew_offline">Le mode hors ligne est géré : les jeux se jouent sans connexion, et leurs sauvegardes sont envoyées dès que le réseau revient.</string>
+    <string name="whatsnew_sign_in">Connexion avec un nom de compte et un mot de passe, en plus du QR code.</string>
+    <string name="whatsnew_compat_title">Compatibilité étendue, nouveaux jeux pris en charge</string>
+    <string name="whatsnew_compat_tested">Testés et confirmés : %1$s.</string>
+    <string name="whatsnew_compat_others">D\'autres jeux sont aussi pris en charge sans avoir été essayés, dont des jeux Unreal jusque-là bloqués par leurs fichiers d\'extension.</string>
+    <string name="whatsnew_on_screen">Pas patchés maintenant car à l\'écran : %1$s.</string>
+    <string name="whatsnew_android_note">Certains jeux sont patchés sans confirmation et d\'autres en demandent une : c\'est une contrainte du jeu, pas de GamePort.</string>
+    <string name="whatsnew_patch_all">Tout patcher</string>
+    <string name="whatsnew_later">Voir plus tard</string>
+    <string name="whatsnew_got_it">Compris</string>
+    <string name="whatsnew_close">Fermer</string>
+    <string name="whatsnew_running">Patch %1$d sur %2$d</string>
+    <string name="whatsnew_done">Tous les jeux sont patchés.</string>
+    <string name="whatsnew_partial">Certains jeux n\'ont pas été patchés et peuvent l\'être depuis leur page : %1$s.</string>
+    <string name="whatsnew_stop">Arrêter</string>
+</resources>

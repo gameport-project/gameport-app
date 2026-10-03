@@ -60,6 +60,16 @@ class UserSettings @Inject constructor(
         _sendAchievementsToSteam.value = send
     }
 
+    private val _whatsNewSeen = MutableStateFlow(prefs.getInt(KEY_WHATS_NEW_SEEN, 0))
+
+    /** The version code of the newest GamePort whose news the player validated, 0 before any. */
+    val whatsNewSeen: StateFlow<Int> = _whatsNewSeen.asStateFlow()
+
+    fun markWhatsNewSeen(versionCode: Int) {
+        prefs.edit().putInt(KEY_WHATS_NEW_SEEN, versionCode).apply()
+        _whatsNewSeen.value = versionCode
+    }
+
     // Before this setting, a switch ("return_to_gameport") said whether a game started by GamePort opens it again: that is kept.
     private val _returnMode = MutableStateFlow(
         ReturnMode.ofId(prefs.getString(KEY_RETURN_MODE, null)) ?: if (prefs.getBoolean(KEY_RETURN, true)) ReturnMode.APP else ReturnMode.NEVER,
@@ -162,6 +172,7 @@ class UserSettings @Inject constructor(
         const val KEY_RETURN_MODE = "return_mode"
         const val KEY_COUNT_PLAYTIME = "count_playtime_on_steam"
         const val KEY_SEND_ACHIEVEMENTS = "send_achievements_to_steam"
+        const val KEY_WHATS_NEW_SEEN = "whats_new_seen"
         const val KEY_BACKDROP = "library_backdrop"
         const val KEY_BACKDROP_STRENGTH = "backdrop_strength"
         const val KEY_GAME_ARTWORK = "game_artwork_height"

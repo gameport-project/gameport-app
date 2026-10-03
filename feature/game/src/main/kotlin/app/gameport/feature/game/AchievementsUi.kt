@@ -2,6 +2,7 @@ package app.gameport.feature.game
 
 import androidx.compose.foundation.layout.Arrangement
 import app.gameport.core.designsystem.GlassBorder
+import app.gameport.core.designsystem.GoldTrophy
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
@@ -188,26 +189,6 @@ private fun StripItem(appId: Int, achievement: Achievement, isOpen: Boolean, onO
             }
         }
     }
-}
-
-/** A trophy in gold, lighter at the top and deeper at the bottom like a metal cup. */
-@Composable
-internal fun GoldTrophy(size: Dp, modifier: Modifier = Modifier) {
-    Icon(
-        Icons.Filled.EmojiEvents,
-        contentDescription = null,
-        tint = Color.White,
-        modifier = modifier
-            .size(size)
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            .drawWithCache {
-                val gold = Brush.verticalGradient(listOf(Color(0xFFFFE08A), Color(0xFFF2B705), Color(0xFFC98A00)))
-                onDrawWithContent {
-                    drawContent()
-                    drawRect(gold, blendMode = BlendMode.SrcIn)
-                }
-            },
-    )
 }
 
 @Composable

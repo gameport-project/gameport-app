@@ -45,6 +45,8 @@ fun BackdropDialog(
     padding: Dp = 24.dp,
     maxTextHeight: Dp = 480.dp,
     maxHeight: Dp = Dp.Unspecified,
+    /** Shown between the text and the buttons, always in view: it does not scroll with the text. */
+    pinned: (@Composable () -> Unit)? = null,
 ) {
     BasicAlertDialog(onDismissRequest = onDismissRequest, modifier = modifier) {
         val shape = RoundedCornerShape(28.dp)
@@ -66,6 +68,7 @@ fun BackdropDialog(
                         ProvideTextStyle(MaterialTheme.typography.bodyMedium) { it() }
                     }
                 }
+                pinned?.invoke()
                 if (confirmButton != null || dismissButton != null) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
                         dismissButton?.invoke()
@@ -97,15 +100,15 @@ fun ProvideAppWindowHeight(content: @Composable () -> Unit) {
 }
 
 /**
- * The most height a dialog may take: about 70 % of the window of the app, whatever its size. What does not fit scrolls. For dialogs whose
- * content can be long.
+ * The most height a dialog may take: about [fraction] (70 % by default) of the window of the app, whatever its size. What does not fit
+ * scrolls. For dialogs whose content can be long.
  */
 @Composable
-fun dialogMaxHeight(): Dp {
+fun dialogMaxHeight(fraction: Float = 0.7f): Dp {
     val density = androidx.compose.ui.platform.LocalDensity.current
     val windowHeight = LocalAppWindowHeightPx.current
-    // The dialog window keeps about 56 dp of margin around the card, which counts in the height it is given: it is added so the card itself is 70 %.
+    // The dialog window keeps about 56 dp of margin around the card, which counts in the height it is given: it is added so the card itself has the fraction asked.
     val margin = 56.dp
-    if (windowHeight <= 0) return (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.7f).dp + margin
-    return with(density) { (windowHeight * 0.7f).toDp() } + margin
+    if (windowHeight <= 0) return (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * fraction).dp + margin
+    return with(density) { (windowHeight * fraction).toDp() } + margin
 }

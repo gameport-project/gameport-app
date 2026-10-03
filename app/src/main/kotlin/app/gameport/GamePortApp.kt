@@ -35,6 +35,12 @@ import app.gameport.feature.library.libraryScreen
 
 @Composable
 fun GamePortApp(viewModel: AppViewModel = hiltViewModel()) {
+    // The height of the app's window is known to the dialogs, which keep to about 70 % of it.
+    app.gameport.core.designsystem.ProvideAppWindowHeight { GamePortContent(viewModel) }
+}
+
+@Composable
+private fun GamePortContent(viewModel: AppViewModel) {
     val authState by viewModel.authState.collectAsStateWithLifecycle()
     val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
     val window = (LocalContext.current as? Activity)?.window
@@ -76,6 +82,8 @@ fun GamePortApp(viewModel: AppViewModel = hiltViewModel()) {
         gameSavesScreen(onBack = navController::goBack)
         gameSettingsScreen(onBack = navController::goBack)
     }
+    // What a new version changes, and the games to patch again when it needs it.
+    if (signedIn) app.gameport.whatsnew.WhatsNewHost()
 }
 
 /**
