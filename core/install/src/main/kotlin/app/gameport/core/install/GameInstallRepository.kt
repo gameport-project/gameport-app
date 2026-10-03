@@ -8,6 +8,7 @@ import app.gameport.core.model.AndroidDepot
 import app.gameport.core.model.Game
 import app.gameport.core.model.InstallError
 import app.gameport.core.model.InstallState
+import app.gameport.core.model.ObbNames
 import app.gameport.core.model.VersionOption
 import app.gameport.core.model.AuthState
 import app.gameport.core.patch.GamePatcher
@@ -179,7 +180,7 @@ class GameInstallRepository @Inject constructor(
                 when (val outcome = packages.install(apks)) {
                     PackageGateway.Outcome.Success -> {
                         events.note(game.appId, "installed $packageName")
-                        placeObb(directory, packageName)
+                        placeExpansionFiles(game.appId, directory, packageName)
                         installed.put(game.appId, packageName)
                         // What this install came from, to recognise a newer build later.
                         builds.put(game.appId, InstalledBuild(depots.associate { it.id to it.manifestId }, chosen))
@@ -507,30 +508,29 @@ class GameInstallRepository @Inject constructor(
      * Best effort: an OBB expansion belongs under Android/obb/<package>, which Android 11+ only
      * lets an app with "all files access" write to.
      */
-    private suspend fun placeObb(directory: File, packageName: String) = withContext(Dispatchers.IO) {
-        val obbs = directory.walkTopDown().filter { it.isFile && it.extension.equals("obb", ignoreCase = true) }.toList()
-        if (obbs.isEmpty()) return@withContext
+    private suspend fun placeExpansionFiles(appId: Int, directory: File, packageName: String) = withContext(Dispatchers.IO) {
         runCatching {
-            val target = File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName").apply { mkdirs() }
-            obbs.forEach { it.copyTo(File(target, it.name), overwrite = true) }
+            val target = File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName")
+            val placed = ExpansionFiles.place(directory, target, packageName, skipped = PATCHED_DIR)
+            if (placed.isNotEmpty()) {
+                events.note(appId, "placed in Android/obb/$packageName: ${placed.take(MAX_PLACED_LISTED).joinToString()}${if (placed.size > MAX_PLACED_LISTED) " and ${placed.size - MAX_PLACED_LISTED} more" else ""}")
+            }
         }
         alignObbVersion(packageName)
     }
 
     /**
      * An expansion file is named after the version code of the APK it belongs to (main.<code>.<package>.obb), and
-     * the game looks for exactly that name. Patching raises the version code, so the files are renamed to follow it;
+     * the game looks for exactly that name (see [app.gameport.core.model.ObbNames], which also covers the overflow files of the largest Unreal games). Patching raises the version code, so the files are renamed to follow it;
      * otherwise the game starts its expansion downloader and never gets going. Best effort, like placing them.
      */
     private fun alignObbVersion(packageName: String) {
         runCatching {
             val code = packages.versionCodeOf(packageName) ?: return
             val directory = File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName")
-            val pattern = Regex("^(main|patch)\\.(\\d+)\\.${Regex.escape(packageName)}\\.obb$")
             directory.listFiles()?.forEach { file ->
-                val match = pattern.matchEntire(file.name) ?: return@forEach
-                if (match.groupValues[2] == code.toString()) return@forEach
-                val renamed = File(directory, "${match.groupValues[1]}.$code.$packageName.obb")
+                val name = ObbNames.aligned(file.name, packageName, code) ?: return@forEach
+                val renamed = File(directory, name)
                 if (!renamed.exists()) file.renameTo(renamed)
             }
         }
@@ -547,6 +547,9 @@ class GameInstallRepository @Inject constructor(
 }
 
 private const val PATCHED_DIR = "patched"
+
+/** How many of the files placed for a game its event log names. */
+private const val MAX_PLACED_LISTED = 12
 private const val STORAGE_PERMISSION = "android.permission.READ_EXTERNAL_STORAGE"
 private const val MAX_CONCURRENT_DOWNLOADS = 2
 
