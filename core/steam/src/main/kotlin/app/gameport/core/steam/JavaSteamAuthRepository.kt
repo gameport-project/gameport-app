@@ -53,6 +53,7 @@ class JavaSteamAuthRepository @Inject constructor(
     override val connection: StateFlow<SteamConnection> = _connection.asStateFlow()
 
     private fun setConnection(value: SteamConnection) {
+        if (_connection.value != value) android.util.Log.i(TAG, "connection to Steam: ${_connection.value} -> $value")
         _connection.value = value
         _offline.value = value != SteamConnection.ONLINE
     }
@@ -99,6 +100,7 @@ class JavaSteamAuthRepository @Inject constructor(
             throw e
         } catch (e: Exception) {
             closeSession()
+            android.util.Log.w(TAG, "log on with the saved token failed: $e")
             // Steam refusing the token means signed out; not reaching Steam only means offline.
             if (known == null || (e is AuthenticationException && e.result !in TRANSIENT_RESULTS)) state.value = AuthState.SignedOut else goOffline(known, chosen = false)
         }
@@ -212,6 +214,7 @@ class JavaSteamAuthRepository @Inject constructor(
      */
     private fun startReconnect(dead: SteamSession?) {
         if (reconnectJob?.isActive == true) return
+        android.util.Log.i(TAG, if (dead != null) "the connection to Steam was lost: reconnecting" else "Steam could not be reached: trying again")
         setConnection(SteamConnection.CONNECTING)
         reconnectJob = scope.launch {
             for (pause in RECONNECT_PAUSES_MS) {
@@ -280,6 +283,8 @@ class JavaSteamAuthRepository @Inject constructor(
 
     private fun SessionIdentity.toAccount() = SteamAccount(steamId = steamId, displayName = displayName)
 }
+
+private const val TAG = "GPConnection"
 
 /** How long to wait before each attempt to reconnect after Steam dropped the connection. */
 private val RECONNECT_PAUSES_MS = listOf(3_000L, 10_000L, 30_000L, 60_000L, 120_000L)
