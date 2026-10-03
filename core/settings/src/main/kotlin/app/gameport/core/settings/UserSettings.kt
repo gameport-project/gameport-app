@@ -47,6 +47,19 @@ class UserSettings @Inject constructor(
         _countPlaytimeOnSteam.value = count
     }
 
+    private val _sendAchievementsToSteam = MutableStateFlow(prefs.getBoolean(KEY_SEND_ACHIEVEMENTS, true))
+
+    /**
+     * Whether the achievements a game unlocks are added to the Steam account. On by default, as the player expects the achievements of a
+     * game played here to count on Steam; it writes to the account, and GamePort cannot take an achievement back, so it can be turned off.
+     */
+    val sendAchievementsToSteam: StateFlow<Boolean> = _sendAchievementsToSteam.asStateFlow()
+
+    fun setSendAchievementsToSteam(send: Boolean) {
+        prefs.edit().putBoolean(KEY_SEND_ACHIEVEMENTS, send).apply()
+        _sendAchievementsToSteam.value = send
+    }
+
     // Before this setting, a switch ("return_to_gameport") said whether a game started by GamePort opens it again: that is kept.
     private val _returnMode = MutableStateFlow(
         ReturnMode.ofId(prefs.getString(KEY_RETURN_MODE, null)) ?: if (prefs.getBoolean(KEY_RETURN, true)) ReturnMode.APP else ReturnMode.NEVER,
@@ -148,6 +161,7 @@ class UserSettings @Inject constructor(
         const val KEY_RETURN = "return_to_gameport"
         const val KEY_RETURN_MODE = "return_mode"
         const val KEY_COUNT_PLAYTIME = "count_playtime_on_steam"
+        const val KEY_SEND_ACHIEVEMENTS = "send_achievements_to_steam"
         const val KEY_BACKDROP = "library_backdrop"
         const val KEY_BACKDROP_STRENGTH = "backdrop_strength"
         const val KEY_GAME_ARTWORK = "game_artwork_height"

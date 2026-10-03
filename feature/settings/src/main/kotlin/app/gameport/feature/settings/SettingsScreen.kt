@@ -99,6 +99,7 @@ fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewMode
     val playerDefaults by viewModel.playerDefaults.collectAsStateWithLifecycle()
     val display by viewModel.display.collectAsStateWithLifecycle()
     val countPlaytime by viewModel.countPlaytimeOnSteam.collectAsStateWithLifecycle()
+    val sendAchievements by viewModel.sendAchievementsToSteam.collectAsStateWithLifecycle()
     val returnMode by viewModel.returnMode.collectAsStateWithLifecycle()
     val language by viewModel.language.collectAsStateWithLifecycle()
     val offline by viewModel.offline.collectAsStateWithLifecycle()
@@ -128,7 +129,7 @@ fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewMode
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
                         when (category) {
-                            Category.ACCOUNT -> AccountSection(accountName, offline, viewModel::onOfflineModeChanged, countPlaytime, viewModel::onCountPlaytimeOnSteamChanged, returnMode, viewModel::onReturnModeChanged, viewModel::onSignOut)
+                            Category.ACCOUNT -> AccountSection(accountName, offline, viewModel::onOfflineModeChanged, countPlaytime, viewModel::onCountPlaytimeOnSteamChanged, sendAchievements, viewModel::onSendAchievementsToSteamChanged, returnMode, viewModel::onReturnModeChanged, viewModel::onSignOut)
                             Category.DOWNLOADS -> DownloadsSection(speedUnit, viewModel::onSpeedUnitSelected)
                             Category.APPEARANCE -> AppearanceSection(display, viewModel::onDisplayChanged)
                             Category.HOME -> HomeSection(display, viewModel.isHeadset, viewModel::onDisplayChanged)
@@ -173,6 +174,8 @@ private fun AccountSection(
     onOfflineChanged: (Boolean) -> Unit,
     countPlaytime: Boolean,
     onCountPlaytimeChanged: (Boolean) -> Unit,
+    sendAchievements: Boolean,
+    onSendAchievementsChanged: (Boolean) -> Unit,
     returnMode: ReturnMode,
     onReturnModeChanged: (ReturnMode) -> Unit,
     onSignOut: () -> Unit,
@@ -211,6 +214,13 @@ private fun AccountSection(
             Text(stringResource(R.string.settings_playtime_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = countPlaytime, onCheckedChange = onCountPlaytimeChanged)
+    }
+    Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.settings_send_achievements), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_send_achievements_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = sendAchievements, onCheckedChange = onSendAchievementsChanged)
     }
     var choosingReturn by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {

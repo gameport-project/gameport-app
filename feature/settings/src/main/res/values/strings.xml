@@ -75,6 +75,8 @@
     <string name="settings_continue_scope_all">All</string>
     <string name="settings_continue_scope_tab">Shown tab</string>
     <string name="settings_continue_scope_description">All: the VR and the flat games started most recently. Shown tab: only those of the tab selected, VR or Flat.</string>
+    <string name="settings_send_achievements">Sync achievements with Steam</string>
+    <string name="settings_send_achievements_description">Achievements unlocked in a game are added to the Steam account, and the ones the account already has (earned on a PC, for example) are given to the game when it starts. This writes to the account and GamePort cannot take an achievement back. Only achievements unlocked while this is on are sent, and one that cannot be sent right away waits for a connection.</string>
     <string name="settings_playtime">Count play time on Steam</string>
     <string name="settings_playtime_description">While a game is on screen, Steam is told the account is playing it, so its time counts on the account. Steam allows one game at a time: starting a game here interrupts one running on another device. Time while the device is asleep or the game is not on screen is not counted.</string>
     <string name="settings_group_colors">Colours</string>

@@ -75,6 +75,8 @@
     <string name="settings_continue_scope_all">Tous</string>
     <string name="settings_continue_scope_tab">Onglet affiché</string>
     <string name="settings_continue_scope_description">Tous : les jeux VR et plats lancés le plus récemment. Onglet affiché : seulement ceux de l\'onglet sélectionné, VR ou Plat.</string>
+    <string name="settings_send_achievements">Synchroniser les succès avec Steam</string>
+    <string name="settings_send_achievements_description">Un succès débloqué dans un jeu est ajouté au compte Steam, et ceux que le compte a déjà (obtenus sur un PC, par exemple) sont donnés au jeu quand il démarre. Cela écrit sur le compte et GamePort ne peut pas retirer un succès. Seuls les succès débloqués pendant que cette option est activée sont envoyés, et celui qui ne peut pas partir tout de suite attend une connexion.</string>
     <string name="settings_playtime">Compter le temps de jeu sur Steam</string>
     <string name="settings_playtime_description">Tant qu\'un jeu est à l\'écran, Steam est prévenu que le compte y joue, et son temps est compté sur le compte. Steam n\'autorise qu\'un jeu à la fois : lancer un jeu ici interrompt celui d\'un autre appareil. Le temps passé en veille, ou quand le jeu n\'est pas à l\'écran, n\'est pas compté.</string>
     <string name="settings_group_colors">Couleurs</string>

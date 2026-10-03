@@ -82,6 +82,10 @@ class SettingsViewModel @Inject constructor(
 
     fun onCountPlaytimeOnSteamChanged(count: Boolean) = settings.setCountPlaytimeOnSteam(count)
 
+    val sendAchievementsToSteam: StateFlow<Boolean> = settings.sendAchievementsToSteam
+
+    fun onSendAchievementsToSteamChanged(send: Boolean) = settings.setSendAchievementsToSteam(send)
+
     val returnMode: StateFlow<app.gameport.core.model.ReturnMode> = settings.returnMode
 
     fun onReturnModeChanged(mode: app.gameport.core.model.ReturnMode) = settings.setReturnMode(mode)
