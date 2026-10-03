@@ -25,7 +25,16 @@ interface SteamAuthRepository {
     /** Starts a QR sign-in; returns when the flow succeeded, failed or was cancelled. */
     suspend fun beginQrSignIn()
 
+    /** Starts a sign-in with the account name and password; Steam Guard is then answered with [submitGuardCode]. */
+    suspend fun beginCredentialsSignIn(accountName: String, password: String)
+
+    /** The Steam Guard code asked for by [app.gameport.core.model.AuthState.AwaitingCode]. */
+    fun submitGuardCode(code: String)
+
     fun cancelSignIn()
+
+    /** Leaves a failed sign-in, back to the choice of how to sign in. */
+    fun resetSignIn()
 
     suspend fun signOut()
 }

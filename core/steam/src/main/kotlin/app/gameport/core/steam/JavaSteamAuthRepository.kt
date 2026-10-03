@@ -10,6 +10,11 @@ import app.gameport.core.steam.session.SessionIdentity
 import app.gameport.core.steam.session.SteamIdentityStore
 import `in`.dragonbra.javasteam.enums.EResult
 import `in`.dragonbra.javasteam.steam.authentication.AuthenticationException
+import `in`.dragonbra.javasteam.steam.authentication.IAuthenticator
+import app.gameport.core.model.GuardCodeKind
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.future.asCompletableFuture
+import java.util.concurrent.CompletableFuture
 import app.gameport.core.steam.session.SteamSession
 import app.gameport.core.steam.session.SteamSessionHolder
 import app.gameport.core.steam.session.StoredCredentials
@@ -57,6 +62,7 @@ class JavaSteamAuthRepository @Inject constructor(
     private val restoreLock = Mutex()
     private var session: SteamSession? = null
     private var signInJob: kotlinx.coroutines.Job? = null
+    @Volatile private var guardPrompt: GuardPrompt? = null
     private val deviceName = "GamePort (${Build.MODEL})"
 
     override suspend fun restoreSession() = withContext(Dispatchers.IO) {
@@ -129,12 +135,35 @@ class JavaSteamAuthRepository @Inject constructor(
     }
 
     override suspend fun beginQrSignIn() = withContext(Dispatchers.IO) {
+        signIn { steam ->
+            steam.authenticateWithQr(deviceName) { url ->
+                state.value = AuthState.AwaitingConfirmation(url)
+            }
+        }
+    }
+
+    override suspend fun beginCredentialsSignIn(accountName: String, password: String) = withContext(Dispatchers.IO) {
+        val prompt = GuardPrompt { kind, hint, wrong -> state.value = AuthState.AwaitingCode(kind, hint, wrong) }
+        guardPrompt = prompt
+        state.value = AuthState.Connecting
+        try {
+            signIn { steam -> steam.authenticateWithCredentials(deviceName, accountName.trim(), password, prompt) }
+        } finally {
+            prompt.cancel()
+            guardPrompt = null
+        }
+    }
+
+    override fun submitGuardCode(code: String) {
+        guardPrompt?.answer(code.trim())
+    }
+
+    /** What both sign-ins share: [authenticate] gets the credentials, which are kept for the next start, then the session logs on. */
+    private suspend fun signIn(authenticate: suspend (SteamSession) -> StoredCredentials) {
         signInJob = kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]
         try {
             val steam = newSession()
-            val credentials: StoredCredentials = steam.authenticateWithQr(deviceName) { url ->
-                state.value = AuthState.AwaitingConfirmation(url)
-            }
+            val credentials = authenticate(steam)
             tokenStore.save(credentials)
             val identity: SessionIdentity = steam.logOn(credentials.accountName, credentials.refreshToken, deviceName)
             sessions.set(session)
@@ -148,12 +177,17 @@ class JavaSteamAuthRepository @Inject constructor(
             throw e
         } catch (e: Exception) {
             closeSession()
-            state.value = AuthState.Failed(e.message)
+            val refused = e is AuthenticationException && e.result in BAD_CREDENTIALS_RESULTS
+            state.value = AuthState.Failed(e.message, badCredentials = refused)
         }
     }
 
     override fun cancelSignIn() {
         signInJob?.cancel()
+    }
+
+    override fun resetSignIn() {
+        if (state.value is AuthState.Failed) state.value = AuthState.SignedOut
     }
 
     override suspend fun signOut() = withContext(Dispatchers.IO) {
@@ -252,3 +286,34 @@ private val RECONNECT_PAUSES_MS = listOf(3_000L, 10_000L, 30_000L, 60_000L, 120_
 
 /** Results that mean Steam could not answer right now, not that the saved sign-in is no longer valid. */
 private val TRANSIENT_RESULTS = setOf(EResult.ServiceUnavailable, EResult.Timeout, EResult.TryAnotherCM, EResult.Busy, EResult.NoConnection)
+
+/** Results that mean the account name or the password was wrong. */
+private val BAD_CREDENTIALS_RESULTS = setOf(EResult.InvalidPassword, EResult.AccountNotFound, EResult.InvalidLoginAuthCode)
+
+/**
+ * Asks the screen for the Steam Guard code and waits for the answer. The code of the mobile app is asked first, and the one sent by e-mail when
+ * the account uses that. Confirming in the mobile app instead is not offered here: the QR sign-in is the way for that.
+ */
+private class GuardPrompt(private val ask: (GuardCodeKind, String?, Boolean) -> Unit) : IAuthenticator {
+    @Volatile private var pending: CompletableDeferred<String>? = null
+
+    override fun getDeviceCode(previousCodeWasIncorrect: Boolean): CompletableFuture<String> = request(GuardCodeKind.APP, null, previousCodeWasIncorrect)
+
+    override fun getEmailCode(email: String?, previousCodeWasIncorrect: Boolean): CompletableFuture<String> = request(GuardCodeKind.EMAIL, email, previousCodeWasIncorrect)
+
+    override fun acceptDeviceConfirmation(): CompletableFuture<Boolean> = CompletableFuture.completedFuture(false)
+
+    fun answer(code: String) {
+        pending?.complete(code)
+    }
+
+    fun cancel() {
+        pending?.cancel()
+    }
+
+    private fun request(kind: GuardCodeKind, hint: String?, wrong: Boolean): CompletableFuture<String> {
+        val deferred = CompletableDeferred<String>().also { pending = it }
+        ask(kind, hint, wrong)
+        return deferred.asCompletableFuture()
+    }
+}

@@ -19,6 +19,18 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch { repository.beginQrSignIn() }
     }
 
+    fun onPasswordSignIn(accountName: String, password: String) {
+        viewModelScope.launch { repository.beginCredentialsSignIn(accountName, password) }
+    }
+
+    fun onGuardCode(code: String) {
+        repository.submitGuardCode(code)
+    }
+
+    fun onRetryClicked() {
+        repository.resetSignIn()
+    }
+
     fun onCancelClicked() {
         repository.cancelSignIn()
     }

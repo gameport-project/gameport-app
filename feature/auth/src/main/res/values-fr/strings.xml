@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="auth_sign_in">Se connecter avec Steam</string>
+    <string name="auth_sign_in_qr">Se connecter avec un QR code</string>
+    <string name="auth_sign_in_password">Se connecter avec un nom de compte</string>
+    <string name="auth_account_name">Nom de compte Steam</string>
+    <string name="auth_password">Mot de passe</string>
+    <string name="auth_password_show">Afficher le mot de passe</string>
+    <string name="auth_password_hide">Masquer le mot de passe</string>
+    <string name="auth_password_kept">Le mot de passe est envoyé à Steam uniquement et n\'est pas conservé.</string>
+    <string name="auth_submit">Se connecter</string>
+    <string name="auth_back">Retour</string>
+    <string name="auth_code_label">Code Steam Guard</string>
+    <string name="auth_code_app">Code Steam Guard affiché dans l\'application mobile Steam</string>
+    <string name="auth_code_email">Code Steam Guard envoyé par e-mail à %1$s</string>
+    <string name="auth_code_email_unknown">Code Steam Guard envoyé par e-mail</string>
+    <string name="auth_code_wrong">Le code n\'a pas été accepté.</string>
+    <string name="auth_bad_credentials">Le nom de compte ou le mot de passe n\'est pas correct.</string>
     <string name="auth_confirm_in_app">Confirmez la connexion dans l\'application mobile Steam</string>
     <string name="auth_connecting">Connexion à Steam…</string>
     <string name="auth_cancel">Annuler</string>

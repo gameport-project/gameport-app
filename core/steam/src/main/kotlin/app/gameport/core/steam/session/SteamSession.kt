@@ -5,6 +5,7 @@ import `in`.dragonbra.javasteam.protobufs.steamclient.SteammessagesClientserver.
 import `in`.dragonbra.javasteam.enums.EResult
 import `in`.dragonbra.javasteam.steam.authentication.AuthSessionDetails
 import `in`.dragonbra.javasteam.steam.authentication.AuthenticationException
+import `in`.dragonbra.javasteam.steam.authentication.IAuthenticator
 import `in`.dragonbra.javasteam.steam.authentication.IChallengeUrlChanged
 import `in`.dragonbra.javasteam.steam.handlers.steamuser.LogOnDetails
 import `in`.dragonbra.javasteam.steam.handlers.steamuser.SteamUser
@@ -218,6 +219,26 @@ class SteamSession {
         val session = client.authentication.beginAuthSessionViaQR(details).await() ?: error("Steam returned no QR session")
         session.challengeUrlChanged = IChallengeUrlChanged { changed -> changed?.let { onChallengeUrl(it.challengeUrl) } }
         onChallengeUrl(session.challengeUrl)
+        val result = session.pollingWaitForResult().await()
+        if (result.refreshToken.isEmpty()) throw AuthenticationException("No refresh token received", EResult.Fail)
+        return StoredCredentials(result.accountName, result.refreshToken)
+    }
+
+    /**
+     * Runs the account name and password flow. Steam Guard is answered through [authenticator]; the password
+     * goes to Steam encrypted and is not kept. Returns the same credentials as the QR flow: the refresh token.
+     */
+    suspend fun authenticateWithCredentials(deviceName: String, username: String, password: String, authenticator: IAuthenticator): StoredCredentials {
+        connect()
+        val details = AuthSessionDetails().apply {
+            this.username = username
+            this.password = password
+            this.authenticator = authenticator
+            persistentSession = true
+            deviceFriendlyName = deviceName
+            clientOSType = EOSType.AndroidUnknown
+        }
+        val session = client.authentication.beginAuthSessionViaCredentials(details).await() ?: error("Steam returned no sign-in session")
         val result = session.pollingWaitForResult().await()
         if (result.refreshToken.isEmpty()) throw AuthenticationException("No refresh token received", EResult.Fail)
         return StoredCredentials(result.accountName, result.refreshToken)

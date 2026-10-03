@@ -1,7 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="auth_title">GamePort</string>
-    <string name="auth_sign_in">Sign in with Steam</string>
+    <string name="auth_sign_in_qr">Sign in with a QR code</string>
+    <string name="auth_sign_in_password">Sign in with an account name</string>
+    <string name="auth_account_name">Steam account name</string>
+    <string name="auth_password">Password</string>
+    <string name="auth_password_show">Show the password</string>
+    <string name="auth_password_hide">Hide the password</string>
+    <string name="auth_password_kept">The password is sent to Steam only and is not kept.</string>
+    <string name="auth_submit">Sign in</string>
+    <string name="auth_back">Back</string>
+    <string name="auth_code_label">Steam Guard code</string>
+    <string name="auth_code_app">Steam Guard code shown in the Steam mobile app</string>
+    <string name="auth_code_email">Steam Guard code sent by e-mail to %1$s</string>
+    <string name="auth_code_email_unknown">Steam Guard code sent by e-mail</string>
+    <string name="auth_code_wrong">The code was not accepted.</string>
+    <string name="auth_bad_credentials">The account name or the password is not right.</string>
     <string name="auth_confirm_in_app">Confirm the sign-in in the Steam mobile app</string>
     <string name="auth_connecting">Connecting to Steam…</string>
     <string name="auth_cancel">Cancel</string>
