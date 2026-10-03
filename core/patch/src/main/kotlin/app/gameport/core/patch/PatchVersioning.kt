@@ -8,7 +8,7 @@ import java.util.zip.CRC32
  * Which patch generation a game carries, and whether GamePort has a newer one.
  *
  * - A release build uses [GENERATION] alone. [GENERATION] is raised when a release is prepared, and
- *   only if the patches or the binaries they inject (shim, hook, OpenXR layer) changed since the
+ *   only if the patches or the binaries they inject (shim, hook, OpenXR layer, OpenXR loader) changed since the
  *   previous release. It is the only number to touch for that.
  * - A debug build adds a fingerprint of the injected binaries, so during development a rebuilt shim,
  *   hook or layer makes games patched earlier show as outdated without raising anything. A change to
@@ -19,13 +19,14 @@ object PatchVersioning {
     const val GENERATION = 2
 
     /** Raised during development when the patches' logic changes; back to 0 at each release. */
-    const val DEV_REVISION = 0
+    const val DEV_REVISION = 1
 
     private const val STEP = 1_000
     private val injected = listOf(
         "shim/arm64-v8a/libsteamclient.so",
         "hook/classes.dex",
         "xrlayer/arm64-v8a/libXrApiLayer_gameport.so",
+        "xrloader/arm64-v8a/libopenxr_loader.so",
     )
 
     @Volatile private var cached: Int? = null

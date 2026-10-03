@@ -31,3 +31,8 @@ GamePort is open source. Everything below is used under its own licence; keep th
 ## OpenXR headers (used to build GamePort's OpenXR layer)
 - Khronos OpenXR-SDK, `include/openxr/*.h` — Apache-2.0 (and MIT). Fetched at build time by
   `scripts/build_xr_layer.sh` into a cache folder; not stored in this repository.
+
+## OpenXR loader (injected into some games)
+- Khronos OpenXR loader 1.1.63, `libopenxr_loader.so` from the official `openxr_loader_for_android` release on Maven Central — Apache-2.0 (and MIT).
+  Stored in `core/patch/src/main/assets/xrloader/` by `scripts/fetch_xr_loader.sh`, which checks it against the checksum Maven publishes.
+  The patcher puts it in a game only when the loader the game ships is too old to find the device's runtime.

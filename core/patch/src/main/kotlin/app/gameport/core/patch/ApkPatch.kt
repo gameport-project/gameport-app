@@ -42,6 +42,10 @@ class PatchSession(private val apk: ApkModule, val existingHookDex: String? = nu
         }.bytes
     }
 
+    /** A file of the game as it is in the APK, or null when there is none. */
+    fun readFile(path: String): ByteArray? =
+        apk.zipEntryMap.getInputSource(path)?.let { source -> source.openStream().use { it.readBytes() } }
+
     /** The game's package name, read from its manifest. */
     fun packageName(): String = apk.androidManifest.packageName
 
@@ -94,4 +98,4 @@ fun interface BinarySource {
 }
 
 /** The binaries a patch may inject. */
-class PatchAssets(val shim: BinarySource, val hookDex: BinarySource, val xrLayer: BinarySource? = null)
+class PatchAssets(val shim: BinarySource, val hookDex: BinarySource, val xrLayer: BinarySource? = null, val xrLoader: BinarySource? = null)

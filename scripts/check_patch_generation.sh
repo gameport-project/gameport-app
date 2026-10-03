@@ -16,7 +16,7 @@ generation="$(sed -n 's/.*const val GENERATION = \([0-9]*\).*/\1/p' "$root/core/
 [[ -n "$generation" ]] || { echo "could not read PatchVersioning.GENERATION" >&2; exit 1; }
 
 sums() {
-  (cd "$assets" && for f in shim/arm64-v8a/libsteamclient.so hook/classes.dex xrlayer/arm64-v8a/libXrApiLayer_gameport.so; do
+  (cd "$assets" && for f in shim/arm64-v8a/libsteamclient.so hook/classes.dex xrlayer/arm64-v8a/libXrApiLayer_gameport.so xrloader/arm64-v8a/libopenxr_loader.so; do
     printf '%s  %s\n' "$(shasum -a 256 "$f" | cut -d' ' -f1)" "$f"
   done)
 }
