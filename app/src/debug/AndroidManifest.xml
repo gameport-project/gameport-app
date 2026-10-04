@@ -13,6 +13,14 @@
         <receiver
             android:name="app.gameport.debug.WhatsNewPreviewReceiver"
             android:exported="true" />
+        <!-- Development only: reads what Steam publishes for a game (depots, branches, files of a depot). -->
+        <receiver
+            android:name="app.gameport.debug.SteamInspectReceiver"
+            android:exported="true" />
+        <!-- Development only: tests whose files a game's expansion folder holds, by copying them anew. -->
+        <receiver
+            android:name="app.gameport.debug.ObbRepairReceiver"
+            android:exported="true" />
         <!-- Development only: works out (and, when asked, really does) the adding of achievements to the Steam account. -->
         <receiver
             android:name="app.gameport.debug.AchievementDebugReceiver"
