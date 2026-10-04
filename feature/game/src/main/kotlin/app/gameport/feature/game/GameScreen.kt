@@ -38,6 +38,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
@@ -275,6 +276,7 @@ internal fun GameContent(
                     onOpenSettings = onOpenSettings,
                     onOpenSaves = onOpenSaves,
                     controllerProfile = uiState.controllerProfile,
+                    savesNotSynced = uiState.savesNotSynced,
                     vrDevice = uiState.vrDevice,
                     onOpenControllers = onOpenControllers,
                     onToggleFavorite = onToggleFavorite,
@@ -324,6 +326,7 @@ private fun GameDetails(
     onOpenSettings: () -> Unit,
     onOpenSaves: () -> Unit,
     controllerProfile: Boolean,
+    savesNotSynced: Boolean,
     favorite: Boolean,
     hidden: Boolean,
     playtime: Playtime,
@@ -485,8 +488,14 @@ private fun GameDetails(
                         onReport = { reporting = true },
                     )
                     if (install is InstallState.Installed) {
-                        GlassIconButton(onClick = onOpenSaves, enabled = repatch !is Repatch.Running) {
-                            Icon(Icons.Filled.CloudSync, contentDescription = stringResource(R.string.saves_title))
+                        Box {
+                            GlassIconButton(onClick = onOpenSaves, enabled = repatch !is Repatch.Running) {
+                                Icon(Icons.Filled.CloudSync, contentDescription = stringResource(R.string.saves_title))
+                            }
+                            // The saves on this device and on Steam do not agree: the page of the saves says which.
+                            if (savesNotSynced) {
+                                Box(Modifier.align(Alignment.TopEnd).size(12.dp).clip(CircleShape).background(Color(0xFFFF9800)))
+                            }
                         }
                     }
                     if (install is InstallState.Installed) {

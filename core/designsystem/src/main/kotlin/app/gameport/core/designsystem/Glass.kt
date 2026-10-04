@@ -41,6 +41,10 @@ fun GlassChip(
     contentColor: Color = Color.White,
     /** Tints the chip's fill and outline: a coloured label rather than a neutral one. */
     accent: Color? = null,
+    /** An icon before the label. */
+    leading: (@Composable () -> Unit)? = null,
+    /** Room above and below the label; less makes a chip that fits in a line of text. */
+    verticalPadding: androidx.compose.ui.unit.Dp = 6.dp,
 ) {
     val shape = androidx.compose.foundation.shape.RoundedCornerShape(50)
     androidx.compose.foundation.layout.Box(
@@ -50,9 +54,15 @@ fun GlassChip(
                 else Modifier.clip(shape).background(accent.copy(alpha = 0.22f)).border(1.dp, accent.copy(alpha = 0.65f), shape),
             )
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = verticalPadding),
     ) {
-        androidx.compose.material3.Text(label, color = contentColor, style = androidx.compose.material3.MaterialTheme.typography.labelLarge)
+        androidx.compose.foundation.layout.Row(
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            leading?.invoke()
+            androidx.compose.material3.Text(label, color = contentColor, style = androidx.compose.material3.MaterialTheme.typography.labelLarge)
+        }
     }
 }
 

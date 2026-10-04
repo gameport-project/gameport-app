@@ -19,6 +19,7 @@ import app.gameport.core.settings.UserSettings
 import app.gameport.core.steam.SteamLibraryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -46,6 +47,8 @@ sealed interface GameUiState {
         val playtime: app.gameport.core.model.Playtime = app.gameport.core.model.Playtime(),
         /** False on a device without VR: nothing that belongs to VR is shown. */
         val vrDevice: Boolean = true,
+        /** The game has saves and the ones on this device and on Steam do not agree. */
+        val savesNotSynced: Boolean = false,
     ) : GameUiState
 }
 
@@ -77,6 +80,7 @@ class GameViewModel @Inject constructor(
     private val reports: app.gameport.core.sync.ReportStore,
     private val reporter: app.gameport.core.sync.ProblemReporter,
     achievementsRepository: app.gameport.core.steam.AchievementsRepository,
+    saves: app.gameport.core.sync.SaveStateRepository,
 ) : ViewModel() {
     /** How GamePort stands with Steam. */
     val connection: StateFlow<app.gameport.core.model.SteamConnection> = auth.connection
@@ -121,12 +125,15 @@ class GameViewModel @Inject constructor(
     val achievements: StateFlow<app.gameport.core.model.AchievementList?> = achievementsRepository.observe(appId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
+    private val savesNotSynced: Flow<Boolean> = saves.observe(appId).map { it.files.isNotEmpty() && !it.inSync }
+
     val uiState: StateFlow<GameUiState> = combine(
         baseState,
         playtimeStore.observe(appId),
         steamMinutes,
-    ) { state, deviceMillis, steam ->
-        if (state is GameUiState.Content) state.copy(playtime = app.gameport.core.model.Playtime(deviceMillis, steam)) else state
+        savesNotSynced,
+    ) { state, deviceMillis, steam, notSynced ->
+        if (state is GameUiState.Content) state.copy(playtime = app.gameport.core.model.Playtime(deviceMillis, steam), savesNotSynced = notSynced) else state
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), GameUiState.Loading)
 
     /** Asks Steam again for the account's total time in the game; the last answer stays when it cannot be reached. */

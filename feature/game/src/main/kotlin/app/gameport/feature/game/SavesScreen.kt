@@ -13,8 +13,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import app.gameport.core.designsystem.BackdropDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -153,19 +156,42 @@ private fun PendingCard(direction: SaveDirection, onCancel: () -> Unit) {
 
 @Composable
 private fun FileCard(file: SaveFileState) {
-    Column(Modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(Modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(file.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
             val local = file.local
             val cloud = file.cloud
-            val (label, color) = when {
-                file.identical -> R.string.saves_state_identical to Color.White
-                local == null -> R.string.saves_state_cloud_only to Color(0xFF90CAF9)
-                cloud == null -> R.string.saves_state_local_only to Color(0xFF90CAF9)
-                local.modifiedMillis >= cloud.modifiedMillis -> R.string.saves_state_local_newer to Color(0xFFFFB74D)
-                else -> R.string.saves_state_cloud_newer to Color(0xFFFFB74D)
+            val label = when {
+                file.identical -> R.string.saves_state_identical
+                local == null -> R.string.saves_state_cloud_only
+                cloud == null -> R.string.saves_state_local_only
+                local.modifiedMillis >= cloud.modifiedMillis -> R.string.saves_state_local_newer
+                else -> R.string.saves_state_cloud_newer
             }
-            GlassChip(stringResource(label), contentColor = color)
+            if (file.identical) {
+                GlassChip(
+                    stringResource(label),
+                    contentColor = SYNCED_GREEN,
+                    accent = SYNCED_GREEN,
+                    verticalPadding = 1.dp,
+                    leading = { Icon(Icons.Filled.Check, contentDescription = null, tint = SYNCED_GREEN, modifier = Modifier.size(18.dp)) },
+                )
+            } else {
+                GlassChip(
+                    stringResource(label),
+                    contentColor = NOT_SYNCED_ORANGE,
+                    accent = NOT_SYNCED_ORANGE,
+                    verticalPadding = 1.dp,
+                    leading = { Icon(Icons.Filled.Warning, contentDescription = null, tint = NOT_SYNCED_ORANGE, modifier = Modifier.size(18.dp)) },
+                )
+            }
+        }
+        // The same content under other dates: a game rewrites its files at every start, which says nothing about the content. Compared as shown.
+        if (file.identical && formatted(file.local) != formatted(file.cloud)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Warning, contentDescription = null, tint = NOT_SYNCED_ORANGE, modifier = Modifier.size(16.dp))
+                Text(stringResource(R.string.saves_identical_detail), color = NOT_SYNCED_ORANGE, style = MaterialTheme.typography.bodySmall)
+            }
         }
         Side(stringResource(R.string.saves_side_local), file.local)
         Side(stringResource(R.string.saves_side_cloud), file.cloud)
@@ -179,8 +205,14 @@ private fun Side(label: String, info: SaveFileInfo?) {
         Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, modifier = Modifier.widthIn(min = 110.dp))
         Text(
             if (info == null) stringResource(R.string.saves_missing)
-            else "${Formatter.formatFileSize(context, info.size)} · ${DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(info.modifiedMillis))}",
+            else "${Formatter.formatFileSize(context, info.size)} · ${formatted(info)}",
             style = MaterialTheme.typography.bodySmall,
         )
     }
 }
+
+private fun formatted(info: SaveFileInfo?): String =
+    info?.let { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(it.modifiedMillis)) }.orEmpty()
+
+private val SYNCED_GREEN = Color(0xFF66BB6A)
+private val NOT_SYNCED_ORANGE = Color(0xFFFF9800)

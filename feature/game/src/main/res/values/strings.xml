@@ -74,7 +74,8 @@
     <string name="saves_side_local">This device</string>
     <string name="saves_side_cloud">Steam Cloud</string>
     <string name="saves_missing">missing</string>
-    <string name="saves_state_identical">Identical</string>
+    <string name="saves_state_identical">Synchronized</string>
+    <string name="saves_identical_detail">Same content, different dates</string>
     <string name="saves_state_local_only">Only on this device</string>
     <string name="saves_state_cloud_only">Only on Steam</string>
     <string name="saves_state_local_newer">Newer on this device</string>

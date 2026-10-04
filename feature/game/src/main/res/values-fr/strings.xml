@@ -73,7 +73,8 @@
     <string name="saves_side_local">Cet appareil</string>
     <string name="saves_side_cloud">Steam Cloud</string>
     <string name="saves_missing">absent</string>
-    <string name="saves_state_identical">Identique</string>
+    <string name="saves_state_identical">Synchronisé</string>
+    <string name="saves_identical_detail">Contenu identique, dates différentes</string>
     <string name="saves_state_local_only">Seulement ici</string>
     <string name="saves_state_cloud_only">Seulement sur Steam</string>
     <string name="saves_state_local_newer">Plus récent ici</string>
