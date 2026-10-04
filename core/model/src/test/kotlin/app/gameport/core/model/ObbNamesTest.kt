@@ -65,4 +65,34 @@ class ObbNamesTest {
         assertNull(ObbNames.placement("", pkg))
         assertNull(ObbNames.placement("obb", pkg))
     }
+
+    @Test
+    fun `an older file with the same part is replaced by the new one`() {
+        assertEquals(
+            listOf("main.2428.$pkg.obb"),
+            ObbNames.superseded(listOf("main.2428.$pkg.obb", "patch.2428.$pkg.obb"), listOf("main.2398.$pkg.obb"), pkg),
+        )
+        assertEquals(
+            listOf("overflow1.2428.$pkg.obb"),
+            ObbNames.superseded(listOf("overflow1.2428.$pkg.obb", "overflow2.2428.$pkg.obb"), listOf("overflow1.2398.$pkg.obb"), pkg),
+        )
+    }
+
+    @Test
+    fun `a file with the name of the new one, or of another part, or of another kind, is kept`() {
+        assertEquals(emptyList<String>(), ObbNames.superseded(listOf("main.2398.$pkg.obb"), listOf("main.2398.$pkg.obb"), pkg))
+        assertEquals(emptyList<String>(), ObbNames.superseded(listOf("patch.2428.$pkg.obb", "chunk.1.$pkg.obb", "data.bundle"), listOf("main.2398.$pkg.obb"), pkg))
+        assertEquals(emptyList<String>(), ObbNames.superseded(listOf("main.2428.com.other.obb"), listOf("main.2398.$pkg.obb"), pkg))
+        assertEquals(emptyList<String>(), ObbNames.superseded(listOf("main.2428.$pkg.obb"), listOf("chunk.1.$pkg.obb"), pkg))
+    }
+
+    @Test
+    fun `a file is in an obb folder when the depot puts it there`() {
+        assertEquals(true, ObbNames.inObbFolder("obb/assets/a.bundle", pkg))
+        assertEquals(true, ObbNames.inObbFolder("Android/obb/$pkg/a.bundle", pkg))
+        assertEquals(true, ObbNames.inObbFolder("x/$pkg/a.bundle", pkg))
+        assertEquals(false, ObbNames.inObbFolder("res/layout.xml", pkg))
+        assertEquals(false, ObbNames.inObbFolder("main_assets_all.bundle", pkg))
+        assertEquals(false, ObbNames.inObbFolder("obb", pkg))
+    }
 }
