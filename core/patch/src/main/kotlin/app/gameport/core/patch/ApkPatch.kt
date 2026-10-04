@@ -21,6 +21,17 @@ data class PatchContext(
     val achievementDefinitions: String? = null,
     /** The achievements the account already unlocked, to seed the shim's own record with. */
     val achievementsEarned: String? = null,
+    /**
+     * The DLC the account (or its family) really has for this game, for the shim to answer with. Null when it is not known: the shim then
+     * keeps saying that every DLC is there, as it did before.
+     */
+    val ownedDlc: List<Int>? = null,
+    /** The DLC the library knows the account does NOT have (the shim says no to those, and keeps saying yes to a DLC nobody listed). */
+    val missingDlc: List<Int> = emptyList(),
+    /** The game is on the account through Family Sharing, not bought by it. */
+    val familyShared: Boolean = false,
+    /** The game has expansion files (`.obb`, or an `obb/` folder) that it reads from shared storage. */
+    val hasExpansionFiles: Boolean = false,
 )
 
 /** The APK being patched: its manifest can be edited and files can be added. */

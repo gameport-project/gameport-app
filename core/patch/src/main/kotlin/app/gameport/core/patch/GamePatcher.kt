@@ -7,6 +7,7 @@ import app.gameport.core.patch.patches.PatchVersionPatch
 import app.gameport.core.patch.patches.VersionCodePatch
 import app.gameport.core.patch.patches.SteamShimPatch
 import app.gameport.core.patch.patches.XrLayerPatch
+import app.gameport.core.patch.patches.StorageTargetPatch
 import app.gameport.core.patch.patches.XrLoaderPatch
 import app.gameport.core.patch.patches.VrLauncherPatch
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -53,7 +54,7 @@ class GamePatcher @Inject constructor(
 
 /** Every patch GamePort knows, in the order they are applied. */
 object PatchCatalog {
-    val all: List<ApkPatch> = listOf(VrLauncherPatch, SteamShimPatch, CloudHookPatch, XrLayerPatch, XrLoaderPatch, AppLabelPatch, VersionCodePatch, PatchVersionPatch)
+    val all: List<ApkPatch> = listOf(VrLauncherPatch, SteamShimPatch, CloudHookPatch, XrLayerPatch, XrLoaderPatch, StorageTargetPatch, AppLabelPatch, VersionCodePatch, PatchVersionPatch)
 
     val recommended: List<ApkPatch> get() = all.filter { it.recommended }
 }

@@ -25,8 +25,7 @@ object SteamShimPatch : ApkPatch {
 
         // Public account data only. The shim reads this stored entry straight from the APK and
         // turns it into the settings files Steamworks expects, at every launch.
-        val config = "appid=${context.steamAppId}\nsteamid=${context.steamId}\nname=${context.personaName.oneLine()}\n"
-        session.addFile(CONFIG_PATH, config.toByteArray())
+        session.addFile(CONFIG_PATH, configFor(context).toByteArray())
 
         // The achievements are a bonus: a shim that does not know them ignores these files, and a failure here never fails the patch.
         runCatching {
@@ -36,6 +35,20 @@ object SteamShimPatch : ApkPatch {
             }
         }
     }
+
+    /**
+     * What the shim reads at every launch. The DLC lines are what the account has and what it does not (as far as the library knows: a DLC
+     * that is on neither list keeps getting a yes); without them the shim keeps saying every DLC is there. Family Sharing is said as it is.
+     */
+    internal fun configFor(context: PatchContext): String = buildString {
+        append("appid=${context.steamAppId}\nsteamid=${context.steamId}\nname=${context.personaName.oneLine()}\n")
+        context.ownedDlc?.let {
+            append("dlc=${it.distinct().sorted().joinToString(",")}\n")
+            if (context.missingDlc.isNotEmpty()) append("dlcmissing=${context.missingDlc.distinct().sorted().joinToString(",")}\n")
+        }
+        if (context.familyShared) append("familysharing=1\n")
+    }
 }
+
 
 private fun String.oneLine() = replace('\n', ' ').replace('\r', ' ').trim()
