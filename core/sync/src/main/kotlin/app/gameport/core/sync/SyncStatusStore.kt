@@ -8,8 +8,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** How the last save sync of a game went. */
-enum class SyncStatus { OK, OFFLINE, FAILED }
+/** How the last save sync of a game went. [PENDING]: the saves on this device differ from the cloud's and were not sent yet. */
+enum class SyncStatus { OK, OFFLINE, FAILED, PENDING }
 
 /** Remembers, per Steam app, the outcome of the last save sync so the game's page can report a problem. */
 @Singleton

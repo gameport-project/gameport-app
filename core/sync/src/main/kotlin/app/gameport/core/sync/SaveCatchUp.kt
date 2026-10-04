@@ -55,6 +55,17 @@ class SaveCatchUp @Inject constructor(
         }
     }
 
+    /**
+     * A game has just closed: what it could not send (its saves differ from the cloud's and the send did not go through) is sent from here.
+     * Waits a little, the game's process is still ending.
+     */
+    fun afterClose() {
+        scope.launch {
+            delay(AFTER_CLOSE_DELAY_MS)
+            if (auth.connection.value == SteamConnection.ONLINE) runDue()
+        }
+    }
+
     private suspend fun runDue() = lock.withLock {
         val due = gamesToCatchUp(syncStatus.statuses.value, installed.all(), playtime::isOnScreen)
         for ((index, packageName) in due.withIndex()) {
@@ -81,5 +92,6 @@ class SaveCatchUp @Inject constructor(
     private companion object {
         const val TAG = "GPCatchUp"
         const val PAUSE_BETWEEN_GAMES_MS = 3_000L
+        const val AFTER_CLOSE_DELAY_MS = 6_000L
     }
 }

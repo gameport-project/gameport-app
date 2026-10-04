@@ -24,7 +24,10 @@ import java.io.File;
 public final class GamePortHookProvider extends ContentProvider {
     private static final String TAG = "GPHook";
     private static final long CONFLICT_WAIT_MS = 180_000;
-    private static final long UPLOAD_AFTER_PAUSE_MS = 1_500;
+    private static final long UPLOAD_AFTER_PAUSE_MS = 300;
+    // How often the saves are looked at while the game runs (see [SaveSync#poll]), and how long the game's end waits for them to be sent.
+    private static final long SAVE_POLL_MS = 4_000;
+    private static final long EXIT_FLUSH_MS = 10_000;
     private static final long ALIVE_INTERVAL_MS = 30_000L;
     private static final long WARM_INTERVAL_MS = 25_000;
 
@@ -46,6 +49,13 @@ public final class GamePortHookProvider extends ContentProvider {
     public boolean onCreate() {
         Context context = getContext();
         if (context == null) return false;
+        // Where the APK is, for the Steamworks shim, which reads its config out of it. Asking the system is surer than finding the APK among
+        // the memory mappings of the process, which the shim used to do alone.
+        try {
+            android.system.Os.setenv("GAMEPORT_APK", context.getApplicationInfo().sourceDir, true);
+        } catch (Throwable t) {
+            Log.w(TAG, "could not tell the shim where the APK is", t);
+        }
         try {
             File root = Environment.getExternalStorageDirectory();
             File files = context.getExternalFilesDir(null);
@@ -95,6 +105,7 @@ public final class GamePortHookProvider extends ContentProvider {
             Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
                 @Override public void run() {
                     if (sessionLog != null) sessionLog.flushNow();
+                    flushSavesBeforeExit();
                     tellGamePort(closing, "closed");
                 }
             }, "gameport-closed"));
@@ -531,8 +542,21 @@ public final class GamePortHookProvider extends ContentProvider {
         thread.start();
         background = new Handler(thread.getLooper());
         final Runnable upload = new Runnable() {
-            @Override public void run() { sync.uploadIfChanged(); }
+            @Override public void run() { sync.flush(); }
         };
+        // The saves are looked at all the time the game runs and sent once they stop changing: waiting for the game to end is not enough, a
+        // game that quits by itself leaves no time for it.
+        final Runnable poll = new Runnable() {
+            @Override public void run() {
+                try {
+                    sync.poll(SystemClock.elapsedRealtime());
+                } catch (Throwable t) {
+                    Log.w(TAG, "could not look at the saves", t);
+                }
+                background.postDelayed(this, SAVE_POLL_MS);
+            }
+        };
+        background.postDelayed(poll, SAVE_POLL_MS);
         final Context appContext = context.getApplicationContext();
         // The time the game is really on screen: GamePort is told when it comes, regularly while it stays, and when it leaves.
         // A device asleep or a game left behind sends nothing, so that time is never counted.
@@ -583,6 +607,31 @@ public final class GamePortHookProvider extends ContentProvider {
     }
 
     private volatile int resumedActivities;
+
+    /**
+     * The game is ending (it quit by itself, or was closed): one last look at its saves, which are sent if they were not, for a few seconds
+     * at most. What cannot be sent now is left for GamePort to send, which is told the game is closed.
+     */
+    private void flushSavesBeforeExit() {
+        if (sync == null || catchUpMode) return;
+        Thread flush = new Thread(new Runnable() {
+            @Override public void run() {
+                try {
+                    boolean sent = sync.flush();
+                    Log.i(TAG, "saves at exit: " + (sent ? "all sent" : "some left to send"));
+                } catch (Throwable t) {
+                    Log.w(TAG, "could not send the saves at exit", t);
+                }
+            }
+        }, "gameport-exit-sync");
+        flush.setDaemon(true);
+        flush.start();
+        try {
+            flush.join(EXIT_FLUSH_MS);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
+    }
 
     /** How the game's first screen was started: its class, the intent's action, categories, flags and the names of its extras. */
     private static String describe(Activity a) {

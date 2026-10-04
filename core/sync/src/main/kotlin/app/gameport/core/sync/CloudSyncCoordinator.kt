@@ -199,6 +199,19 @@ class CloudSyncCoordinator @Inject constructor(
         return BeginResult.Ready(paths.expandedRules())
     }
 
+    /**
+     * What the game says its saves are right now, outside any sync: the page of its saves shows it, and a difference with the cloud is
+     * remembered as something to send (see [SaveCatchUp]), so a save is never left behind without anyone knowing.
+     */
+    fun observeLocal(packageName: String, local: List<LocalFile>) {
+        val appId = installed.all().entries.firstOrNull { it.value == packageName }?.key ?: return
+        val files = local.filterNot { OwnFiles.isOwn("/" + it.rel) }
+        snapshots.saveLocal(appId, files.map { SnapFile(it.rel, it.size, it.mtime, it.sha1) })
+        val cloud = snapshots.load(appId).cloud
+        statusAfterObserving(syncStatus.statuses.value[appId], files.associate { it.rel to it.sha1 }, cloud.associate { it.rel to it.sha1 })
+            ?.let { syncStatus.record(appId, it) }
+    }
+
     /** Compares the game's [local] files with the cloud. [force] applies the player's choice. */
     fun plan(packageName: String, local: List<LocalFile>, force: Side? = null): SyncAction {
         val sync = active[packageName] ?: return SyncAction.None
@@ -382,3 +395,14 @@ private fun File.sha1(): String = inputStream().use { input ->
 private fun sha1Hex(bytes: ByteArray) = MessageDigest.getInstance("SHA-1").digest(bytes).joinToString("") { "%02x".format(it) }
 
 private fun String.hexToBytes() = ByteArray(length / 2) { substring(it * 2, it * 2 + 2).toInt(16).toByte() }
+
+/**
+ * The status to record once the saves on this device are known, or null to leave it as it is. Saves that differ from the cloud's are to be
+ * sent; a status that already says a sync did not go through (offline, failed) stays, and one that said "to send" ends when they agree.
+ */
+internal fun statusAfterObserving(current: SyncStatus?, local: Map<String, String>, cloud: Map<String, String>): SyncStatus? = when {
+    local == cloud -> if (current == SyncStatus.PENDING) SyncStatus.OK else null
+    current == null || current == SyncStatus.OK -> SyncStatus.PENDING
+    else -> null
+}
+

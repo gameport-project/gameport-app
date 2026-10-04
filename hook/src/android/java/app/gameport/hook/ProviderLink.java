@@ -97,6 +97,15 @@ final class ProviderLink implements GamePortLink {
     }
 
     @Override
+    public boolean observe(List<LocalFile> files) throws IOException {
+        Bundle extras = new Bundle();
+        String[] encoded = new String[files.size()];
+        for (int i = 0; i < encoded.length; i++) encoded[i] = files.get(i).encode();
+        extras.putStringArray("files", encoded);
+        return "OK".equals(call("local", extras).getString("status"));
+    }
+
+    @Override
     public boolean commit() throws IOException {
         return "OK".equals(call("commit", null).getString("status"));
     }

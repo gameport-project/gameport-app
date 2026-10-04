@@ -24,7 +24,17 @@ final class SaveSync {
     private final GamePortLink link;
     private final Log log;
     private final long conflictWaitMs;
+    // How the saves were the last time they were all sent (or found identical to the cloud), the last time GamePort was told what they are,
+    // and the last look. A save is sent when it differs from the first, once it has stopped changing.
     private String lastSyncedSignature = "";
+    private String lastReportedSignature = "";
+    private String lastScannedSignature = "";
+    private String stableSignature = "";
+    private String attemptedSignature = "";
+    private String blockedSignature = "";
+    private long attemptedAt;
+    // The folders to look at, known after a sync began once.
+    private List<SaveRule> knownRules;
 
     SaveSync(File root, File backupRoot, GamePortLink link, Log log, long conflictWaitMs) {
         this.root = root;
@@ -44,6 +54,68 @@ final class SaveSync {
         run(false);
     }
 
+    /** How long before a send that did not go through is tried again while the game is played. */
+    static final long RETRY_AFTER_MS = 60_000;
+
+    /**
+     * Looks at the saves without asking Steam anything and tells GamePort what they are, so what it shows is true. True when something
+     * differs from what was last sent.
+     */
+    synchronized boolean reportLocal() {
+        if (knownRules == null) return false;
+        try {
+            List<LocalFile> files = new LocalScanner(root).scan(knownRules);
+            lastScannedSignature = signature(files);
+            if (!lastScannedSignature.equals(lastReportedSignature)) {
+                link.observe(files);
+                lastReportedSignature = lastScannedSignature;
+            }
+        } catch (IOException e) {
+            log.info("could not tell GamePort what the saves are: " + e);
+            return false;
+        }
+        return !lastScannedSignature.equals(lastSyncedSignature);
+    }
+
+    /**
+     * Called every few seconds while the game runs. A save is sent while the game is played, not only when it ends: it goes once it has
+     * stayed the same for a whole look, so a file still being written is left alone, and again after a minute if it did not go through.
+     */
+    synchronized void poll(long now) {
+        if (knownRules == null) {
+            // No sync has been able to begin yet (no connection at launch): try again now and then.
+            if (now - attemptedAt >= RETRY_AFTER_MS) {
+                attemptedAt = now;
+                run(false);
+            }
+            return;
+        }
+        if (!reportLocal()) {
+            stableSignature = "";
+            return;
+        }
+        String signature = lastScannedSignature;
+        if (signature.equals(blockedSignature)) return;
+        if (!signature.equals(stableSignature)) {
+            stableSignature = signature;
+            return;
+        }
+        if (signature.equals(attemptedSignature) && now - attemptedAt < RETRY_AFTER_MS) return;
+        attemptedSignature = signature;
+        attemptedAt = now;
+        run(false);
+    }
+
+    /**
+     * The last look before the game goes (it left the screen, or is ending): GamePort is told what the saves are and they are sent if they
+     * were not. True when nothing is left to send.
+     */
+    synchronized boolean flush() {
+        if (knownRules != null && !reportLocal()) return true;
+        run(false);
+        return knownRules != null && !reportLocal();
+    }
+
     private void run(boolean launch) {
         currentBackup = null;
         try {
@@ -52,6 +124,7 @@ final class SaveSync {
                 log.info("sync skipped: " + begin.status);
                 return;
             }
+            knownRules = begin.rules;
             LocalScanner scanner = new LocalScanner(root);
             List<LocalFile> files = scanner.scan(begin.rules);
             String signature = signature(files);
@@ -60,7 +133,11 @@ final class SaveSync {
             GamePortLink.Plan plan = link.plan(files, null);
             log.info("plan: " + plan.action);
             if ("CONFLICT".equals(plan.action)) {
-                if (!launch) return;
+                if (!launch) {
+                    // Both sides changed: the player decides at the next start, not while playing, and it is not asked again for the same saves.
+                    blockedSignature = signature;
+                    return;
+                }
                 plan = resolveConflict(scanner, begin.rules);
                 if (plan == null) return;
             }
@@ -68,7 +145,8 @@ final class SaveSync {
                 if (!launch) return;
                 applyDownload(plan, scanner, begin.rules);
             } else if ("UPLOAD".equals(plan.action)) {
-                applyUpload(plan);
+                // A send that did not go through leaves the saves as not sent, so it is tried again.
+                if (!applyUpload(plan)) return;
             }
             lastSyncedSignature = signature(scanner.scan(begin.rules));
         } catch (Exception e) {
@@ -129,7 +207,7 @@ final class SaveSync {
         log.info("downloaded " + plan.downloads.size() + " file(s), removed " + plan.deleteLocal.size());
     }
 
-    private void applyUpload(GamePortLink.Plan plan) throws IOException {
+    private boolean applyUpload(GamePortLink.Plan plan) throws IOException {
         for (String rel : plan.uploads) {
             try (InputStream in = new java.io.FileInputStream(new File(root, rel)); OutputStream out = link.push(rel)) {
                 copy(in, out);
@@ -137,6 +215,7 @@ final class SaveSync {
         }
         boolean committed = link.commit();
         log.info("uploaded " + plan.uploads.size() + " file(s): " + (committed ? "ok" : "FAILED"));
+        return committed;
     }
 
     /** Copies every current save aside before the cloud version replaces them. */

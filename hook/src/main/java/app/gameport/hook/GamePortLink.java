@@ -65,6 +65,12 @@ interface GamePortLink {
 
     boolean acknowledge(List<LocalFile> files) throws IOException;
 
+    /**
+     * Tells GamePort what the saves are right now, without asking for anything: it needs no connection to Steam, so what GamePort shows
+     * (and whether something is left to send) is true even when sending is not possible.
+     */
+    boolean observe(List<LocalFile> files) throws IOException;
+
     boolean commit() throws IOException;
 
     void end();

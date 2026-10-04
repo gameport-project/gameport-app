@@ -32,4 +32,10 @@ class SaveCatchUpTest {
     fun `games come in a steady order`() {
         assertEquals(listOf("pkg.one", "pkg.two", "pkg.three"), gamesToCatchUp(mapOf(3 to SyncStatus.OFFLINE, 1 to SyncStatus.OFFLINE, 2 to SyncStatus.FAILED), installed) { false })
     }
+
+    @Test
+    fun `saves not sent yet are sent too`() {
+        val due = gamesToCatchUp(mapOf(1 to SyncStatus.PENDING, 2 to SyncStatus.OK), installed) { false }
+        assertEquals(listOf("pkg.one"), due)
+    }
 }

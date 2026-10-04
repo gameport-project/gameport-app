@@ -37,6 +37,8 @@ internal interface CloudEntryPoint {
 
     fun reports(): ReportStore
 
+    fun catchUp(): SaveCatchUp
+
     fun achievementNotifier(): AchievementNotifier
 
     fun steamAchievements(): SteamAchievementSync
@@ -54,6 +56,7 @@ internal interface CloudEntryPoint {
  * - `plan` (local files, optional forced side) -> what to download, upload or ask the player
  * - `conflict` -> the player's answer once given
  * - `ack` (local files after a download) and `commit` (after uploading) -> finish a sync
+ * - `local` (local files) -> what the saves are now, outside a sync
  * - `end` -> the game is done
  * - `resumed`, `alive`, `paused` -> the game is on screen, still there, gone: its playing time
  * - `log` (its last log lines, how its last runs ended) -> kept for a problem report
@@ -114,7 +117,13 @@ class CloudProvider : ContentProvider() {
         "alive" -> okAfter { entryPoint.playtime().alive(packageName) }
         "paused" -> okAfter { entryPoint.playtime().paused(packageName) }
         // The game's process is ending (it quit by itself, or its last screen closed): how long it lasted shows a problem.
-        "closed" -> okAfter { entryPoint.reports().left(packageName) }
+        // Saves it could not send are then sent by GamePort itself (see [SaveCatchUp]).
+        "closed" -> okAfter {
+            entryPoint.reports().left(packageName)
+            entryPoint.catchUp().afterClose()
+        }
+        // What the saves are now, whatever the connection: the page of the game's saves shows it, and what is not sent is remembered.
+        "local" -> okAfter { coordinator.observeLocal(packageName, parseFiles(extras)) }
         // What the game wrote to the system log lately and how it last ended, for a problem report.
         "log" -> okAfter { entryPoint.reports().saveGameData(packageName, extras) }
         // The game unlocked achievements, which the shim recorded: they are announced with a notification.

@@ -209,6 +209,96 @@ public class SaveSyncTest {
         assertEquals("local", read("g/a.sav"));
     }
 
+    private GamePortLink.Plan upload(String rel) {
+        return new GamePortLink.Plan("UPLOAD", Collections.<GamePortLink.Download>emptyList(), Collections.<String>emptyList(), Arrays.asList(rel));
+    }
+
+    @Test
+    public void aSaveIsSentWhileTheGameRunsOnceItHasStoppedChanging() throws IOException {
+        SaveSync sync = sync();
+        link.plan = new GamePortLink.Plan("NONE", Collections.<GamePortLink.Download>emptyList(), Collections.<String>emptyList(), Collections.<String>emptyList());
+        sync.syncAtLaunch();
+        write("g/a.sav", "progress");
+        link.plan = upload("g/a.sav");
+
+        sync.poll(1_000);
+        assertFalse("a file that may still be written is not sent at the first look", link.committed);
+        sync.poll(5_000);
+        assertEquals("progress", link.pushed.get("g/a.sav"));
+        assertTrue(link.committed);
+    }
+
+    @Test
+    public void aSaveStillChangingIsNotSent() throws IOException {
+        SaveSync sync = sync();
+        sync.syncAtLaunch();
+        write("g/a.sav", "one");
+        link.plan = upload("g/a.sav");
+        sync.poll(1_000);
+        write("g/a.sav", "two, longer");
+        sync.poll(5_000);
+        assertFalse(link.committed);
+        sync.poll(9_000);
+        assertEquals("two, longer", link.pushed.get("g/a.sav"));
+    }
+
+    @Test
+    public void whatIsNotSentIsNotMistakenForSentAndIsTriedAgainAfterAWhile() throws IOException {
+        SaveSync sync = sync();
+        sync.syncAtLaunch();
+        write("g/a.sav", "progress");
+        link.plan = upload("g/a.sav");
+        link.commitResult = false;
+        sync.poll(1_000);
+        sync.poll(5_000);
+        assertTrue(link.committed);
+        link.committed = false;
+        sync.poll(9_000);
+        assertFalse("not tried again at once", link.committed);
+        link.commitResult = true;
+        sync.poll(5_000 + SaveSync.RETRY_AFTER_MS);
+        assertTrue(link.committed);
+    }
+
+    @Test
+    public void gamePortIsToldWhatTheSavesAreEvenWhenNothingCanBeSent() throws IOException {
+        SaveSync sync = sync();
+        sync.syncAtLaunch();
+        write("g/a.sav", "progress");
+        link.plan = new GamePortLink.Plan("NONE", Collections.<GamePortLink.Download>emptyList(), Collections.<String>emptyList(), Collections.<String>emptyList());
+        link.status = "OFFLINE";
+        int before = link.observed;
+        assertTrue(sync.reportLocal());
+        assertEquals(before + 1, link.observed);
+        sync.reportLocal();
+        assertEquals("the same saves are not told twice", before + 1, link.observed);
+    }
+
+    @Test
+    public void theLastLookBeforeTheGameGoesSendsWhatWasNot() throws IOException {
+        SaveSync sync = sync();
+        sync.syncAtLaunch();
+        write("g/a.sav", "last progress");
+        link.plan = upload("g/a.sav");
+
+        assertTrue(sync.flush());
+        assertEquals("last progress", link.pushed.get("g/a.sav"));
+    }
+
+    @Test
+    public void aGameWhoseSyncCouldNotBeginIsLookedAtAgainLater() throws IOException {
+        SaveSync sync = sync();
+        link.status = "OFFLINE";
+        sync.syncAtLaunch();
+        link.status = "READY";
+        write("g/a.sav", "progress");
+        link.plan = upload("g/a.sav");
+
+        sync.poll(SaveSync.RETRY_AFTER_MS);
+
+        assertTrue(link.committed);
+    }
+
     private final class FakeLink implements GamePortLink {
         String status = "READY";
         Plan plan = new Plan("NONE", Collections.<Download>emptyList(), Collections.<String>emptyList(), Collections.<String>emptyList());
@@ -216,8 +306,8 @@ public class SaveSyncTest {
         Map<String, String> cloudContent = new HashMap<>();
         Map<String, String> pushed = new HashMap<>();
         String choice = "PENDING";
-        boolean acknowledged, committed, ended, conflictShown;
-        int planCalls;
+        boolean acknowledged, committed, ended, conflictShown, commitResult = true;
+        int planCalls, observed;
 
         @Override public Begin begin() {
             return new Begin(status, new ArrayList<>(Arrays.asList(new SaveRule("g", "*.sav", true))));
@@ -240,7 +330,8 @@ public class SaveSyncTest {
             };
         }
         @Override public boolean acknowledge(List<LocalFile> files) { acknowledged = true; return true; }
-        @Override public boolean commit() { committed = true; return true; }
+        @Override public boolean observe(List<LocalFile> files) { observed++; return true; }
+        @Override public boolean commit() { committed = true; return commitResult; }
         @Override public void end() { ended = true; }
     }
 }
