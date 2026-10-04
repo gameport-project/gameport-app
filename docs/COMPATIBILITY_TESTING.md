@@ -94,6 +94,18 @@ Le jeu utilise Steamworks.NET et appelle `SteamAPI_Init()` au démarrage, qui ch
 - Correction : le patch `xr_loader` remplace le chargeur du jeu par celui de Khronos (1.1.63) quand il n'a pas cette chaîne. Les huit autres jeux de la bibliothèque ont un chargeur récent et ne sont pas touchés.
 - Piste écartée : déclarer les permissions OpenXR et les courtiers dans le manifeste ne changeait rien (les courtiers répondent « Null cursor » même sur un jeu qui fonctionne).
 
+## Escape Simulator (AppID 1435790, package `com.PineStudio.EscapeSimulator`)
+
+- **Fonctionne** (2026-10-04, Quest 3), Steam initialisé, image, son et suivi de la tête.
+- Jeu Unity avec un fichier d'extension (`main.<code>.<paquet>.obb`) qui contient entre autres les réglages de FMOD. Unity le cherche sous le code de version **installé**, que le patch relève : sans renommage, l'OBB n'est pas monté, FMOD ne trouve pas ses réglages et le jeu plante. GamePort renomme donc les fichiers d'extension après chaque patch, pour Unity comme pour Unreal.
+- Les fichiers posés par GamePort doivent être lisibles par le jeu (mode ouvert à tous), sinon « Unable to open archive file ». GamePort les ouvre à la pose et à chaque réalignement.
+- Unity ignore l'OBB sans la permission de lecture du stockage, que Android 13+ ne propose plus pour une cible 33 ou plus : le patch `storage_target` abaisse la cible à 32.
+
+## Non pris en charge : jeux qui vérifient l'achat auprès de Meta
+
+- **Metro Awakening** (2026-10-03) et **Vail** (2026-10-04) vérifient l'achat auprès de Meta au lancement. Sans licence du Horizon Store, Vail affiche un avertissement à chaque lancement, Metro quitte quelques secondes après avoir reçu le focus.
+- Les fichiers de ces jeux sont complets (Vail : les 156 paks de son manifeste sont présents) : le problème n'est pas l'installation. GamePort ne contourne pas cette vérification, ces jeux ne sont pas pris en charge.
+
 ## Tickets Steam pour les services en ligne des jeux
 
 **État (2026-09-30) : les services en ligne des jeux refusent le ticket fabriqué par GamePort. Non supporté.**
