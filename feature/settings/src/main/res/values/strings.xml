@@ -130,4 +130,7 @@
     <string name="settings_return_app">Games started from GamePort</string>
     <string name="settings_return_library">Games started from the library</string>
     <string name="settings_return_all">All games</string>
+    <string name="settings_download_region">Download server</string>
+    <string name="settings_download_region_description">The Steam region games are downloaded from. Automatic follows the location of the connection. Another region can be faster on a network whose route to the nearest server is poor. A change reconnects to Steam at once, and a download in progress stops and can be resumed.</string>
+    <string name="settings_download_region_auto">Automatic</string>
 </resources>

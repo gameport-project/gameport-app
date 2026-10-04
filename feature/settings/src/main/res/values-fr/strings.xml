@@ -130,4 +130,7 @@
     <string name="settings_return_app">Jeux lancés depuis GamePort</string>
     <string name="settings_return_library">Jeux lancés depuis la bibliothèque</string>
     <string name="settings_return_all">Tous les jeux</string>
+    <string name="settings_download_region">Serveur de téléchargement</string>
+    <string name="settings_download_region_description">La région de Steam d\'où les jeux sont téléchargés. Automatique suit la position de la connexion. Une autre région peut être plus rapide sur un réseau dont la route vers le serveur le plus proche est mauvaise. Un changement reconnecte à Steam tout de suite, et un téléchargement en cours s\'arrête et peut être repris.</string>
+    <string name="settings_download_region_auto">Automatique</string>
 </resources>

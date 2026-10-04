@@ -38,6 +38,7 @@ class SettingsViewModel @Inject constructor(
     private val patching: app.gameport.core.sync.PatchAllCoordinator,
     library: SteamLibraryRepository,
     private val history: PlayHistoryStore,
+    private val downloadRegion: app.gameport.core.steam.DownloadRegion,
     device: DeviceProfile,
 ) : ViewModel() {
     /** The games hidden in GamePort's library (Steam's own library is untouched), by name. */
@@ -106,6 +107,16 @@ class SettingsViewModel @Inject constructor(
     fun onReturnModeChanged(mode: app.gameport.core.model.ReturnMode) = settings.setReturnMode(mode)
 
     fun onSpeedUnitSelected(unit: SpeedUnit) = settings.setSpeedUnit(unit)
+
+    /** The region downloads are served from: 0 is automatic. */
+    val downloadRegionId: StateFlow<Int> = downloadRegion.cellId
+
+    fun onDownloadRegionSelected(id: Int) {
+        if (id == downloadRegion.cellId.value) return
+        downloadRegion.select(id)
+        // The region is given to Steam when connecting: connect again now, so the player does not have to restart anything.
+        viewModelScope.launch { auth.reconnect() }
+    }
 
     /** Forgets the account and every unfinished download. Installed games stay. */
     fun onSignOut() {

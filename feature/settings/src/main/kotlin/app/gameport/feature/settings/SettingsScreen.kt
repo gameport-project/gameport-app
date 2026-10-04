@@ -132,7 +132,7 @@ fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewMode
                     ) {
                         when (category) {
                             Category.ACCOUNT -> AccountSection(accountName, offline, viewModel::onOfflineModeChanged, countPlaytime, viewModel::onCountPlaytimeOnSteamChanged, sendAchievements, viewModel::onSendAchievementsToSteamChanged, returnMode, viewModel::onReturnModeChanged, viewModel::onSignOut)
-                            Category.DOWNLOADS -> DownloadsSection(speedUnit, viewModel::onSpeedUnitSelected)
+                            Category.DOWNLOADS -> DownloadsSection(speedUnit, viewModel::onSpeedUnitSelected, viewModel.downloadRegionId.collectAsStateWithLifecycle().value, viewModel::onDownloadRegionSelected)
                             Category.APPEARANCE -> AppearanceSection(display, viewModel::onDisplayChanged)
                             Category.HOME -> HomeSection(display, viewModel.isHeadset, viewModel::onDisplayChanged)
                             Category.LANGUAGE -> LanguageSection(language) { chosen ->
@@ -273,7 +273,7 @@ private fun AccountSection(
 }
 
 @Composable
-private fun DownloadsSection(speedUnit: SpeedUnit, onSelect: (SpeedUnit) -> Unit) {
+private fun DownloadsSection(speedUnit: SpeedUnit, onSelect: (SpeedUnit) -> Unit, regionId: Int, onRegionSelected: (Int) -> Unit) {
     Text(stringResource(R.string.settings_category_downloads), style = MaterialTheme.typography.headlineSmall)
     Text(stringResource(R.string.settings_speed_unit), style = MaterialTheme.typography.titleMedium)
     SpeedUnit.entries.forEach { unit ->
@@ -288,6 +288,23 @@ private fun DownloadsSection(speedUnit: SpeedUnit, onSelect: (SpeedUnit) -> Unit
                 ),
                 modifier = Modifier.padding(start = 12.dp),
             )
+        }
+    }
+
+    // The region downloads come from.
+    Text(stringResource(R.string.settings_download_region), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
+    Text(stringResource(R.string.settings_download_region_description), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.widthIn(max = 720.dp))
+    var choosing by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(onClick = { choosing = true }, contentPadding = PaddingValues(start = 16.dp, end = 8.dp)) {
+            Text(app.gameport.core.model.SteamRegions.nameOf(regionId) ?: stringResource(R.string.settings_download_region_auto))
+            Icon(Icons.Filled.ArrowDropDown, contentDescription = null, modifier = Modifier.size(24.dp))
+        }
+        DropdownMenu(expanded = choosing, onDismissRequest = { choosing = false }) {
+            DropdownMenuItem(text = { Text(stringResource(R.string.settings_download_region_auto)) }, onClick = { onRegionSelected(app.gameport.core.model.SteamRegions.AUTOMATIC); choosing = false })
+            app.gameport.core.model.SteamRegions.all.forEach { (id, name) ->
+                DropdownMenuItem(text = { Text(name) }, onClick = { onRegionSelected(id); choosing = false })
+            }
         }
     }
 }
