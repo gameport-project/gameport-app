@@ -8,6 +8,7 @@ import app.gameport.core.model.AndroidDepot
 import app.gameport.core.model.Game
 import app.gameport.core.model.InstallError
 import app.gameport.core.model.InstallState
+import app.gameport.core.model.reportable
 import app.gameport.core.model.ObbNames
 import app.gameport.core.model.VersionOption
 import app.gameport.core.model.AuthState
@@ -84,6 +85,15 @@ class GameInstallRepository @Inject constructor(
     init {
         // Closing GamePort stops "patch all": nobody is looking at it any more.
         InstallForegroundService.onClosed = ::cancelPatchAll
+        // A game patched again gets a higher version code and its expansion files must follow, even when it is started from the
+        // library of the device and not from here. This is done when the install ends, and again at every change of packages.
+        scope.launch { packages.packageChanges().collect { alignAllObbVersions() } }
+        // Downloads that were cut short (GamePort closed, the system stopped it, the connection lost) go on by themselves once signed in.
+        scope.launch {
+            auth.authState.first { it is AuthState.SignedIn }
+            kotlinx.coroutines.delay(RESUME_DELAY_MS)
+            resumeInterrupted()
+        }
     }
 
     private val downloadSlots = Semaphore(MAX_CONCURRENT_DOWNLOADS)
@@ -129,6 +139,9 @@ class GameInstallRepository @Inject constructor(
         val depots = game.androidBuild?.depotsFor(chosen).orEmpty()
         notEnoughSpace(game.appId, depots)?.let { return fail(game.appId, it) }
         directory.mkdirs()
+        // The player asks for it: it is not paused nor failed any more.
+        File(directory, PAUSED_FILE).delete()
+        File(directory, FAILED_FILE).delete()
         writeChosenDlc(directory, chosen)
         keepAlive(start = true)
         val job = scope.launch(start = CoroutineStart.LAZY) {
@@ -140,10 +153,15 @@ class GameInstallRepository @Inject constructor(
                     // at a time would each keep buffers in memory and starve the app.
                     setState(game.appId, InstallState.Queued)
                     downloadSlots.withPermit {
-                        setState(game.appId, InstallState.Downloading(0f))
+                        // Resuming: the downloader first checks what is already there, which takes a while and tells nothing. Say so from
+                        // the start, with the share of the game that is on the disk, instead of a progress that does not move.
+                        val onDisk = bytesOnDisk(directory)
+                        val resuming = onDisk > 0
+                        val total = depots.sumOf { it.installBytes }
+                        setState(game.appId, InstallState.Downloading(if (resuming && total > 0) (onDisk.toFloat() / total).coerceIn(0f, 1f) else 0f, 0L, resuming))
                         val speed = SpeedMeter()
-                        val check = VerifyingDetector()
-                        downloader.download(game.appId, depots.map { it.id }, directory) { progress, received ->
+                        val check = VerifyingDetector(startVerifying = resuming)
+                        downloader.download(game.appId, depots.map { it.id }, directory, depots.associate { it.id to it.downloadBytes }) { progress, received ->
                             setState(game.appId, InstallState.Downloading(progress, speed.update(received), check.update(received)))
                         }
                     }
@@ -160,6 +178,7 @@ class GameInstallRepository @Inject constructor(
                     events.note(game.appId, "build chosen: ${downloaded.joinToString { it.name }}")
                     val account = (auth.authState.value as? AuthState.SignedIn)?.account
                         ?: return@launch fail(game.appId, InstallError.NotSignedIn)
+                    notEnoughSpaceToPatch(directory, downloaded)?.let { return@launch fail(game.appId, it) }
                     setState(game.appId, InstallState.Patching)
                     events.note(game.appId, "patching ${downloaded.size} file(s)")
                     // Read before waiting for the lock, so the network is never asked while another game is being patched.
@@ -172,7 +191,7 @@ class GameInstallRepository @Inject constructor(
                         // Written under another name and renamed when complete, so an interrupted
                         // patch is never mistaken for a finished one.
                         val partial = File(patched.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second))
+                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlcOf(game), missingDlc = missingDlcOf(game), familyShared = game.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = downloadHasExpansion(directory)))
                         check(partial.renameTo(patched)) { "Could not finish the patched APK." }
                         // Keep only one copy of a multi-gigabyte game on disk.
                         original.delete()
@@ -257,10 +276,12 @@ class GameInstallRepository @Inject constructor(
     /**
      * Patches [appIds] again, one after the other: they rewrite whole games and Android installs one at a time, and the player may be asked
      * to confirm each update. A game that fails (no room, refused update) is noted and the others go on. Games that are not outdated
-     * any more are skipped.
+     * any more are skipped. The games Android updates without asking go first (see [PatchAllOrder]), so the run does not wait on a
+     * confirmation while some games could already be done.
      */
-    fun repatchAll(appIds: List<Int>) {
+    fun repatchAll(requested: List<Int>) {
         if (patchAllJob?.isActive == true) return
+        val appIds = PatchAllOrder.silentFirst(requested) { appId -> installed.all()[appId]?.let(packages::updatesWithoutConfirmation) == true }
         _patchAll.value = app.gameport.core.model.PatchAllState(total = appIds.size, done = 0, current = null, failed = emptyList(), finished = appIds.isEmpty(), ids = appIds)
         patchAllJob = scope.launch {
             val failed = mutableListOf<Int>()
@@ -373,7 +394,7 @@ class GameInstallRepository @Inject constructor(
                         val result = File(patchedDirectory(directory), original.name)
                         result.parentFile?.mkdirs()
                         val partial = File(result.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second), patches)
+                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = game?.let(::ownedDlcOf), missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = deviceHasExpansion(packageName)), patches)
                         check(partial.renameTo(result)) { "Could not finish the patched APK." }
                         result
                     }
@@ -382,6 +403,7 @@ class GameInstallRepository @Inject constructor(
                 val outcome = if (confirmTimeoutMs == null) packages.install(patched) else kotlinx.coroutines.withTimeoutOrNull(confirmTimeoutMs) { packages.install(patched) }
                     ?: PackageGateway.Outcome.Cancelled.also { events.note(appId, "the update was not confirmed in time: given up") }
                 events.note(appId, "re-patch install outcome: $outcome")
+                if (outcome == PackageGateway.Outcome.Success) alignObbVersion(packageName)
                 when (outcome) {
                     PackageGateway.Outcome.Success, PackageGateway.Outcome.Cancelled -> clearState(appId)
                     PackageGateway.Outcome.Conflict -> fail(appId, InstallError.VersionConflict)
@@ -410,6 +432,8 @@ class GameInstallRepository @Inject constructor(
     fun pause(appId: Int) {
         val job = jobs[appId]?.takeIf { it.isActive } ?: return
         paused.add(appId)
+        // Remembered on disk: a download the player paused does not start again by itself when GamePort is opened.
+        runCatching { File(downloadDirectory(appId), PAUSED_FILE).createNewFile() }
         job.cancel()
     }
 
@@ -466,20 +490,62 @@ class GameInstallRepository @Inject constructor(
         // The patched game reads this mark to know GamePort started it, so it can open GamePort again when it closes.
         ?.also { it.putExtra("app.gameport.launched", true); playHistory.markPlayed(appId) }
 
-    /**
-     * Patching writes a second copy of the APK next to the download, so the worst case needs
-     * about twice the download size. Games whose size Steam does not tell are not checked.
-     */
+    /** Checked before the download: see [SpaceNeeds]. Games whose size Steam does not tell are not checked. */
     private fun notEnoughSpace(appId: Int, depots: List<AndroidDepot>): InstallError? {
         val size = depots.sumOf { it.installBytes }.takeIf { it > 0 } ?: return null
         val directory = downloadDirectory(appId).apply { mkdirs() }
         // What a resumed download already holds does not need to be found again.
         val alreadyThere = directory.walkTopDown().filter { it.isFile }.sumOf { it.length() }
-        val needed = size * 2 - alreadyThere
+        val needed = SpaceNeeds.toInstall(size, alreadyThere)
         val free = directory.usableSpace
         if (needed <= free) return null
         return InstallError.NotEnoughSpace(neededBytes = needed, freeBytes = free)
     }
+
+    /** True when the download holds expansion files: a `.obb`, or an `obb/` folder the depot spells out. */
+    private fun downloadHasExpansion(directory: File): Boolean = directory.walkTopDown().onEnter { it.name != PATCHED_DIR }.any { file ->
+        file.isFile && (file.name.endsWith(".obb", ignoreCase = true) || file.relativeTo(directory).path.replace('\\', '/').startsWith("obb/"))
+    }
+
+    /** True when the game already has files under `Android/obb`, for a game patched again. */
+    private fun deviceHasExpansion(packageName: String): Boolean =
+        File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName").list()?.isNotEmpty() == true
+
+    /** The DLC of [game] the account has, or null when the library does not tell what DLC the game has. */
+    private fun ownedDlcOf(game: Game): List<Int>? = game.androidBuild?.dlc?.filter { it.owned }?.map { it.appId }
+
+    /** The DLC of [game] the library lists and the account does not have. */
+    private fun missingDlcOf(game: Game): List<Int> = game.androidBuild?.dlc?.filter { !it.owned }?.map { it.appId }.orEmpty()
+
+    /** Checked once the download is there: the patched copy of the APKs is written next to them. */
+    private fun notEnoughSpaceToPatch(directory: File, apks: List<File>): InstallError? {
+        val needed = SpaceNeeds.toPatch(apks.sumOf { it.length() })
+        val free = directory.usableSpace
+        return if (needed <= free) null else InstallError.NotEnoughSpace(neededBytes = needed, freeBytes = free)
+    }
+
+    /**
+     * Continues the downloads left half done. Not the ones the player paused, nor the ones that failed for a reason of their own (a bad
+     * download would otherwise be tried again at every start), and not a game that is installed (what is left there is something else).
+     */
+    private suspend fun resumeInterrupted() {
+        if (auth.offline.value || gate.updating.value) return
+        for (appId in leftoverIds()) {
+            val directory = downloadDirectory(appId)
+            if (File(directory, PAUSED_FILE).exists() || File(directory, FAILED_FILE).exists()) continue
+            if (installed.all()[appId]?.let(packages::isInstalled) == true) continue
+            if (jobs[appId]?.isActive == true) continue
+            val game = kotlinx.coroutines.withTimeoutOrNull(RESUME_LOOKUP_MS) { library.observeGame(appId).first() } ?: continue
+            events.note(appId, "download left half done: going on with it")
+            install(game, null)
+        }
+    }
+
+    /** What a download folder holds of the game itself: not what GamePort and the downloader keep for themselves. */
+    private fun bytesOnDisk(directory: File): Long = directory.walkTopDown()
+        .onEnter { it.name != PATCHED_DIR && it.name != ".DepotDownloader" }
+        .filter { it.isFile && !it.name.startsWith(".") }
+        .sumOf { it.length() }
 
     private fun hasLeftovers(appId: Int): Boolean = downloadDirectory(appId).list()?.isNotEmpty() == true
 
@@ -625,19 +691,18 @@ class GameInstallRepository @Inject constructor(
     /**
      * An expansion file is named after the version code of the APK it belongs to (main.<code>.<package>.obb), and
      * the game looks for exactly that name (see [app.gameport.core.model.ObbNames], which also covers the overflow files of the largest Unreal games). Patching raises the version code, so the files are renamed to follow it;
-     * otherwise the game starts its expansion downloader and never gets going. Best effort, like placing them.
+     * otherwise the game starts its expansion downloader and never gets going. Best effort, like placing them. Unity reads the same name:
+     * its Application.dataPath only points at the expansion file when it is found under the installed version code.
      */
     private fun alignObbVersion(packageName: String) {
         runCatching {
             val code = packages.versionCodeOf(packageName) ?: return
-            val directory = File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName")
-            directory.listFiles()?.forEach { file ->
-                val name = ObbNames.aligned(file.name, packageName, code) ?: return@forEach
-                val renamed = File(directory, name)
-                if (!renamed.exists()) file.renameTo(renamed)
-            }
+            ExpansionFiles.align(File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName"), packageName, code)
         }
     }
+
+    /** Every installed game gets its expansion files named after the version it has now, whoever installed it and whenever. */
+    private fun alignAllObbVersions() = installed.all().values.forEach(::alignObbVersion)
 
     private fun setState(appId: Int, state: InstallState) = operations.update { it + (appId to state) }
 
@@ -645,6 +710,8 @@ class GameInstallRepository @Inject constructor(
 
     private fun fail(appId: Int, error: InstallError): Unit {
         events.note(appId, "failed: $error")
+        // A failure that comes from the download itself is not tried again by itself at the next start.
+        if (error.reportable) runCatching { downloadDirectory(appId).takeIf { it.exists() }?.let { File(it, FAILED_FILE).createNewFile() } }
         setState(appId, InstallState.Failed(error))
     }
 }
@@ -664,11 +731,11 @@ private const val MAX_CONCURRENT_DOWNLOADS = 2
  * It only switches after a few seconds without data, and back after a real flow, so the label does not flicker
  * when two chunks happen to finish without a byte in between.
  */
-internal class VerifyingDetector(private val now: () -> Long = System::currentTimeMillis) {
+internal class VerifyingDetector(startVerifying: Boolean = false, private val now: () -> Long = System::currentTimeMillis) {
     private var lastReceived = 0L
     private var lastGrowth = now()
     private var fetchedSince = 0L
-    private var verifying = false
+    private var verifying = startVerifying
 
     fun update(received: Long): Boolean {
         val delta = received - lastReceived
@@ -692,6 +759,14 @@ internal class VerifyingDetector(private val now: () -> Long = System::currentTi
     }
 }
 private const val CHOICE_FILE = ".gameport-dlc"
+
+/** Written in a download's folder when the player pauses it, or when it failed for a reason of its own: GamePort does not resume it by itself. */
+private const val PAUSED_FILE = ".gameport-paused"
+private const val FAILED_FILE = ".gameport-failed"
+
+/** What GamePort waits after signing in before it resumes the downloads left half done, and how long it waits for a game's data. */
+private const val RESUME_DELAY_MS = 5_000L
+private const val RESUME_LOOKUP_MS = 10_000L
 
 /** Smooths the network rate over a few seconds so the figure on screen does not jump around. */
 internal class SpeedMeter(private val now: () -> Long = System::currentTimeMillis) {

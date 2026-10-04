@@ -63,6 +63,18 @@ class PackageGateway @Inject constructor(
 
     fun versionCodeOf(packageName: String): Long? = runCatching { packageManager.getPackageInfo(packageName, 0).longVersionCode }.getOrNull()
 
+    /**
+     * True when Android updates this game without asking: GamePort installed it, and the system is Android 12 or later with a game that targets
+     * Android 12 or later (the ones that target an older version still ask, and Android 11 always asks). Seen on a device, it is the system
+     * that decides in the end, so this tells what to expect, not a promise.
+     */
+    fun updatesWithoutConfirmation(packageName: String): Boolean = runCatching {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return@runCatching false
+        val target = packageManager.getApplicationInfo(packageName, 0).targetSdkVersion
+        val installer = packageManager.getInstallSourceInfo(packageName).installingPackageName
+        target >= Build.VERSION_CODES.S && installer == context.packageName
+    }.getOrDefault(false)
+
     fun isInstalled(packageName: String): Boolean = runCatching {
         packageManager.getPackageInfo(packageName, 0)
         true

@@ -34,4 +34,14 @@ class VerifyingDetectorTest {
         clock += 1_000
         assertFalse(detector.update(1_000_000))
     }
+
+    @Test
+    fun `a resumed download shows as verifying from the start, until real data flows`() {
+        val resumed = VerifyingDetector(startVerifying = true) { clock }
+        assertTrue(resumed.update(0))
+        clock += 1_000
+        assertTrue(resumed.update(100_000))
+        clock += 1_000
+        assertFalse(resumed.update(100_000 + 600_000))
+    }
 }
