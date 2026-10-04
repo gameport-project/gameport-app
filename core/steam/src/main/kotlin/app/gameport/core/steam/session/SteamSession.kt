@@ -58,7 +58,7 @@ data class SessionIdentity(val steamId: Long, val displayName: String)
  * Thin wrapper around a JavaSteam client: connection, callback pump, QR authentication and
  * refresh-token log on. It exposes coroutines and knows nothing about Android or UI state.
  */
-class SteamSession {
+class SteamSession(private val cellId: Int = 0) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val traffic = ConcurrentHashMap<Int, AtomicLong>()
 
@@ -72,6 +72,8 @@ class SteamSession {
         SteamConfiguration.create {
             it.withProtocolTypes(EnumSet.of(ProtocolTypes.WEB_SOCKET))
             it.withHttpClient(httpClient(traffic))
+            // The region downloads are served from, when the player chose one (0: Steam decides).
+            if (cellId > 0) it.withCellID(cellId)
         },
     )
     private val callbacks = CallbackManager(client)
@@ -257,7 +259,7 @@ class SteamSession {
                 shouldRememberPassword = true,
                 machineName = deviceName,
                 clientOSType = EOSType.AndroidUnknown,
-            ),
+            ).also { details -> if (cellId > 0) details.cellID = cellId },
         )
         val logon = withTimeout(CONNECT_TIMEOUT_MS) { result.await() }
         if (logon.result != EResult.OK) throw AuthenticationException("Log on failed", logon.result)

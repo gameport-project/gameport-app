@@ -17,13 +17,15 @@ import kotlinx.coroutines.withContext
 class JavaSteamGameDownloader @Inject constructor(
     private val sessions: SteamSessionHolder,
 ) : GameDownloader {
-    override suspend fun download(appId: Int, depotIds: List<Int>, directory: File, onProgress: (Float, Long) -> Unit) {
+    override suspend fun download(appId: Int, depotIds: List<Int>, directory: File, depotBytes: Map<Int, Long>, onProgress: (Float, Long) -> Unit) {
         withContext(Dispatchers.IO) {
             val session = sessions.current.value ?: error("Not signed in to Steam")
             val startBytes = session.receivedBytes(depotIds)
             directory.mkdirs()
+            // Resuming: the downloader must check what is already there, not believe its own notes (see [DownloadState]).
+            DownloadState.forgetForResume(directory)
             val failure = AtomicReference<Throwable?>()
-            // Each depot reports the fraction of its own download; the overall figure is their mean.
+            // Each depot reports the fraction of its own download; the overall figure weighs each by its size.
             val fractionByDepot = ConcurrentHashMap<Int, Float>()
 
             session.newDepotDownloader().use { downloader ->
@@ -36,7 +38,7 @@ class JavaSteamGameDownloader @Inject constructor(
                     ) {
                         fractionByDepot[depotId] = depotPercentComplete
                         // What came over the network, so files checked on disk (a resumed download) do not count.
-                        onProgress(fractionByDepot.values.average().toFloat().coerceIn(0f, 1f), session.receivedBytes(depotIds) - startBytes)
+                        onProgress(DownloadProgress.overall(depotIds, fractionByDepot, depotBytes), session.receivedBytes(depotIds) - startBytes)
                     }
 
                     override fun onDownloadFailed(item: DownloadItem, error: Throwable) {

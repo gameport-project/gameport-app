@@ -68,6 +68,14 @@ data class VersionOption(val id: String, val versionName: String?, val versionCo
 val InstallError.reportable: Boolean
     get() = this !is InstallError.NotEnoughSpace && this !is InstallError.NotSignedIn && this !is InstallError.Offline && this !is InstallError.AppUpdating
 
+/**
+ * True while a game is on its way to being installed: waiting its turn, downloading, patching, installing, or waiting for the player's
+ * choice. Not for an install that was cut short, that failed, or that is done.
+ */
+val InstallState.inProgress: Boolean
+    get() = this is InstallState.Queued || this is InstallState.Downloading || this is InstallState.Patching || this is InstallState.Installing ||
+        this is InstallState.ChoosingVersion || this is InstallState.ChoosingDuplicate
+
 /** Where "patch all" stands: [done] of [total] games handled, [current] being patched, and the games that could not be patched. */
 data class PatchAllState(
     val total: Int,

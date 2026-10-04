@@ -19,6 +19,12 @@ interface SteamAuthRepository {
     /** Offline mode: stays off Steam until turned off. Turning it off reconnects. */
     suspend fun setOfflineMode(enabled: Boolean)
 
+    /**
+     * Connects again with the saved token on a new connection, to take a changed download region into account. A download in progress on the
+     * old connection stops and can be resumed. Does nothing when not signed in or in offline mode.
+     */
+    suspend fun reconnect()
+
     /** Restores a previous session from the stored refresh token, if any. */
     suspend fun restoreSession()
 
