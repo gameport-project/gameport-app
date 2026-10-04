@@ -59,10 +59,12 @@ sealed interface LibraryUiState {
         val connection: SteamConnection = SteamConnection.ONLINE,
         /** How many installed games are behind on patches, and the run that patches them. */
         val patchAll: PatchAllInfo = PatchAllInfo(0, null),
+        /** How many games are being installed, shown on the downloads button. */
+        val installing: Int = 0,
     ) : LibraryUiState
 }
 
-private class HeaderInfo(val games: List<String>, val app: String?, val connection: SteamConnection, val ids: Set<Int>, val patchAll: PatchAllInfo)
+private class HeaderInfo(val games: List<String>, val app: String?, val connection: SteamConnection, val ids: Set<Int>, val patchAll: PatchAllInfo, val installing: Int = 0)
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
@@ -83,8 +85,11 @@ class LibraryViewModel @Inject constructor(
         combine(repository.observeLibrary(), query, tab, attention.observe(), combine(appearance.observe(), history.observe(), filters) { shown, played, narrowed -> Triple(shown, played, narrowed) }) { library, query, tab, outdated, (shown, played, narrowed) ->
             library.toUiState(query, tab, showTabs).copy(attention = outdated).arranged(shown, played, narrowed)
         },
-        combine(updates.observe(), updates.observeApp(), updates.observeConnection(), updates.observeIds(), updates.observePatchAll()) { games, app, connection, ids, patchAll -> HeaderInfo(games, app, connection, ids, patchAll) },
-    ) { state, info -> state.copy(updates = info.games, appUpdate = info.app, connection = info.connection, updatable = info.ids, patchAll = info.patchAll) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LibraryUiState.Loading)
+        combine(
+            combine(updates.observe(), updates.observeApp(), updates.observeConnection(), updates.observeIds(), updates.observePatchAll()) { games, app, connection, ids, patchAll -> HeaderInfo(games, app, connection, ids, patchAll) },
+            updates.observeInstalling(),
+        ) { info, installing -> HeaderInfo(info.games, info.app, info.connection, info.ids, info.patchAll, installing) },
+    ) { state, info -> state.copy(updates = info.games, appUpdate = info.app, connection = info.connection, updatable = info.ids, patchAll = info.patchAll, installing = info.installing) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LibraryUiState.Loading)
 
     init {
         // Asked when the library opens (that is, when the app starts).

@@ -1,6 +1,8 @@
 package app.gameport.feature.library
 
 import app.gameport.core.install.AppUpdater
+import kotlinx.coroutines.flow.distinctUntilChanged
+import app.gameport.core.model.inProgress
 import app.gameport.core.install.GameUpdatesRepository
 import app.gameport.core.model.AppUpdateState
 import app.gameport.core.model.PatchAllInfo
@@ -30,6 +32,9 @@ interface UpdatesSource {
     /** How many installed games were patched by an older patcher, and where "patch all" stands. */
     fun observePatchAll(): Flow<PatchAllInfo> = flowOf(PatchAllInfo(0, null))
 
+    /** How many games are being installed right now. */
+    fun observeInstalling(): Flow<Int> = flowOf(0)
+
     /** Patches the games that are behind. */
     fun patchAll() {}
 
@@ -48,6 +53,7 @@ internal class InstalledGamesUpdatesSource @Inject constructor(
     private val app: AppUpdater,
     private val auth: app.gameport.core.steam.SteamAuthRepository,
     private val patching: app.gameport.core.sync.PatchAllCoordinator,
+    private val installer: app.gameport.core.install.GameInstallRepository,
 ) : UpdatesSource {
     override fun observe(): Flow<List<String>> = updates.updates.map { list -> list.map { it.name } }
 
@@ -60,6 +66,8 @@ internal class InstalledGamesUpdatesSource @Inject constructor(
     override fun observeConnection(): Flow<SteamConnection> = auth.connection
 
     override fun observePatchAll(): Flow<PatchAllInfo> = patching.observe()
+
+    override fun observeInstalling(): Flow<Int> = installer.observeAll().map { states -> states.values.count { it.inProgress } }.distinctUntilChanged()
 
     override fun patchAll() = patching.patchAll()
 

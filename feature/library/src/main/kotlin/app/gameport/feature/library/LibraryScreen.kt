@@ -508,8 +508,23 @@ private fun Header(
                     )
                 }
             }
-            GlassIconButton(onClick = onOpenDownloads) {
-                Icon(Icons.Filled.Download, contentDescription = stringResource(R.string.library_downloads))
+            // How many games are being installed sits on the button, as the filters do.
+            Box {
+                GlassIconButton(onClick = onOpenDownloads) {
+                    Icon(Icons.Filled.Download, contentDescription = stringResource(R.string.library_downloads))
+                }
+                if (state.installing > 0) {
+                    Text(
+                        text = state.installing.toString(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(18.dp)
+                            .background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.CircleShape)
+                            .wrapContentSize(Alignment.Center),
+                    )
+                }
             }
             GlassIconButton(onClick = onOpenSettings) {
                 Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.library_settings))
