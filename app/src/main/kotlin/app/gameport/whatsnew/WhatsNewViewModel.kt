@@ -159,7 +159,7 @@ class WhatsNewViewModel @Inject constructor(
     private val previewNames = listOf("SUPERHOT VR", "Moss 2", "Ancient Dungeon VR", "Underdogs")
 
     private fun previewState(patchNeeded: Boolean, progress: PatchAllState?): WhatsNewState {
-        val notes = WhatsNew.between(0, Int.MAX_VALUE)
+        val notes = WhatsNew.latest()
         return WhatsNewState(
             version = WhatsNew.latestName,
             items = notes.items,
@@ -169,7 +169,7 @@ class WhatsNewViewModel @Inject constructor(
             progress = progress,
             currentName = progress?.current?.let { previewNames.getOrNull(it) },
             failedNames = progress?.failed.orEmpty().mapNotNull(previewNames::getOrNull),
-            preview = true,
+            preview = preview.labelled,
         )
     }
 

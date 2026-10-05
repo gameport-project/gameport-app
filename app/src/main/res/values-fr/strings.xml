@@ -12,6 +12,9 @@
     <string name="whatsnew_achievements">Les succès sont enfin là, synchronisés avec Steam : ceux gagnés ici apparaissent sur Steam, et ceux gagnés ailleurs apparaissent ici.</string>
     <string name="whatsnew_offline">Le mode hors ligne est géré : les jeux se jouent sans connexion, et leurs sauvegardes sont envoyées dès que le réseau revient.</string>
     <string name="whatsnew_sign_in">Connexion avec un nom de compte et un mot de passe, en plus du QR code.</string>
+    <string name="whatsnew_saves_sync">Les sauvegardes sont envoyées pendant la partie et pas seulement à sa fin, et la page des sauvegardes montre d\'un coup d\'œil ce qui est synchronisé avec Steam et ce qui ne l\'est pas.</string>
+    <string name="whatsnew_downloads">La région Steam de téléchargement se choisit, les téléchargements interrompus reprennent d\'eux-mêmes, et une pastille indique combien de jeux s\'installent.</string>
+    <string name="whatsnew_expansion_files">Les jeux avec fichiers d\'extension démarrent : les fichiers suivent la version installée et sont lisibles par le jeu.</string>
     <string name="whatsnew_compat_title">Compatibilité étendue, nouveaux jeux pris en charge</string>
     <string name="whatsnew_compat_tested">Testés et confirmés : %1$s.</string>
     <string name="whatsnew_compat_others">D\'autres jeux sont aussi pris en charge sans avoir été essayés, dont des jeux Unreal jusque-là bloqués par leurs fichiers d\'extension.</string>

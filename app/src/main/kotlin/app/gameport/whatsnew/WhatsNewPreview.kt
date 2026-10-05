@@ -16,7 +16,12 @@ class WhatsNewPreview @Inject constructor() {
     private val _mode = MutableStateFlow<Boolean?>(null)
     val mode: StateFlow<Boolean?> = _mode.asStateFlow()
 
-    fun show(patchNeeded: Boolean) {
+    /** Whether the window says it is a preview: a capture to publish does without that line. */
+    var labelled: Boolean = true
+        private set
+
+    fun show(patchNeeded: Boolean, labelled: Boolean = true) {
+        this.labelled = labelled
         _mode.value = patchNeeded
     }
 

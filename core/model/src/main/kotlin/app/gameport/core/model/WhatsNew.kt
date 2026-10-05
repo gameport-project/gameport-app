@@ -5,7 +5,7 @@ package app.gameport.core.model
  * and the games confirmed to work. A game is only named once the player confirmed that it works.
  */
 object WhatsNew {
-    enum class Item { ACHIEVEMENTS, OFFLINE, SIGN_IN }
+    enum class Item { ACHIEVEMENTS, OFFLINE, SIGN_IN, SAVES_SYNC, DOWNLOADS, EXPANSION_FILES }
 
     class Version(val code: Int, val items: List<Item>, val confirmedGames: List<String>)
 
@@ -20,11 +20,19 @@ object WhatsNew {
             items = listOf(Item.ACHIEVEMENTS, Item.OFFLINE, Item.SIGN_IN),
             confirmedGames = listOf("Moss 2", "The Last Clockwinder", "Cubism VR", "Space Pirate Trainer", "Richie's Plank Experience"),
         ),
+        Version(
+            code = 701,
+            items = listOf(Item.SAVES_SYNC, Item.DOWNLOADS, Item.EXPANSION_FILES),
+            confirmedGames = listOf("Escape Simulator"),
+        ),
     )
 
     /** The newest version that has news, as its name (700 is 0.7.0): what a preview shows. */
     val latestName: String
         get() = versions.maxOf { it.code }.let { code -> "${code / 10_000}.${code / 100 % 100}.${code % 100}" }
+
+    /** What the newest version brings, and only that: what a preview shows. */
+    fun latest(): Summary = versions.maxBy { it.code }.let { Summary(it.items, it.confirmedGames) }
 
     /** What the versions after [seen], up to and including [current], bring. */
     fun between(seen: Int, current: Int): Summary {

@@ -13,9 +13,16 @@ class WhatsNewTest {
     }
 
     @Test
+    fun `a player coming from 0_7_0 gets only what 0_7_1 brings`() {
+        val summary = WhatsNew.between(seen = 700, current = 701)
+        assertEquals(listOf(WhatsNew.Item.SAVES_SYNC, WhatsNew.Item.DOWNLOADS, WhatsNew.Item.EXPANSION_FILES), summary.items)
+        assertEquals(listOf("Escape Simulator"), summary.confirmedGames)
+    }
+
+    @Test
     fun `a player who already saw the version is told nothing more`() {
-        assertTrue(WhatsNew.between(seen = 700, current = 700).isEmpty)
-        assertTrue(WhatsNew.between(seen = 800, current = 700).isEmpty)
+        assertTrue(WhatsNew.between(seen = 701, current = 701).isEmpty)
+        assertTrue(WhatsNew.between(seen = 800, current = 701).isEmpty)
     }
 
     @Test
@@ -27,11 +34,18 @@ class WhatsNewTest {
     fun `several versions skipped are told together without repeats`() {
         val games = WhatsNew.between(seen = 0, current = 900).confirmedGames
         assertEquals(games.distinct(), games)
-        assertEquals(5, games.size)
+        assertEquals(6, games.size)
     }
 
     @Test
     fun `the latest version is named like a version`() {
-        assertEquals("0.7.0", WhatsNew.latestName)
+        assertEquals("0.7.1", WhatsNew.latestName)
+    }
+
+    @Test
+    fun `the preview shows only the newest version`() {
+        val latest = WhatsNew.latest()
+        assertEquals(WhatsNew.between(seen = 700, current = 701).items, latest.items)
+        assertEquals(listOf("Escape Simulator"), latest.confirmedGames)
     }
 }

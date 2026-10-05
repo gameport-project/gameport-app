@@ -20,6 +20,8 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
@@ -157,6 +159,9 @@ private fun Feature(item: WhatsNew.Item) {
                 WhatsNew.Item.ACHIEVEMENTS -> GoldTrophy(28.dp)
                 WhatsNew.Item.OFFLINE -> Icon(Icons.Filled.CloudSync, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
                 WhatsNew.Item.SIGN_IN -> Icon(Icons.Filled.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
+                WhatsNew.Item.SAVES_SYNC -> Icon(Icons.Filled.Check, contentDescription = null, tint = Color(0xFF66BB6A), modifier = Modifier.size(26.dp))
+                WhatsNew.Item.DOWNLOADS -> Icon(Icons.Filled.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
+                WhatsNew.Item.EXPANSION_FILES -> Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
             }
         }
         Text(stringResource(itemText(item)), modifier = Modifier.weight(1f))
@@ -198,4 +203,7 @@ private fun itemText(item: WhatsNew.Item): Int = when (item) {
     WhatsNew.Item.ACHIEVEMENTS -> R.string.whatsnew_achievements
     WhatsNew.Item.OFFLINE -> R.string.whatsnew_offline
     WhatsNew.Item.SIGN_IN -> R.string.whatsnew_sign_in
+    WhatsNew.Item.SAVES_SYNC -> R.string.whatsnew_saves_sync
+    WhatsNew.Item.DOWNLOADS -> R.string.whatsnew_downloads
+    WhatsNew.Item.EXPANSION_FILES -> R.string.whatsnew_expansion_files
 }
