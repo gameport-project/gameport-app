@@ -24,7 +24,7 @@ data class DownloadEntry(val appId: Int, val game: Game?, val state: InstallStat
 /** Work in progress first, then the games with an update, then what needs attention, then what is installed; the latest installed or updated first in each. */
 internal fun downloadsOrder(withUpdate: Set<Int>): Comparator<DownloadEntry> = compareBy<DownloadEntry> {
     when (it.state) {
-        is InstallState.Downloading, InstallState.Patching, InstallState.Installing, InstallState.Queued, is InstallState.ChoosingVersion, is InstallState.ChoosingDuplicate -> 0
+        is InstallState.Downloading, InstallState.Patching, InstallState.Installing, InstallState.Finishing, InstallState.Queued, is InstallState.ChoosingVersion, is InstallState.ChoosingDuplicate -> 0
         is InstallState.Installed -> if (it.appId in withUpdate) 1 else 3
         is InstallState.Interrupted, is InstallState.Failed -> 2
         else -> 3

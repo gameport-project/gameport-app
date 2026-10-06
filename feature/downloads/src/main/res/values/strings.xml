@@ -4,10 +4,6 @@
     <string name="downloads_back">Back</string>
     <string name="downloads_empty">Nothing is downloading and no game is installed yet.</string>
     <string name="downloads_unknown_game">App %1$d</string>
-    <string name="downloads_queued">Waiting for other downloads…</string>
-    <string name="downloads_downloading">Downloading… %1$d%%</string>
-    <string name="downloads_patching">Preparing for Steam…</string>
-    <string name="downloads_installing">Installing…</string>
     <string name="downloads_interrupted">Download interrupted</string>
     <string name="downloads_failed">Install failed</string>
     <string name="downloads_installed">Installed</string>
@@ -20,7 +16,6 @@
     <string name="downloads_update_all">Update all</string>
     <string name="downloads_update_available">Update available</string>
     <string name="downloads_update_many">%1$d games have an update</string>
-    <string name="downloads_verifying">Checking files already downloaded… %1$d%%</string>
     <string name="downloads_pause">Pause</string>
     <string name="downloads_choose_version">A version must be chosen: open the game</string>
     <string name="downloads_choose_duplicate">A copy is already installed: open the game to choose</string>

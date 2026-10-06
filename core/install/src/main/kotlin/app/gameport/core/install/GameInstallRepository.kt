@@ -247,13 +247,16 @@ class GameInstallRepository @Inject constructor(
                 when (val outcome = packages.install(apks)) {
                     PackageGateway.Outcome.Success -> {
                         events.note(game.appId, "installed $packageName")
+                        // Not playable yet: the expansion files have to be in place, under the name the game looks for.
+                        setState(game.appId, InstallState.Finishing)
                         placeExpansionFiles(game.appId, directory, packageName)
                         installed.put(game.appId, packageName)
                         // What this install came from, to recognise a newer build later.
                         builds.put(game.appId, InstalledBuild(depots.associate { it.id to it.manifestId }, chosen))
                         updates.markCurrent(game.appId)
-                        directory.deleteRecursively()
+                        // The game is ready: Play shows now. Clearing the work folder (possibly gigabytes) is not waited for.
                         clearState(game.appId)
+                        directory.deleteRecursively()
                     }
                     PackageGateway.Outcome.Cancelled -> clearState(game.appId)
                     PackageGateway.Outcome.Conflict -> fail(game.appId, InstallError.VersionConflict)

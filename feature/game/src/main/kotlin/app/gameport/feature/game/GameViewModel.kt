@@ -110,7 +110,7 @@ class GameViewModel @Inject constructor(
             install is InstallState.Queued -> Repatch.Running(RepatchStage.QUEUED)
             install is InstallState.Downloading -> Repatch.Running(RepatchStage.DOWNLOADING, install.progress, install.bytesPerSecond)
             install is InstallState.Patching -> Repatch.Running(RepatchStage.PATCHING)
-            install is InstallState.Installing -> Repatch.Running(RepatchStage.INSTALLING)
+            install is InstallState.Installing || install is InstallState.Finishing -> Repatch.Running(RepatchStage.INSTALLING)
             install is InstallState.Failed -> Repatch.Failed(install.error)
             else -> Repatch.None
         }

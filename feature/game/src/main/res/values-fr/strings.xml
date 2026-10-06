@@ -2,12 +2,6 @@
 <resources>
     <string name="game_back">Retour</string>
     <string name="game_install">Installer</string>
-    <string name="game_queued">En attente des autres téléchargements…</string>
-    <string name="game_step_download">Télécharger</string>
-    <string name="game_step_patch">Patcher</string>
-    <string name="game_step_install">Installer</string>
-    <string name="game_patching">Préparation du jeu pour Steam… cela peut prendre quelques minutes</string>
-    <string name="game_installing">Installation… une confirmation peut être demandée à l\'écran</string>
     <string name="game_cancel">Annuler</string>
     <string name="game_resume">Reprendre le téléchargement</string>
     <string name="game_discard">Supprimer</string>
@@ -139,15 +133,14 @@
     <string name="game_info_played_steam">Sur Steam</string>
     <string name="game_kind_demo">Démo</string>
     <string name="game_kind_beta">Bêta</string>
-    <string name="game_other_gameport">Ce jeu appartient à un autre GamePort de cet appareil (%1$s). Il se lance et se met à jour depuis celui-là.</string>
-    <string name="game_duplicate_other_gameport">Ce jeu est déjà installé par un autre GamePort de cet appareil (%1$s). Il peut rester avec lui, ou être désinstallé pour que ce GamePort l\'installe.</string>
-    <string name="game_verifying">Vérification des fichiers déjà téléchargés… %1$d %%</string>
     <string name="game_pause">Pause</string>
     <string name="game_choose_version_title">Quelle version ?</string>
     <string name="game_choose_version_message">Ce jeu existe en plusieurs versions et aucune ne convient clairement à cet appareil. Choisir celle à installer.</string>
     <string name="game_choose_version_waiting">En attente d\'un choix…</string>
     <string name="game_duplicate_title">Déjà installé</string>
     <string name="game_duplicate_message">Une copie de ce jeu est déjà installée sur cet appareil, probablement celle du store Meta. Les deux ne peuvent pas être installées ensemble. Utiliser cette version demande de désinstaller l\'autre, et ses sauvegardes sur cet appareil sont perdues avec elle.</string>
+    <string name="game_other_gameport">Ce jeu appartient à un autre GamePort de cet appareil (%1$s). Il se lance et se met à jour depuis celui-là.</string>
+    <string name="game_duplicate_other_gameport">Ce jeu est déjà installé par un autre GamePort de cet appareil (%1$s). Il peut rester avec lui, ou être désinstallé pour que ce GamePort l\'installe.</string>
     <string name="game_duplicate_keep">Garder la copie installée</string>
     <string name="game_duplicate_replace">La désinstaller et installer cette version</string>
     <string name="game_version_headset">Version VR</string>

@@ -31,6 +31,9 @@ sealed interface InstallState {
     /** The APK is handed to Android; the user may have to confirm on screen. */
     data object Installing : InstallState
 
+    /** Android installed the game; GamePort now puts its expansion files in place and registers it. The game is not ready to play yet. */
+    data object Finishing : InstallState
+
     /** [otherGamePort]: the package name of another GamePort on the device that patched the game, which then is the one that starts and updates it. */
     data class Installed(val packageName: String, val otherGamePort: String? = null) : InstallState
 
@@ -75,7 +78,7 @@ val InstallError.reportable: Boolean
  * choice. Not for an install that was cut short, that failed, or that is done.
  */
 val InstallState.inProgress: Boolean
-    get() = this is InstallState.Queued || this is InstallState.Downloading || this is InstallState.Patching || this is InstallState.Installing ||
+    get() = this is InstallState.Queued || this is InstallState.Downloading || this is InstallState.Patching || this is InstallState.Installing || this is InstallState.Finishing ||
         this is InstallState.ChoosingVersion || this is InstallState.ChoosingDuplicate
 
 /** Where "patch all" stands: [done] of [total] games handled, [current] being patched, and the games that could not be patched. */
@@ -93,3 +96,16 @@ data class PatchAllState(
 data class PatchAllInfo(val behind: Int, val progress: PatchAllState?) {
     val running: Boolean get() = progress != null && !progress.finished
 }
+
+/** The steps a game goes through to be installed, in order; the same on the game's page and on the downloads page. */
+enum class InstallStage { DOWNLOAD, PATCH, INSTALL, FINISH }
+
+/** The step this state is in, or null when it is not one of them (waiting for a choice, interrupted, failed, installed). */
+val InstallState.stage: InstallStage?
+    get() = when (this) {
+        InstallState.Queued, is InstallState.Downloading -> InstallStage.DOWNLOAD
+        InstallState.Patching -> InstallStage.PATCH
+        InstallState.Installing -> InstallStage.INSTALL
+        InstallState.Finishing -> InstallStage.FINISH
+        else -> null
+    }

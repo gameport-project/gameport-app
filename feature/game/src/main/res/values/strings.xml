@@ -2,12 +2,6 @@
 <resources>
     <string name="game_back">Back</string>
     <string name="game_install">Install</string>
-    <string name="game_queued">Waiting for other downloads to finish…</string>
-    <string name="game_step_download">Download</string>
-    <string name="game_step_patch">Patch</string>
-    <string name="game_step_install">Install</string>
-    <string name="game_patching">Preparing the game for Steam… this can take a few minutes</string>
-    <string name="game_installing">Installing… a confirmation may be asked on screen</string>
     <string name="game_cancel">Cancel</string>
     <string name="game_resume">Resume download</string>
     <string name="game_discard">Discard</string>
@@ -140,15 +134,14 @@
     <string name="game_info_played_steam">On Steam</string>
     <string name="game_kind_demo">Demo</string>
     <string name="game_kind_beta">Beta</string>
-    <string name="game_other_gameport">This game belongs to another GamePort on this device (%1$s). It is started and updated from there.</string>
-    <string name="game_duplicate_other_gameport">This game is already installed by another GamePort on this device (%1$s). It can stay with that one, or be uninstalled so this GamePort installs it.</string>
-    <string name="game_verifying">Checking files already downloaded… %1$d%%</string>
     <string name="game_pause">Pause</string>
     <string name="game_choose_version_title">Which version?</string>
     <string name="game_choose_version_message">This game comes in several versions and none fits this device on its own. Choose the one to install.</string>
     <string name="game_choose_version_waiting">Waiting for a choice…</string>
     <string name="game_duplicate_title">Already installed</string>
     <string name="game_duplicate_message">A copy of this game is already installed on this device, probably the one from the Meta store. The two cannot be installed together. Using this version means uninstalling the other one first, and its saves on this device are lost with it.</string>
+    <string name="game_other_gameport">This game belongs to another GamePort on this device (%1$s). It is started and updated from there.</string>
+    <string name="game_duplicate_other_gameport">This game is already installed by another GamePort on this device (%1$s). It can stay with that one, or be uninstalled so this GamePort installs it.</string>
     <string name="game_duplicate_keep">Keep the installed copy</string>
     <string name="game_duplicate_replace">Uninstall it and install this version</string>
     <string name="game_version_headset">VR version</string>

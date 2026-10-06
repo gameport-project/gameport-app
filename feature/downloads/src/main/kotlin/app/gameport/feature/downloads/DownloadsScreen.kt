@@ -50,7 +50,10 @@ import app.gameport.core.designsystem.GameImage
 import app.gameport.core.designsystem.GlassButton
 import app.gameport.core.designsystem.GlassChip
 import app.gameport.core.designsystem.glass
+import app.gameport.core.designsystem.InstallStepper
+import app.gameport.core.designsystem.installStatusText
 import app.gameport.core.designsystem.speedText
+import app.gameport.core.model.stage
 import app.gameport.core.model.InstallState
 import app.gameport.core.model.SpeedUnit
 
@@ -156,17 +159,15 @@ private fun EntryRow(
                 modifier = Modifier.bleed(NAME_BLEED).clip(RoundedCornerShape(8.dp)).clickable(onClick = onOpen).padding(horizontal = NAME_BLEED),
             )
             when (val state = entry.state) {
-                InstallState.Queued -> Text(stringResource(R.string.downloads_queued))
-                is InstallState.Downloading -> {
-                    val percent = stringResource(R.string.downloads_downloading, (state.progress * 100).toInt())
-                    if (state.verifying) Text(stringResource(R.string.downloads_verifying, (state.progress * 100).toInt()))
-                    else Text(if (state.bytesPerSecond > 0) "$percent · ${speedText(state.bytesPerSecond, speedUnit)}" else percent)
-                    LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
+                InstallState.Queued, is InstallState.Downloading, InstallState.Patching, InstallState.Installing, InstallState.Finishing -> {
+                    // The same steps and words as on the game's page.
+                    state.stage?.let { InstallStepper(it) }
+                    installStatusText(state, speedUnit)?.let { Text(it) }
+                    if (state is InstallState.Downloading) LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
+                    else LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
                 is InstallState.ChoosingVersion -> Text(stringResource(R.string.downloads_choose_version))
                 is InstallState.ChoosingDuplicate -> Text(stringResource(R.string.downloads_choose_duplicate))
-                InstallState.Patching -> Text(stringResource(R.string.downloads_patching))
-                InstallState.Installing -> Text(stringResource(R.string.downloads_installing))
                 InstallState.Interrupted -> Text(stringResource(R.string.downloads_interrupted))
                 is InstallState.Failed -> Text(installErrorText(state.error), color = MaterialTheme.colorScheme.error)
                 is InstallState.Installed ->

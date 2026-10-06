@@ -117,6 +117,9 @@ import app.gameport.core.designsystem.DangerButton
 import app.gameport.core.designsystem.DangerTextButton
 import app.gameport.core.designsystem.DangerTrashButton
 import app.gameport.core.designsystem.AttentionBadge
+import app.gameport.core.designsystem.InstallStepper
+import app.gameport.core.designsystem.installStatusText
+import app.gameport.core.model.stage
 import app.gameport.core.designsystem.UpdateBadge
 import app.gameport.core.designsystem.GameImage
 import app.gameport.core.designsystem.GlassButton
@@ -621,12 +624,8 @@ private fun InstallActions(
             Button(onClick = onResume) { Text(stringResource(R.string.game_resume)) }
             DangerButton(onClick = onDiscard) { Text(stringResource(R.string.game_discard)) }
         }
-        InstallState.Queued -> Column(Modifier.widthIn(max = 460.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(stringResource(R.string.game_queued))
-            LinearProgressIndicator(Modifier.fillMaxWidth())
-            DangerButton(onClick = onCancel) { Text(stringResource(R.string.game_cancel)) }
-        }
-        is InstallState.Downloading -> Progress(step = Step.DOWNLOAD, fraction = install.progress, speed = install.bytesPerSecond, speedUnit = speedUnit, onCancel = onCancel, verifying = install.verifying, onPause = onPause)
+        InstallState.Queued -> Progress(state = install, speedUnit = speedUnit, onCancel = onCancel)
+        is InstallState.Downloading -> Progress(state = install, speedUnit = speedUnit, onCancel = onCancel, onPause = onPause)
         is InstallState.ChoosingVersion -> {
             VersionDialog(install.options, onChosen = onVersionChosen)
             Text(stringResource(R.string.game_choose_version_waiting), style = MaterialTheme.typography.bodyMedium)
@@ -635,8 +634,7 @@ private fun InstallActions(
             DuplicateDialog(otherGamePort = install.otherGamePort, onChosen = onDuplicateChosen)
             Text(stringResource(R.string.game_choose_version_waiting), style = MaterialTheme.typography.bodyMedium)
         }
-        InstallState.Patching -> Progress(step = Step.PATCH, fraction = null, speed = 0, speedUnit = speedUnit, onCancel = null)
-        InstallState.Installing -> Progress(step = Step.INSTALL, fraction = null, speed = 0, speedUnit = speedUnit, onCancel = null)
+        InstallState.Patching, InstallState.Installing, InstallState.Finishing -> Progress(state = install, speedUnit = speedUnit, onCancel = null)
         is InstallState.Installed -> if (install.otherGamePort != null) {
             // The game was patched by another GamePort of this device: it starts and updates it, this one leaves it alone.
             Text(stringResource(R.string.game_other_gameport, install.otherGamePort!!), color = Color(0xFFFF9800), style = MaterialTheme.typography.bodyMedium)
@@ -666,49 +664,15 @@ private fun InstallActions(
     }
 }
 
-private enum class Step(val label: Int) {
-    DOWNLOAD(R.string.game_step_download),
-    PATCH(R.string.game_step_patch),
-    INSTALL(R.string.game_step_install),
-}
-
-/** The three stages an install goes through, with the current one highlighted. */
+/** The steps an install goes through, with the current one highlighted, what it is doing, and its progress: the same as on the downloads page. */
 @Composable
-private fun Progress(step: Step, fraction: Float?, speed: Long, speedUnit: SpeedUnit, onCancel: (() -> Unit)?, verifying: Boolean = false, onPause: (() -> Unit)? = null) {
+private fun Progress(state: InstallState, speedUnit: SpeedUnit, onCancel: (() -> Unit)?, onPause: (() -> Unit)? = null) {
+    val stage = state.stage ?: return
     Column(Modifier.widthIn(max = 460.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Step.entries.forEach { entry ->
-                val done = entry.ordinal < step.ordinal
-                val current = entry == step
-                Text(
-                    text = (if (done) "✓ " else "${entry.ordinal + 1}. ") + stringResource(entry.label),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = when {
-                        current -> MaterialTheme.colorScheme.primary
-                        done -> MaterialTheme.colorScheme.onSurface
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-            }
-        }
-        if (fraction != null) {
-            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
-            val percent = "${(fraction * 100).toInt()}%"
-            Text(
-                when {
-                    verifying -> stringResource(R.string.game_verifying, (fraction * 100).toInt())
-                    speed > 0 -> "$percent · ${speedText(speed, speedUnit)}"
-                    else -> percent
-                },
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        } else {
-            LinearProgressIndicator(Modifier.fillMaxWidth())
-            Text(
-                stringResource(if (step == Step.PATCH) R.string.game_patching else R.string.game_installing),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
+        InstallStepper(stage)
+        if (state is InstallState.Downloading) LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
+        else LinearProgressIndicator(Modifier.fillMaxWidth())
+        installStatusText(state, speedUnit)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             onPause?.let { androidx.compose.material3.OutlinedButton(onClick = it) { Text(stringResource(R.string.game_pause)) } }
             onCancel?.let { DangerButton(onClick = it) { Text(stringResource(R.string.game_cancel)) } }

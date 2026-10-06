@@ -26,4 +26,13 @@
     <string name="patch_all_waiting">Waiting</string>
     <string name="patch_all_close">Close</string>
     <string name="patch_all_stop">Stop</string>
+    <string name="install_step_download">Download</string>
+    <string name="install_step_patch">Patch</string>
+    <string name="install_step_install">Install</string>
+    <string name="install_step_finish">Finish</string>
+    <string name="install_queued">Waiting for other downloads to finish…</string>
+    <string name="install_verifying">Checking files already downloaded… %1$d%%</string>
+    <string name="install_patching">Preparing the game for Steam… this can take a few minutes</string>
+    <string name="install_installing">Installing… a confirmation may be asked on screen</string>
+    <string name="install_finishing">Putting the files of the game in place… it can be played right after</string>
 </resources>
