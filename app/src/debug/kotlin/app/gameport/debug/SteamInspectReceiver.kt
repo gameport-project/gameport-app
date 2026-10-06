@@ -14,7 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * adb shell am broadcast -n app.gameport/app.gameport.debug.SteamInspectReceiver --ei appId <id> [--ei depot <id> --es manifest <gid>]
+ * adb shell am broadcast -n app.gameport.dev/app.gameport.debug.SteamInspectReceiver --ei appId <id> [--ei depot <id> --es manifest <gid>]
  * Writes what Steam publishes for the app, as the signed-in account sees it (depots, branches, settings), to files/inspect/<appId>.txt,
  * and with a depot and a manifest the list of its files with their sizes and SHA-1 to files/inspect/<appId>-<depot>.txt. Read only.
  */

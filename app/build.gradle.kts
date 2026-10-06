@@ -15,6 +15,13 @@ android {
 
     // One debug key for everyone: a build from a developer's machine and one from the CI update each other.
     // It was made for this project only and is public on purpose (password "android"): it signs test builds, never a release.
+    buildTypes {
+        // A test build lives next to the released GamePort: its own package name, so its own games, key and provider.
+        getByName("debug") {
+            applicationIdSuffix = ".dev"
+        }
+    }
+
     signingConfigs {
         getByName("debug") {
             storeFile = file("debug.keystore")

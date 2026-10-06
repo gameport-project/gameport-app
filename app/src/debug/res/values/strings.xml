@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Next to the released GamePort on the same device: told apart by its name. -->
+    <string name="app_name">GamePort Dev</string>
+</resources>

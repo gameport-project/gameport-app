@@ -14,7 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * adb shell am broadcast -n app.gameport/app.gameport.debug.CloudDebugReceiver --ei appId <id>
+ * adb shell am broadcast -n app.gameport.dev/app.gameport.debug.CloudDebugReceiver --ei appId <id>
  * Logs (tag GPCloud) the cloud files of that app for the signed-in account.
  */
 @AndroidEntryPoint

@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * adb shell am broadcast -n app.gameport/app.gameport.debug.PatchDebugReceiver --ei appId <id> --es patches steam_shim,cloud_hook,xr_layer
+ * adb shell am broadcast -n app.gameport.dev/app.gameport.debug.PatchDebugReceiver --ei appId <id> --es patches steam_shim,cloud_hook,xr_layer
  * Patches the installed game again with only those patches (an empty list removes them all), to
  * find out which one a game does not get along with. Android still asks to confirm the install.
  */

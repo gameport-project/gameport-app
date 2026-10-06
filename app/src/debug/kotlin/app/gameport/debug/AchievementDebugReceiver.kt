@@ -13,7 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * adb shell am broadcast -n app.gameport/app.gameport.debug.AchievementDebugReceiver --ei appId <id> --es names NAME1,NAME2
+ * adb shell am broadcast -n app.gameport.dev/app.gameport.debug.AchievementDebugReceiver --ei appId <id> --es names NAME1,NAME2
  * Logs (tag GPAchievements) what adding those achievements to the Steam account would change. Nothing is sent.
  *
  * Add `--ez send true` to really add them. That writes to the account and cannot be undone from GamePort.

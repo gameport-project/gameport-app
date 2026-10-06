@@ -8,7 +8,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
 /**
- * adb shell am broadcast -n app.gameport/app.gameport.debug.WhatsNewPreviewReceiver
+ * adb shell am broadcast -n app.gameport.dev/app.gameport.debug.WhatsNewPreviewReceiver
  * Opens the news window with made-up games that have to be patched again, to see it. Nothing is patched. Add `--ez patch false` to see it
  * for a version that needs no patch, `--ez label false` to leave out the line that says it is a preview (to take a capture), and `--ez show false` to close it.
  */

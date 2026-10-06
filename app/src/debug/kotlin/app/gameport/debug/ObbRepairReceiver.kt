@@ -12,7 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * adb shell am broadcast -n app.gameport/app.gameport.debug.ObbRepairReceiver --es pkg <package> [--es file <path under Android/obb/<package>>]
+ * adb shell am broadcast -n app.gameport.dev/app.gameport.debug.ObbRepairReceiver --es pkg <package> [--es file <path under Android/obb/<package>>]
  * Test only. Makes a fresh copy of the expansion files of a game, by GamePort itself, and says whose each file is before and after (tag
  * GPObb): a file moved from GamePort's own folder keeps GamePort as its owner, and the game may not be able to open it. Without `file`,
  * every file under the game's obb folder whose owner is not the game is copied.
