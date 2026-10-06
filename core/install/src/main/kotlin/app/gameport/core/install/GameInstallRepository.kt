@@ -158,16 +158,50 @@ class GameInstallRepository @Inject constructor(
                     // at a time would each keep buffers in memory and starve the app.
                     setState(game.appId, InstallState.Queued)
                     downloadSlots.withPermit {
-                        // Resuming: the downloader first checks what is already there, which takes a while and tells nothing. Say so from
-                        // the start, with the share of the game that is on the disk, instead of a progress that does not move.
+                        // Resuming: the downloader first checks what is already there, which takes a while and announces nothing. Say so from the start.
                         val onDisk = bytesOnDisk(directory)
                         val resuming = onDisk > 0
-                        val total = depots.sumOf { it.installBytes }
-                        setState(game.appId, InstallState.Downloading(if (resuming && total > 0) (onDisk.toFloat() / total).coerceIn(0f, 1f) else 0f, 0L, resuming))
+                        // The size of the files on the disk says nothing about what was downloaded: the downloader reserves each file at its final size.
+                        // So a resume starts at 0 and says it is checking; the figure comes from the bytes the check reads, then from the downloader.
+                        setState(game.appId, InstallState.Downloading(0f, 0L, resuming))
                         val speed = SpeedMeter()
                         val check = VerifyingDetector(startVerifying = resuming)
+                        val verification = VerificationProgress(onDisk)
+                        var wentBack = false
+                        var wasVerifying = resuming
+                        var shownProgress = 0f
+                        var reported = false
                         downloader.download(game.appId, depots.map { it.id }, directory, depots.associate { it.id to it.downloadBytes }) { progress, received ->
-                            setState(game.appId, InstallState.Downloading(progress, speed.update(received), check.update(received)))
+                            val verifying = check.update(received)
+                            if (verifying) {
+                                // Checking what is on the device: the figure is how far the check has read, not the download.
+                                wasVerifying = true
+                                setState(game.appId, InstallState.Downloading(verification.fraction(), speed.update(received), true))
+                                return@download
+                            }
+                            if (wasVerifying) {
+                                // Downloading begins: its figure starts again from what the downloader says, not from the end of the check.
+                                wasVerifying = false
+                                reported = false
+                                shownProgress = 0f
+                            }
+                            if (progress >= 0f) {
+                                // 100 % means done: the install moves on when the downloader returns, not before.
+                                val real = minOf(progress, MAX_WHILE_DOWNLOADING)
+                                if (!reported) {
+                                    reported = true
+                                    shownProgress = real
+                                } else {
+                                    // A download only moves forward: a figure that goes back (a depot recounting what it has) is not shown. The first
+                                    // time it happens it is written down, to find out why.
+                                    if (real < shownProgress - BACKWARDS_TOLERANCE && !wentBack) {
+                                        wentBack = true
+                                        events.note(game.appId, "the progress went back from ${(shownProgress * 1000).toInt() / 10.0}% to ${(real * 1000).toInt() / 10.0}%: not shown")
+                                    }
+                                    shownProgress = maxOf(shownProgress, real)
+                                }
+                            }
+                            setState(game.appId, InstallState.Downloading(shownProgress, speed.update(received), false))
                         }
                     }
 
@@ -801,6 +835,12 @@ internal class VerifyingDetector(startVerifying: Boolean = false, private val no
 }
 private const val CHOICE_FILE = ".gameport-dlc"
 
+/** A recount smaller than this is noise, not worth a line in the log. */
+private const val BACKWARDS_TOLERANCE = 0.002f
+
+/** The figure shown while a game downloads never reaches 100 %: that is for when it is done. */
+private const val MAX_WHILE_DOWNLOADING = 0.99f
+
 /** Written in a download's folder when the player pauses it, or when it failed for a reason of its own: GamePort does not resume it by itself. */
 private const val PAUSED_FILE = ".gameport-paused"
 private const val FAILED_FILE = ".gameport-failed"
@@ -809,27 +849,32 @@ private const val FAILED_FILE = ".gameport-failed"
 private const val RESUME_DELAY_MS = 5_000L
 private const val RESUME_LOOKUP_MS = 10_000L
 
-/** Smooths the network rate over a few seconds so the figure on screen does not jump around. */
-internal class SpeedMeter(private val now: () -> Long = System::currentTimeMillis) {
-    private var lastBytes = 0L
-    private var lastTime = now()
-    private var smoothed = 0.0
+/**
+ * The download speed, as the average over the last few seconds of what was really received. Samples are kept with their time, so the figure
+ * follows the network whether bytes arrive in bursts or steadily, and falls to zero when nothing arrives (it does not stay at the last value).
+ */
+internal class SpeedMeter(private val now: () -> Long = System::currentTimeMillis, private val windowMs: Long = WINDOW_MS) {
+    private class Sample(val time: Long, val bytes: Long)
 
-    /** Feeds the bytes received so far; returns bytes per second. */
+    private val samples = ArrayDeque<Sample>()
+
+    /** Feeds the bytes received so far; returns bytes per second over the window. Can be called as often as wanted, and with no new bytes. */
+    @Synchronized
     fun update(receivedBytes: Long): Long {
         val time = now()
-        val elapsed = time - lastTime
-        if (elapsed >= WINDOW_MS) {
-            val instant = (receivedBytes - lastBytes).coerceAtLeast(0) * 1000.0 / elapsed
-            smoothed = if (smoothed == 0.0) instant else smoothed * (1 - SMOOTHING) + instant * SMOOTHING
-            lastBytes = receivedBytes
-            lastTime = time
-        }
-        return smoothed.toLong()
+        // One sample per half second is enough: more would only make the queue long.
+        if (samples.isEmpty() || time - samples.last().time >= SAMPLE_MS) samples.addLast(Sample(time, receivedBytes))
+        while (samples.size > 1 && time - samples.first().time > windowMs) samples.removeFirst()
+        val first = samples.first()
+        val elapsed = time - first.time
+        // Under a second of history is too little to say anything: the figure is not shown yet.
+        if (elapsed < MIN_MS) return 0L
+        return ((receivedBytes - first.bytes).coerceAtLeast(0) * 1000.0 / elapsed).toLong()
     }
 
     private companion object {
-        const val WINDOW_MS = 1_000L
-        const val SMOOTHING = 0.3
+        const val WINDOW_MS = 5_000L
+        const val SAMPLE_MS = 500L
+        const val MIN_MS = 1_000L
     }
 }

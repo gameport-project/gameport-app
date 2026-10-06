@@ -11,6 +11,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Singleton
@@ -28,6 +30,14 @@ class JavaSteamGameDownloader @Inject constructor(
             // Each depot reports the fraction of its own download; the overall figure weighs each by its size.
             val fractionByDepot = ConcurrentHashMap<Int, Float>()
 
+            // The speed shown is worked out from what was received over time, so it is told at a steady pace and not only when a chunk completes.
+            val latest = java.util.concurrent.atomic.AtomicReference(NO_PROGRESS_YET)
+            val ticker = launch {
+                while (true) {
+                    delay(PROGRESS_TICK_MS)
+                    onProgress(latest.get(), session.receivedBytes(depotIds) - startBytes)
+                }
+            }
             session.newDepotDownloader().use { downloader ->
                 downloader.addListener(object : IDownloadListener {
                     override fun onChunkCompleted(
@@ -38,7 +48,9 @@ class JavaSteamGameDownloader @Inject constructor(
                     ) {
                         fractionByDepot[depotId] = depotPercentComplete
                         // What came over the network, so files checked on disk (a resumed download) do not count.
-                        onProgress(DownloadProgress.overall(depotIds, fractionByDepot, depotBytes), session.receivedBytes(depotIds) - startBytes)
+                        val overall = DownloadProgress.overall(depotIds, fractionByDepot, depotBytes)
+                        latest.set(overall)
+                        onProgress(overall, session.receivedBytes(depotIds) - startBytes)
                     }
 
                     override fun onDownloadFailed(item: DownloadItem, error: Throwable) {
@@ -50,9 +62,19 @@ class JavaSteamGameDownloader @Inject constructor(
                 require(depotIds.isNotEmpty()) { "No Android depot to download." }
                 downloader.add(AppItem(appId, installDirectory = directory.absolutePath, depot = depotIds))
                 downloader.finishAdding()
-                downloader.getCompletion().await()
+                try {
+                    downloader.getCompletion().await()
+                } finally {
+                    ticker.cancel()
+                }
             }
             failure.get()?.let { throw it }
         }
     }
 }
+
+/** How often the received bytes are told to the install, whatever the downloader reports. */
+private const val PROGRESS_TICK_MS = 1_000L
+
+/** Told before any chunk is complete: the progress is not known yet, and the one the install already shows (a resumed download) stays. */
+const val NO_PROGRESS_YET = -1f
