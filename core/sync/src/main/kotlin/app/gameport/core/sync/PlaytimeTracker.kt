@@ -77,6 +77,22 @@ class PlaytimeTracker @Inject constructor(
         scheduleRelease(game)
     }
 
+    /** True while a game is on screen, still held on Steam, or only just left: GamePort has to stay connected for it. */
+    @Synchronized
+    fun hasActiveGame(): Boolean = games.values.any { it.meter.running || it.steamHeld || it.release?.isActive == true } || gameCalledRecently()
+
+    @Volatile private var lastGameCall = 0L
+
+    /**
+     * A game spoke to GamePort (its ticket, its saves, its regular sign of life): its process is there, even when it does not come to the screen
+     * (the headset is not worn yet). GamePort stays connected for it a minute after its last word.
+     */
+    fun gameCalled() {
+        lastGameCall = now()
+    }
+
+    private fun gameCalledRecently() = lastGameCall != 0L && now() - lastGameCall < GAME_CALL_WINDOW_MS
+
     /** True while the game is on screen. */
     @Synchronized
     fun isOnScreen(packageName: String): Boolean = games[packageName]?.meter?.running == true
@@ -139,6 +155,7 @@ class PlaytimeTracker @Inject constructor(
     private companion object {
         const val TAG = "GPPlaytime"
         const val RELEASE_GRACE_MS = 15_000L
+        const val GAME_CALL_WINDOW_MS = 60_000L
         const val WATCH_INTERVAL_MS = 30_000L
         const val SESSION_WAIT_MS = 10_000L
     }

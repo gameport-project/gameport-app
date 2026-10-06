@@ -73,6 +73,7 @@ class GameInstallRepository @Inject constructor(
     private val operations = MutableStateFlow<Map<Int, InstallState>>(emptyMap())
     private val jobs = HashMap<Int, Job>()
     private val paused = java.util.Collections.synchronizedSet(HashSet<Int>())
+    private val repatching = java.util.Collections.synchronizedSet(HashSet<Int>())
     private val activeJobs = AtomicInteger()
     private val _isBusy = MutableStateFlow(false)
 
@@ -129,7 +130,11 @@ class GameInstallRepository @Inject constructor(
      * Installs the base game plus the chosen [dlc] (only DLC the account owns is fetched). With
      * null, an interrupted install continues with the choice it started with.
      */
-    fun install(game: Game, dlc: Set<Int>? = null) {
+    fun install(game: Game, dlc: Set<Int>? = null) = synchronized(jobs) { installUnlocked(game, dlc) }
+
+    // Looking whether a job runs and registering the new one must not be separated: two callers at once (the resume at start and the one when a
+    // window is shown again) would both find none and download the same game twice into the same folder.
+    private fun installUnlocked(game: Game, dlc: Set<Int>?) {
         if (jobs[game.appId]?.isActive == true) return
         if (gate.updating.value) return fail(game.appId, InstallError.AppUpdating)
         if (auth.offline.value) return fail(game.appId, InstallError.Offline)
@@ -366,7 +371,9 @@ class GameInstallRepository @Inject constructor(
      * [confirmTimeoutMs], when given, bounds the wait for the player to confirm the update: a game left unconfirmed is given up (and counts as
      * not patched), so the ones after it are not held up by a window nobody answers.
      */
-    private fun reinstall(appId: Int, patches: List<ApkPatch>, confirmTimeoutMs: Long? = null) {
+    private fun reinstall(appId: Int, patches: List<ApkPatch>, confirmTimeoutMs: Long? = null) = synchronized(jobs) { reinstallUnlocked(appId, patches, confirmTimeoutMs) }
+
+    private fun reinstallUnlocked(appId: Int, patches: List<ApkPatch>, confirmTimeoutMs: Long?) {
         if (jobs[appId]?.isActive == true) return
         if (gate.updating.value) return fail(appId, InstallError.AppUpdating)
         val packageName = installed.all()[appId]?.takeIf(packages::isInstalled) ?: return
@@ -419,7 +426,9 @@ class GameInstallRepository @Inject constructor(
                 directory.deleteRecursively()
             }
         }
-        job.invokeOnCompletion { keepAlive(start = false) }
+        // A patch again works on what is already on the device and is short: quitting GamePort does not stop it.
+        repatching.add(appId)
+        job.invokeOnCompletion { repatching.remove(appId); keepAlive(start = false) }
         jobs[appId] = job
         job.start()
     }
@@ -435,6 +444,30 @@ class GameInstallRepository @Inject constructor(
         // Remembered on disk: a download the player paused does not start again by itself when GamePort is opened.
         runCatching { File(downloadDirectory(appId), PAUSED_FILE).createNewFile() }
         job.cancel()
+    }
+
+    /**
+     * GamePort is being quit: the downloads stop, keeping what they have, and go on by themselves the next time GamePort is opened (they are
+     * not marked as paused by the player). Patching and installing are short and are left to finish. Returns how many were stopped.
+     */
+    fun stopDownloadsForExit(): Int {
+        var stopped = 0
+        for ((appId, job) in synchronized(jobs) { jobs.toMap() }) {
+            if (!job.isActive || appId in repatching) continue
+            val state = operations.value[appId]
+            if (state !is InstallState.Downloading && state !is InstallState.Queued) continue
+            paused.add(appId)
+            job.invokeOnCompletion { paused.remove(appId) }
+            job.cancel()
+            events.note(appId, "GamePort was quit: the download stops here and goes on when it is opened again")
+            stopped++
+        }
+        return stopped
+    }
+
+    /** GamePort is open again: the downloads that were left half done go on. */
+    fun resumeInterruptedDownloads() {
+        scope.launch { runCatching { resumeInterrupted() } }
     }
 
     /** Throws away an interrupted download. */

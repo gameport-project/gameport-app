@@ -79,6 +79,8 @@ class CloudProvider : ContentProvider() {
             Log.w(TAG, "refused $method from $callingPackage for $packageName")
             return null
         }
+        // The game is there: GamePort stays connected for it (see [ConnectionKeeper]), except when it says it is leaving.
+        if (method != "closed" && method != "end") entryPoint.playtime().gameCalled()
         return try {
             handle(method, packageName, extras ?: Bundle.EMPTY)
         } catch (e: Exception) {
