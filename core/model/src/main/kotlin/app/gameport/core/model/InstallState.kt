@@ -22,7 +22,8 @@ sealed interface InstallState {
      * A copy of the game that GamePort did not install (the Meta store's, for instance) is already on the device. It is signed with another
      * key, so the two cannot be installed together: the player chooses between keeping it and replacing it with this one.
      */
-    data class ChoosingDuplicate(val packageName: String) : InstallState
+    /** [otherGamePort] is the package name of another GamePort that patched the copy on the device, or null when it comes from elsewhere. */
+    data class ChoosingDuplicate(val packageName: String, val otherGamePort: String? = null) : InstallState
 
     /** The downloaded APK is being prepared: Steam shim, VR entry, signature. */
     data object Patching : InstallState
@@ -30,7 +31,8 @@ sealed interface InstallState {
     /** The APK is handed to Android; the user may have to confirm on screen. */
     data object Installing : InstallState
 
-    data class Installed(val packageName: String) : InstallState
+    /** [otherGamePort]: the package name of another GamePort on the device that patched the game, which then is the one that starts and updates it. */
+    data class Installed(val packageName: String, val otherGamePort: String? = null) : InstallState
 
     data class Failed(val error: InstallError) : InstallState
 }

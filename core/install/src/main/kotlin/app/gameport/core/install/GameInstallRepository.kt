@@ -111,7 +111,7 @@ class GameInstallRepository @Inject constructor(
 
     private fun stateOf(appId: Int, ops: Map<Int, InstallState>): InstallState =
         ops[appId]
-            ?: installed.all()[appId]?.takeIf(packages::isInstalled)?.let { InstallState.Installed(it) }
+            ?: installed.all()[appId]?.takeIf(packages::isInstalled)?.let { InstallState.Installed(it, otherGamePortOf(it)) }
             ?: if (hasLeftovers(appId)) InstallState.Interrupted else InstallState.NotInstalled
 
     private fun leftoverIds(): List<Int> =
@@ -191,7 +191,7 @@ class GameInstallRepository @Inject constructor(
                         // Written under another name and renamed when complete, so an interrupted
                         // patch is never mistaken for a finished one.
                         val partial = File(patched.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlcOf(game), missingDlc = missingDlcOf(game), familyShared = game.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = downloadHasExpansion(directory)))
+                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlcOf(game), missingDlc = missingDlcOf(game), familyShared = game.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = downloadHasExpansion(directory), owner = context.packageName))
                         check(partial.renameTo(patched)) { "Could not finish the patched APK." }
                         // Keep only one copy of a multi-gigabyte game on disk.
                         original.delete()
@@ -394,7 +394,7 @@ class GameInstallRepository @Inject constructor(
                         val result = File(patchedDirectory(directory), original.name)
                         result.parentFile?.mkdirs()
                         val partial = File(result.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = game?.let(::ownedDlcOf), missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = deviceHasExpansion(packageName)), patches)
+                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = game?.let(::ownedDlcOf), missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = deviceHasExpansion(packageName), owner = context.packageName), patches)
                         check(partial.renameTo(result)) { "Could not finish the patched APK." }
                         result
                     }
@@ -486,7 +486,7 @@ class GameInstallRepository @Inject constructor(
 
     /** The intent that starts the installed game, or null when it is not installed. */
     /** [isVr] false starts a flat game as a normal window, without the immersive categories of a headset. */
-    fun launchIntent(appId: Int, isVr: Boolean? = null) = installed.all()[appId]?.also(::alignObbVersion)?.let { packages.launchIntent(it, immersive = isVr != false) }
+    fun launchIntent(appId: Int, isVr: Boolean? = null) = installed.all()[appId]?.takeIf { !belongsToOtherGamePort(it) }?.also(::alignObbVersion)?.let { packages.launchIntent(it, immersive = isVr != false) }
         // The patched game reads this mark to know GamePort started it, so it can open GamePort again when it closes.
         ?.also { it.putExtra("app.gameport.launched", true); playHistory.markPlayed(appId) }
 
@@ -638,10 +638,12 @@ class GameInstallRepository @Inject constructor(
      */
     private suspend fun settleDuplicate(appId: Int, packageName: String): Boolean {
         if (!packages.isInstalled(packageName) || installed.all()[appId] == packageName) return true
-        events.note(appId, "$packageName is already on the device and was not installed by GamePort: the player is asked")
+        // Another GamePort on the device (the released one next to a test build) keeps its games: the player is told whose it is.
+        val other = packages.ownerOf(packageName)?.takeIf { it != context.packageName }
+        events.note(appId, "$packageName is already on the device and was not installed by this GamePort${other?.let { " ($it did)" }.orEmpty()}: the player is asked")
         val deferred = kotlinx.coroutines.CompletableDeferred<Boolean>()
         duplicateChoices[appId] = deferred
-        setState(appId, InstallState.ChoosingDuplicate(packageName))
+        setState(appId, InstallState.ChoosingDuplicate(packageName, other))
         val replace = try {
             deferred.await()
         } finally {
@@ -695,11 +697,17 @@ class GameInstallRepository @Inject constructor(
      * its Application.dataPath only points at the expansion file when it is found under the installed version code.
      */
     private fun alignObbVersion(packageName: String) {
+        if (belongsToOtherGamePort(packageName)) return
         runCatching {
             val code = packages.versionCodeOf(packageName) ?: return
             ExpansionFiles.align(File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName"), packageName, code)
         }
     }
+
+    /** The package name of the other GamePort that patched [packageName], when it is not this one (a game belongs to one GamePort at a time). */
+    fun otherGamePortOf(packageName: String): String? = packages.ownerOf(packageName)?.takeIf { it != context.packageName }
+
+    private fun belongsToOtherGamePort(packageName: String) = otherGamePortOf(packageName) != null
 
     /** Every installed game gets its expansion files named after the version it has now, whoever installed it and whenever. */
     private fun alignAllObbVersions() = installed.all().values.forEach(::alignObbVersion)

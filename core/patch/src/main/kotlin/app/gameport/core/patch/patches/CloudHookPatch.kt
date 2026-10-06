@@ -8,6 +8,7 @@ import app.gameport.core.patch.json.ATTR_AUTHORITIES
 import app.gameport.core.patch.json.ATTR_EXPORTED
 import app.gameport.core.patch.json.ATTR_INIT_ORDER
 import app.gameport.core.patch.json.ATTR_NAME
+import app.gameport.core.patch.json.ATTR_VALUE
 import app.gameport.core.patch.json.ManifestAttr
 import app.gameport.core.patch.json.element
 import app.gameport.core.patch.json.named
@@ -31,11 +32,18 @@ object CloudHookPatch : ApkPatch {
     override val locked = true
 
     private const val HOOK_PROVIDER = "app.gameport.hook.GamePortHookProvider"
-    private const val GAMEPORT_PACKAGE = "app.gameport"
-    private const val GAMEPORT_AUTHORITY = "app.gameport.cloud"
+
+    /** What the game's manifest says about the GamePort that patched it: the hook reads it to know whom to talk to. */
+    const val META_OWNER = "app.gameport.owner"
+
+    /** The authority of the provider a GamePort answers the games on. */
+    fun authorityOf(owner: String) = "$owner.cloud"
+
+    // The package GamePort is released under, and the ones of its test builds ("app.gameport.dev"): all are told apart from a game's own packages.
+    private fun String?.isGamePortPackage() = this == PatchContext.DEFAULT_OWNER || this?.startsWith(PatchContext.DEFAULT_OWNER + ".") == true
 
     private fun JSONObject?.isGamePortQueries(): Boolean =
-        named("queries") && elem<JSONArray>("nodes").elemEach<JSONObject> { named("package") && nameAttribute() == GAMEPORT_PACKAGE }.isNotEmpty()
+        named("queries") && elem<JSONArray>("nodes").elemEach<JSONObject> { named("package") && nameAttribute().isGamePortPackage() }.isNotEmpty()
 
     /** Takes the hook's manifest entries out again; the caller removes the dex. */
     fun removeFrom(session: PatchSession) {
@@ -47,6 +55,7 @@ object CloudHookPatch : ApkPatch {
             takeNodesEach({ named("application") }) {
                 takeNodes {
                     this.takeEach<JSONObject>({ named("provider") && nameAttribute() == HOOK_PROVIDER }) { null }
+                    this.takeEach<JSONObject>({ named("meta-data") && nameAttribute() == META_OWNER }) { null }
                     this
                 }
             }
@@ -66,8 +75,8 @@ object CloudHookPatch : ApkPatch {
                     element(
                         "queries",
                         children = listOf(
-                            element("package", ManifestAttr("name", ATTR_NAME, "STRING", GAMEPORT_PACKAGE)),
-                            element("provider", ManifestAttr("authorities", ATTR_AUTHORITIES, "STRING", GAMEPORT_AUTHORITY)),
+                            element("package", ManifestAttr("name", ATTR_NAME, "STRING", context.owner)),
+                            element("provider", ManifestAttr("authorities", ATTR_AUTHORITIES, "STRING", authorityOf(context.owner))),
                         ),
                     ),
                 )
@@ -75,6 +84,9 @@ object CloudHookPatch : ApkPatch {
             takeNodesEach({ named("application") }) {
                 takeNodes {
                     this.takeEach<JSONObject>({ named("provider") && nameAttribute() == HOOK_PROVIDER }) { null }
+                    this.takeEach<JSONObject>({ named("meta-data") && nameAttribute() == META_OWNER }) { null }
+                    // Who patched the game: only that GamePort lists it as its own and starts it.
+                    this?.put(element("meta-data", ManifestAttr("name", ATTR_NAME, "STRING", META_OWNER), ManifestAttr("value", ATTR_VALUE, "STRING", context.owner)))
                     this?.put(
                         element(
                             "provider",

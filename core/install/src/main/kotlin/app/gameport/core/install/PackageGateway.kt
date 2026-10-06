@@ -47,6 +47,16 @@ class PackageGateway @Inject constructor(
             .metaData?.takeIf { it.containsKey(key) }?.getInt(key)
     }.getOrNull()
 
+    /**
+     * The GamePort that patched [packageName], by its package name: the one written into the game, or the released one for a game patched before it was.
+     * Null for a package GamePort did not patch.
+     */
+    fun ownerOf(packageName: String): String? = runCatching {
+        val meta = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA).metaData
+        meta?.getString("app.gameport.owner")?.takeIf { it.isNotEmpty() }
+            ?: if (meta?.containsKey("app.gameport.patch_version") == true) "app.gameport" else null
+    }.getOrNull()
+
     /** True when the package asks for [permission] in its manifest and has not been given it. */
     fun requestsButLacks(packageName: String, permission: String): Boolean = runCatching {
         val info = packageManager.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS)

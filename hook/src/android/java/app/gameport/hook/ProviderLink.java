@@ -15,18 +15,18 @@ import java.util.List;
 
 /** Talks to GamePort's content provider. Each call carries the game's package name, which GamePort checks. */
 final class ProviderLink implements GamePortLink {
-    private static final Uri BASE = Uri.parse("content://app.gameport.cloud");
-
     private final Context context;
     private final String pkg;
+    private final Uri base;
 
     ProviderLink(Context context) {
         this.context = context;
         this.pkg = context.getPackageName();
+        this.base = Owner.cloud(context);
     }
 
     private Bundle call(String method, Bundle extras) throws IOException {
-        Bundle result = context.getContentResolver().call(BASE, method, pkg, extras);
+        Bundle result = context.getContentResolver().call(base, method, pkg, extras);
         if (result == null) throw new IOException("GamePort refused or did not answer: " + method);
         return result;
     }
@@ -68,20 +68,20 @@ final class ProviderLink implements GamePortLink {
 
     @Override
     public void showConflict() {
-        Intent screen = new Intent().setClassName("app.gameport", "app.gameport.feature.sync.SyncActivity")
+        Intent screen = new Intent().setClassName(Owner.packageName(context), "app.gameport.feature.sync.SyncActivity")
                 .putExtra("pkg", pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         context.startActivity(screen);
     }
 
     @Override
     public InputStream fetch(String cloudName) throws IOException {
-        Uri uri = BASE.buildUpon().appendPath("fetch").appendQueryParameter("pkg", pkg).appendQueryParameter("name", cloudName).build();
+        Uri uri = base.buildUpon().appendPath("fetch").appendQueryParameter("pkg", pkg).appendQueryParameter("name", cloudName).build();
         return context.getContentResolver().openInputStream(uri);
     }
 
     @Override
     public OutputStream push(String rel) throws IOException {
-        Uri uri = BASE.buildUpon().appendPath("push").appendQueryParameter("pkg", pkg).appendQueryParameter("rel", rel).build();
+        Uri uri = base.buildUpon().appendPath("push").appendQueryParameter("pkg", pkg).appendQueryParameter("rel", rel).build();
         ParcelFileDescriptor descriptor = context.getContentResolver().openFileDescriptor(uri, "w");
         if (descriptor == null) throw new FileNotFoundException("no upload target for " + rel);
         return new ParcelFileDescriptor.AutoCloseOutputStream(descriptor);

@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.update
  */
 @Singleton
 class GameIssuesRepository @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
     private val installer: GameInstallRepository,
     private val coordinator: CloudSyncCoordinator,
     private val syncStatus: SyncStatusStore,
@@ -64,7 +65,7 @@ class GameIssuesRepository @Inject constructor(
 
     /** Opens the screen where the player resolves the game's save conflict. */
     fun conflictIntent(appId: Int): Intent? = installed.all()[appId]?.let { packageName ->
-        Intent().setClassName("app.gameport", "app.gameport.feature.sync.SyncActivity")
+        Intent().setClassName(context.packageName, "app.gameport.feature.sync.SyncActivity")
             .putExtra("pkg", packageName)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }

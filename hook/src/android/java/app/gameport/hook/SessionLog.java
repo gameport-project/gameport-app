@@ -33,7 +33,6 @@ import java.util.zip.GZIPOutputStream;
  */
 final class SessionLog {
     private static final String TAG = "GPHook";
-    private static final Uri BASE = Uri.parse("content://app.gameport.cloud");
     private static final int HEAD_LINES = 1500;
     private static final int TAIL_LINES = 3500;
     private static final int MAX_ENGINE_FILES = 4;
@@ -180,7 +179,7 @@ final class SessionLog {
         }
         if (!exitSent) addPreviousExit(extras);
         try {
-            Bundle result = context.getContentResolver().call(BASE, "log", context.getPackageName(), extras);
+            Bundle result = context.getContentResolver().call(Owner.cloud(context), "log", context.getPackageName(), extras);
             if (result != null) {
                 sentVersion = at;
                 exitSent = true;

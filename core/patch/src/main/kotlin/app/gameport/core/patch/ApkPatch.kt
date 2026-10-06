@@ -32,7 +32,14 @@ data class PatchContext(
     val familyShared: Boolean = false,
     /** The game has expansion files (`.obb`, or an `obb/` folder) that it reads from shared storage. */
     val hasExpansionFiles: Boolean = false,
-)
+    /** The GamePort that patches the game, by its package name: the game's hook talks to that one and to no other. */
+    val owner: String = DEFAULT_OWNER,
+) {
+    companion object {
+        /** The package name of GamePort as it is released. */
+        const val DEFAULT_OWNER = "app.gameport"
+    }
+}
 
 /** The APK being patched: its manifest can be edited and files can be added. */
 class PatchSession(private val apk: ApkModule, val existingHookDex: String? = null) {

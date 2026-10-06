@@ -117,7 +117,7 @@ public final class GamePortHookProvider extends ContentProvider {
     /** True when GamePort asked for this process to be started to send the game's saves, and not for the game to be played. */
     private static boolean startedToSendSaves(Context context) {
         try {
-            Bundle result = context.getContentResolver().call(Uri.parse("content://app.gameport.cloud"), "catchup", context.getPackageName(), null);
+            Bundle result = context.getContentResolver().call(Owner.cloud(context), "catchup", context.getPackageName(), null);
             return result != null && result.getBoolean("catchup", false);
         } catch (Throwable t) {
             return false;
@@ -170,7 +170,7 @@ public final class GamePortHookProvider extends ContentProvider {
 
     private static boolean calledByGamePort(Context context) {
         String[] packages = context.getPackageManager().getPackagesForUid(android.os.Binder.getCallingUid());
-        if (packages != null) for (String name : packages) if ("app.gameport".equals(name)) return true;
+        if (packages != null) for (String name : packages) if (Owner.packageName(context).equals(name)) return true;
         return false;
     }
 
@@ -199,7 +199,7 @@ public final class GamePortHookProvider extends ContentProvider {
         File target = new File(dir, "steam_ticket.bin");
         target.delete();
         try {
-            Bundle result = context.getContentResolver().call(Uri.parse("content://app.gameport.cloud"), "ticket", context.getPackageName(), null);
+            Bundle result = context.getContentResolver().call(Owner.cloud(context), "ticket", context.getPackageName(), null);
             byte[] ticket = result == null ? null : result.getByteArray("ticket");
             if (ticket == null || ticket.length == 0) {
                 Log.i(TAG, "no Steam ticket (GamePort offline, or Steam gave none)");
@@ -241,7 +241,7 @@ public final class GamePortHookProvider extends ContentProvider {
             Bundle extras = new Bundle();
             extras.putString("source", source);
             extras.putStringArray("controls", controls.toArray(new String[0]));
-            context.getContentResolver().call(Uri.parse("content://app.gameport.cloud"), "controller_profile", context.getPackageName(), extras);
+            context.getContentResolver().call(Owner.cloud(context), "controller_profile", context.getPackageName(), extras);
             Log.i(TAG, "reported " + controls.size() + " " + source + " controls");
         } catch (Throwable t) {
             Log.w(TAG, "could not report the controller profile", t);
@@ -267,13 +267,13 @@ public final class GamePortHookProvider extends ContentProvider {
                         // Keep GamePort running and connected to Steam, so a ticket takes a moment when asked for.
                         if (SystemClock.elapsedRealtime() - lastWarm > WARM_INTERVAL_MS) {
                             lastWarm = SystemClock.elapsedRealtime();
-                            context.getContentResolver().call(Uri.parse("content://app.gameport.cloud"), "warm", context.getPackageName(), null);
+                            context.getContentResolver().call(Owner.cloud(context), "warm", context.getPackageName(), null);
                         }
                         if (request.exists()) {
                             String id = readLine(request);
                             request.delete();
                             long begun = SystemClock.elapsedRealtime();
-                            Bundle result = context.getContentResolver().call(Uri.parse("content://app.gameport.cloud"), "ticket", context.getPackageName(), null);
+                            Bundle result = context.getContentResolver().call(Owner.cloud(context), "ticket", context.getPackageName(), null);
                             byte[] ticket = result == null ? null : result.getByteArray("ticket");
                             if (ticket != null && ticket.length > 0) {
                                 writeAll(ticketFile, ticket);
@@ -316,7 +316,7 @@ public final class GamePortHookProvider extends ContentProvider {
             if (current == null || current.length() > 400_000) return;
             Bundle extras = new Bundle();
             extras.putString("current", current);
-            Bundle result = context.getContentResolver().call(Uri.parse("content://app.gameport.cloud"), "earned", context.getPackageName(), extras);
+            Bundle result = context.getContentResolver().call(Owner.cloud(context), "earned", context.getPackageName(), extras);
             String merged = result == null ? null : result.getString("merged");
             if (merged == null || merged.isEmpty()) return;
             File parent = record.getParentFile();
@@ -407,7 +407,7 @@ public final class GamePortHookProvider extends ContentProvider {
                 times[i] = at == null ? 0L : at;
             }
             extras.putLongArray("times", times);
-            Bundle result = context.getContentResolver().call(Uri.parse("content://app.gameport.cloud"), "achievement", context.getPackageName(), extras);
+            Bundle result = context.getContentResolver().call(Owner.cloud(context), "achievement", context.getPackageName(), extras);
             Log.i(TAG, "told GamePort about " + names.size() + " unlocked achievement(s)");
             return result != null && "OK".equals(result.getString("status"));
         } catch (Throwable t) {
@@ -491,7 +491,7 @@ public final class GamePortHookProvider extends ContentProvider {
         String controls = "";
         String family = "";
         try {
-            Bundle config = context.getContentResolver().call(Uri.parse("content://app.gameport.cloud"), "config", context.getPackageName(), null);
+            Bundle config = context.getContentResolver().call(Owner.cloud(context), "config", context.getPackageName(), null);
             if (config == null) throw new java.io.IOException("no answer");
             seated = config.getBoolean("seated") ? "1" : "0";
             eyeCm = String.valueOf(config.getInt("eyeCm"));
@@ -652,7 +652,7 @@ public final class GamePortHookProvider extends ContentProvider {
     private static void openGamePort(Context context) {
         try {
             context.startActivity(new android.content.Intent(android.content.Intent.ACTION_MAIN)
-                    .setClassName("app.gameport", "app.gameport.MainActivity")
+                    .setClassName(Owner.packageName(context), "app.gameport.MainActivity")
                     .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
         } catch (Throwable t) {
             Log.w(TAG, "could not open GamePort again", t);
@@ -661,7 +661,7 @@ public final class GamePortHookProvider extends ContentProvider {
 
     private static void tellGamePort(Context context, String method) {
         try {
-            context.getContentResolver().call(Uri.parse("content://app.gameport.cloud"), method, context.getPackageName(), null);
+            context.getContentResolver().call(Owner.cloud(context), method, context.getPackageName(), null);
         } catch (Throwable t) {
             Log.w(TAG, "could not tell GamePort: " + method, t);
         }

@@ -632,12 +632,15 @@ private fun InstallActions(
             Text(stringResource(R.string.game_choose_version_waiting), style = MaterialTheme.typography.bodyMedium)
         }
         is InstallState.ChoosingDuplicate -> {
-            DuplicateDialog(onChosen = onDuplicateChosen)
+            DuplicateDialog(otherGamePort = install.otherGamePort, onChosen = onDuplicateChosen)
             Text(stringResource(R.string.game_choose_version_waiting), style = MaterialTheme.typography.bodyMedium)
         }
         InstallState.Patching -> Progress(step = Step.PATCH, fraction = null, speed = 0, speedUnit = speedUnit, onCancel = null)
         InstallState.Installing -> Progress(step = Step.INSTALL, fraction = null, speed = 0, speedUnit = speedUnit, onCancel = null)
-        is InstallState.Installed -> FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        is InstallState.Installed -> if (install.otherGamePort != null) {
+            // The game was patched by another GamePort of this device: it starts and updates it, this one leaves it alone.
+            Text(stringResource(R.string.game_other_gameport, install.otherGamePort!!), color = Color(0xFFFF9800), style = MaterialTheme.typography.bodyMedium)
+        } else FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = if (patchOutdated) onPatchAndPlay else onPlay, enabled = !busy, modifier = Modifier.height(ACTION_HEIGHT)) {
                 if (patchOutdated) {
                     Icon(Icons.Filled.Build, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -737,11 +740,11 @@ private fun VersionDialog(options: List<VersionOption>, onChosen: (String?) -> U
 
 /** A copy of the game that GamePort did not install is on the device: keep it, or uninstall it so this version can be installed. */
 @Composable
-private fun DuplicateDialog(onChosen: (Boolean) -> Unit) {
+private fun DuplicateDialog(otherGamePort: String?, onChosen: (Boolean) -> Unit) {
     BackdropDialog(
         onDismissRequest = {},
         title = { Text(stringResource(R.string.game_duplicate_title)) },
-        text = { Text(stringResource(R.string.game_duplicate_message)) },
+        text = { Text(if (otherGamePort != null) stringResource(R.string.game_duplicate_other_gameport, otherGamePort) else stringResource(R.string.game_duplicate_message)) },
         confirmButton = {
             DangerButton(onClick = { onChosen(true) }) {
                 Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))

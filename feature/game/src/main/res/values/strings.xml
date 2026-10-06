@@ -140,6 +140,8 @@
     <string name="game_info_played_steam">On Steam</string>
     <string name="game_kind_demo">Demo</string>
     <string name="game_kind_beta">Beta</string>
+    <string name="game_other_gameport">This game belongs to another GamePort on this device (%1$s). It is started and updated from there.</string>
+    <string name="game_duplicate_other_gameport">This game is already installed by another GamePort on this device (%1$s). It can stay with that one, or be uninstalled so this GamePort installs it.</string>
     <string name="game_verifying">Checking files already downloaded… %1$d%%</string>
     <string name="game_pause">Pause</string>
     <string name="game_choose_version_title">Which version?</string>
