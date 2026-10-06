@@ -13,6 +13,7 @@ import `in`.dragonbra.javasteam.steam.handlers.steamuser.callback.LoggedOnCallba
 import `in`.dragonbra.javasteam.steam.steamclient.SteamClient
 import `in`.dragonbra.javasteam.steam.steamclient.callbackmgr.CallbackManager
 import `in`.dragonbra.javasteam.steam.steamclient.callbacks.ConnectedCallback
+import `in`.dragonbra.javasteam.steam.handlers.steamuser.callback.LoggedOffCallback
 import `in`.dragonbra.javasteam.steam.steamclient.callbacks.DisconnectedCallback
 import `in`.dragonbra.javasteam.steam.steamclient.configuration.SteamConfiguration
 import `in`.dragonbra.javasteam.enums.EOSType
@@ -167,6 +168,13 @@ class SteamSession(private val cellId: Int = 0) {
 
     @Volatile private var closedOnPurpose = false
 
+    /**
+     * Steam ended this session because the same account logged on somewhere else (another GamePort, another device): that one has the session now,
+     * and taking it back at once would only make it take it back in turn.
+     */
+    @Volatile var wasReplaced = false
+        private set
+
     /** False once the connection to Steam is gone (network change, sleep, Steam closing it): requests would fail at once. */
     val isAlive: Boolean get() = !lost && client.isConnected
 
@@ -187,6 +195,7 @@ class SteamSession(private val cellId: Int = 0) {
             if (!closedOnPurpose) onLost?.invoke()
         }
         callbacks.subscribe(LoggedOnCallback::class.java) { loggedOn?.complete(it) }
+        callbacks.subscribe(LoggedOffCallback::class.java) { if (it.result == EResult.LogonSessionReplaced) wasReplaced = true }
         callbacks.subscribe(LicenseListCallback::class.java) { _licenses.value = it.licenseList }
         callbacks.subscribe(AccountInfoCallback::class.java) { accountName?.complete(it.personaName) }
         scope.launch {

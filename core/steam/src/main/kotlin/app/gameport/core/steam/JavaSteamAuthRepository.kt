@@ -1,6 +1,7 @@
 package app.gameport.core.steam
 
 import android.os.Build
+import android.os.SystemClock
 import app.gameport.core.model.AuthState
 import app.gameport.core.model.SteamConnection
 import app.gameport.core.model.SteamAccount
@@ -61,6 +62,9 @@ class JavaSteamAuthRepository @Inject constructor(
 
     private var reconnectJob: kotlinx.coroutines.Job? = null
 
+    // When Steam last gave this account's session to another logon (0: never).
+    @Volatile private var replacedAt = 0L
+
     private val restoreLock = Mutex()
     private var session: SteamSession? = null
     private var signInJob: kotlinx.coroutines.Job? = null
@@ -77,6 +81,20 @@ class JavaSteamAuthRepository @Inject constructor(
         restoreLock.withLock { restoreOnce() }
     }
 
+    override suspend fun resume() = withContext(Dispatchers.IO) {
+        replacedAt = 0L
+        restoreLock.withLock { restoreOnce() }
+    }
+
+    override suspend fun release() = withContext(Dispatchers.IO) {
+        restoreLock.withLock {
+            if (state.value !is AuthState.SignedIn || identities.offlineMode.value || session == null) return@withLock
+            reconnectJob?.cancel()
+            closeSession()
+            android.util.Log.i(TAG, "nothing needs Steam now: the connection is closed until it is needed again")
+        }
+    }
+
     // Safe to call from several places (the UI, the save sync): the first one does the work.
     private suspend fun restoreOnce() {
         val chosenOffline = identities.offlineMode.value
@@ -84,7 +102,12 @@ class JavaSteamAuthRepository @Inject constructor(
         if (state.value is AuthState.SignedIn) {
             if (chosenOffline || current?.isAlive == true) return
             // Signed in, but Steam may have dropped the connection since: every request would then fail until restart.
-            if (current != null) { reviveOnce(current); return }
+            // One that was taken by another GamePort or device is left to it for a while: taking it back would have it take it back again.
+            if (current != null) {
+                if (current.wasReplaced && recentlyReplaced(SystemClock.elapsedRealtime(), replacedAt)) return
+                reviveOnce(current)
+                return
+            }
         }
         val stored = tokenStore.load()
         if (stored == null) {
@@ -221,10 +244,16 @@ class JavaSteamAuthRepository @Inject constructor(
      */
     private fun startReconnect(dead: SteamSession?) {
         if (reconnectJob?.isActive == true) return
-        android.util.Log.i(TAG, if (dead != null) "the connection to Steam was lost: reconnecting" else "Steam could not be reached: trying again")
+        val replaced = dead?.wasReplaced == true
+        if (replaced) replacedAt = SystemClock.elapsedRealtime()
+        android.util.Log.i(TAG, when {
+            replaced -> "Steam gave the session to another logon of the account: waiting before taking it back"
+            dead != null -> "the connection to Steam was lost: reconnecting"
+            else -> "Steam could not be reached: trying again"
+        })
         setConnection(SteamConnection.CONNECTING)
         reconnectJob = scope.launch {
-            for (pause in RECONNECT_PAUSES_MS) {
+            for (pause in reconnectPauses(replaced)) {
                 delay(pause)
                 if (identities.offlineMode.value) return@launch
                 val done = restoreLock.withLock { if (dead != null) reviveOnce(dead) else retryLogOn() }
@@ -292,9 +321,6 @@ class JavaSteamAuthRepository @Inject constructor(
 }
 
 private const val TAG = "GPConnection"
-
-/** How long to wait before each attempt to reconnect after Steam dropped the connection. */
-private val RECONNECT_PAUSES_MS = listOf(3_000L, 10_000L, 30_000L, 60_000L, 120_000L)
 
 /** Results that mean Steam could not answer right now, not that the saved sign-in is no longer valid. */
 private val TRANSIENT_RESULTS = setOf(EResult.ServiceUnavailable, EResult.Timeout, EResult.TryAnotherCM, EResult.Busy, EResult.NoConnection)

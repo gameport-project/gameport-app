@@ -28,6 +28,18 @@ interface SteamAuthRepository {
     /** Restores a previous session from the stored refresh token, if any. */
     suspend fun restoreSession()
 
+    /**
+     * GamePort is on screen again: connects at once, even when the session was taken by another GamePort or device a moment ago (the player is
+     * here now, so this one has it).
+     */
+    suspend fun resume() = restoreSession()
+
+    /**
+     * Closes the connection to Steam without signing out: nothing needs it now. The next [restoreSession] (a game asking for its ticket, the
+     * screen coming back) opens it again.
+     */
+    suspend fun release() {}
+
     /** Starts a QR sign-in; returns when the flow succeeded, failed or was cancelled. */
     suspend fun beginQrSignIn()
 
