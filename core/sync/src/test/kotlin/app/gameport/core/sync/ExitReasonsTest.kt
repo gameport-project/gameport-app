@@ -1,5 +1,6 @@
 package app.gameport.core.sync
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -23,5 +24,15 @@ class ExitReasonsTest {
     fun `quitting by itself is not a crash`() {
         assertFalse(ExitReasons.isCrash("time=1 reason=EXIT_SELF status=0 importance=100"))
         assertFalse(ExitReasons.isCrash(""))
+    }
+
+    @Test
+    fun `the time Android gives is followed by the date and time on the device`() {
+        val zone = java.util.TimeZone.getTimeZone("GMT-04:00")
+        val text = "time=1790975469144 reason=SIGNALED status=9 importance=100\nnot a line\n"
+        assertEquals(
+            "time=1790975469144 (2026-10-02 17:11:09 -0400) reason=SIGNALED status=9 importance=100\nnot a line\n",
+            ExitReasons.withTimes(text, zone),
+        )
     }
 }

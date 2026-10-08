@@ -110,7 +110,7 @@ class ProblemReporter @Inject constructor(
             entry("device.txt", clean(deviceFacts()))
             entry("settings.txt", clean(settingsFacts(game.appId)))
             if (packageName != null) {
-                entry("performance.txt", clean(store.text(packageName, "performance.txt").ifBlank { "(no performance lines yet: the game has not run with the current patch)" }))
+                entry("performance.txt", clean(store.text(packageName, "performance.txt").ifBlank { "(no performance line received from the game: it has not run with the current patch, or the runtime printed none while it ran)" }))
                 entry("files.txt", clean(files(packageName)))
                 entry("apk-contents.txt", clean(apkContents(packageName)))
                 entry("steam-interfaces.txt", clean(steamInterfaces(packageName)))
@@ -121,8 +121,12 @@ class ProblemReporter @Inject constructor(
                 entry("loaded-libraries.txt", clean(store.text(packageName, "libraries.txt").ifBlank { "(the game has not handed it over yet)" }))
                 entry("game-log-start.txt", clean(store.text(packageName, "log-start.txt").ifBlank { "(the game has not handed over its log yet)" }))
                 entry("game-log.txt", clean(store.hookLog(packageName).ifBlank { "(empty: a short run fits in game-log-start.txt, or the game has not handed over its log)" }))
+                // The run before the last one, when the last one began after it ended: the one that explains how it ended.
+                store.previousLogStart(packageName).takeIf { it.isNotBlank() }?.let { entry("previous-run-log-start.txt", clean(it)) }
+                store.previousHookLog(packageName).takeIf { it.isNotBlank() }?.let { entry("previous-run-log.txt", clean(it)) }
                 entry("engine-logs.txt", clean(store.text(packageName, "engine.log").ifBlank { "(no log file of the game's engine found)" }))
-                entry("last-exits.txt", clean(store.previousExit(packageName).ifBlank { "(not available)" }))
+                entry("last-exits.txt", clean(ExitReasons.withTimes(store.previousExit(packageName)).ifBlank { "(not available)" }))
+                entry("diagnosis.txt", ReportDiagnosis.of(store.text(packageName, "libraries.txt"), store.text(packageName, "log-start.txt"), store.previousExit(packageName), store.lastDataMillis(packageName)?.let { (System.currentTimeMillis() - it) / 1000 }))
                 store.bytes(packageName, "tombstone.pb")?.let { trace ->
                     zip.putNextEntry(ZipEntry("crash-tombstone.pb"))
                     zip.write(trace)
@@ -163,6 +167,8 @@ class ProblemReporter @Inject constructor(
             "device.vrPlatform" to device.vrPlatform?.id,
             "steam.connected" to (auth.connection.value.name),
             "suspicion" to packageName?.let { store.suspected.value[it]?.name },
+            // How old what the game handed over is: a game that logs little leaves it as it was.
+            "hook.lastDataSecondsAgo" to packageName?.let { store.lastDataMillis(it) }?.let { (System.currentTimeMillis() - it) / 1000 },
             "lastSession.seconds" to packageName?.let { store.lastSessionMillis(it) }?.let { it / 1000 },
         )
         return facts.entries.joinToString(",\n", "{\n", "\n}\n") { (key, value) -> "  ${q(key)}: ${if (value == null) "null" else q(value)}" }
@@ -330,6 +336,7 @@ class ProblemReporter @Inject constructor(
             Made on the player's device to help find why one game does not work. Nothing was sent anywhere:
             the player chose to share this file.
 
+            diagnosis.txt         what the files show at once (the hook ran, the OpenXR loader and layer loaded, how the last runs ended) and how old the data is
             report.json           versions of GamePort, the game and the patch; the connection to Steam; why a report is suggested
             device.txt            the device, its system, storage, memory, VR features
             settings.txt          the player's choices for this game (seated mode, height, controller mapping), the save sync state
@@ -344,6 +351,7 @@ class ProblemReporter @Inject constructor(
             loaded-libraries.txt  the files the game process really loaded (which OpenXR runtime, the shim...)
             game-log-start.txt    the first lines of the game's system log (its start)
             game-log.txt          the latest lines of the game's system log
+            previous-run-log-*.txt the same for the run before the last one, when there was one
             engine-logs.txt       log files the game's engine wrote in the game's folders, when there are some
             last-exits.txt        how the last runs ended, as Android recorded it
             crash-tombstone.pb    Android's crash report of the last native crash, when there was one (binary; it holds

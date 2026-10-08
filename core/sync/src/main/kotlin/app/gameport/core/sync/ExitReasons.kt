@@ -13,4 +13,13 @@ object ExitReasons {
         val status = Regex("status=(\\d+)").find(line)?.groupValues?.get(1)?.toIntOrNull()
         return line.contains("reason=SIGNALED") && status in faultSignals
     }
+
+    /** The lines with the time Android gave in milliseconds followed by the date and time on this device, as the player lived them. */
+    fun withTimes(text: String, zone: java.util.TimeZone = java.util.TimeZone.getDefault()): String {
+        val format = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", java.util.Locale.ROOT).apply { timeZone = zone }
+        return text.lines().joinToString("\n") { line ->
+            val millis = Regex("^time=(\\d{10,})").find(line)?.groupValues?.get(1)?.toLongOrNull()
+            if (millis == null) line else line.replaceFirst("time=$millis", "time=$millis (${format.format(java.util.Date(millis))})")
+        }
+    }
 }

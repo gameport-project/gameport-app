@@ -34,6 +34,8 @@ class ReportStore @Inject constructor(
     /** What the patched game handed over: see `SessionLog` in the hook. Text comes gzip-compressed to fit in one call. */
     fun saveGameData(packageName: String, extras: Bundle) {
         val folder = File(directory, safe(packageName)).apply { mkdirs() }
+        // A new run of the game: what the one before left is kept apart, as it is the run that explains how it ended and would be written over.
+        RunArchive.noteRun(folder, extras.getInt("pid", 0), mapOf(LOG_START to PREVIOUS_LOG_START, HOOK_LOG to PREVIOUS_HOOK_LOG))
         extras.getByteArray("headGz")?.let { gunzip(it)?.let { text -> File(folder, LOG_START).writeBytes(text) } }
         extras.getByteArray("logGz")?.let { gunzip(it)?.let { text -> File(folder, HOOK_LOG).writeBytes(text) } }
         extras.getByteArray("performanceGz")?.let { gunzip(it)?.let { text -> File(folder, PERFORMANCE).writeBytes(text) } }
@@ -86,6 +88,15 @@ class ReportStore @Inject constructor(
 
     fun previousExit(packageName: String): String = text(packageName, PREVIOUS_EXIT)
 
+    /** The start of the log of the run before the last one, or empty when there is none. */
+    fun previousLogStart(packageName: String): String = text(packageName, PREVIOUS_LOG_START)
+
+    fun previousHookLog(packageName: String): String = text(packageName, PREVIOUS_HOOK_LOG)
+
+    /** When the game last handed something over, in milliseconds, or null: a report says how old what it holds is. */
+    fun lastDataMillis(packageName: String): Long? =
+        File(directory, safe(packageName)).listFiles()?.filter { it.isFile }?.maxOfOrNull { it.lastModified() }
+
     private fun gunzip(bytes: ByteArray, limit: Int = MAX_CHARS * 4): ByteArray? = runCatching {
         GZIPInputStream(bytes.inputStream()).use { input ->
             val out = java.io.ByteArrayOutputStream()
@@ -135,6 +146,8 @@ class ReportStore @Inject constructor(
 
     private companion object {
         const val HOOK_LOG = "hook.log"
+        const val PREVIOUS_LOG_START = "previous-log-start.txt"
+        const val PREVIOUS_HOOK_LOG = "previous-hook.log"
         const val LOG_START = "log-start.txt"
         const val ENGINE_LOG = "engine.log"
         const val PERFORMANCE = "performance.txt"
