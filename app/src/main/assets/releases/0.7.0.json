@@ -1,0 +1,135 @@
+{
+  "version": "0.7.0",
+  "previous": "0.6.0",
+  "code": 700,
+  "patchNeeded": true,
+  "window": {
+    "items": [
+      {
+        "id": "achievements",
+        "icon": "trophy",
+        "text": {
+          "en": "Achievements are finally here, synced with Steam: the ones earned here show up on Steam, and the ones earned elsewhere show up here.",
+          "fr": "Les succès sont enfin là, synchronisés avec Steam : ceux gagnés ici apparaissent sur Steam, et ceux gagnés ailleurs apparaissent ici."
+        }
+      },
+      {
+        "id": "offline",
+        "icon": "cloud-sync",
+        "text": {
+          "en": "Offline mode is supported: games can be played without a connection, and their saves are sent as soon as the network is back.",
+          "fr": "Le mode hors ligne est géré : les jeux se jouent sans connexion, et leurs sauvegardes sont envoyées dès que le réseau revient."
+        }
+      },
+      {
+        "id": "sign-in",
+        "icon": "key",
+        "text": {
+          "en": "Sign-in with an account name and a password, besides the QR code.",
+          "fr": "Connexion avec un nom de compte et un mot de passe, en plus du QR code."
+        }
+      }
+    ],
+    "games": {
+      "title": {
+        "en": "Wider compatibility, new games supported",
+        "fr": "Compatibilité étendue, nouveaux jeux pris en charge"
+      },
+      "testedLabel": {
+        "en": "Tested and confirmed:",
+        "fr": "Testés et confirmés :"
+      },
+      "tested": [
+        "Moss 2",
+        "The Last Clockwinder",
+        "Cubism VR",
+        "Space Pirate Trainer",
+        "Richie's Plank Experience"
+      ],
+      "others": {
+        "en": "Other games are supported too without having been tried, among them Unreal games that were blocked by their expansion files.",
+        "fr": "D'autres jeux sont aussi pris en charge sans avoir été essayés, dont des jeux Unreal jusque-là bloqués par leurs fichiers d'extension."
+      }
+    }
+  },
+  "notes": [
+    {
+      "id": "section-0",
+      "items": [
+        {
+          "id": "item-0-0",
+          "text": {
+            "en": "**Achievements are finally here, synced with Steam.** The ones earned in a game are added to the Steam account, and the ones earned elsewhere, on a PC for example, show up in the game when it starts. Nothing is ever taken away. One switch, on by default, in Settings > Steam account. An achievement that cannot be sent right away waits for a connection. The game page shows them with their pictures and dates, in the language chosen in GamePort. Hidden ones stay hidden until unlocked.",
+            "fr": "**Les succès sont enfin là, synchronisés avec Steam.** Ceux gagnés dans un jeu sont ajoutés au compte Steam, et ceux gagnés ailleurs, sur un PC par exemple, apparaissent dans le jeu quand il démarre. Rien n'est jamais retiré. Un seul interrupteur, activé par défaut, dans Réglages > Compte Steam. Un succès qui ne peut pas partir tout de suite attend une connexion. La fiche d'un jeu les affiche avec leurs images et leurs dates, dans la langue choisie dans GamePort. Les succès cachés le restent jusqu'à leur déblocage."
+          },
+          "image": {
+            "src": "screenshots/achievements.png",
+            "alt": {
+              "en": "The achievements of a game, with their pictures",
+              "fr": "Les succès d'un jeu, avec leurs images"
+            },
+            "width": 360
+          }
+        },
+        {
+          "id": "item-0-1",
+          "text": {
+            "en": "**Offline mode.** Games can be played without a connection, and their saves are sent as soon as the network is back, without starting the game. A conflict is left for the next start, and nothing is overwritten.",
+            "fr": "**Mode hors ligne.** Les jeux se jouent sans connexion, et leurs sauvegardes sont envoyées dès que le réseau revient, sans qu'il soit lancé. Un conflit est laissé pour le prochain lancement, et rien n'est écrasé."
+          }
+        },
+        {
+          "id": "item-0-2",
+          "text": {
+            "en": "**Sign in with an account name and a password**, besides the QR code, with the Steam Guard code when the account has one. The password is not kept.",
+            "fr": "**Connexion avec un nom de compte et un mot de passe**, en plus du QR code, avec le code Steam Guard quand le compte en a un. Le mot de passe n'est pas conservé."
+          }
+        },
+        {
+          "id": "item-0-3",
+          "text": {
+            "en": "**What a new version changes.** When a new version opens for the first time, a window says what changes. If games have to be patched again, a red alert stays in view above the buttons, the games are listed in the window, and it offers Patch all, See later and Got it. A button on the home and a row in Settings > Updates patch them all too, with a window that shows each game and can be closed or stopped. A game also offers Patch and play. Some games are patched without any confirmation and others ask for one: that is a constraint of the game, not of GamePort.",
+            "fr": "**Ce que change une nouvelle version.** À sa première ouverture, une nouvelle version affiche une fenêtre qui dit ce qui change. Si des jeux sont à patcher de nouveau, une alerte rouge reste visible au-dessus des boutons, les jeux sont listés dans la fenêtre, et elle propose Tout patcher, Voir plus tard et Compris. Un bouton sur l'accueil et une ligne dans Réglages > Mises à jour les patchent aussi tous, avec une fenêtre qui montre chaque jeu et qui peut être fermée ou arrêtée. Un jeu propose aussi Patcher et jouer. Certains jeux sont patchés sans confirmation et d'autres en demandent une : c'est une contrainte du jeu, pas de GamePort."
+          },
+          "image": {
+            "src": "screenshots/whats-new.png",
+            "alt": {
+              "en": "The window that tells what a new version changes",
+              "fr": "La fenêtre qui dit ce que change une nouvelle version"
+            },
+            "width": 360
+          }
+        },
+        {
+          "id": "item-0-4",
+          "text": {
+            "en": "**Already installed.** When a game is already on the device from another source, such as the Meta store, GamePort does not try to install over it. It asks whether to keep that copy or to uninstall it.",
+            "fr": "**Déjà installé.** Quand un jeu est déjà sur l'appareil depuis une autre source, comme le store Meta, GamePort n'essaie pas de l'installer par-dessus. Il demande s'il faut garder cette copie ou la désinstaller."
+          }
+        },
+        {
+          "id": "item-0-5",
+          "text": {
+            "en": "**A new game page.** The artwork covers more of the page, and a setting in Settings > Appearance chooses how much, from 0 to 100 %. The cover is lifted off the page, size and play time line up with the cards beside them, and the button to hide a game has the red of the menu of a cover.",
+            "fr": "**Une nouvelle fiche de jeu.** L'image du jeu couvre plus de la page, et un réglage dans Réglages > Apparence choisit sa hauteur, de 0 à 100 %. La cover est détachée de la page, la taille et le temps de jeu s'alignent sur les cartes à côté, et le bouton pour cacher un jeu a le rouge du menu d'une cover."
+          },
+          "image": {
+            "src": "screenshots/game.png",
+            "alt": {
+              "en": "A game page, with its achievements",
+              "fr": "La fiche d'un jeu, avec ses succès"
+            },
+            "width": 360
+          }
+        },
+        {
+          "id": "item-0-6",
+          "text": {
+            "en": "**Wider compatibility, new games supported.** Moss 2 starts in VR on a Quest, its OpenXR loader having been too old. Tested and confirmed: Moss 2, The Last Clockwinder, Cubism VR, Space Pirate Trainer and Richie's Plank Experience. Other games are supported too without having been tried, among them Unreal games that were blocked by their expansion files: everything a game's download holds is now placed next to it, and the overflow files follow the new version.",
+            "fr": "**Compatibilité étendue, nouveaux jeux pris en charge.** Moss 2 démarre en VR sur un Quest, son chargeur OpenXR étant trop ancien. Testés et confirmés : Moss 2, The Last Clockwinder, Cubism VR, Space Pirate Trainer et Richie's Plank Experience. D'autres jeux sont aussi pris en charge sans avoir été essayés, dont des jeux Unreal jusque-là bloqués par leurs fichiers d'extension : tout ce que contient le téléchargement d'un jeu est placé à côté de lui, et les fichiers « overflow » suivent la nouvelle version."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -21,7 +21,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
@@ -35,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -48,7 +51,8 @@ import app.gameport.core.designsystem.GlassButton
 import app.gameport.core.designsystem.GoldTrophy
 import app.gameport.core.designsystem.HideRed
 import app.gameport.core.designsystem.dialogMaxHeight
-import app.gameport.core.model.WhatsNew
+import app.gameport.core.model.WindowItem
+import app.gameport.core.model.pick
 
 /** The news of a new GamePort, when there are some to show. */
 @Composable
@@ -130,11 +134,12 @@ private fun Intro(state: WhatsNewState) {
     // The news first, then what has to be done about the games.
     Text(stringResource(R.string.whatsnew_in_this_version), style = MaterialTheme.typography.titleSmall)
     state.items.forEach { item -> Feature(item) }
-    if (state.confirmedGames.isNotEmpty()) {
+    state.compat?.let { compat ->
         // What was tested, then what is covered without having been tried.
-        Text(stringResource(R.string.whatsnew_compat_title), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 4.dp))
-        Text(stringResource(R.string.whatsnew_compat_tested, state.confirmedGames.joinToString(", ")))
-        Text(stringResource(R.string.whatsnew_compat_others))
+        val language = currentLanguage()
+        Text(compat.title.pick(language), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 4.dp))
+        Text(compat.testedLabel.pick(language) + " " + compat.tested.joinToString(", ") + ".")
+        Text(compat.others.pick(language))
     }
     if (state.games.isNotEmpty()) {
         Text(stringResource(R.string.whatsnew_games), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 4.dp))
@@ -148,23 +153,16 @@ private fun Intro(state: WhatsNewState) {
 
 /** One novelty: its picture in a tile, then its text. */
 @Composable
-private fun Feature(item: WhatsNew.Item) {
+private fun Feature(item: WindowItem) {
     val shape = RoundedCornerShape(12.dp)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(
             Modifier.size(44.dp).clip(shape).background(Color.White.copy(alpha = 0.08f)).border(1.dp, Color.White.copy(alpha = 0.18f), shape),
             contentAlignment = Alignment.Center,
         ) {
-            when (item) {
-                WhatsNew.Item.ACHIEVEMENTS -> GoldTrophy(28.dp)
-                WhatsNew.Item.OFFLINE -> Icon(Icons.Filled.CloudSync, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
-                WhatsNew.Item.SIGN_IN -> Icon(Icons.Filled.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
-                WhatsNew.Item.SAVES_SYNC -> Icon(Icons.Filled.Check, contentDescription = null, tint = Color(0xFF66BB6A), modifier = Modifier.size(26.dp))
-                WhatsNew.Item.DOWNLOADS -> Icon(Icons.Filled.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
-                WhatsNew.Item.EXPANSION_FILES -> Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
-            }
+            WindowIcon(item.icon)
         }
-        Text(stringResource(itemText(item)), modifier = Modifier.weight(1f))
+        Text(item.text.pick(currentLanguage()), modifier = Modifier.weight(1f))
     }
 }
 
@@ -199,11 +197,25 @@ private fun Finished(state: WhatsNewState) {
     }
 }
 
-private fun itemText(item: WhatsNew.Item): Int = when (item) {
-    WhatsNew.Item.ACHIEVEMENTS -> R.string.whatsnew_achievements
-    WhatsNew.Item.OFFLINE -> R.string.whatsnew_offline
-    WhatsNew.Item.SIGN_IN -> R.string.whatsnew_sign_in
-    WhatsNew.Item.SAVES_SYNC -> R.string.whatsnew_saves_sync
-    WhatsNew.Item.DOWNLOADS -> R.string.whatsnew_downloads
-    WhatsNew.Item.EXPANSION_FILES -> R.string.whatsnew_expansion_files
+/** The language the texts of the release files are read in: the one GamePort is shown in. */
+@Composable
+private fun currentLanguage(): String = LocalConfiguration.current.locales[0].language
+
+/** One of the pictures the release files may name (see [app.gameport.core.model.Release.ICONS]). */
+@Composable
+private fun WindowIcon(name: String) {
+    val tint = MaterialTheme.colorScheme.primary
+    val size = Modifier.size(26.dp)
+    when (name) {
+        "trophy" -> GoldTrophy(28.dp)
+        "cloud-sync" -> Icon(Icons.Filled.CloudSync, contentDescription = null, tint = tint, modifier = size)
+        "key" -> Icon(Icons.Filled.Key, contentDescription = null, tint = tint, modifier = size)
+        "check" -> Icon(Icons.Filled.Check, contentDescription = null, tint = Color(0xFF66BB6A), modifier = size)
+        "download" -> Icon(Icons.Filled.Download, contentDescription = null, tint = tint, modifier = size)
+        "play" -> Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = tint, modifier = size)
+        "warning" -> Icon(Icons.Filled.Warning, contentDescription = null, tint = Color(0xFFFFB74D), modifier = size)
+        "build" -> Icon(Icons.Filled.Build, contentDescription = null, tint = tint, modifier = size)
+        "trash" -> Icon(Icons.Filled.Delete, contentDescription = null, tint = HideRed, modifier = size)
+        else -> Icon(Icons.Filled.Info, contentDescription = null, tint = tint, modifier = size)
+    }
 }

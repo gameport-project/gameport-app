@@ -8,6 +8,8 @@ import app.gameport.core.install.InstalledGames
 import app.gameport.core.model.AuthState
 import app.gameport.core.model.PatchAllState
 import app.gameport.core.model.WhatsNew
+import app.gameport.core.model.WindowGames
+import app.gameport.core.model.WindowItem
 import app.gameport.core.settings.UserSettings
 import app.gameport.core.steam.SteamAuthRepository
 import app.gameport.core.steam.SteamLibraryRepository
@@ -30,8 +32,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 /** What the news window shows. [games] is empty when no game has to be patched again: then there is no alert and no button to patch. */
 data class WhatsNewState(
     val version: String,
-    val items: List<WhatsNew.Item>,
-    val confirmedGames: List<String>,
+    val items: List<WindowItem>,
+    /** The games tested and confirmed, with what is covered besides: null when there are none to tell. */
+    val compat: WindowGames?,
     /** The games to patch again, by name. */
     val games: List<String>,
     /** The games left out because they are on screen, by name. */
@@ -59,7 +62,10 @@ class WhatsNewViewModel @Inject constructor(
     private val playtime: PlaytimeTracker,
     private val preview: WhatsNewPreview,
     private val postponed: WhatsNewPostponed,
+    catalog: WhatsNewCatalog,
 ) : ViewModel() {
+    private val news = catalog.news
+
     private val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
     private val versionCode = packageInfo.longVersionCode.toInt()
     private val versionName = packageInfo.versionName.orEmpty()
@@ -88,7 +94,7 @@ class WhatsNewViewModel @Inject constructor(
             running != null -> WhatsNewState(
                 version = versionName,
                 items = running.notes.items,
-                confirmedGames = running.notes.confirmedGames,
+                compat = running.notes.games,
                 games = running.ids.mapNotNull(running.names::get),
                 onScreen = running.onScreen,
                 progress = input.progress,
@@ -97,10 +103,10 @@ class WhatsNewViewModel @Inject constructor(
                 preview = false,
             )
             input.signedIn && input.seen < versionCode && !input.postponed -> {
-                val notes = WhatsNew.between(input.seen, versionCode)
+                val notes = news.between(input.seen, versionCode)
                 if (notes.isEmpty) null else {
                     val (waiting, busy) = input.outdated.sorted().partition { !isOnScreen(it) }
-                    WhatsNewState(versionName, notes.items, notes.confirmedGames, waiting.map { nameOf(it) }, busy.map { nameOf(it) }, null, null, emptyList(), false)
+                    WhatsNewState(versionName, notes.items, notes.games, waiting.map { nameOf(it) }, busy.map { nameOf(it) }, null, null, emptyList(), false)
                 }
             }
             else -> null
@@ -115,7 +121,7 @@ class WhatsNewViewModel @Inject constructor(
         if (preview.mode.value != null) return simulate()
         viewModelScope.launch {
             val outdated = withTimeoutOrNull(5_000) { installer.observeOutdatedPatches().first() } ?: return@launch
-            val notes = WhatsNew.between(settings.whatsNewSeen.value, versionCode)
+            val notes = news.between(settings.whatsNewSeen.value, versionCode)
             val (ids, busy) = outdated.sorted().partition { !isOnScreen(it) }
             run.value = Run(ids, outdated.associateWith { nameOf(it) }, notes, busy.map { nameOf(it) })
             installer.repatchAll(ids)
@@ -159,11 +165,11 @@ class WhatsNewViewModel @Inject constructor(
     private val previewNames = listOf("SUPERHOT VR", "Moss 2", "Ancient Dungeon VR", "Underdogs")
 
     private fun previewState(patchNeeded: Boolean, progress: PatchAllState?): WhatsNewState {
-        val notes = WhatsNew.latest()
+        val notes = news.latest()
         return WhatsNewState(
-            version = WhatsNew.latestName,
+            version = news.latestName,
             items = notes.items,
-            confirmedGames = notes.confirmedGames,
+            compat = notes.games,
             games = if (patchNeeded) previewNames else emptyList(),
             onScreen = emptyList(),
             progress = progress,

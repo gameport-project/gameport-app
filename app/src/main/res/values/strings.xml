@@ -9,15 +9,6 @@
         <item quantity="other">%1$d games must be patched again to benefit from these new features.</item>
     </plurals>
     <string name="whatsnew_in_this_version">In this version:</string>
-    <string name="whatsnew_achievements">Achievements are finally here, synced with Steam: the ones earned here show up on Steam, and the ones earned elsewhere show up here.</string>
-    <string name="whatsnew_offline">Offline mode is supported: games can be played without a connection, and their saves are sent as soon as the network is back.</string>
-    <string name="whatsnew_sign_in">Sign-in with an account name and a password, besides the QR code.</string>
-    <string name="whatsnew_saves_sync">Saves are sent while a game is played, not only when it ends, and the saves page shows at a glance what is synchronized with Steam and what is not.</string>
-    <string name="whatsnew_downloads">The Steam region to download from can be chosen, interrupted downloads resume by themselves, and a badge shows how many games are being installed.</string>
-    <string name="whatsnew_expansion_files">Games with expansion files start: the files follow the installed version and are readable by the game.</string>
-    <string name="whatsnew_compat_title">Wider compatibility, new games supported</string>
-    <string name="whatsnew_compat_tested">Tested and confirmed: %1$s.</string>
-    <string name="whatsnew_compat_others">Other games are supported too without having been tried, among them Unreal games that were blocked by their expansion files.</string>
     <string name="whatsnew_on_screen">Not patched now because they are on screen: %1$s.</string>
     <string name="whatsnew_android_note">Some games are patched without any confirmation and others ask for one: it is a constraint of the game, not of GamePort.</string>
     <string name="whatsnew_patch_all">Patch all</string>

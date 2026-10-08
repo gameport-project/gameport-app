@@ -1,0 +1,24 @@
+{
+  "languages": [
+    "en",
+    "fr"
+  ],
+  "en": {
+    "heading": "## GamePort {version}",
+    "news": "What's new in this version",
+    "install": "Install",
+    "apk": "The APK is `GamePort-v{version}.apk`, below. GamePort {previous} offers it by itself, in Settings > Updates. On a Quest, developer mode is needed, with SideQuest or `adb install GamePort-v{version}.apk`. On a phone or a tablet, opening the file is enough.",
+    "installs_over": "It installs over {previous} and keeps games, saves and settings.",
+    "patch_again": "Games patched by an earlier version show an attention point, and GamePort offers to patch them again when it first opens.",
+    "about": "GamePort is free and open source, and is not made by or affiliated with Valve, Meta or Pico. See the [README](https://github.com/gameport-project/gameport-app#readme)."
+  },
+  "fr": {
+    "heading": "## GamePort {version}",
+    "news": "Les nouveautés de cette version",
+    "install": "Installer",
+    "apk": "L'APK est `GamePort-v{version}.apk`, ci-dessous. GamePort {previous} le propose toute seule, dans Réglages > Mises à jour. Sur un Quest, le mode développeur est nécessaire, avec SideQuest ou `adb install GamePort-v{version}.apk`. Sur un téléphone ou une tablette, ouvrir le fichier suffit.",
+    "installs_over": "Elle s'installe par-dessus la {previous} et garde jeux, sauvegardes et réglages.",
+    "patch_again": "Les jeux patchés par une version précédente affichent un point d'attention, et GamePort propose de les patcher de nouveau à sa première ouverture.",
+    "about": "GamePort est gratuite et open source, et n'est ni créée par Valve, Meta ou Pico, ni affiliée à eux. Voir le [README](https://github.com/gameport-project/gameport-app/blob/main/README.fr.md)."
+  }
+}
