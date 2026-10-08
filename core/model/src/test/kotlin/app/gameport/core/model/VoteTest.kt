@@ -136,6 +136,16 @@ class VoteTest {
     }
 
     @Test
+    fun `the answer offline only is sent as such, and never carries the offline flag`() {
+        val message = VoteMessage(1, Verdict.OFFLINE_ONLY, "0.7.2", "quest", "0123456789abcdef0123456789abcdef")
+        assertEquals("offline_only", Json.parseToJsonElement(message.toJson()).jsonObject.getValue("verdict").jsonPrimitive.content)
+        assertEquals(Verdict.OFFLINE_ONLY, Verdict.fromWire("offline_only"))
+        val proven = VerdictBook().closed(1, "0.7.2", day1, offlineRun = true).answered(1, Verdict.OFFLINE_ONLY, "0.7.2", day1, send = true)
+        assertEquals(listOf(Answer(1, Verdict.OFFLINE_ONLY, false)), proven.unsent())
+        assertFalse(proven.shouldAsk(1, "0.7.2", day2))
+    }
+
+    @Test
     fun `the offline flag goes in the message only when it is true`() {
         val without = Json.parseToJsonElement(VoteMessage(1, Verdict.WORKS, "0.7.2", "quest", "0123456789abcdef0123456789abcdef").toJson()).jsonObject
         assertFalse("offline" in without.keys)

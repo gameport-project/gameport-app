@@ -3,7 +3,10 @@ package app.gameport.core.designsystem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -56,12 +59,27 @@ fun GlassChip(
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 12.dp, vertical = verticalPadding),
     ) {
+        // The eye centres on the capitals, which sit a little above the middle of the line of text: the icon is moved to where they are.
+        var lift by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
+        val density = androidx.compose.ui.platform.LocalDensity.current
         androidx.compose.foundation.layout.Row(
             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
         ) {
-            leading?.invoke()
-            androidx.compose.material3.Text(label, color = contentColor, style = androidx.compose.material3.MaterialTheme.typography.labelLarge)
+            if (leading != null) {
+                androidx.compose.foundation.layout.Box(Modifier.offset { androidx.compose.ui.unit.IntOffset(0, lift) }) { leading() }
+            }
+            androidx.compose.material3.Text(
+                label,
+                color = contentColor,
+                style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+                onTextLayout = { layout ->
+                    val capitals = with(density) { layout.layoutInput.style.fontSize.toPx() } * CAPITAL_HEIGHT_SHARE
+                    val middleOfCapitals = layout.getLineBaseline(0) - capitals / 2
+                    val middleOfLine = (layout.getLineTop(0) + layout.getLineBottom(0)) / 2
+                    lift = Math.round(middleOfCapitals - middleOfLine)
+                },
+            )
         }
     }
 }
@@ -90,3 +108,6 @@ fun GlassIconButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled:
         content = content,
     )
 }
+
+/** The height of a capital letter as a share of the size of the font (that of the Roboto of the app). */
+private const val CAPITAL_HEIGHT_SHARE = 0.711f

@@ -20,14 +20,26 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-/** Sends one message to the relay. True when the relay has it. */
+/** What became of a message sent to the relay. */
+enum class Delivery {
+    /** The relay has it. */
+    SENT,
+
+    /** The relay will never take it (it is not what it expects): trying again would only block the answers after it. */
+    REFUSED,
+
+    /** No connection, or the relay is busy or down: it is tried again later. */
+    LATER,
+}
+
+/** Sends one message to the relay. */
 fun interface VoteTransport {
-    suspend fun post(json: String): Boolean
+    suspend fun post(json: String): Delivery
 }
 
 /** The relay of the project (see its README). The address is public and holds nothing personal. */
 class HttpVoteTransport(private val address: String = RELAY_VOTE_URL) : VoteTransport {
-    override suspend fun post(json: String): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun post(json: String): Delivery = withContext(Dispatchers.IO) {
         val connection = URL(address).openConnection() as HttpURLConnection
         try {
             connection.requestMethod = "POST"
@@ -36,10 +48,14 @@ class HttpVoteTransport(private val address: String = RELAY_VOTE_URL) : VoteTran
             connection.doOutput = true
             connection.setRequestProperty("Content-Type", "application/json")
             connection.outputStream.use { it.write(json.toByteArray()) }
-            // Only a clear "received" counts: anything else, the answer is sent again later.
-            connection.responseCode == HttpURLConnection.HTTP_NO_CONTENT
+            when (connection.responseCode) {
+                HttpURLConnection.HTTP_NO_CONTENT -> Delivery.SENT
+                // The relay looked at it and said no: a message that is not as it expects, or too big. It would say no again.
+                HttpURLConnection.HTTP_BAD_REQUEST, HttpURLConnection.HTTP_ENTITY_TOO_LARGE -> Delivery.REFUSED
+                else -> Delivery.LATER
+            }
         } catch (e: java.io.IOException) {
-            false
+            Delivery.LATER
         } finally {
             connection.disconnect()
         }
@@ -94,7 +110,7 @@ class VerdictSender @Inject constructor(
 
 /**
  * Sends the answers one after the other and tells each one that got through. At the first one that does not (no connection, the relay is down)
- * it stops: the others stay waiting, in order, for the next time.
+ * it stops: the others stay waiting, in order, for the next time. An answer the relay refuses is given up, so it cannot block the others.
  */
 internal suspend fun sendAnswers(
     unsent: List<Answer>,
@@ -103,7 +119,9 @@ internal suspend fun sendAnswers(
     onSent: (Answer) -> Unit,
 ) {
     for (answer in unsent) {
-        if (!transport.post(message(answer).toJson())) return
-        onSent(answer)
+        when (transport.post(message(answer).toJson())) {
+            Delivery.SENT, Delivery.REFUSED -> onSent(answer) // done with it either way
+            Delivery.LATER -> return
+        }
     }
 }

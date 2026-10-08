@@ -44,6 +44,32 @@ class CompatTest {
         assertEquals(CompatLevel.MIXED, level(2, 3))
     }
 
+    private fun offline(works: Int, offlineOnly: Int, fails: Int) =
+        CompatRules.of(CompatCounts(1, works, fails, 0, mapOf("quest" to DeviceCounts(works, fails, 0, offlineOnly)), offlineOnly), "quest")?.level
+
+    @Test
+    fun `a game that works but only offline for at least half of its players is told so`() {
+        assertEquals(CompatLevel.OFFLINE_ONLY, offline(0, 3, 0))
+        assertEquals(CompatLevel.OFFLINE_ONLY, offline(1, 2, 0))
+        assertEquals(CompatLevel.OFFLINE_ONLY, offline(2, 2, 0))
+        assertEquals(CompatLevel.OFFLINE_ONLY, offline(1, 3, 1))
+    }
+
+    @Test
+    fun `a game that works offline only for a few players is said to work`() {
+        assertEquals(CompatLevel.WORKS, offline(2, 1, 0))
+        assertEquals(CompatLevel.WORKS, offline(5, 2, 1))
+    }
+
+    @Test
+    fun `the answer offline only is on the side of the players for whom it works`() {
+        // 1 works, 1 offline only, 1 fails: two thirds are happy, which is mixed, as 2 works and 1 fails would be.
+        assertEquals(CompatLevel.MIXED, offline(1, 1, 1))
+        assertEquals(CompatLevel.FAILS, offline(0, 1, 3))
+        assertNull(offline(1, 1, 0))
+        assertEquals(3, CompatRules.of(CompatCounts(1, 1, 0, 0, mapOf("quest" to DeviceCounts(1, 0, 0, 2)), 2), "quest")!!.players)
+    }
+
     @Test
     fun `only the players of the same kind of device count`() {
         val game = CompatCounts(
@@ -77,9 +103,11 @@ class CompatTest {
     @Test
     fun `the summary of the relay is read, with the devices and the offline count optional`() {
         val summary = CompatSummary.parse(
-            """{"v":1,"games":[{"appId":1125240,"works":7,"fails":1,"worksOffline":3,"devices":{"quest":{"works":6,"fails":0,"worksOffline":3},"pico":{"works":1,"fails":1}}},{"appId":5,"works":0,"fails":2}]}""",
+            """{"v":1,"games":[{"appId":1125240,"works":7,"offlineOnly":2,"fails":1,"worksOffline":3,"devices":{"quest":{"works":6,"offlineOnly":2,"fails":0,"worksOffline":3},"pico":{"works":1,"fails":1}}},{"appId":5,"works":0,"fails":2}]}""",
         )!!
-        assertEquals(DeviceCounts(6, 0, 3), summary.of(1125240)?.devices?.get("quest"))
+        assertEquals(2, summary.of(1125240)?.offlineOnly)
+        assertEquals(2, summary.of(1125240)?.devices?.get("quest")?.offlineOnly)
+        assertEquals(DeviceCounts(6, 0, 3, 2), summary.of(1125240)?.devices?.get("quest"))
         assertEquals(DeviceCounts(1, 1, 0), summary.of(1125240)?.devices?.get("pico"))
         assertEquals(CompatCounts(5, 0, 2, 0), summary.of(5))
         assertNull(summary.of(99))

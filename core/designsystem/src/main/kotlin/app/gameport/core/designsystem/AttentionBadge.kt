@@ -1,7 +1,6 @@
 package app.gameport.core.designsystem
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -38,22 +37,6 @@ fun AttentionBadge(modifier: Modifier = Modifier, size: Dp = 28.dp) {
             drawRoundRect(Color.White, topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(width, bar), cornerRadius = androidx.compose.ui.geometry.CornerRadius(width / 2f))
             drawCircle(Color.White, radius = width / 2f, center = androidx.compose.ui.geometry.Offset(s / 2f, top + bar + gap + width / 2f))
         }
-    }
-}
-
-/** A small green check that tells the player the game is said to work on this device by the players who tried it. */
-@Composable
-fun WorksBadge(modifier: Modifier = Modifier, size: Dp = 28.dp) {
-    Box(
-        modifier = modifier.size(size).clip(CircleShape).background(Color(0xFF66BB6A)),
-        contentAlignment = Alignment.Center,
-    ) {
-        androidx.compose.material3.Icon(
-            Icons.Rounded.Check,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(size * 0.72f),
-        )
     }
 }
 

@@ -9,6 +9,9 @@ import kotlinx.serialization.json.put
 /** What a player says about a game once it has closed. [wire] is how the relay writes it. */
 enum class Verdict(val wire: String) {
     WORKS("works"),
+
+    /** The game works, but only without the network: its online or multiplayer part does not. */
+    OFFLINE_ONLY("offline_only"),
     FAILS("fails"),
     ;
 

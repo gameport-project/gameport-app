@@ -56,4 +56,8 @@
     <string name="menu_hide">Hide the game</string>
     <string name="menu_hide_note">Hiding only concerns the app, nothing changes on Steam. Hidden games are listed in Settings, under Hidden games.</string>
     <string name="menu_close">Close</string>
+    <string name="card_works">Works on this device</string>
+    <string name="card_offline_only">Works on this device, but only offline</string>
+    <string name="card_mixed">Mixed reports on this device</string>
+    <string name="card_fails">Problems reported on this device</string>
 </resources>

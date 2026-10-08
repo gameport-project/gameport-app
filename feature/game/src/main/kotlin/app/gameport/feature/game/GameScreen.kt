@@ -44,11 +44,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
 import app.gameport.core.designsystem.BackdropDialog
+import app.gameport.core.designsystem.CompatGlyph
+import app.gameport.core.designsystem.Glyph
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
@@ -1022,14 +1025,25 @@ private val CompatRed = Color(0xFFE57373)
 private fun CompatChips(compat: app.gameport.core.model.Compat?, incompatible: app.gameport.core.model.IncompatibleReason?) {
     when {
         // A game known not to run says so, whatever the players said.
-        incompatible != null -> GlassChip(stringResource(R.string.game_compat_incompatible), accent = CompatRed)
+        incompatible != null -> CompatChip(stringResource(R.string.game_compat_incompatible), CompatRed, Glyph.CROSS)
         compat != null -> when (compat.level) {
-            app.gameport.core.model.CompatLevel.WORKS -> GlassChip(stringResource(R.string.game_compat_works, deviceName(compat.device)), accent = CompatGreen)
-            app.gameport.core.model.CompatLevel.MIXED -> GlassChip(stringResource(R.string.game_compat_mixed, deviceName(compat.device)), accent = CompatOrange)
-            app.gameport.core.model.CompatLevel.FAILS -> GlassChip(stringResource(R.string.game_compat_fails, deviceName(compat.device)), accent = CompatRed)
+            app.gameport.core.model.CompatLevel.WORKS -> CompatChip(stringResource(R.string.game_compat_works, deviceName(compat.device)), CompatGreen, Glyph.CHECK)
+            app.gameport.core.model.CompatLevel.OFFLINE_ONLY -> CompatChip(stringResource(R.string.game_compat_offline_only, deviceName(compat.device)), CompatOrange, Glyph.NO_NETWORK)
+            app.gameport.core.model.CompatLevel.MIXED -> CompatChip(stringResource(R.string.game_compat_mixed, deviceName(compat.device)), CompatOrange, Glyph.EXCLAMATION)
+            app.gameport.core.model.CompatLevel.FAILS -> CompatChip(stringResource(R.string.game_compat_fails, deviceName(compat.device)), CompatRed, Glyph.CROSS)
         }
     }
 }
+
+/** A label of what is known about the game: its colour, and before the words the mark of the same colour, as tall as the capitals of the text. */
+@Composable
+private fun CompatChip(label: String, colour: Color, glyph: Glyph) {
+    val capitals = with(LocalDensity.current) { (MaterialTheme.typography.labelLarge.fontSize * CAPITAL_HEIGHT).toDp() }
+    GlassChip(label, accent = colour, leading = { CompatGlyph(glyph, colour, capitals) })
+}
+
+/** The height of a capital letter, as a share of the size of the font. */
+private const val CAPITAL_HEIGHT = 0.72f
 
 /** What stands behind the label: why the game is incompatible, or that players tried it with the offline mode. No numbers: the label says it. */
 @Composable

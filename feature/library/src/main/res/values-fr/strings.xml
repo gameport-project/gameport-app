@@ -54,4 +54,8 @@
     <string name="menu_hide">Cacher le jeu</string>
     <string name="menu_hide_note">Cacher ne concerne que l\'application, rien ne change sur Steam. Les jeux cachés se retrouvent dans Réglages, sous Jeux cachés.</string>
     <string name="menu_close">Fermer</string>
+    <string name="card_works">Fonctionne sur cet appareil</string>
+    <string name="card_offline_only">Fonctionne sur cet appareil, mais hors ligne seulement</string>
+    <string name="card_mixed">Avis partagés sur cet appareil</string>
+    <string name="card_fails">Problèmes signalés sur cet appareil</string>
 </resources>

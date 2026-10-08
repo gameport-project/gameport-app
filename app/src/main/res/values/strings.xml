@@ -14,6 +14,7 @@
     <string name="verdict_where">Only the game, the answer, the version of GamePort and the kind of device are sent. The choice is in Settings > Account.</string>
     <string name="verdict_worked">It worked</string>
     <string name="verdict_failed">It did not work</string>
+    <string name="verdict_offline_only">Works offline only</string>
     <string name="verdict_later">Not now</string>
     <string name="whatsnew_games">Games concerned:</string>
     <plurals name="whatsnew_alert_title">

@@ -16,9 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -35,7 +33,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import app.gameport.R
 import app.gameport.core.designsystem.BackdropDialog
+import app.gameport.core.designsystem.CompatGlyph
 import app.gameport.core.designsystem.GameImage
+import app.gameport.core.designsystem.Glyph
 import app.gameport.core.designsystem.GlassButton
 import app.gameport.core.designsystem.KindBlue
 import app.gameport.core.designsystem.dialogMaxHeight
@@ -122,14 +122,15 @@ fun VerdictAskHost(viewModel: VerdictAskViewModel = hiltViewModel()) {
             }
         },
         confirmButton = {
-            // The two answers share the first line, whole; "not now" is alone below, so no label is cut.
+            // The two main answers share the first line, whole; the answer "offline only" and "not now" share the second, so no label is cut.
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Answer(Icons.Filled.Check, R.string.verdict_worked, tint = WorksGreen) { viewModel.onAnswer(Verdict.WORKS) }
-                    Answer(Icons.Filled.Close, R.string.verdict_failed, tint = FailsRed) { viewModel.onAnswer(Verdict.FAILS) }
+                    Answer(R.string.verdict_worked, glyph = Glyph.CHECK, tint = WorksGreen) { viewModel.onAnswer(Verdict.WORKS) }
+                    Answer(R.string.verdict_failed, glyph = Glyph.CROSS, tint = FailsRed) { viewModel.onAnswer(Verdict.FAILS) }
                 }
-                Row(Modifier.fillMaxWidth()) {
-                    Answer(Icons.Filled.Schedule, R.string.verdict_later, onClick = viewModel::onLater)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Answer(R.string.verdict_offline_only, glyph = Glyph.NO_NETWORK, tint = OfflineOrange) { viewModel.onAnswer(Verdict.OFFLINE_ONLY) }
+                    Answer(R.string.verdict_later, icon = Icons.Filled.Schedule, onClick = viewModel::onLater)
                 }
             }
         },
@@ -137,10 +138,10 @@ fun VerdictAskHost(viewModel: VerdictAskViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun RowScope.Answer(icon: ImageVector, text: Int, tint: Color? = null, onClick: () -> Unit) {
+private fun RowScope.Answer(text: Int, glyph: Glyph? = null, icon: ImageVector? = null, tint: Color? = null, onClick: () -> Unit) {
     GlassButton(onClick = onClick, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)) {
-        // Only the mark is in colour: the buttons are the same as everywhere else.
-        if (tint != null) Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp)) else Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        // The marks are the ones of the labels of the games; only they are in colour, the buttons are the same as everywhere else.
+        if (glyph != null && tint != null) CompatGlyph(glyph, tint, height = 14.dp) else if (icon != null) Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
         // The label may take two lines rather than be cut.
         Text(stringResource(text), maxLines = 2)
@@ -149,3 +150,4 @@ private fun RowScope.Answer(icon: ImageVector, text: Int, tint: Color? = null, o
 
 private val WorksGreen = Color(0xFF66BB6A)
 private val FailsRed = Color(0xFFE57373)
+private val OfflineOrange = Color(0xFFFFB74D)

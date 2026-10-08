@@ -33,8 +33,8 @@ data class PlayHistory(
     val installedAt: Map<Int, Long> = emptyMap(),
     /** Hidden in GamePort's library (not on Steam). */
     val hidden: Set<Int> = emptySet(),
-    /** The games the players who use this kind of device say work. */
-    val works: Set<Int> = emptySet(),
+    /** What the players who use this kind of device say of the games they said enough about. */
+    val compat: Map<Int, app.gameport.core.model.CompatLevel> = emptyMap(),
 )
 
 fun interface HistorySource {
@@ -76,8 +76,8 @@ internal class StoredHistorySource @Inject constructor(
             .map { installed.all().mapNotNull { (appId, packageName) -> packages.installTimeOf(packageName)?.let { appId to it } }.toMap() }
             .flowOn(Dispatchers.IO)
         // A game confirmed as incompatible is hidden like one the player hid, unless they chose to show those anyway.
-        return combine(history.lastPlayed, history.favorites, installedAt, history.hidden, combine(incompatible.showAnyway, compat.observeWorks()) { show, works -> show to works }) { played, starred, at, hidden, (showAnyway, works) ->
-            PlayHistory(played, starred, at, hidden + incompatible.hiddenIds(showAnyway), works)
+        return combine(history.lastPlayed, history.favorites, installedAt, history.hidden, combine(incompatible.showAnyway, compat.observeLevels()) { show, levels -> show to levels }) { played, starred, at, hidden, (showAnyway, levels) ->
+            PlayHistory(played, starred, at, hidden + incompatible.hiddenIds(showAnyway), levels)
         }
     }
 }

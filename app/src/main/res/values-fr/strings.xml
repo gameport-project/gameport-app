@@ -14,6 +14,7 @@
     <string name="verdict_where">Seuls le jeu, la réponse, la version de GamePort et le type d\'appareil sont envoyés. Le choix se fait dans Réglages > Compte.</string>
     <string name="verdict_worked">Ça a marché</string>
     <string name="verdict_failed">Ça n\'a pas marché</string>
+    <string name="verdict_offline_only">Marche hors ligne seulement</string>
     <string name="verdict_later">Pas maintenant</string>
     <string name="whatsnew_games">Jeux concernés :</string>
     <plurals name="whatsnew_alert_title">

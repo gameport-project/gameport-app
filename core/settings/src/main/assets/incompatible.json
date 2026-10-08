@@ -6,8 +6,8 @@
         "fr": "Protégé contre la modification"
       },
       "text": {
-        "en": "the game checks that its files are untouched and closes itself a few seconds after it starts once GamePort has patched it. Nothing can be done about it from GamePort.",
-        "fr": "le jeu vérifie que ses fichiers n'ont pas été modifiés et se ferme de lui-même quelques secondes après son démarrage une fois patché par GamePort. GamePort n'y peut rien."
+        "en": "the game detects that its files were modified and closes itself after a few seconds. Nothing can be done about it from GamePort.",
+        "fr": "le jeu détecte que ses fichiers ont été modifiés et se ferme de lui-même au bout de quelques secondes. GamePort n'y peut rien."
       }
     }
   },

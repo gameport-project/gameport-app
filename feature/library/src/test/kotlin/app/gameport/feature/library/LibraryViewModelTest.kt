@@ -51,6 +51,18 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun `what the players say of the games on this device reaches the home`() = runTest {
+        val viewModel = LibraryViewModel(FakeLibrary(flowOf(Library(listOf(vrGame, flatGame), false))), HeadsetDetector { true }, { flowOf(emptySet()) }, { flowOf(DisplaySettings()) }, { flowOf(PlayHistory(compat = mapOf(vrGame.appId to app.gameport.core.model.CompatLevel.FAILS, flatGame.appId to app.gameport.core.model.CompatLevel.WORKS))) }, NoActions, NoUpdates)
+        val collector = backgroundScope.launch(dispatcher) { viewModel.uiState.collect {} }
+
+        assertEquals(
+            mapOf(vrGame.appId to app.gameport.core.model.CompatLevel.FAILS, flatGame.appId to app.gameport.core.model.CompatLevel.WORKS),
+            (viewModel.uiState.value as LibraryUiState.Content).compat,
+        )
+        collector.cancel()
+    }
+
+    @Test
     fun `search matches names regardless of case`() = runTest {
         val viewModel = LibraryViewModel(FakeLibrary(flowOf(Library(listOf(vrGame, flatGame), false))), HeadsetDetector { true }, { flowOf(emptySet()) }, { flowOf(DisplaySettings()) }, { flowOf(PlayHistory()) }, NoActions, NoUpdates)
         val collector = backgroundScope.launch(dispatcher) { viewModel.uiState.collect {} }

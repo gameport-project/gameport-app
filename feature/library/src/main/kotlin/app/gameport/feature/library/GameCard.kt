@@ -24,8 +24,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
@@ -52,14 +56,18 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.gameport.core.designsystem.AttentionBadge
 import app.gameport.core.designsystem.UpdateBadge
-import app.gameport.core.designsystem.WorksBadge
+import app.gameport.core.designsystem.CompatGlyph
 import app.gameport.core.designsystem.GameImage
+import app.gameport.core.designsystem.Glyph
 import app.gameport.core.designsystem.glass
 import app.gameport.core.model.AppKind
 import app.gameport.core.model.Game
@@ -85,8 +93,8 @@ internal fun GameCard(
     onLongClick: (() -> Unit)? = null,
     needsAttention: Boolean = false,
     hasUpdate: Boolean = false,
-    /** The players who use this kind of device say the game works. */
-    worksHere: Boolean = false,
+    /** What the players who use this kind of device say of the game, once enough of them did. */
+    compat: app.gameport.core.model.CompatLevel? = null,
     showTitle: Boolean = true,
     favorite: Boolean = false,
     hover: HoverAnimation = HoverAnimation.FULL,
@@ -164,19 +172,23 @@ internal fun GameCard(
                     color = Color.White,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 10.dp, top = 10.dp, bottom = 10.dp, end = if (favorite) 32.dp else 10.dp),
+                    // With the mark of what players say, the name rises above it.
+                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 10.dp, top = 10.dp, bottom = if (compat != null) 42.dp else 10.dp, end = if (favorite && compat == null) 32.dp else 10.dp),
                 )
             }
-            if (favorite) {
-                Icon(Icons.Filled.Favorite, contentDescription = null, tint = FavoriteRed, modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).size(18.dp))
+            if (favorite || compat != null) {
+                // The mark of what players say, as small as the other marks of the cover, and the heart of a favourite beside it.
+                Row(Modifier.align(Alignment.BottomEnd).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    compat?.let { CompatMark(it, size = 18.dp) }
+                    if (favorite) Icon(Icons.Filled.Favorite, contentDescription = null, tint = FavoriteRed, modifier = Modifier.size(18.dp))
+                }
             }
             Badges(game, Modifier.align(Alignment.TopEnd).padding(8.dp))
             // Small, so they do not hide the artwork: orange for what needs attention, green for an update.
-            if (needsAttention || hasUpdate || worksHere) {
+            if (needsAttention || hasUpdate) {
                 Row(Modifier.align(Alignment.TopStart).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (needsAttention) AttentionBadge(size = 18.dp)
                     if (hasUpdate) UpdateBadge(size = 18.dp)
-                    if (worksHere) WorksBadge(size = 18.dp)
                 }
             }
         }
@@ -267,3 +279,29 @@ private val RING_STROKE = 1.5.dp
 private val RING_GAP = 2.5.dp
 private val RING_GAP_START = 0.dp
 
+
+/**
+ * The label of the page of the game reduced to its mark (the same mark): a check, an exclamation mark or a cross in the tint of the label, in a
+ * circle as big as the other marks of a cover.
+ */
+@Composable
+private fun CompatMark(level: app.gameport.core.model.CompatLevel, size: androidx.compose.ui.unit.Dp) {
+    val (colour, glyph, words) = when (level) {
+        app.gameport.core.model.CompatLevel.WORKS -> Triple(Color(0xFF66BB6A), Glyph.CHECK, R.string.card_works)
+        app.gameport.core.model.CompatLevel.OFFLINE_ONLY -> Triple(Color(0xFFFFB74D), Glyph.NO_NETWORK, R.string.card_offline_only)
+        app.gameport.core.model.CompatLevel.MIXED -> Triple(Color(0xFFFFB74D), Glyph.EXCLAMATION, R.string.card_mixed)
+        app.gameport.core.model.CompatLevel.FAILS -> Triple(Color(0xFFE57373), Glyph.CROSS, R.string.card_fails)
+    }
+    val description = stringResource(words)
+    Box(
+        Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(colour.copy(alpha = 0.22f))
+            .border(1.dp, colour.copy(alpha = 0.65f), CircleShape)
+            .semantics { contentDescription = description },
+    ) {
+        // The mark is a bit under half the height of the circle, centred in it.
+        CompatGlyph(glyph, colour, height = size * (if (glyph == Glyph.NO_NETWORK) 0.5f else 0.46f), modifier = Modifier.align(Alignment.Center))
+    }
+}

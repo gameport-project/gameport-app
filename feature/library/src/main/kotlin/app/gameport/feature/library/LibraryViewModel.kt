@@ -37,8 +37,8 @@ sealed interface LibraryUiState {
         val anyKind: List<Game> = games,
         /** Games that need the player's attention (an outdated patch). */
         val attention: Set<Int> = emptySet(),
-        /** Games the players who use this kind of device say work. */
-        val works: Set<Int> = emptySet(),
+        /** What the players who use this kind of device say of the games they said enough about. */
+        val compat: Map<Int, app.gameport.core.model.CompatLevel> = emptyMap(),
         /** What is shown besides the covers: the artwork behind them, the names, their size. */
         val appearance: DisplaySettings = DisplaySettings(),
         /** The rows of the home: the last games started, the starred ones, then everything in the chosen order. */
@@ -85,7 +85,7 @@ class LibraryViewModel @Inject constructor(
 
     val uiState: StateFlow<LibraryUiState> = combine(
         combine(repository.observeLibrary(), query, tab, attention.observe(), combine(appearance.observe(), history.observe(), filters) { shown, played, narrowed -> Triple(shown, played, narrowed) }) { library, query, tab, outdated, (shown, played, narrowed) ->
-            library.toUiState(query, tab, showTabs).copy(attention = outdated, works = played.works).arranged(shown, played, narrowed)
+            library.toUiState(query, tab, showTabs).copy(attention = outdated, compat = played.compat).arranged(shown, played, narrowed)
         },
         combine(
             combine(updates.observe(), updates.observeApp(), updates.observeConnection(), updates.observeIds(), updates.observePatchAll()) { games, app, connection, ids, patchAll -> HeaderInfo(games, app, connection, ids, patchAll) },

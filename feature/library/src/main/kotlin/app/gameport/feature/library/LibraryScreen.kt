@@ -383,7 +383,7 @@ private fun Rail(
                         onLongClick = { onMenu(game) },
                         needsAttention = game.appId in state.attention,
                         hasUpdate = game.appId in state.updatable,
-                        worksHere = game.appId in state.works,
+                        compat = state.compat[game.appId],
                         showTitle = display.coverTitles,
                         favorite = game.appId in state.favoriteIds,
                         hover = display.hoverAnimation,
