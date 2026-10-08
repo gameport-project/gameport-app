@@ -18,3 +18,6 @@ captures/
 
 # Local log dumps
 logcat.txt
+
+__pycache__/
+

@@ -1,27 +1,71 @@
 name: Release
 
-# Publishes a signed APK as a GitHub release when a version tag is pushed (git tag v0.2.0 && git push --tags).
+# Publishes a signed APK as a GitHub release. Two ways in, one result.
+#
+#  - By hand: Actions > Release > Run workflow, with a version such as 0.7.2. The workflow prepares the release itself
+#    (version, notes, patch generation: scripts/prepare_release.py), builds and signs the APK, and only then pushes the release commit and its tag
+#    to main, so a failure leaves nothing behind. The news of the version (app/src/main/assets/releases/<version>.json) must already be on main.
+#  - By tag: run scripts/prepare_release.py 0.7.2 on main, then push main and the tag it made. The workflow checks the tag is consistent and publishes.
+#
 # The signing key lives in the repository secrets: KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD.
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, such as 0.7.2 (its release file must be on main)"
+        required: true
+        type: string
 
 permissions:
   contents: write
+
+# Two releases never run side by side.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
     # The signing key is only handed to this job through the "release" environment, which can require an approval.
     environment: release
+    env:
+      # The tag being released: the one pushed, or the one a manual run is about to make.
+      TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
     steps:
+      - name: A manual run releases main
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Run this workflow on main"
+          exit 1
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: A pushed tag must be on main
+        if: github.event_name == 'push'
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::$TAG is not on main"; exit 1; }
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
+      - name: Tests of the release scripts
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - name: Prepare the release commit and its tag (manual run)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 scripts/prepare_release.py "$VERSION"
+      - name: The version, its notes and its tag must agree
+        run: python3 scripts/prepare_release.py verify "$TAG"
       - name: The patch generation must follow the injected binaries
         run: scripts/check_patch_generation.sh
       - name: Check the signing key is there
@@ -43,20 +87,24 @@ jobs:
           "$tools/zipalign" -f -p 4 "$unsigned" "$RUNNER_TEMP/aligned.apk"
           "$tools/apksigner" sign --ks "$RUNNER_TEMP/release.jks" --ks-pass env:KEYSTORE_PASSWORD \
             --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASSWORD \
-            --out "GamePort-${GITHUB_REF_NAME}.apk" "$RUNNER_TEMP/aligned.apk"
+            --out "GamePort-${TAG}.apk" "$RUNNER_TEMP/aligned.apk"
           rm -f "$RUNNER_TEMP/release.jks"
+      # Everything has worked: only now does a manual run put its commit and its tag on the repository. Refused, not forced, if main moved meanwhile.
+      - name: Push the release commit and its tag (manual run)
+        if: github.event_name == 'workflow_dispatch'
+        run: git push --atomic origin "HEAD:refs/heads/main" "refs/tags/$TAG"
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          apk="GamePort-${GITHUB_REF_NAME}.apk"
+          apk="GamePort-${TAG}.apk"
           tools="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
           body="$RUNNER_TEMP/release-notes.md"
           # The text of the release is the notes file of this version, shown as it is, followed by how to check the APK.
-          notes="docs/releases/${GITHUB_REF_NAME}.md"
-          if [[ -f "$notes" ]]; then cp "$notes" "$body"; else echo "GamePort ${GITHUB_REF_NAME}" > "$body"; fi
+          notes="docs/releases/${TAG}.md"
+          if [[ -f "$notes" ]]; then cp "$notes" "$body"; else echo "GamePort ${TAG}" > "$body"; fi
           # The notes point to their pictures relative to the file (so a preview shows them); on the release page those paths lead nowhere, so they become the tag's own addresses.
-          sed -i "s|\.\./screenshots/|https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_REF_NAME}/docs/screenshots/|g" "$body"
+          sed -i "s|\.\./screenshots/|https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${TAG}/docs/screenshots/|g" "$body"
           {
             echo
             echo "---"
@@ -64,4 +112,4 @@ jobs:
             echo
             echo "**Signing certificate (SHA-256):** \`$("$tools/apksigner" verify --print-certs "$apk" | sed -n 's/.*certificate SHA-256 digest: //p' | head -1)\`"
           } >> "$body"
-          gh release create "$GITHUB_REF_NAME" "$apk" --title "GamePort ${GITHUB_REF_NAME}" --notes-file "$body"
+          gh release create "$TAG" "$apk" --verify-tag --title "GamePort ${TAG}" --notes-file "$body"

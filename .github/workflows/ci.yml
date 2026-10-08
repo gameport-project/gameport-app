@@ -37,6 +37,16 @@ jobs:
           name: test-reports
           path: "**/build/reports/tests/"
 
+  release-files:
+    name: Release notes and scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The notes are what the release files give
+        run: python3 scripts/release_notes.py --check
+      - name: Tests of the release scripts
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
   native:
     name: In-game hook and OpenXR layer compile
     runs-on: ubuntu-latest

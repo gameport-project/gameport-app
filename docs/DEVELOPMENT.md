@@ -40,8 +40,13 @@ Debug builds (yours and the CI's) are all signed with `app/debug.keystore`, a de
 ## Continuous integration and releases
 
 - **CI** (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: it builds the debug APK, runs the unit tests, compiles the in-game hook, checks the syntax of the OpenXR layer and scans the history for secrets and personal data.
-- **Releases** (`.github/workflows/release.yml`) run when a tag such as `v0.2.0` is pushed: they build the release APK, sign it with the key kept in the repository secrets (`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`) and publish it as a GitHub release, which is also what the download counter counts.
-- **Preparing a release:** run `scripts/check_patch_generation.sh`. If the injected binaries changed since the previous release, raise `PatchVersioning.GENERATION` (and reset `DEV_REVISION` to 0); once the release is out, run `scripts/check_patch_generation.sh --update` and commit `core/patch/patch-generation.lock`. The release workflow refuses a tag when the binaries changed and the generation did not.
+- **Releases** (`.github/workflows/release.yml`) build the release APK, sign it with the key kept in the repository secrets (`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`) and publish it as a GitHub release, which is also what the download counter counts. They start from Actions > Release > Run workflow (see below) or when a tag such as `v0.2.0`, prepared locally, is pushed.
+- **Releasing a version:**
+  1. Write `app/src/main/assets/releases/<version>.json` (the news window and the release notes are both built from it; `version`, `code` and `previous` must agree with the version) and merge it into `main`.
+  2. Run Actions > Release > Run workflow with the version. The workflow prepares the release (`scripts/prepare_release.py`: `versionCode` and `versionName`, `docs/releases/v<version>.md`, `PatchVersioning.GENERATION` raised and `DEV_REVISION` reset when the injected binaries changed since the previous release, `patch-generation.lock` recorded), builds and signs the APK, and only then pushes the commit `chore(release): prepare <version>` and the tag `v<version>` to `main` and publishes. If anything fails, nothing is pushed. The `main` branch must let the workflow push to it.
+  3. Or do the preparation yourself: `scripts/prepare_release.py <version>` on a clean `main` (add `--dry-run` to see what it would change) makes the same commit and tag locally and pushes nothing; push `main` and the tag, and the workflow checks them (`scripts/prepare_release.py verify v<version>`) and publishes.
+
+  The notes under `docs/releases/` from 0.7.0 on are written by `scripts/release_notes.py` and never by hand; the CI fails when one is not what its release file gives. The release workflow refuses a tag when the binaries changed and the generation did not.
 
 ### Keeping the signing key safe
 

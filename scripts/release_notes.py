@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Builds docs/releases/v<version>.md from app/src/main/assets/releases/<version>.json and docs/releases/labels.json.
 
-    scripts/release_notes.py            writes the notes of every release
+    scripts/release_notes.py            writes the notes of every release that is out
     scripts/release_notes.py --check    writes nothing, fails when a note is not what its release file gives
+
+A release file for a version that is not out yet (newer than the versionName of app/build.gradle.kts) has no note: it is written, in the commit
+that prepares the release, by scripts/prepare_release.py.
 """
 import json
 import pathlib
+import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -39,11 +43,21 @@ def notes(release):
     return "\n\n---\n\n".join(language_part(release, lang) for lang in LANGUAGES) + "\n"
 
 
+def current_version():
+    """The version of the app now, as a tuple, or None when it cannot be read (then every release is taken as out)."""
+    match = re.search(r'versionName\s*=\s*"(\d+)\.(\d+)\.(\d+)"', (ROOT / "app/build.gradle.kts").read_text(encoding="utf-8")) if (ROOT / "app/build.gradle.kts").exists() else None
+    return tuple(int(part) for part in match.groups()) if match else None
+
+
 def main():
     check = "--check" in sys.argv
     stale = []
+    current = current_version()
     for path in sorted(RELEASES.glob("*.json")):
         release = json.loads(path.read_text(encoding="utf-8"))
+        version = tuple(int(part) for part in release["version"].split("."))
+        if current is not None and version > current:
+            continue  # not out yet: its note is made when the release is prepared
         target = ROOT / "docs/releases" / f"v{release['version']}.md"
         text = notes(release)
         if check:
