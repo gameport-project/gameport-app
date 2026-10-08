@@ -10,6 +10,8 @@ import `in`.dragonbra.javasteam.protobufs.steamclient.SteammessagesClientserverL
 import `in`.dragonbra.javasteam.protobufs.steamclient.SteammessagesClientserver.CMsgClientAuthListAck
 import `in`.dragonbra.javasteam.protobufs.steamclient.SteammessagesClientserver.CMsgClientGameConnectTokens
 import `in`.dragonbra.javasteam.protobufs.steamclient.SteammessagesClientserver.CMsgClientTicketAuthComplete
+import `in`.dragonbra.javasteam.protobufs.steamclient.SteammessagesClientserver2.CMsgClientKickPlayingSession
+import `in`.dragonbra.javasteam.protobufs.steamclient.SteammessagesClientserver2.CMsgClientPlayingSessionState
 import `in`.dragonbra.javasteam.steam.handlers.ClientMsgHandler
 import android.util.Log
 import com.google.protobuf.ByteString
@@ -19,10 +21,22 @@ import java.util.concurrent.LinkedBlockingDeque
 import java.util.concurrent.TimeUnit
 import java.util.zip.CRC32
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
 
 private const val TAG = "GPSteamTicket"
+
+/**
+ * Steam lets one session play at a time on an account. This is what it said when another session plays: [appId] is the game it plays (0 when
+ * not said), and [kicked] is true when it ended the playing session of this one.
+ */
+data class PlayingElsewhere(val appId: Int, val kicked: Boolean)
+
+/** Steam refuses the playing session of this connection because another one plays: no ticket is made until the player says what to do. */
+class PlayingBlockedException(val other: PlayingElsewhere) : Exception("another session of the account plays (app ${other.appId})")
 
 /**
  * Keeps the game connect tokens Steam sends after log on. A token is used up by every session
@@ -30,6 +44,23 @@ private const val TAG = "GPSteamTicket"
  */
 internal class GameConnectTokens : ClientMsgHandler() {
     private val tokens = LinkedBlockingDeque<ByteArray>()
+
+    @Volatile private var traceUntil = 0L
+
+    /** Writes down what Steam sends over the next [millis]. */
+    fun traceFor(millis: Long) {
+        traceUntil = android.os.SystemClock.elapsedRealtime() + millis
+    }
+
+    private val _playingElsewhere = MutableStateFlow<PlayingElsewhere?>(null)
+
+    /** Steam dropped this connection just after the account was declared as playing: another session plays, and which one is not said. */
+    fun refusedPlaying() {
+        if (_playingElsewhere.value == null) _playingElsewhere.value = PlayingElsewhere(0, kicked = false)
+    }
+
+    /** Set while Steam says another session of the account plays; null when it says nobody does, or has said nothing. */
+    val playingElsewhere: StateFlow<PlayingElsewhere?> = _playingElsewhere.asStateFlow()
 
     @Volatile var authSequenceFromServer = 0
         private set
@@ -49,6 +80,16 @@ internal class GameConnectTokens : ClientMsgHandler() {
                 val message = ClientMsgProtobuf<CMsgClientGameConnectTokens.Builder>(CMsgClientGameConnectTokens::class.java, packetMsg)
                 message.body.tokensList.forEach { tokens.addLast(it.toByteArray()) }
             }
+            EMsg.ClientPlayingSessionState -> {
+                val state = ClientMsgProtobuf<CMsgClientPlayingSessionState.Builder>(CMsgClientPlayingSessionState::class.java, packetMsg).body
+                Log.i(TAG, "Steam says playing is ${if (state.playingBlocked) "blocked: another session plays app ${state.playingApp}" else "free"}")
+                _playingElsewhere.value = if (state.playingBlocked) PlayingElsewhere(state.playingApp, kicked = false) else null
+            }
+            EMsg.ClientKickPlayingSession -> {
+                val kick = ClientMsgProtobuf<CMsgClientKickPlayingSession.Builder>(CMsgClientKickPlayingSession::class.java, packetMsg).body
+                Log.i(TAG, "Steam ended the playing session of this connection (only the game: ${kick.onlyStopGame})")
+                _playingElsewhere.value = PlayingElsewhere(_playingElsewhere.value?.appId ?: 0, kicked = true)
+            }
             EMsg.ClientAuthListAck -> {
                 val ack = ClientMsgProtobuf<CMsgClientAuthListAck.Builder>(CMsgClientAuthListAck::class.java, packetMsg)
                 authSequenceFromServer = ack.body.messageSequence
@@ -58,7 +99,7 @@ internal class GameConnectTokens : ClientMsgHandler() {
                 val done = ClientMsgProtobuf<CMsgClientTicketAuthComplete.Builder>(CMsgClientTicketAuthComplete::class.java, packetMsg)
                 Log.i(TAG, "Steam validated a ticket: session response ${done.body.eauthSessionResponse}, state ${done.body.estate}")
             }
-            else -> Unit
+            else -> if (android.os.SystemClock.elapsedRealtime() < traceUntil) Log.i(TAG, "Steam sent ${packetMsg.msgType}")
         }
     }
 

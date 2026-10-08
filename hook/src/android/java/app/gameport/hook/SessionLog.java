@@ -53,6 +53,10 @@ final class SessionLog {
     private int sentVersion = -1;
     private boolean exitSent;
     private int flushes;
+    /** Counts the performance lines, so a flush knows they changed even when the main log is quiet. */
+    private int performanceVersion;
+    private int sentPerformanceVersion = -1;
+    private String sentLibraries = "";
     private volatile String launchInfo = "";
     private String lastEngineDigest = "";
 
@@ -141,6 +145,7 @@ final class SessionLog {
             while ((line = reader.readLine()) != null) {
                 synchronized (performance) {
                     performance.addLast(line);
+                    performanceVersion++;
                     if (performance.size() > PERFORMANCE_LINES) performance.removeFirst();
                 }
             }
@@ -153,9 +158,15 @@ final class SessionLog {
         String headText;
         String tailText;
         int at;
+        // What is sent is more than the log: the libraries the game has loaded by now and the performance lines change without a line of the log,
+        // and a game that logs little would leave them as they were a second after its start.
+        String libraries = loadedLibraries();
+        String librariesSignature = librariesSignature(libraries);
+        int performanceAt;
+        synchronized (performance) { performanceAt = performanceVersion; }
         synchronized (head) {
             at = version;
-            if (at == sentVersion && exitSent) return;
+            if (at == sentVersion && performanceAt == sentPerformanceVersion && librariesSignature.equals(sentLibraries) && exitSent) return;
             StringBuilder h = new StringBuilder();
             for (String line : head) h.append(line).append('\n');
             StringBuilder t = new StringBuilder();
@@ -170,7 +181,9 @@ final class SessionLog {
         synchronized (performance) { for (String line : performance) perf.append(line).append('\n'); }
         extras.putByteArray("performanceGz", gzip(perf.toString()));
         extras.putString("launch", launchInfo);
-        extras.putString("libraries", loadedLibraries());
+        extras.putString("libraries", libraries);
+        // Which run this is: GamePort keeps the log of the run before when a new one begins.
+        extras.putInt("pid", android.os.Process.myPid());
         String engine = engineLogs();
         String digest = Integer.toHexString(engine.hashCode());
         if (!digest.equals(lastEngineDigest) && !engine.isEmpty()) {
@@ -179,9 +192,11 @@ final class SessionLog {
         }
         if (!exitSent) addPreviousExit(extras);
         try {
-            Bundle result = context.getContentResolver().call(Owner.cloud(context), "log", context.getPackageName(), extras);
+            Bundle result = Calls.call(context, Owner.cloud(context), "log", context.getPackageName(), extras);
             if (result != null) {
                 sentVersion = at;
+                sentPerformanceVersion = performanceAt;
+                sentLibraries = librariesSignature;
                 exitSent = true;
             }
         } catch (Throwable t) {
@@ -211,6 +226,19 @@ final class SessionLog {
         } catch (Throwable t) {
             return new byte[0];
         }
+    }
+
+    /**
+     * What tells that the game has loaded another library: the code files only. The other mappings (memory shared with the graphics driver, caches)
+     * come and go all the time, and would make every look a change.
+     */
+    private static String librariesSignature(String libraries) {
+        StringBuilder out = new StringBuilder();
+        for (String line : libraries.split("\n")) {
+            if (line.endsWith(".so") || line.endsWith(".apk") || line.endsWith(".jar") || line.endsWith(".dex") || line.endsWith(".vdex")
+                    || line.endsWith(".odex") || line.endsWith(".oat") || line.endsWith(".art")) out.append(line).append('\n');
+        }
+        return out.toString();
     }
 
     /** The files this process has mapped (game libraries, GamePort's shim, the OpenXR runtime in use): one path per line. */

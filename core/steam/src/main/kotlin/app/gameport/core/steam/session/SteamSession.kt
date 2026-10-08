@@ -19,6 +19,7 @@ import `in`.dragonbra.javasteam.steam.steamclient.configuration.SteamConfigurati
 import `in`.dragonbra.javasteam.enums.EOSType
 import `in`.dragonbra.javasteam.types.SteamID
 import `in`.dragonbra.javasteam.enums.EPersonaState
+import `in`.dragonbra.javasteam.protobufs.steamclient.SteammessagesClientserver2.CMsgClientKickPlayingSession
 import `in`.dragonbra.javasteam.steam.handlers.steamuser.callback.AccountInfoCallback
 import `in`.dragonbra.javasteam.networking.steam3.ProtocolTypes
 import android.util.Log
@@ -38,6 +39,7 @@ import `in`.dragonbra.javasteam.steam.handlers.steamapps.SteamApps
 import `in`.dragonbra.javasteam.steam.handlers.steamcloud.SteamCloud
 import `in`.dragonbra.javasteam.steam.handlers.steamapps.callback.LicenseListCallback
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import okhttp3.ConnectionPool
@@ -84,6 +86,9 @@ class SteamSession(private val cellId: Int = 0) {
     val cloud: SteamCloud = client.getHandler(SteamCloud::class.java)!!
 
     internal val connectTokens = GameConnectTokens().also { client.addHandler(it) }
+
+    /** Steam allows one playing session per account: set while it says another session plays (see [PlayingElsewhere]). */
+    val playingElsewhere: kotlinx.coroutines.flow.StateFlow<PlayingElsewhere?> get() = connectTokens.playingElsewhere
     internal val storeStatsResponses = StoreStatsResponses().also { client.addHandler(it) }
 
     @Volatile internal var loggedOnAtMillis: Long = System.currentTimeMillis()
@@ -100,6 +105,9 @@ class SteamSession(private val cellId: Int = 0) {
     internal val pipeHandle: Int = 1 + java.util.Random().nextInt(0x3fffffff)
 
     @Volatile private var playingApp = 0
+
+    /** When the account was last declared as playing a game, to tell a refusal (Steam drops the connection at once) from an ordinary loss. */
+    @Volatile private var playingSentAt = 0L
     @Volatile private var playingJob: kotlinx.coroutines.Job? = null
 
     /** The game the player is playing right now, held for as long as it is on screen so Steam counts its time. */
@@ -111,6 +119,11 @@ class SteamSession(private val cellId: Int = 0) {
             `in`.dragonbra.javasteam.enums.EMsg.ClientGamesPlayedWithDataBlob,
         )
         if (appId != 0) message.body.addGamesPlayed(CMsgClientGamesPlayed.GamePlayed.newBuilder().setGameId(appId.toLong()))
+        // What Steam answers is written down for a few seconds: it is how a refused playing session shows (see [PlayingElsewhere]).
+        if (appId != 0) {
+            connectTokens.traceFor(TRACE_MS)
+            playingSentAt = android.os.SystemClock.elapsedRealtime()
+        }
         client.send(message)
         playingApp = appId
     }
@@ -151,7 +164,40 @@ class SteamSession(private val cellId: Int = 0) {
     /** A session ticket for [appId] that its servers can verify against Steam; see [AuthTicket]. Each one is good for a single use. */
     suspend fun authSessionTicket(appId: Int): ByteArray {
         markPlaying(appId)
+        // Steam refuses a second playing session: the ticket would not be honoured, and it is for the player to say what to do.
+        playingElsewhere.value?.takeIf { !it.kicked }?.let { throw PlayingBlockedException(it) }
         return AuthTicket.build(this, appId)
+    }
+
+    /**
+     * Asks Steam whether the account may play [appId] here, for at most [waitMs]: declares it, and says what Steam answers. Null when Steam
+     * says nothing against it. The playing state is released again.
+     */
+    suspend fun probePlaying(appId: Int, waitMs: Long): PlayingElsewhere? {
+        sendPlaying(appId)
+        val answer = kotlinx.coroutines.withTimeoutOrNull(waitMs) { playingElsewhere.first { it != null && !it.kicked } }
+        if (answer != null) sendPlaying(0)
+        return answer
+    }
+
+    /**
+     * Takes the playing session from the other device, as Steam's own client does when the player chooses to play here: the game that runs there
+     * is stopped, then this one is declared. True when Steam no longer says another session plays.
+     */
+    suspend fun takePlaying(appId: Int): Boolean {
+        val kick = `in`.dragonbra.javasteam.base.ClientMsgProtobuf<CMsgClientKickPlayingSession.Builder>(
+            CMsgClientKickPlayingSession::class.java,
+            `in`.dragonbra.javasteam.enums.EMsg.ClientKickPlayingSession,
+        )
+        kick.body.setOnlyStopGame(true)
+        connectTokens.traceFor(TRACE_MS)
+        client.send(kick)
+        // The other session needs a moment to stop its game before this one can be declared.
+        kotlinx.coroutines.delay(KICK_SETTLE_MS)
+        sendPlaying(appId)
+        // Refused again, Steam drops the connection within a moment (see [PlayingElsewhere]); still there after that, the session is ours.
+        kotlinx.coroutines.delay(TAKE_WAIT_MS)
+        return isAlive && playingElsewhere.value == null
     }
 
     private val _licenses = MutableStateFlow<List<License>?>(null)
@@ -195,7 +241,13 @@ class SteamSession(private val cellId: Int = 0) {
             if (!closedOnPurpose) onLost?.invoke()
         }
         callbacks.subscribe(LoggedOnCallback::class.java) { loggedOn?.complete(it) }
-        callbacks.subscribe(LoggedOffCallback::class.java) { if (it.result == EResult.LogonSessionReplaced) wasReplaced = true }
+        callbacks.subscribe(LoggedOffCallback::class.java) {
+            if (it.result == EResult.LogonSessionReplaced) wasReplaced = true
+            // Right after the account was declared as playing, it is Steam saying another session plays: it does not accept a second one.
+            val justDeclared = playingApp != 0 && android.os.SystemClock.elapsedRealtime() - playingSentAt < REFUSAL_WINDOW_MS
+            android.util.Log.i("GPSteamTicket", "Steam logged this connection off: ${it.result}" + if (justDeclared) " (just after playing was declared)" else "")
+            if (justDeclared) connectTokens.refusedPlaying()
+        }
         callbacks.subscribe(LicenseListCallback::class.java) { _licenses.value = it.licenseList }
         callbacks.subscribe(AccountInfoCallback::class.java) { accountName?.complete(it.personaName) }
         scope.launch {
@@ -287,6 +339,9 @@ class SteamSession(private val cellId: Int = 0) {
     private companion object {
         const val PUMP_TIMEOUT_MS = 1_000L
         const val PLAYING_SETTLE_MS = 700L
+        const val KICK_SETTLE_MS = 1_500L
+        const val REFUSAL_WINDOW_MS = 10_000L
+        const val TAKE_WAIT_MS = 3_000L
         const val PLAYING_TIMEOUT_MS = 3 * 60 * 1_000L
         const val MAX_PARALLEL_DOWNLOADS = 12
         const val MAX_PARALLEL_DECOMPRESS = 3
@@ -354,3 +409,6 @@ private fun httpClient(traffic: ConcurrentHashMap<Int, AtomicLong>): OkHttpClien
 
 private const val HTTP_MAX_REQUESTS = 64
 private const val HTTP_MAX_REQUESTS_PER_HOST = 16
+
+/** How long after a game is declared as played the messages of Steam are written to the log. */
+private const val TRACE_MS = 15_000L

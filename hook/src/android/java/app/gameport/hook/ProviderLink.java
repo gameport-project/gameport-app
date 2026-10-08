@@ -26,7 +26,7 @@ final class ProviderLink implements GamePortLink {
     }
 
     private Bundle call(String method, Bundle extras) throws IOException {
-        Bundle result = context.getContentResolver().call(base, method, pkg, extras);
+        Bundle result = Calls.call(context, base, method, pkg, extras);
         if (result == null) throw new IOException("GamePort refused or did not answer: " + method);
         return result;
     }

@@ -24,6 +24,8 @@ import java.io.File;
 public final class GamePortHookProvider extends ContentProvider {
     private static final String TAG = "GPHook";
     private static final long CONFLICT_WAIT_MS = 180_000;
+    /** How long the question about another device that plays waits for the player: then the game starts without its ticket. */
+    private static final long PLAY_CHOICE_WAIT_MS = 90_000;
     private static final long UPLOAD_AFTER_PAUSE_MS = 300;
     // How often the saves are looked at while the game runs (see [SaveSync#poll]), and how long the game's end waits for them to be sent.
     private static final long SAVE_POLL_MS = 4_000;
@@ -90,7 +92,8 @@ public final class GamePortHookProvider extends ContentProvider {
             // Before the game reads its saves.
             sync.syncAtLaunch();
             Log.i(TAG, "launch sync finished after " + (SystemClock.elapsedRealtime() - start) + " ms");
-            prepareSteamTicket(context);
+            // The player cancelled the launch: nothing else is set up, the game closes.
+            if (prepareSteamTicket(context)) return;
             watchTicketRequests(context);
             pullAchievementsFromSteam(context);
             watchAchievements(context);
@@ -117,7 +120,7 @@ public final class GamePortHookProvider extends ContentProvider {
     /** True when GamePort asked for this process to be started to send the game's saves, and not for the game to be played. */
     private static boolean startedToSendSaves(Context context) {
         try {
-            Bundle result = context.getContentResolver().call(Owner.cloud(context), "catchup", context.getPackageName(), null);
+            Bundle result = Calls.call(context, Owner.cloud(context), "catchup", context.getPackageName(), null);
             return result != null && result.getBoolean("catchup", false);
         } catch (Throwable t) {
             return false;
@@ -193,17 +196,82 @@ public final class GamePortHookProvider extends ContentProvider {
      * game's folder. The Steam shim returns it when the game asks for one, so the game's own servers
      * accept the login. Without it (GamePort offline) the shim answers with its placeholder ticket.
      */
-    private void prepareSteamTicket(Context context) {
+    /**
+     * The game is not to be played: its first screen is closed as soon as it exists, so the system sees a game that was closed (and does not start
+     * it again, as it would a process that died on its own), and the process leaves with it.
+     */
+    private void quitTheGame(Context context) {
+        final Application application = (Application) context.getApplicationContext();
+        final Handler main = new Handler(android.os.Looper.getMainLooper());
+        final Runnable leave = new Runnable() {
+            @Override public void run() {
+                System.exit(0);
+            }
+        };
+        application.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
+            @Override public void onActivityCreated(Activity a, Bundle b) { a.finishAndRemoveTask(); }
+            @Override public void onActivityDestroyed(Activity a) { main.postDelayed(leave, 300); }
+            @Override public void onActivityStarted(Activity a) {}
+            @Override public void onActivityResumed(Activity a) {}
+            @Override public void onActivityPaused(Activity a) {}
+            @Override public void onActivityStopped(Activity a) {}
+            @Override public void onActivitySaveInstanceState(Activity a, Bundle b) {}
+        });
+        // No screen ever opens: the process leaves anyway.
+        main.postDelayed(leave, 15_000);
+    }
+
+    /** Puts the question in front of the game and waits for the answer: QUIT, KICK or PLAY (also when there is none in time). */
+    private String askAboutOtherDevice(Context context) {
+        try {
+            new ProviderLink(context).showConflict();
+            long deadline = SystemClock.elapsedRealtime() + PLAY_CHOICE_WAIT_MS;
+            while (SystemClock.elapsedRealtime() < deadline) {
+                Bundle answer = Calls.call(context, Owner.cloud(context), "playchoice", context.getPackageName(), null);
+                String choice = answer == null ? "PENDING" : answer.getString("choice", "PENDING");
+                if ("NONE".equals(choice)) {
+                    // GamePort was stopped and started again since the question was put: it no longer knows it.
+                    Calls.call(context, Owner.cloud(context), "ticket", context.getPackageName(), null);
+                    new ProviderLink(context).showConflict();
+                } else if (!"PENDING".equals(choice)) {
+                    return choice;
+                }
+                Thread.sleep(300);
+            }
+            Calls.call(context, Owner.cloud(context), "playgiveup", context.getPackageName(), null);
+        } catch (Throwable t) {
+            Log.w(TAG, "the question about the other device could not be put", t);
+        }
+        return "PLAY";
+    }
+
+    private boolean prepareSteamTicket(Context context) {
         File files = context.getExternalFilesDir(null);
         File dir = new File(files != null ? files : context.getFilesDir(), "gameport");
         File target = new File(dir, "steam_ticket.bin");
         target.delete();
         try {
-            Bundle result = context.getContentResolver().call(Owner.cloud(context), "ticket", context.getPackageName(), null);
+            Bundle result = Calls.call(context, Owner.cloud(context), "ticket", context.getPackageName(), null);
+            if (result != null && "BLOCKED".equals(result.getString("status"))) {
+                // Steam says another device plays with the account: the player decides, in front of the game, before it goes on.
+                String choice = askAboutOtherDevice(context);
+                if ("QUIT".equals(choice)) {
+                    Log.i(TAG, "the player cancelled the launch: another device plays with the account");
+                    quitTheGame(context);
+                    return true;
+                } else if ("KICK".equals(choice)) {
+                    Bundle takeOver = new Bundle();
+                    takeOver.putBoolean("takeOver", true);
+                    result = Calls.call(context, Owner.cloud(context), "ticket", context.getPackageName(), takeOver);
+                } else {
+                    Log.i(TAG, "the player chose to play without the Steam ticket");
+                    result = null;
+                }
+            }
             byte[] ticket = result == null ? null : result.getByteArray("ticket");
             if (ticket == null || ticket.length == 0) {
                 Log.i(TAG, "no Steam ticket (GamePort offline, or Steam gave none)");
-                return;
+                return false;
             }
             dir.mkdirs();
             java.io.FileOutputStream out = new java.io.FileOutputStream(target);
@@ -213,6 +281,7 @@ public final class GamePortHookProvider extends ContentProvider {
         } catch (Throwable t) {
             Log.w(TAG, "could not get a Steam ticket", t);
         }
+        return false;
     }
 
     /**
@@ -241,7 +310,7 @@ public final class GamePortHookProvider extends ContentProvider {
             Bundle extras = new Bundle();
             extras.putString("source", source);
             extras.putStringArray("controls", controls.toArray(new String[0]));
-            context.getContentResolver().call(Owner.cloud(context), "controller_profile", context.getPackageName(), extras);
+            Calls.call(context, Owner.cloud(context), "controller_profile", context.getPackageName(), extras);
             Log.i(TAG, "reported " + controls.size() + " " + source + " controls");
         } catch (Throwable t) {
             Log.w(TAG, "could not report the controller profile", t);
@@ -267,13 +336,16 @@ public final class GamePortHookProvider extends ContentProvider {
                         // Keep GamePort running and connected to Steam, so a ticket takes a moment when asked for.
                         if (SystemClock.elapsedRealtime() - lastWarm > WARM_INTERVAL_MS) {
                             lastWarm = SystemClock.elapsedRealtime();
-                            context.getContentResolver().call(Owner.cloud(context), "warm", context.getPackageName(), null);
+                            Calls.call(context, Owner.cloud(context), "warm", context.getPackageName(), null);
                         }
                         if (request.exists()) {
                             String id = readLine(request);
                             request.delete();
                             long begun = SystemClock.elapsedRealtime();
-                            Bundle result = context.getContentResolver().call(Owner.cloud(context), "ticket", context.getPackageName(), null);
+                            // A ticket asked for while the game runs never opens the question: it was put when the game started.
+                            Bundle quiet = new Bundle();
+                            quiet.putBoolean("quiet", true);
+                            Bundle result = Calls.call(context, Owner.cloud(context), "ticket", context.getPackageName(), quiet);
                             byte[] ticket = result == null ? null : result.getByteArray("ticket");
                             if (ticket != null && ticket.length > 0) {
                                 writeAll(ticketFile, ticket);
@@ -316,7 +388,7 @@ public final class GamePortHookProvider extends ContentProvider {
             if (current == null || current.length() > 400_000) return;
             Bundle extras = new Bundle();
             extras.putString("current", current);
-            Bundle result = context.getContentResolver().call(Owner.cloud(context), "earned", context.getPackageName(), extras);
+            Bundle result = Calls.call(context, Owner.cloud(context), "earned", context.getPackageName(), extras);
             String merged = result == null ? null : result.getString("merged");
             if (merged == null || merged.isEmpty()) return;
             File parent = record.getParentFile();
@@ -407,7 +479,7 @@ public final class GamePortHookProvider extends ContentProvider {
                 times[i] = at == null ? 0L : at;
             }
             extras.putLongArray("times", times);
-            Bundle result = context.getContentResolver().call(Owner.cloud(context), "achievement", context.getPackageName(), extras);
+            Bundle result = Calls.call(context, Owner.cloud(context), "achievement", context.getPackageName(), extras);
             Log.i(TAG, "told GamePort about " + names.size() + " unlocked achievement(s)");
             return result != null && "OK".equals(result.getString("status"));
         } catch (Throwable t) {
@@ -491,7 +563,7 @@ public final class GamePortHookProvider extends ContentProvider {
         String controls = "";
         String family = "";
         try {
-            Bundle config = context.getContentResolver().call(Owner.cloud(context), "config", context.getPackageName(), null);
+            Bundle config = Calls.call(context, Owner.cloud(context), "config", context.getPackageName(), null);
             if (config == null) throw new java.io.IOException("no answer");
             seated = config.getBoolean("seated") ? "1" : "0";
             eyeCm = String.valueOf(config.getInt("eyeCm"));
@@ -661,7 +733,7 @@ public final class GamePortHookProvider extends ContentProvider {
 
     private static void tellGamePort(Context context, String method) {
         try {
-            context.getContentResolver().call(Owner.cloud(context), method, context.getPackageName(), null);
+            Calls.call(context, Owner.cloud(context), method, context.getPackageName(), null);
         } catch (Throwable t) {
             Log.w(TAG, "could not tell GamePort: " + method, t);
         }

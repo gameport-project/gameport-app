@@ -10,4 +10,14 @@
     <string name="conflict_keep_local">Garder celles de cet appareil</string>
     <string name="conflict_use_cloud">Utiliser celles de Steam</string>
     <string name="conflict_later">Décider plus tard</string>
+    <string name="play_title">Compte Steam utilisé sur un autre appareil</string>
+    <string name="play_explanation">Steam indique qu\'un jeu est lancé sur un autre appareil avec ce compte. Steam n\'accepte qu\'une seule partie à la fois par compte. Que faire pour %1$s ?</string>
+    <string name="play_quit">Annuler le lancement</string>
+    <string name="play_quit_detail">Le jeu se ferme. Rien n\'est changé sur l\'autre appareil.</string>
+    <string name="play_kick">Fermer le jeu de l\'autre appareil et jouer ici</string>
+    <string name="play_kick_detail">Steam arrête la partie en cours sur l\'autre appareil. Ce qui n\'y est pas sauvegardé est perdu. %1$s démarre ensuite avec son ticket Steam.</string>
+    <string name="play_anyway">Jouer sans ticket Steam</string>
+    <string name="play_anyway_detail">%1$s démarre sans ticket Steam. Un jeu qui se connecte à ses propres services en ligne peut échouer ou se fermer. Le temps de jeu n\'est pas compté sur Steam. L\'autre appareil n\'est pas touché.</string>
+    <string name="play_once">Le choix ne vaut que pour ce lancement.</string>
+    <string name="play_choose">Choisir</string>
 </resources>

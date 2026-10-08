@@ -41,6 +41,8 @@ internal interface CloudEntryPoint {
 
     fun achievementNotifier(): AchievementNotifier
 
+    fun playDecisions(): PlayDecisions
+
     fun steamAchievements(): SteamAchievementSync
 }
 
@@ -121,6 +123,7 @@ class CloudProvider : ContentProvider() {
         // The game's process is ending (it quit by itself, or its last screen closed): how long it lasted shows a problem.
         // Saves it could not send are then sent by GamePort itself (see [SaveCatchUp]).
         "closed" -> okAfter {
+            entryPoint.playDecisions().clear(packageName)
             entryPoint.reports().left(packageName)
             entryPoint.catchUp().afterClose()
         }
@@ -149,9 +152,28 @@ class CloudProvider : ContentProvider() {
             Bundle().apply { putString(STATUS, OK) }
         }
         // A fresh Steam session ticket, for games that log in to their own online services.
-        "ticket" -> runBlocking { coordinator.authTicket(packageName) }
-            ?.let { Bundle().apply { putByteArray("ticket", it) } }
-            ?: Bundle().apply { putString(STATUS, ERROR) }
+        "ticket" -> if (entryPoint.playDecisions().playsWithout(packageName)) {
+            // The player chose to play this game without its ticket: it is not asked again.
+            Bundle().apply { putString(STATUS, ERROR) }
+        } else if (entryPoint.playDecisions().isSimulated(packageName) && !extras.getBoolean("takeOver", false) && !extras.getBoolean("quiet", false)) {
+            // A test: the question is put as if another device played.
+            entryPoint.playDecisions().ask(packageName, gameLabel(packageName))
+            Bundle().apply { putString(STATUS, "BLOCKED"); putInt("otherApp", 0) }
+        } else when (val outcome = runBlocking { coordinator.authTicket(packageName, extras.getBoolean("takeOver", false)) }) {
+            is CloudSyncCoordinator.TicketOutcome.Given -> Bundle().apply { putByteArray("ticket", outcome.ticket) }
+            // Another device plays with the account: at the start of the game the question is put to the player, in front of it.
+            is CloudSyncCoordinator.TicketOutcome.Blocked -> if (extras.getBoolean("quiet", false)) {
+                Bundle().apply { putString(STATUS, ERROR) }
+            } else {
+                entryPoint.playDecisions().ask(packageName, gameLabel(packageName))
+                Bundle().apply { putString(STATUS, "BLOCKED"); putInt("otherApp", outcome.otherApp) }
+            }
+            CloudSyncCoordinator.TicketOutcome.None -> Bundle().apply { putString(STATUS, ERROR) }
+        }
+        // The player's answer to that question: PENDING while it is open, then QUIT, KICK or PLAY.
+        "playchoice" -> Bundle().apply { putString(CHOICE, entryPoint.playDecisions().answerFor(packageName)) }
+        // The game gave up waiting for the answer.
+        "playgiveup" -> okAfter { entryPoint.playDecisions().clear(packageName) }
         // Did GamePort start this game's process only to send its saves? Then it is not played: nothing else is set up (no ticket, no time counted).
         "catchup" -> Bundle().apply {
             putString(STATUS, OK)
@@ -186,6 +208,11 @@ class CloudProvider : ContentProvider() {
         entryPoint.playHistory().markPlayed(appId)
         entryPoint.reports().launched(packageName)
     }
+
+    private fun gameLabel(packageName: String): String = runCatching {
+        val manager = context!!.packageManager
+        manager.getApplicationInfo(packageName, 0).loadLabel(manager).toString()
+    }.getOrDefault(packageName)
 
     private inline fun okAfter(action: () -> Unit): Bundle {
         action()

@@ -15,7 +15,7 @@ import app.gameport.core.designsystem.GamePortTheme
 import app.gameport.core.settings.AppLocale
 import dagger.hilt.android.AndroidEntryPoint
 
-/** In front of a launching game while its saves and Steam's disagree; closes once the player has answered. */
+/** In front of a launching game while its saves and Steam's disagree, or while another device plays with the account; closes once the player has answered. */
 @AndroidEntryPoint
 class SyncActivity : ComponentActivity() {
     private val viewModel: SyncViewModel by viewModels()
@@ -27,11 +27,14 @@ class SyncActivity : ComponentActivity() {
         setContent {
             GamePortTheme {
                 val conflict by viewModel.conflict.collectAsState()
+                val playChoice by viewModel.playChoice.collectAsState()
                 var seen by remember { mutableStateOf(false) }
-                LaunchedEffect(conflict) {
-                    if (conflict != null) seen = true else if (seen) finish()
+                LaunchedEffect(conflict, playChoice) {
+                    if (conflict != null || playChoice != null) seen = true else if (seen) finish()
                 }
-                conflict?.let {
+                playChoice?.let {
+                    PlayChoiceScreen(pending = it, onQuit = viewModel::onQuit, onKick = viewModel::onKick, onPlay = viewModel::onPlayAnyway)
+                } ?: conflict?.let {
                     ConflictScreen(
                         conflict = it,
                         onKeepLocal = viewModel::onKeepLocal,

@@ -10,4 +10,14 @@
     <string name="conflict_keep_local">Keep this device\'s saves</string>
     <string name="conflict_use_cloud">Use Steam\'s saves</string>
     <string name="conflict_later">Decide later</string>
+    <string name="play_title">Steam account in use on another device</string>
+    <string name="play_explanation">Steam says a game is running on another device with this account. Steam only allows one game at a time per account. What to do for %1$s?</string>
+    <string name="play_quit">Cancel the launch</string>
+    <string name="play_quit_detail">The game closes. Nothing is changed on the other device.</string>
+    <string name="play_kick">Close the other device\'s game and play here</string>
+    <string name="play_kick_detail">Steam stops the game running on the other device. Whatever is not saved there is lost. %1$s then starts with its Steam ticket.</string>
+    <string name="play_anyway">Play without a Steam ticket</string>
+    <string name="play_anyway_detail">%1$s starts without a Steam ticket. A game that logs in to its own online services can fail or close. Play time is not counted on Steam. The other device is not touched.</string>
+    <string name="play_once">The choice only applies to this launch.</string>
+    <string name="play_choose">Choose</string>
 </resources>

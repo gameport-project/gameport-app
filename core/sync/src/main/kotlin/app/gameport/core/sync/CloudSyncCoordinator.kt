@@ -72,6 +72,8 @@ class CloudSyncCoordinator @Inject constructor(
     private val snapshots: SaveSnapshotStore,
     private val pending: PendingSyncStore,
     private val gate: app.gameport.core.install.UpdateGate,
+    private val decisions: PlayDecisions,
+    private val events: app.gameport.core.install.GameEventLog,
 ) {
     private class Active(
         val packageName: String,
@@ -110,18 +112,63 @@ class CloudSyncCoordinator @Inject constructor(
     val conflicts: StateFlow<Map<String, PendingConflict>> = _conflicts.asStateFlow()
 
     /** Starts a sync for [packageName]: finds the session, the game's rules and the cloud files. */
+    /** What a request for a ticket came to. */
+    sealed interface TicketOutcome {
+        class Given(val ticket: ByteArray) : TicketOutcome
+
+        /** No ticket: GamePort is offline, signed out, or Steam gave none. The game starts without it. */
+        data object None : TicketOutcome
+
+        /** Steam says another device plays with the account: what to do is the player's (see [PlayDecisions]). */
+        class Blocked(val otherApp: Int) : TicketOutcome
+    }
+
     /**
-     * A Steam session ticket for the game, made with the signed-in account, or null when GamePort is
-     * offline or Steam gives none. The game's own servers verify it (login to their online services).
+     * A Steam session ticket for the game, made with the signed-in account. The game's own servers verify it (login to their online services).
+     * With [takeOver] the playing session is first taken from the other device, as Steam's client does when the player chooses to play here.
      */
-    suspend fun authTicket(packageName: String): ByteArray? {
-        val appId = installed.all().entries.firstOrNull { it.value == packageName }?.key ?: return null
-        runCatching { auth.restoreSession() }
-        if (auth.offline.value) return null
-        val session = withTimeoutOrNull(SESSION_WAIT_MS) { sessions.current.filterNotNull().first() } ?: return null
-        return runCatching { session.authSessionTicket(appId) }
-            .onFailure { android.util.Log.w("GPSync", "no session ticket for $packageName", it) }
-            .getOrNull()
+    suspend fun authTicket(packageName: String, takeOver: Boolean = false): TicketOutcome {
+        val appId = installed.all().entries.firstOrNull { it.value == packageName }?.key ?: return TicketOutcome.None
+        // Taking the playing session is the player's wish: the connection is opened even when the account was just taken by another device.
+        runCatching { if (takeOver) auth.resume() else auth.restoreSession() }
+        if (auth.offline.value) return TicketOutcome.None
+        val session = withTimeoutOrNull(SESSION_WAIT_MS) { sessions.current.filterNotNull().first() } ?: return TicketOutcome.None
+        if (takeOver) {
+            val taken = runCatching { session.takePlaying(appId) }.getOrDefault(false)
+            events.note(appId, "the playing session was taken from the other device: ${if (taken) "done" else "Steam still says another one plays"}")
+        }
+        return try {
+            TicketOutcome.Given(session.authSessionTicket(appId)).also { events.note(appId, "Steam ticket given to the game") }
+        } catch (blocked: app.gameport.core.steam.session.PlayingBlockedException) {
+            events.note(appId, "no Steam ticket: Steam says another device plays (app ${blocked.other.appId})")
+            TicketOutcome.Blocked(blocked.other.appId)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            android.util.Log.w("GPSync", "no session ticket for $packageName: the connection fell", e)
+            // Steam drops the connection when it refuses the playing session: said at once, as a headset stops GamePort a few seconds after a game starts.
+            val refused = session.playingElsewhere.value?.takeIf { !it.kicked }
+            if (refused != null) {
+                events.note(appId, "no Steam ticket: Steam dropped the connection as the game was declared, another device plays with the account")
+                TicketOutcome.Blocked(refused.appId)
+            } else {
+                retryOnNextConnection(appId, session)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("GPSync", "no session ticket for $packageName", e)
+            events.note(appId, "no Steam ticket (${e::class.simpleName})")
+            TicketOutcome.None
+        }
+    }
+
+    /** The connection fell as the ticket was asked for: on the next one, Steam is asked whether the account may play, and says if it may not. */
+    private suspend fun retryOnNextConnection(appId: Int, lost: SteamSession): TicketOutcome {
+        val next = withTimeoutOrNull(RECONNECT_WAIT_MS) { sessions.current.filterNotNull().first { it !== lost && it.isAlive } }
+        val other = next?.probePlaying(appId, PROBE_WAIT_MS)
+        if (other != null) {
+            events.note(appId, "no Steam ticket: Steam says another device plays (app ${other.appId})")
+            return TicketOutcome.Blocked(other.appId)
+        }
+        events.note(appId, "no Steam ticket: the connection to Steam fell as it was asked for, and Steam says nothing against playing")
+        return TicketOutcome.None
     }
 
     /**
@@ -375,6 +422,8 @@ class CloudSyncCoordinator @Inject constructor(
     private companion object {
         const val TAG = "GPSync"
         const val SESSION_WAIT_MS = 25_000L
+        const val RECONNECT_WAIT_MS = 10_000L
+        const val PROBE_WAIT_MS = 5_000L
 
         /** A request to send a game's saves stays valid this long; the hook says when it is done. */
         const val CATCH_UP_WINDOW_MS = 60_000L

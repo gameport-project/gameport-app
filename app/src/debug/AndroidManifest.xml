@@ -21,6 +21,14 @@
         <receiver
             android:name="app.gameport.debug.ObbRepairReceiver"
             android:exported="true" />
+        <!-- Development only: puts the question about another device that plays, without one. -->
+        <receiver
+            android:name="app.gameport.debug.PlaySimulationReceiver"
+            android:exported="true" />
+        <!-- Development only: downloads a game as Steam sells it, without patching or installing it. -->
+        <receiver
+            android:name="app.gameport.debug.OriginalDownloadReceiver"
+            android:exported="true" />
         <!-- Development only: works out (and, when asked, really does) the adding of achievements to the Steam account. -->
         <receiver
             android:name="app.gameport.debug.AchievementDebugReceiver"
