@@ -21,6 +21,10 @@
         <receiver
             android:name="app.gameport.debug.ObbRepairReceiver"
             android:exported="true" />
+        <!-- Development only: puts the question "did it work?" for a game, without playing it. -->
+        <receiver
+            android:name="app.gameport.debug.VerdictAskReceiver"
+            android:exported="true" />
         <!-- Development only: puts the question about another device that plays, without one. -->
         <receiver
             android:name="app.gameport.debug.PlaySimulationReceiver"

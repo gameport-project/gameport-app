@@ -10,6 +10,8 @@ class GamePortApplication : Application() {
     @Inject lateinit var steamAchievements: app.gameport.core.sync.SteamAchievementSync
     @Inject lateinit var saveCatchUp: app.gameport.core.sync.SaveCatchUp
     @Inject lateinit var connectionKeeper: app.gameport.core.sync.ConnectionKeeper
+    @Inject lateinit var verdictSender: app.gameport.core.sync.VerdictSender
+    @Inject lateinit var compat: app.gameport.core.sync.CompatRepository
 
     override fun onCreate() {
         super.onCreate()
@@ -21,6 +23,10 @@ class GamePortApplication : Application() {
         saveCatchUp.start()
         // Quitting GamePort closes its connection to Steam too (see [ConnectionKeeper]).
         connectionKeeper.start()
+        // The answers the player gave about games are sent to the relay of the project (if they chose to share them).
+        verdictSender.start()
+        // What the players say about the games is read when GamePort starts (and when a page opens, if what is kept is old).
+        compat.start()
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: android.app.Activity) = connectionKeeper.screenShown()
             override fun onActivityStopped(activity: android.app.Activity) {}

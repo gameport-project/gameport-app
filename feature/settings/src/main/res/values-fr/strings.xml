@@ -123,6 +123,8 @@
     <string name="settings_hidden_description">Jeux cachés de l\'application. Ils restent dans la bibliothèque Steam, où rien ne change.</string>
     <string name="settings_hidden_empty">Aucun jeu n\'est caché de l\'application.</string>
     <string name="settings_hidden_show">Réafficher</string>
+    <string name="settings_share_verdicts">Partager si les jeux fonctionnent</string>
+    <string name="settings_share_verdicts_description">Quand un jeu se ferme, GamePort demande s\'il a fonctionné. La réponse reste sur cet appareil, et quand cette option est activée elle est aussi envoyée au projet pour montrer quels jeux fonctionnent. Elle ne contient que le jeu, la réponse, la version de GamePort et le type d\'appareil, avec un nombre aléatoire qui n\'identifie personne. Ni nom, ni adresse, ni compte.</string>
     <string name="settings_category_incompatible">Jeux incompatibles</string>
     <string name="settings_incompatible_description">Jeux confirmés comme ne fonctionnant pas avec GamePort. Ils sont écartés de l\'accueil et restent dans la bibliothèque Steam, où rien ne change.</string>
     <string name="settings_incompatible_show_title">Les afficher quand même</string>

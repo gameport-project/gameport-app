@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.layout.layout
 import app.gameport.core.model.AppKind
 import app.gameport.core.model.Playtime
+import app.gameport.core.model.pick
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -47,6 +48,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
@@ -84,6 +86,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.platform.LocalDensity
 import kotlin.math.abs
 import androidx.compose.runtime.mutableStateOf
@@ -280,6 +283,8 @@ internal fun GameContent(
                     onOpenSaves = onOpenSaves,
                     controllerProfile = uiState.controllerProfile,
                     savesNotSynced = uiState.savesNotSynced,
+                    compat = uiState.compat,
+                    incompatible = uiState.incompatible,
                     vrDevice = uiState.vrDevice,
                     onOpenControllers = onOpenControllers,
                     onToggleFavorite = onToggleFavorite,
@@ -330,6 +335,8 @@ private fun GameDetails(
     onOpenSaves: () -> Unit,
     controllerProfile: Boolean,
     savesNotSynced: Boolean,
+    compat: app.gameport.core.model.Compat?,
+    incompatible: app.gameport.core.model.IncompatibleReason?,
     favorite: Boolean,
     hidden: Boolean,
     playtime: Playtime,
@@ -372,6 +379,18 @@ private fun GameDetails(
     // Owned extra content is offered when installing; what the account lacks cannot be installed.
     val ownedDlc = game.androidBuild?.dlc.orEmpty().filter { it.owned }
     var choosingDlc by remember { mutableStateOf(false) }
+    // A game that most players could not run is installed only after the player has been told.
+    var warning by remember { mutableStateOf(false) }
+    val startInstall = { if (ownedDlc.isEmpty()) onInstall(emptySet()) else choosingDlc = true }
+    if (warning && compat != null) {
+        BackdropDialog(
+            onDismissRequest = { warning = false },
+            title = { Text(stringResource(R.string.game_compat_warning_title)) },
+            text = { Text(stringResource(R.string.game_compat_warning_text, deviceName(compat.device))) },
+            confirmButton = { Button(onClick = { warning = false; startInstall() }) { Text(stringResource(R.string.game_compat_warning_install)) } },
+            dismissButton = { GlassButton(onClick = { warning = false }) { Text(stringResource(R.string.game_compat_warning_cancel)) } },
+        )
+    }
     if (choosingDlc) {
         DlcDialog(
             game = game,
@@ -467,7 +486,9 @@ private fun GameDetails(
                         AppKind.BETA -> GlassChip(stringResource(R.string.game_kind_beta), accent = KindBlue)
                         AppKind.GAME -> Unit
                     }
+                    CompatChips(compat, incompatible)
                 }
+                CompatDetails(compat, incompatible)
                 FlowRow(
                     modifier = Modifier.onGloballyPositioned { alignment.actionsPlaced(it) },
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -476,7 +497,7 @@ private fun GameDetails(
                     InstallActions(
                         install = install,
                         speedUnit = speedUnit,
-                        onInstall = { if (ownedDlc.isEmpty()) onInstall(emptySet()) else choosingDlc = true },
+                        onInstall = { if (compat?.level == app.gameport.core.model.CompatLevel.FAILS) warning = true else startInstall() },
                         onResume = { onInstall(null) },
                         onCancel = onCancel,
                     onPause = onPause,
@@ -991,3 +1012,45 @@ private fun durationText(minutes: Int): String = when {
     minutes < 60 -> stringResource(R.string.game_duration_minutes, minutes)
     else -> stringResource(R.string.game_duration_hours, minutes / 60, minutes % 60)
 }
+
+private val CompatGreen = Color(0xFF66BB6A)
+private val CompatOrange = Color(0xFFFFB74D)
+private val CompatRed = Color(0xFFE57373)
+
+/** The label of what is known about the game, in colour. */
+@Composable
+private fun CompatChips(compat: app.gameport.core.model.Compat?, incompatible: app.gameport.core.model.IncompatibleReason?) {
+    when {
+        // A game known not to run says so, whatever the players said.
+        incompatible != null -> GlassChip(stringResource(R.string.game_compat_incompatible), accent = CompatRed)
+        compat != null -> when (compat.level) {
+            app.gameport.core.model.CompatLevel.WORKS -> GlassChip(stringResource(R.string.game_compat_works, deviceName(compat.device)), accent = CompatGreen)
+            app.gameport.core.model.CompatLevel.MIXED -> GlassChip(stringResource(R.string.game_compat_mixed, deviceName(compat.device)), accent = CompatOrange)
+            app.gameport.core.model.CompatLevel.FAILS -> GlassChip(stringResource(R.string.game_compat_fails, deviceName(compat.device)), accent = CompatRed)
+        }
+    }
+}
+
+/** What stands behind the label: why the game is incompatible, or that players tried it with the offline mode. No numbers: the label says it. */
+@Composable
+private fun CompatDetails(compat: app.gameport.core.model.Compat?, incompatible: app.gameport.core.model.IncompatibleReason?) {
+    val language = LocalConfiguration.current.locales[0].language
+    val style = MaterialTheme.typography.bodySmall
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    when {
+        incompatible != null -> Text(incompatible.title.pick(language) + incompatible.separator(language) + incompatible.text.pick(language), style = style, color = muted)
+        compat != null && compat.offlineTested -> Text(stringResource(R.string.game_compat_offline), style = style, color = muted)
+    }
+}
+
+/** The kind of device as it is written, in the words of the player's language. */
+@Composable
+private fun deviceName(kind: String): String = stringResource(
+    when (kind) {
+        "quest" -> R.string.game_device_quest
+        "pico" -> R.string.game_device_pico
+        "phone" -> R.string.game_device_phone
+        "tablet" -> R.string.game_device_tablet
+        else -> R.string.game_device_other
+    },
+)

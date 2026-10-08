@@ -76,7 +76,11 @@ class IncompatibleNoticeViewModel @Inject constructor(
 @Composable
 fun IncompatibleNoticeHost(viewModel: IncompatibleNoticeViewModel = hiltViewModel()) {
     val notices by viewModel.notices.collectAsStateWithLifecycle()
-    if (notices.isEmpty()) return
+    if (notices.isEmpty()) {
+        // Nothing to tell about incompatible games: the last window of the chain may ask whether a game worked.
+        VerdictAskHost()
+        return
+    }
     val language = LocalConfiguration.current.locales[0].language
     BackdropDialog(
         onDismissRequest = {},

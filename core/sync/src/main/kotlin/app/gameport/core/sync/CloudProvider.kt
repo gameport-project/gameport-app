@@ -43,6 +43,8 @@ internal interface CloudEntryPoint {
 
     fun playDecisions(): PlayDecisions
 
+    fun verdictAsker(): VerdictAsker
+
     fun steamAchievements(): SteamAchievementSync
 }
 
@@ -123,6 +125,7 @@ class CloudProvider : ContentProvider() {
         // The game's process is ending (it quit by itself, or its last screen closed): how long it lasted shows a problem.
         // Saves it could not send are then sent by GamePort itself (see [SaveCatchUp]).
         "closed" -> okAfter {
+            entryPoint.verdictAsker().gameClosed(packageName)
             entryPoint.playDecisions().clear(packageName)
             entryPoint.reports().left(packageName)
             entryPoint.catchUp().afterClose()

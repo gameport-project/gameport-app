@@ -39,6 +39,7 @@ class SettingsViewModel @Inject constructor(
     library: SteamLibraryRepository,
     private val history: PlayHistoryStore,
     private val incompatible: app.gameport.core.settings.IncompatibleGames,
+    private val verdicts: app.gameport.core.settings.GameVerdicts,
     private val downloadRegion: app.gameport.core.steam.DownloadRegion,
     device: DeviceProfile,
 ) : ViewModel() {
@@ -59,6 +60,11 @@ class SettingsViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     val showIncompatible: StateFlow<Boolean> = incompatible.showAnyway
+
+    /** The player lets their answers about games ("it worked" / "it did not") go to the project. */
+    val shareVerdicts: StateFlow<Boolean> = verdicts.share
+
+    fun onShareVerdictsChanged(share: Boolean) = verdicts.setShare(share)
 
     fun onShowIncompatibleChanged(show: Boolean) = incompatible.setShowAnyway(show)
 

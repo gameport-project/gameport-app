@@ -49,6 +49,10 @@ sealed interface GameUiState {
         val vrDevice: Boolean = true,
         /** The game has saves and the ones on this device and on Steam do not agree. */
         val savesNotSynced: Boolean = false,
+        /** What the players say about the game: null while too few of them said anything. */
+        val compat: app.gameport.core.model.Compat? = null,
+        /** Why the game is known not to run, when it is on the list of incompatible games. */
+        val incompatible: app.gameport.core.model.IncompatibleReason? = null,
     ) : GameUiState
 }
 
@@ -81,7 +85,14 @@ class GameViewModel @Inject constructor(
     private val reporter: app.gameport.core.sync.ProblemReporter,
     achievementsRepository: app.gameport.core.steam.AchievementsRepository,
     saves: app.gameport.core.sync.SaveStateRepository,
+    private val compat: app.gameport.core.sync.CompatRepository,
+    incompatibleGames: app.gameport.core.settings.IncompatibleGames,
 ) : ViewModel() {
+    init {
+        // The totals of the players are asked again when they are old; what is kept shows meanwhile.
+        viewModelScope.launch { compat.refreshIfStale() }
+    }
+
     /** How GamePort stands with Steam. */
     val connection: StateFlow<app.gameport.core.model.SteamConnection> = auth.connection
 
@@ -127,13 +138,24 @@ class GameViewModel @Inject constructor(
 
     private val savesNotSynced: Flow<Boolean> = saves.observe(appId).map { it.files.isNotEmpty() && !it.inSync }
 
+    /** What is said about the game by the players, and by the list of incompatible games. */
+    private class Opinion(val compat: app.gameport.core.model.Compat?, val incompatible: app.gameport.core.model.IncompatibleReason?)
+
+    private val opinion: Flow<Opinion> = compat.observe(appId).map { community -> Opinion(community, incompatibleGames.list.reasonOf(appId)) }
+
     val uiState: StateFlow<GameUiState> = combine(
         baseState,
-        playtimeStore.observe(appId),
-        steamMinutes,
-        savesNotSynced,
-    ) { state, deviceMillis, steam, notSynced ->
-        if (state is GameUiState.Content) state.copy(playtime = app.gameport.core.model.Playtime(deviceMillis, steam), savesNotSynced = notSynced) else state
+        combine(playtimeStore.observe(appId), steamMinutes, savesNotSynced) { deviceMillis, steam, notSynced -> Triple(deviceMillis, steam, notSynced) },
+        opinion,
+    ) { state, (deviceMillis, steam, notSynced), opinion ->
+        if (state is GameUiState.Content) {
+            state.copy(
+                playtime = app.gameport.core.model.Playtime(deviceMillis, steam),
+                savesNotSynced = notSynced,
+                compat = opinion.compat,
+                incompatible = opinion.incompatible,
+            )
+        } else state
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), GameUiState.Loading)
 
     /** Asks Steam again for the account's total time in the game; the last answer stays when it cannot be reached. */

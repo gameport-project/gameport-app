@@ -8,6 +8,13 @@
         <item quantity="one">%1$d game of the library is confirmed as incompatible. It is hidden from the home and can be shown again in Settings > Incompatible games.</item>
         <item quantity="other">%1$d games of the library are confirmed as incompatible. They are hidden from the home and can be shown again in Settings > Incompatible games.</item>
     </plurals>
+    <string name="verdict_title">%1$s: did it work?</string>
+    <string name="verdict_shared">The answer helps to know which games work, and is sent to the project without any name.</string>
+    <string name="verdict_kept">The answer stays on this device: sending is off in Settings.</string>
+    <string name="verdict_where">Only the game, the answer, the version of GamePort and the kind of device are sent. The choice is in Settings > Account.</string>
+    <string name="verdict_worked">It worked</string>
+    <string name="verdict_failed">It did not work</string>
+    <string name="verdict_later">Not now</string>
     <string name="whatsnew_games">Games concerned:</string>
     <plurals name="whatsnew_alert_title">
         <item quantity="one">%1$d game must be patched again to benefit from these new features.</item>

@@ -8,6 +8,13 @@
         <item quantity="many">%1$d jeux de la bibliothèque sont confirmés comme incompatibles. Ils sont cachés de l\'accueil et peuvent être réaffichés dans Réglages > Jeux incompatibles.</item>
         <item quantity="other">%1$d jeux de la bibliothèque sont confirmés comme incompatibles. Ils sont cachés de l\'accueil et peuvent être réaffichés dans Réglages > Jeux incompatibles.</item>
     </plurals>
+    <string name="verdict_title">%1$s : est-ce que ça a marché ?</string>
+    <string name="verdict_shared">La réponse aide à savoir quels jeux fonctionnent, et elle est envoyée au projet sans aucun nom.</string>
+    <string name="verdict_kept">La réponse reste sur cet appareil : l\'envoi est désactivé dans les Réglages.</string>
+    <string name="verdict_where">Seuls le jeu, la réponse, la version de GamePort et le type d\'appareil sont envoyés. Le choix se fait dans Réglages > Compte.</string>
+    <string name="verdict_worked">Ça a marché</string>
+    <string name="verdict_failed">Ça n\'a pas marché</string>
+    <string name="verdict_later">Pas maintenant</string>
     <string name="whatsnew_games">Jeux concernés :</string>
     <plurals name="whatsnew_alert_title">
         <item quantity="one">%1$d jeu doit être patché de nouveau pour profiter de ces nouveautés.</item>

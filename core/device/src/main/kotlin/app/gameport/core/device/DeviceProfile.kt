@@ -2,6 +2,7 @@ package app.gameport.core.device
 
 import android.content.Context
 import android.os.Build
+import app.gameport.core.model.VoteDevice
 import app.gameport.core.model.vr.DeviceInfo
 import app.gameport.core.model.vr.VrPlatform
 import app.gameport.core.model.vr.VrPlatforms
@@ -27,4 +28,11 @@ class DeviceProfile @Inject constructor(
     val vrPlatform: VrPlatform? by lazy { VrPlatforms.detect(info) }
 
     val isHeadset: Boolean get() = vrPlatform != null
+
+    /** The kind of device in the few words the project's totals use ("quest", "pico", "phone", "tablet", "other"): nothing finer than that leaves the device. */
+    val kind: String by lazy { VoteDevice.of(vrPlatform?.id, context.resources.configuration.smallestScreenWidthDp >= TABLET_DP) }
+
+    private companion object {
+        const val TABLET_DP = 600
+    }
 }

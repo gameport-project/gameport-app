@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.gameport.core.designsystem.AttentionBadge
 import app.gameport.core.designsystem.UpdateBadge
+import app.gameport.core.designsystem.WorksBadge
 import app.gameport.core.designsystem.GameImage
 import app.gameport.core.designsystem.glass
 import app.gameport.core.model.AppKind
@@ -84,6 +85,8 @@ internal fun GameCard(
     onLongClick: (() -> Unit)? = null,
     needsAttention: Boolean = false,
     hasUpdate: Boolean = false,
+    /** The players who use this kind of device say the game works. */
+    worksHere: Boolean = false,
     showTitle: Boolean = true,
     favorite: Boolean = false,
     hover: HoverAnimation = HoverAnimation.FULL,
@@ -169,10 +172,11 @@ internal fun GameCard(
             }
             Badges(game, Modifier.align(Alignment.TopEnd).padding(8.dp))
             // Small, so they do not hide the artwork: orange for what needs attention, green for an update.
-            if (needsAttention || hasUpdate) {
+            if (needsAttention || hasUpdate || worksHere) {
                 Row(Modifier.align(Alignment.TopStart).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (needsAttention) AttentionBadge(size = 18.dp)
                     if (hasUpdate) UpdateBadge(size = 18.dp)
+                    if (worksHere) WorksBadge(size = 18.dp)
                 }
             }
         }

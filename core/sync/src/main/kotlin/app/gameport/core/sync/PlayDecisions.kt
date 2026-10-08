@@ -44,6 +44,7 @@ class PlayDecisions(private val prefs: SharedPreferences?) {
 
     /** The question is put to the player; asking again for the same game keeps the answer it has. */
     fun ask(packageName: String, gameName: String) {
+        asked.add(packageName)
         _pending.update { current -> if (current[packageName] != null) current else current + (packageName to Pending(packageName, gameName)) }
     }
 
@@ -57,8 +58,21 @@ class PlayDecisions(private val prefs: SharedPreferences?) {
         val choice = pending.choice ?: return "PENDING"
         _pending.update { it - packageName }
         if (choice == Choice.PLAY) without.add(packageName)
+        if (choice == Choice.QUIT) quit.add(packageName)
         return choice.name
     }
+
+    /** Games for which the window about another device was opened during their launch: what they did then says little about the offline mode. */
+    private val asked = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /** True, once, when that window was opened for [packageName] since the last time this was asked. */
+    fun consumeAsked(packageName: String): Boolean = asked.remove(packageName)
+
+    /** Games whose launch the player cancelled: they close at once, which says nothing about whether they work. */
+    private val quit = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /** True, once, when [packageName] closed because the player cancelled its launch. */
+    fun consumeQuit(packageName: String): Boolean = quit.remove(packageName)
 
     /**
      * Games for which the question is put at every start as if another device played, "all" for all of them: only the debug build can set it, to try
