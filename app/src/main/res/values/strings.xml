@@ -3,6 +3,11 @@
     <string name="app_name">GamePort</string>
     <string name="whatsnew_title">What\'s new in GamePort %1$s</string>
     <string name="whatsnew_preview">Preview: the games are made up and nothing is patched.</string>
+    <string name="incompatible_title">Games confirmed as incompatible</string>
+    <plurals name="incompatible_intro">
+        <item quantity="one">%1$d game of the library is confirmed as incompatible. It is hidden from the home and can be shown again in Settings > Incompatible games.</item>
+        <item quantity="other">%1$d games of the library are confirmed as incompatible. They are hidden from the home and can be shown again in Settings > Incompatible games.</item>
+    </plurals>
     <string name="whatsnew_games">Games concerned:</string>
     <plurals name="whatsnew_alert_title">
         <item quantity="one">%1$d game must be patched again to benefit from these new features.</item>

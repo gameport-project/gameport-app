@@ -2,6 +2,12 @@
 <resources>
     <string name="whatsnew_title">Nouveautés de GamePort %1$s</string>
     <string name="whatsnew_preview">Aperçu : les jeux sont inventés et rien n\'est patché.</string>
+    <string name="incompatible_title">Jeux confirmés comme incompatibles</string>
+    <plurals name="incompatible_intro">
+        <item quantity="one">%1$d jeu de la bibliothèque est confirmé comme incompatible. Il est caché de l\'accueil et peut être réaffiché dans Réglages > Jeux incompatibles.</item>
+        <item quantity="many">%1$d jeux de la bibliothèque sont confirmés comme incompatibles. Ils sont cachés de l\'accueil et peuvent être réaffichés dans Réglages > Jeux incompatibles.</item>
+        <item quantity="other">%1$d jeux de la bibliothèque sont confirmés comme incompatibles. Ils sont cachés de l\'accueil et peuvent être réaffichés dans Réglages > Jeux incompatibles.</item>
+    </plurals>
     <string name="whatsnew_games">Jeux concernés :</string>
     <plurals name="whatsnew_alert_title">
         <item quantity="one">%1$d jeu doit être patché de nouveau pour profiter de ces nouveautés.</item>

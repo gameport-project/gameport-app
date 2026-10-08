@@ -65,13 +65,17 @@ internal class StoredHistorySource @Inject constructor(
     private val history: PlayHistoryStore,
     private val installed: InstalledGames,
     private val packages: PackageGateway,
+    private val incompatible: app.gameport.core.settings.IncompatibleGames,
 ) : HistorySource {
     override fun observe(): Flow<PlayHistory> {
         val installedAt = packages.packageChanges()
             .onStart { emit(Unit) }
             .map { installed.all().mapNotNull { (appId, packageName) -> packages.installTimeOf(packageName)?.let { appId to it } }.toMap() }
             .flowOn(Dispatchers.IO)
-        return combine(history.lastPlayed, history.favorites, installedAt, history.hidden) { played, starred, at, hidden -> PlayHistory(played, starred, at, hidden) }
+        // A game confirmed as incompatible is hidden like one the player hid, unless they chose to show those anyway.
+        return combine(history.lastPlayed, history.favorites, installedAt, history.hidden, incompatible.showAnyway) { played, starred, at, hidden, showAnyway ->
+            PlayHistory(played, starred, at, hidden + incompatible.hiddenIds(showAnyway))
+        }
     }
 }
 

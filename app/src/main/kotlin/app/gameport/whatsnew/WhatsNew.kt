@@ -58,7 +58,12 @@ import app.gameport.core.model.pick
 @Composable
 fun WhatsNewHost(viewModel: WhatsNewViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    state?.let { WhatsNewDialog(it, onPatchAll = viewModel::onPatchAll, onLater = viewModel::onLater, onStop = viewModel::onStop, onClose = viewModel::onClose) }
+    // The news first; once it is closed, the games confirmed as incompatible that the player was not told about yet.
+    if (state != null) {
+        WhatsNewDialog(state!!, onPatchAll = viewModel::onPatchAll, onLater = viewModel::onLater, onStop = viewModel::onStop, onClose = viewModel::onClose)
+    } else {
+        IncompatibleNoticeHost()
+    }
 }
 
 /**

@@ -38,6 +38,7 @@ class SettingsViewModel @Inject constructor(
     private val patching: app.gameport.core.sync.PatchAllCoordinator,
     library: SteamLibraryRepository,
     private val history: PlayHistoryStore,
+    private val incompatible: app.gameport.core.settings.IncompatibleGames,
     private val downloadRegion: app.gameport.core.steam.DownloadRegion,
     device: DeviceProfile,
 ) : ViewModel() {
@@ -47,6 +48,19 @@ class SettingsViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     fun onShowAgain(appId: Int) = history.setHidden(appId, false)
+
+    /** A game of the library that is confirmed as incompatible, with the reason to tell. */
+    class IncompatibleEntry(val game: Game, val reason: app.gameport.core.model.IncompatibleReason?)
+
+    /** The games of the library confirmed as incompatible. */
+    val incompatibleGames: StateFlow<List<IncompatibleEntry>> = library.observeLibrary().map { loaded ->
+        loaded.games.filter { incompatible.list.game(it.appId) != null }.sortedBy { it.name.lowercase() }
+            .map { IncompatibleEntry(it, incompatible.list.reasonOf(it.appId)) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
+    val showIncompatible: StateFlow<Boolean> = incompatible.showAnyway
+
+    fun onShowIncompatibleChanged(show: Boolean) = incompatible.setShowAnyway(show)
 
     /** How many installed games are behind on patches, and where the run that patches them stands. */
     val patchAll: StateFlow<app.gameport.core.model.PatchAllInfo> = patching.observe()

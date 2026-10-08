@@ -123,6 +123,11 @@
     <string name="settings_hidden_description">Jeux cachés de l\'application. Ils restent dans la bibliothèque Steam, où rien ne change.</string>
     <string name="settings_hidden_empty">Aucun jeu n\'est caché de l\'application.</string>
     <string name="settings_hidden_show">Réafficher</string>
+    <string name="settings_category_incompatible">Jeux incompatibles</string>
+    <string name="settings_incompatible_description">Jeux confirmés comme ne fonctionnant pas avec GamePort. Ils sont écartés de l\'accueil et restent dans la bibliothèque Steam, où rien ne change.</string>
+    <string name="settings_incompatible_show_title">Les afficher quand même</string>
+    <string name="settings_incompatible_show_description">Remet ces jeux sur l\'accueil pour les essayer. Ils peuvent se fermer tout seuls.</string>
+    <string name="settings_incompatible_empty">Aucun jeu de la bibliothèque n\'est confirmé comme incompatible.</string>
     <string name="settings_group_game_page">Fiche d\'un jeu</string>
     <string name="settings_game_artwork">Hauteur de l\'image</string>
     <string name="settings_game_artwork_description">Part de la hauteur de la fiche d\'un jeu que couvre son image. À 0 il n\'y a pas d\'image, à 100 elle remplit l\'écran.</string>

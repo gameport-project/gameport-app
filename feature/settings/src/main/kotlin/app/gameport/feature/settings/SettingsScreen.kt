@@ -39,6 +39,10 @@ import androidx.compose.material.icons.filled.Check
 import app.gameport.core.model.ReturnMode
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Switch
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -78,6 +82,7 @@ import app.gameport.core.designsystem.OnDangerRed
 import app.gameport.core.model.AppLanguage
 import app.gameport.core.model.AppUpdateState
 import app.gameport.core.model.PlayerDefaults
+import app.gameport.core.model.pick
 import app.gameport.core.model.SpeedUnit
 
 private enum class Category(val title: Int) {
@@ -89,6 +94,7 @@ private enum class Category(val title: Int) {
     UPDATES(R.string.settings_category_updates),
     GAMES(R.string.settings_category_games),
     HIDDEN(R.string.settings_category_hidden),
+    INCOMPATIBLE(R.string.settings_category_incompatible),
 }
 
 /** A full settings page: categories on the left, the selected one on the right. */
@@ -166,6 +172,11 @@ fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewMode
                             }
                             Category.GAMES -> GamesSection(playerDefaults.heightCm, viewModel::onDefaultHeightChanged)
                             Category.HIDDEN -> HiddenSection(viewModel.hiddenGames.collectAsStateWithLifecycle().value, viewModel::onShowAgain)
+                            Category.INCOMPATIBLE -> IncompatibleSection(
+                                viewModel.incompatibleGames.collectAsStateWithLifecycle().value,
+                                viewModel.showIncompatible.collectAsStateWithLifecycle().value,
+                                viewModel::onShowIncompatibleChanged,
+                            )
                     }
                     }
                 }
@@ -178,7 +189,8 @@ fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewMode
                     }
                 } else {
                     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-                        Column(Modifier.width(260.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Scrolls: with every category the list is taller than a headset screen, and the last ones were cut off.
+                        Column(Modifier.width(260.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             entries.forEach { entry -> CategoryItem(entry, entry == category, compact = false) { category = entry } }
                         }
                         page(Modifier.weight(1f))
@@ -365,6 +377,50 @@ private fun HiddenSection(games: List<Game>, onShowAgain: (Int) -> Unit) {
                 Icon(Icons.Filled.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.settings_hidden_show))
+            }
+        }
+    }
+}
+
+/** The games of the library confirmed as incompatible, each with why, and the switch that puts them back on the home. */
+@Composable
+private fun IncompatibleSection(entries: List<SettingsViewModel.IncompatibleEntry>, showAnyway: Boolean, onShowAnywayChanged: (Boolean) -> Unit) {
+    val language = LocalConfiguration.current.locales[0].language
+    Text(stringResource(R.string.settings_category_incompatible), style = MaterialTheme.typography.headlineSmall)
+    Text(stringResource(R.string.settings_incompatible_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.settings_incompatible_show_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_incompatible_show_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = showAnyway, onCheckedChange = onShowAnywayChanged)
+    }
+    if (entries.isEmpty()) {
+        Text(stringResource(R.string.settings_incompatible_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    entries.forEach { entry ->
+        Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
+            GameImage(
+                url = entry.game.capsuleUrl,
+                fallbackUrl = entry.game.capsuleFallbacks.firstOrNull(),
+                moreFallbacks = entry.game.capsuleFallbacks.drop(1),
+                contentDescription = null,
+                modifier = Modifier.width(62.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(6.dp)),
+            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(entry.game.name, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+                entry.reason?.let { reason ->
+                    // The reason runs on from its title, lighter than the name of the game, so the two are not mistaken for each other.
+                    val title = reason.title.pick(language)
+                    Text(
+                        buildAnnotatedString {
+                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(title) }
+                            append(reason.separator(language))
+                            append(reason.text.pick(language))
+                        },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }

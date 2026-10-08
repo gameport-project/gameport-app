@@ -123,6 +123,11 @@
     <string name="settings_hidden_description">Games hidden from the app. They stay in the Steam library and nothing changes there.</string>
     <string name="settings_hidden_empty">No game is hidden from the app.</string>
     <string name="settings_hidden_show">Show again</string>
+    <string name="settings_category_incompatible">Incompatible games</string>
+    <string name="settings_incompatible_description">Games confirmed as not running through GamePort. They are left out of the home and stay in the Steam library, where nothing changes.</string>
+    <string name="settings_incompatible_show_title">Show them anyway</string>
+    <string name="settings_incompatible_show_description">Puts these games back on the home to try them. They may close by themselves.</string>
+    <string name="settings_incompatible_empty">No game of the library is confirmed as incompatible.</string>
     <string name="settings_group_game_page">Game page</string>
     <string name="settings_game_artwork">Artwork height</string>
     <string name="settings_game_artwork_description">How much of the height of a game\'s page its artwork covers. At 0 there is no artwork, at 100 it fills the screen.</string>
