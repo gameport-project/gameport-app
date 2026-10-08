@@ -26,9 +26,16 @@ class WhatsNewTest {
     }
 
     @Test
+    fun `a player coming from 0_7_1 gets what 0_7_2 brings, and the games of the version before are not told again`() {
+        val summary = news.between(seen = 701, current = 702)
+        assertEquals(listOf("playing-elsewhere", "incompatible-games", "game-answers", "reports"), summary.items.map { it.id })
+        assertNull(summary.games)
+    }
+
+    @Test
     fun `a player who already saw the version is told nothing more`() {
-        assertTrue(news.between(seen = 701, current = 701).isEmpty)
-        assertTrue(news.between(seen = 800, current = 701).isEmpty)
+        assertTrue(news.between(seen = 702, current = 702).isEmpty)
+        assertTrue(news.between(seen = 800, current = 702).isEmpty)
     }
 
     @Test
@@ -53,14 +60,15 @@ class WhatsNewTest {
 
     @Test
     fun `the latest version is named like a version`() {
-        assertEquals("0.7.1", news.latestName)
+        assertEquals("0.7.2", news.latestName)
     }
 
     @Test
     fun `the preview shows only the newest version`() {
         val latest = news.latest()
-        assertEquals(news.between(seen = 700, current = 701).items, latest.items)
-        assertEquals(listOf("Escape Simulator"), latest.games!!.tested)
+        assertEquals(news.between(seen = 701, current = 702).items, latest.items)
+        // 0.7.2 confirms no new game: its window has no games block.
+        assertNull(latest.games)
     }
 
     @Test
