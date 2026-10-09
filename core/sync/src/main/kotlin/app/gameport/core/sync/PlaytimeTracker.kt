@@ -36,7 +36,19 @@ class PlaytimeTracker @Inject constructor(
     private val store: PlaytimeStore,
     private val settings: UserSettings,
 ) {
-    private class Game(val appId: Int, val meter: PlaytimeMeter = PlaytimeMeter()) {
+    /** Told when a game has left for good (it did not come back after a short grace), and when one that was left comes back. */
+    interface SessionListener {
+        /** The game gave a sign of life ([paused]: it said it left the screen). */
+        fun seen(packageName: String, paused: Boolean)
+
+        fun over(packageName: String)
+
+        fun back(packageName: String)
+    }
+
+    @Volatile var listener: SessionListener? = null
+
+    private class Game(val appId: Int, val packageName: String, val meter: PlaytimeMeter = PlaytimeMeter()) {
         var steamHeld = false
         var release: Job? = null
     }
@@ -52,6 +64,9 @@ class PlaytimeTracker @Inject constructor(
         game.release?.cancel()
         game.release = null
         game.meter.resumed(now())
+        Log.i(TAG, "$packageName came to the screen")
+        listener?.seen(packageName, paused = false)
+        listener?.back(packageName)
         if (!game.steamHeld && settings.countPlaytimeOnSteam.value) {
             game.steamHeld = true
             scope.launch { withSession { it.holdPlaying(game.appId) } }
@@ -65,6 +80,7 @@ class PlaytimeTracker @Inject constructor(
         val game = gameOf(packageName) ?: return
         val wasRunning = game.meter.running
         store.add(game.appId, game.meter.alive(now()))
+        listener?.seen(packageName, paused = false)
         // GamePort restarted while the game ran: it picks the game up again where it is.
         if (!wasRunning) resumed(packageName)
     }
@@ -74,6 +90,8 @@ class PlaytimeTracker @Inject constructor(
     fun paused(packageName: String) {
         val game = games[packageName] ?: return
         store.add(game.appId, game.meter.paused(now()))
+        Log.i(TAG, "$packageName left the screen")
+        listener?.seen(packageName, paused = true)
         scheduleRelease(game)
     }
 
@@ -104,7 +122,7 @@ class PlaytimeTracker @Inject constructor(
     private fun gameOf(packageName: String): Game? {
         games[packageName]?.let { return it }
         val appId = installed.all().entries.firstOrNull { it.value == packageName }?.key ?: return null
-        return Game(appId).also { games[packageName] = it }
+        return Game(appId, packageName).also { games[packageName] = it }
     }
 
     private fun scheduleRelease(game: Game) {
@@ -112,6 +130,8 @@ class PlaytimeTracker @Inject constructor(
         game.release = scope.launch {
             delay(RELEASE_GRACE_MS)
             synchronized(this@PlaytimeTracker) { if (game.meter.running) return@launch }
+            // Not back after the grace: the run is over, whether the game left the screen or simply stopped speaking (a game the system kills).
+            listener?.over(game.packageName)
             if (game.steamHeld) {
                 game.steamHeld = false
                 withSession { it.releasePlaying(game.appId) }
@@ -127,6 +147,7 @@ class PlaytimeTracker @Inject constructor(
                 delay(WATCH_INTERVAL_MS)
                 synchronized(this@PlaytimeTracker) {
                     games.values.filter { it.meter.isStale(now()) }.forEach { game ->
+                        Log.i(TAG, "${game.packageName} stopped speaking")
                         game.meter.drop()
                         scheduleRelease(game)
                     }

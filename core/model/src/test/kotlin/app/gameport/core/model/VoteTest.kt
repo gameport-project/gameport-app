@@ -70,12 +70,21 @@ class VoteTest {
     }
 
     @Test
-    fun `closing the question without answering does not ask again for this version`() {
+    fun `not now means later, so the question is not asked again the same day but comes back the next one`() {
         val book = VerdictBook().closed(1, "0.7.2", day1).dismissed(1, "0.7.2", day1)
         assertTrue(book.pending.isEmpty())
-        assertFalse(book.shouldAsk(1, "0.7.2", day2))
+        assertFalse(book.shouldAsk(1, "0.7.2", day1))
+        assertTrue(book.closed(1, "0.7.2", day1).pending.isEmpty())
         assertNull(book.games.getValue(1).verdict)
-        assertTrue(book.shouldAsk(1, "0.7.3", day2))
+        assertTrue(book.shouldAsk(1, "0.7.2", day2))
+        assertTrue(book.shouldAsk(1, "0.7.3", day1))
+    }
+
+    @Test
+    fun `a test build asks at every end of a run, whatever was answered`() {
+        val answered = VerdictBook().answered(1, Verdict.WORKS, "0.7.2", day1, send = true)
+        assertTrue(answered.closed(1, "0.7.2", day1).pending.isEmpty())
+        assertEquals(setOf(1), answered.closed(1, "0.7.2", day1, always = true).pending)
     }
 
     @Test
@@ -161,5 +170,72 @@ class VoteTest {
         for (connection in listOf(SteamConnection.ONLINE, SteamConnection.CONNECTING, SteamConnection.UNREACHABLE)) {
             assertFalse("$connection", OfflineEvidence.qualifies(connection, networkAvailable = true, otherDeviceAsked = false))
         }
+    }
+
+    @Test
+    fun `a game back on screen no longer waits to be asked about`() {
+        val book = VerdictBook().closed(1, "0.7.2", day1).closed(2, "0.7.2", day1)
+        assertEquals(setOf(2), book.resumed(1).pending)
+        assertEquals(book, book.resumed(3))
+    }
+
+    @Test
+    fun `the same end told twice in a short time is dealt with once`() {
+        val ends = RecentEvents(windowMs = 90_000)
+        assertTrue(ends.firstWithin("a.b", now = 1_000))
+        assertFalse(ends.firstWithin("a.b", now = 30_000))
+        assertFalse(ends.firstWithin("a.b", now = 90_999)) // the second try did not renew the window: it counts from the first
+        assertTrue(ends.firstWithin("a.b", now = 91_000))
+    }
+
+    @Test
+    fun `the ends of two games are told apart`() {
+        val ends = RecentEvents(windowMs = 90_000)
+        assertTrue(ends.firstWithin("a.b", now = 1_000))
+        assertTrue(ends.firstWithin("c.d", now = 2_000))
+    }
+
+    @Test
+    fun `a game seen alive is followed, and is over once its last sign is old enough`() {
+        val book = VerdictBook().seen(1, at = 1_000)
+        assertTrue(book.staleRuns(now = 1_000 + VerdictBook.ALIVE_STALE_MS).isEmpty())
+        assertEquals(listOf(1), book.staleRuns(now = 1_001 + VerdictBook.ALIVE_STALE_MS))
+    }
+
+    @Test
+    fun `a game that left the screen is over sooner`() {
+        val book = VerdictBook().seen(1, at = 1_000, paused = true)
+        assertTrue(book.staleRuns(now = 1_000 + VerdictBook.PAUSED_STALE_MS).isEmpty())
+        assertEquals(listOf(1), book.staleRuns(now = 1_001 + VerdictBook.PAUSED_STALE_MS))
+    }
+
+    @Test
+    fun `a new sign of life renews the run, and a run ended is no longer followed`() {
+        val renewed = VerdictBook().seen(1, at = 1_000).seen(1, at = 200_000)
+        assertTrue(renewed.staleRuns(now = 300_000).isEmpty())
+        assertTrue(renewed.runEnded(1).openRuns.isEmpty())
+        assertEquals(renewed, renewed.runEnded(2))
+    }
+
+    @Test
+    fun `the runs of several games are told apart`() {
+        val book = VerdictBook().seen(1, at = 0).seen(2, at = 200_000)
+        assertEquals(listOf(1), book.staleRuns(now = 200_001))
+    }
+
+    @Test
+    fun `the runs survive being written and read, even a day later`() {
+        val book = VerdictBook().seen(1, at = 1_791_498_512_481, paused = true)
+        val back = VerdictBook.fromJson(book.toJson())
+        assertEquals(book, back)
+        assertEquals(listOf(1), back.staleRuns(now = 1_791_498_512_481 + 86_400_000))
+    }
+
+    @Test
+    fun `an old book without runs is still read`() {
+        val old = """{"games":{"1":{"verdict":"works","askedFor":"0.7.1","askedDay":"2026-10-08"}},"pending":[2]}"""
+        val book = VerdictBook.fromJson(old)
+        assertEquals(setOf(2), book.pending)
+        assertTrue(book.openRuns.isEmpty())
     }
 }

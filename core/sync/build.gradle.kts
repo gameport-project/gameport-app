@@ -8,6 +8,11 @@ android {
     namespace = "app.gameport.core.sync"
 }
 
+// The tests read the manifest of the app: a change there must run them again.
+tasks.withType<Test>().configureEach {
+    inputs.file("../../app/src/main/AndroidManifest.xml")
+}
+
 dependencies {
     api(project(":core:model"))
     implementation(project(":core:device"))

@@ -58,7 +58,7 @@ class PlayDecisions(private val prefs: SharedPreferences?) {
         val choice = pending.choice ?: return "PENDING"
         _pending.update { it - packageName }
         if (choice == Choice.PLAY) without.add(packageName)
-        if (choice == Choice.QUIT) quit.add(packageName)
+        if (choice == Choice.QUIT) quit[packageName] = System.currentTimeMillis()
         return choice.name
     }
 
@@ -69,10 +69,13 @@ class PlayDecisions(private val prefs: SharedPreferences?) {
     fun consumeAsked(packageName: String): Boolean = asked.remove(packageName)
 
     /** Games whose launch the player cancelled: they close at once, which says nothing about whether they work. */
-    private val quit = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val quit = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
-    /** True, once, when [packageName] closed because the player cancelled its launch. */
-    fun consumeQuit(packageName: String): Boolean = quit.remove(packageName)
+    /**
+     * True when the player cancelled the launch of [packageName] a moment ago, so that its end is not the end of a game that was played. It stays true
+     * for a while rather than once: the end reaches GamePort from more than one side.
+     */
+    fun wasQuitRecently(packageName: String, now: Long = System.currentTimeMillis()): Boolean = quit[packageName]?.let { now - it < QUIT_MEMORY_MS } == true
 
     /**
      * Games for which the question is put at every start as if another device played, "all" for all of them: only the debug build can set it, to try
@@ -101,5 +104,6 @@ class PlayDecisions(private val prefs: SharedPreferences?) {
     private companion object {
         const val SIMULATED_KEY = "simulated"
         const val ALL = "all"
+        const val QUIT_MEMORY_MS = 120_000L
     }
 }

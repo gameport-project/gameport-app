@@ -45,6 +45,8 @@ internal interface CloudEntryPoint {
 
     fun verdictAsker(): VerdictAsker
 
+    fun lifeWatch(): LifeWatch
+
     fun steamAchievements(): SteamAchievementSync
 }
 
@@ -119,9 +121,9 @@ class CloudProvider : ContentProvider() {
             Bundle().apply { putString(STATUS, OK) }
         }
         // The game came to the screen, is still there, or left it: the time it is on screen is counted (see PlaytimeTracker).
-        "resumed" -> okAfter { entryPoint.playtime().resumed(packageName) }
-        "alive" -> okAfter { entryPoint.playtime().alive(packageName) }
-        "paused" -> okAfter { entryPoint.playtime().paused(packageName) }
+        "resumed" -> okAfter { watchLife(packageName, extras); entryPoint.playtime().resumed(packageName) }
+        "alive" -> okAfter { watchLife(packageName, extras); entryPoint.playtime().alive(packageName) }
+        "paused" -> okAfter { watchLife(packageName, extras); entryPoint.playtime().paused(packageName) }
         // The game's process is ending (it quit by itself, or its last screen closed): how long it lasted shows a problem.
         // Saves it could not send are then sent by GamePort itself (see [SaveCatchUp]).
         "closed" -> okAfter {
@@ -206,6 +208,11 @@ class CloudProvider : ContentProvider() {
     }
 
     /** The game says it started: that is its launch, whether GamePort or the system's library started it. */
+    /** The game gave its witness of life (a game patched before has none): GamePort will know the moment its process is gone. */
+    private fun watchLife(packageName: String, extras: Bundle) {
+        extras.getBinder("life")?.let { entryPoint.lifeWatch().watch(packageName, it) }
+    }
+
     private fun noteLaunch(packageName: String) {
         val appId = entryPoint.installedGames().all().entries.firstOrNull { it.value == packageName }?.key ?: return
         entryPoint.playHistory().markPlayed(appId)

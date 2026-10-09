@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,14 +17,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.Dp
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -122,15 +125,15 @@ fun VerdictAskHost(viewModel: VerdictAskViewModel = hiltViewModel()) {
             }
         },
         confirmButton = {
-            // The two main answers share the first line, whole; the answer "offline only" and "not now" share the second, so no label is cut.
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // The four buttons are stacked, each as wide as the window, so no label is cut or wraps: the three answers, then "not now" in white.
+            // A button reserves an invisible margin to reach 48 dp of touch area, which adds to the space between them: it is taken away here, so the
+            // space between the buttons is the one that is written.
+            CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Answer(R.string.verdict_worked, glyph = Glyph.CHECK, tint = WorksGreen) { viewModel.onAnswer(Verdict.WORKS) }
-                    Answer(R.string.verdict_failed, glyph = Glyph.CROSS, tint = FailsRed) { viewModel.onAnswer(Verdict.FAILS) }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Answer(R.string.verdict_offline_only, glyph = Glyph.NO_NETWORK, tint = OfflineOrange) { viewModel.onAnswer(Verdict.OFFLINE_ONLY) }
-                    Answer(R.string.verdict_later, icon = Icons.Filled.Schedule, onClick = viewModel::onLater)
+                    Answer(R.string.verdict_failed, glyph = Glyph.CROSS, tint = FailsRed) { viewModel.onAnswer(Verdict.FAILS) }
+                    NotNow(viewModel::onLater)
                 }
             }
         },
@@ -138,13 +141,27 @@ fun VerdictAskHost(viewModel: VerdictAskViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun RowScope.Answer(text: Int, glyph: Glyph? = null, icon: ImageVector? = null, tint: Color? = null, onClick: () -> Unit) {
-    GlassButton(onClick = onClick, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)) {
+private fun Answer(text: Int, glyph: Glyph, tint: Color, onClick: () -> Unit) {
+    GlassButton(onClick = onClick, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)) {
         // The marks are the ones of the labels of the games; only they are in colour, the buttons are the same as everywhere else.
-        if (glyph != null && tint != null) CompatGlyph(glyph, tint, height = 14.dp) else if (icon != null) Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        CompatGlyph(glyph, tint, height = 14.dp)
         Spacer(Modifier.width(8.dp))
-        // The label may take two lines rather than be cut.
-        Text(stringResource(text), maxLines = 2)
+        Text(stringResource(text), maxLines = 1)
+    }
+}
+
+/** The way out, in white: a plain filled button, so it stands apart from the three answers. */
+@Composable
+private fun NotNow(onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+    ) {
+        Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(R.string.verdict_later), maxLines = 1)
     }
 }
 

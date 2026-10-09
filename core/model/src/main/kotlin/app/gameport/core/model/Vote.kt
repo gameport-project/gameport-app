@@ -68,6 +68,10 @@ data class GameVerdict(
 /** An answer that has not reached the relay yet. */
 data class Answer(val appId: Int, val verdict: Verdict, val offline: Boolean)
 
+/** The last sign of life of a game that is being played: when, and whether it was "the game left the screen". Kept on disk, so it outlives GamePort. */
+@Serializable
+data class OpenRun(val at: Long, val paused: Boolean = false)
+
 /**
  * The answers a player gave, and the games that are waiting to be asked about, as plain data so the rules are tested without a device. A game is
  * asked about when it closes, but not twice for the same version of GamePort, unless the last answer was "it did not work": then once a day, so the
@@ -79,18 +83,39 @@ data class VerdictBook(
     val pending: Set<Int> = emptySet(),
     /** The games whose last run was a clean test of the offline mode (see [OfflineEvidence]). */
     val offlineRuns: Set<Int> = emptySet(),
+    /**
+     * The games being played, with their last sign of life. A game the system kills cannot say it closed; when GamePort opens again (a minute or a
+     * day later), a run whose last sign is old enough is a run that ended, and its question is asked.
+     */
+    val openRuns: Map<Int, OpenRun> = emptyMap(),
 ) {
+    /** The game gave a sign of life at [at] ([paused]: it said it left the screen). */
+    fun seen(appId: Int, at: Long, paused: Boolean = false): VerdictBook = copy(openRuns = openRuns + (appId to OpenRun(at, paused)))
+
+    /** The run of the game is over, or is dealt with: it is no longer followed. */
+    fun runEnded(appId: Int): VerdictBook = if (appId in openRuns) copy(openRuns = openRuns - appId) else this
+
+    /** The games whose last sign of life is old enough, at [now], for their run to be over. */
+    fun staleRuns(now: Long): List<Int> =
+        openRuns.filter { (_, run) -> now - run.at > if (run.paused) PAUSED_STALE_MS else ALIVE_STALE_MS }.keys.toList()
+
     fun shouldAsk(appId: Int, appVersion: String, today: String): Boolean {
         val known = games[appId] ?: return true
         if (known.askedFor != appVersion) return true
-        return known.verdict == Verdict.FAILS.wire && known.askedDay != today
+        // After "it did not work", and after "not now" (no answer yet), the question comes back once a day; after an answer that is not a failure, no more for this version.
+        val unsettled = known.verdict == null || known.verdict == Verdict.FAILS.wire
+        return unsettled && known.askedDay != today
     }
 
     /** A game closed: it waits to be asked about if the rules say so. [offlineRun] is whether this run proves the offline mode (see [OfflineEvidence]). */
-    fun closed(appId: Int, appVersion: String, today: String, offlineRun: Boolean = false): VerdictBook {
+    fun closed(appId: Int, appVersion: String, today: String, offlineRun: Boolean = false, always: Boolean = false): VerdictBook {
         val runs = if (offlineRun) offlineRuns + appId else offlineRuns - appId
-        return if (shouldAsk(appId, appVersion, today)) copy(pending = pending + appId, offlineRuns = runs) else copy(offlineRuns = runs)
+        // [always]: a test build asks at every end of a run, whatever was answered before, so that a run can be tried again and again.
+        return if (always || shouldAsk(appId, appVersion, today)) copy(pending = pending + appId, offlineRuns = runs) else copy(offlineRuns = runs)
     }
+
+    /** The game is back on screen: the run it was left from goes on, so the question about it no longer waits. */
+    fun resumed(appId: Int): VerdictBook = if (appId in pending) copy(pending = pending - appId) else this
 
     /** The player answered. [send] is false when they chose not to share: the answer stays on this device. */
     fun answered(appId: Int, verdict: Verdict, appVersion: String, today: String, send: Boolean): VerdictBook =
@@ -116,6 +141,12 @@ data class VerdictBook(
     fun toJson(): String = json.encodeToString(serializer(), this)
 
     companion object {
+        /** A game that said it was on screen speaks every 30 seconds: this long without a word, it is gone. */
+        const val ALIVE_STALE_MS = 150_000L
+
+        /** A game that said it left the screen and did not come back: it is gone. */
+        const val PAUSED_STALE_MS = 8_000L
+
         private val json = Json { ignoreUnknownKeys = true }
 
         fun fromJson(text: String?): VerdictBook = runCatching { json.decodeFromString(serializer(), text.orEmpty()) }.getOrDefault(VerdictBook())
@@ -130,4 +161,21 @@ data class VerdictBook(
 object OfflineEvidence {
     fun qualifies(connection: SteamConnection, networkAvailable: Boolean, otherDeviceAsked: Boolean): Boolean =
         connection == SteamConnection.OFFLINE_MODE && networkAvailable && !otherDeviceAsked
+}
+
+/**
+ * Remembers what happened lately, so that the same thing told twice in a short time is dealt with once: the end of a run reaches GamePort from the
+ * game (it says it closes) and from the follow-up of the time played (the game left the screen, or stopped speaking), whichever comes first.
+ */
+class RecentEvents(private val windowMs: Long) {
+    private val seen = HashMap<String, Long>()
+
+    /** True the first time [key] is seen, and again once [windowMs] has passed since the last time it counted. */
+    @Synchronized
+    fun firstWithin(key: String, now: Long): Boolean {
+        val last = seen[key]
+        if (last != null && now - last < windowMs) return false
+        seen[key] = now
+        return true
+    }
 }

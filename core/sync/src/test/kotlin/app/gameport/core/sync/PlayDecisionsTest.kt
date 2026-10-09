@@ -37,14 +37,17 @@ class PlayDecisionsTest {
     }
 
     @Test
-    fun `a cancelled launch is told once, and only for the game that was cancelled`() {
+    fun `a cancelled launch is remembered for a while, for the game that was cancelled only`() {
         decisions.ask("a.b", "Game")
         decisions.resolve("a.b", PlayDecisions.Choice.QUIT)
-        assertFalse(decisions.consumeQuit("a.b"))
+        val before = System.currentTimeMillis()
+        assertFalse(decisions.wasQuitRecently("a.b", now = before)) // not before the answer was read
         decisions.answerFor("a.b")
-        assertFalse(decisions.consumeQuit("c.d"))
-        assertTrue(decisions.consumeQuit("a.b"))
-        assertFalse(decisions.consumeQuit("a.b"))
+        val answered = System.currentTimeMillis()
+        assertTrue(decisions.wasQuitRecently("a.b", now = answered))
+        assertTrue(decisions.wasQuitRecently("a.b", now = answered + 119_000)) // still, when the end is told a second time
+        assertFalse(decisions.wasQuitRecently("a.b", now = answered + 121_000)) // not for ever: the next launch is a game played
+        assertFalse(decisions.wasQuitRecently("c.d", now = answered))
     }
 
     @Test
@@ -53,7 +56,7 @@ class PlayDecisionsTest {
             decisions.ask("a.b", "Game")
             decisions.resolve("a.b", choice)
             decisions.answerFor("a.b")
-            assertFalse(decisions.consumeQuit("a.b"))
+            assertFalse(decisions.wasQuitRecently("a.b"))
         }
     }
 

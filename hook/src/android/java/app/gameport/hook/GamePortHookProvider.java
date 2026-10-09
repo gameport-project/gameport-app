@@ -731,9 +731,21 @@ public final class GamePortHookProvider extends ContentProvider {
         }
     }
 
+    /**
+     * The game's witness of life: an object that lives and dies with this process. GamePort keeps it and is told at once, by Android, when the
+     * process is gone, however it ended (the system kills a game left from the menu without a word). It goes with the signs that say the game
+     * is being played.
+     */
+    private static final android.os.Binder LIFE = new android.os.Binder();
+
     private static void tellGamePort(Context context, String method) {
         try {
-            Calls.call(context, Owner.cloud(context), method, context.getPackageName(), null);
+            Bundle extras = null;
+            if ("alive".equals(method) || "resumed".equals(method) || "paused".equals(method)) {
+                extras = new Bundle();
+                extras.putBinder("life", LIFE);
+            }
+            Calls.call(context, Owner.cloud(context), method, context.getPackageName(), extras);
         } catch (Throwable t) {
             Log.w(TAG, "could not tell GamePort: " + method, t);
         }

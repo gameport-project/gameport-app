@@ -12,6 +12,7 @@ class GamePortApplication : Application() {
     @Inject lateinit var connectionKeeper: app.gameport.core.sync.ConnectionKeeper
     @Inject lateinit var verdictSender: app.gameport.core.sync.VerdictSender
     @Inject lateinit var compat: app.gameport.core.sync.CompatRepository
+    @Inject lateinit var verdictAsker: app.gameport.core.sync.VerdictAsker
 
     override fun onCreate() {
         super.onCreate()
@@ -27,8 +28,15 @@ class GamePortApplication : Application() {
         verdictSender.start()
         // What the players say about the games is read when GamePort starts (and when a page opens, if what is kept is old).
         compat.start()
+        // The end of a game is also seen from the follow-up of the time played, for a game the system kills without it saying so.
+        verdictAsker.start()
+        // A game killed while GamePort was not looking (a minute or a day ago) is found out now.
+        verdictAsker.checkRuns()
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
-            override fun onActivityStarted(activity: android.app.Activity) = connectionKeeper.screenShown()
+            override fun onActivityStarted(activity: android.app.Activity) {
+                connectionKeeper.screenShown()
+                verdictAsker.checkRuns()
+            }
             override fun onActivityStopped(activity: android.app.Activity) {}
             override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) = connectionKeeper.screenOpened()
             override fun onActivityResumed(activity: android.app.Activity) {}
