@@ -1,5 +1,5 @@
-generation=5
+generation=6
 e127679808fc4c47f74d25d00278592b8cf5f22ce947f163679fd180312ec03c  shim/arm64-v8a/libsteamclient.so
-b2f8ac49ec146e320032f03798240280634f6591f11d3075148ac78226bb34b9  hook/classes.dex
+a9905b8208bdb8092233cee946c456ceedb977e84e458e190173321e5c1a10c9  hook/classes.dex
 3d78ef94fe5274e499f8eeae3af5009afb67ad08ec352a2ee2253f812d8a6e05  xrlayer/arm64-v8a/libXrApiLayer_gameport.so
 0b72f11b0009e1cb4d3a4d2136b7a773cab7db3691ac7a6c65a32e5a7a43b1c5  xrloader/arm64-v8a/libopenxr_loader.so

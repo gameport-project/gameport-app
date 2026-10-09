@@ -16,7 +16,7 @@ import java.util.zip.CRC32
  *   to 0 when [GENERATION] is raised).
  */
 object PatchVersioning {
-    const val GENERATION = 5
+    const val GENERATION = 6
 
     /** Raised during development when the patches' logic changes; back to 0 at each release. */
     const val DEV_REVISION = 0

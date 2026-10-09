@@ -9,8 +9,8 @@ android {
 
     defaultConfig {
         applicationId = "app.gameport"
-        versionCode = 702
-        versionName = "0.7.2"
+        versionCode = 703
+        versionName = "0.7.3"
     }
 
     // One debug key for everyone: a build from a developer's machine and one from the CI update each other.
