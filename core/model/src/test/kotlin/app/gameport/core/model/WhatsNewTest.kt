@@ -59,16 +59,18 @@ class WhatsNewTest {
     }
 
     @Test
-    fun `the latest version is named like a version`() {
-        assertEquals("0.7.2", news.latestName)
+    fun `the latest version is the newest release file, named like a version`() {
+        val newest = releases.maxBy { it.code }
+        assertEquals(newest.version, news.latestName)
+        val (major, minor, patch) = newest.version.split(".").map { it.toInt() }
+        assertEquals(major * 10000 + minor * 100 + patch, newest.code)
     }
 
     @Test
     fun `the preview shows only the newest version`() {
-        val latest = news.latest()
-        assertEquals(news.between(seen = 701, current = 702).items, latest.items)
-        // 0.7.2 confirms no new game: its window has no games block.
-        assertNull(latest.games)
+        val newest = releases.maxBy { it.code }
+        val before = releases.first { it.version == newest.previous }
+        assertEquals(news.between(seen = before.code, current = newest.code).items, news.latest().items)
     }
 
     @Test
