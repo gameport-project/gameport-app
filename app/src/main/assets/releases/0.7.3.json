@@ -1,0 +1,134 @@
+{
+  "version": "0.7.3",
+  "previous": "0.7.2",
+  "code": 703,
+  "patchNeeded": true,
+  "window": {
+    "items": [
+      {
+        "id": "playing-elsewhere",
+        "icon": "warning",
+        "text": {
+          "en": "When the Steam account already plays on another device, a window offers three choices: cancel the launch, close the game of the other device and play here, or play without the Steam ticket.",
+          "fr": "Quand le compte Steam joue déjà sur un autre appareil, une fenêtre propose trois choix : annuler le lancement, fermer le jeu de l'autre appareil et jouer ici, ou jouer sans le ticket Steam."
+        }
+      },
+      {
+        "id": "incompatible-games",
+        "icon": "info",
+        "text": {
+          "en": "Games confirmed as incompatible are set aside: hidden from the home, listed in Settings with the reason, and they can be shown again.",
+          "fr": "Les jeux confirmés comme incompatibles sont mis de côté : cachés de l'accueil, listés dans les Réglages avec la raison, et réaffichables."
+        }
+      },
+      {
+        "id": "game-answers",
+        "icon": "check",
+        "text": {
+          "en": "After a game closes, a window asks whether it worked. What players answer shows in colour on the covers and on the page of each game, and a game most of them could not run is announced before it is installed.",
+          "fr": "Quand un jeu se ferme, une fenêtre demande s'il a fonctionné. Ce que répondent les joueurs apparaît en couleur sur les jaquettes et sur la page de chaque jeu, et un jeu que la plupart n'ont pas pu lancer est signalé avant son installation."
+        }
+      },
+      {
+        "id": "reports",
+        "icon": "build",
+        "text": {
+          "en": "Problem reports are cleaner and more useful: personal data is hidden more carefully, the previous runs of a game are kept, and a short diagnosis is added.",
+          "fr": "Les rapports de problème sont plus propres et plus utiles : les données personnelles sont masquées avec plus de soin, les parties précédentes d'un jeu sont conservées, et un court diagnostic est ajouté."
+        }
+      }
+    ]
+  },
+  "notes": [
+    {
+      "id": "section-0",
+      "title": {
+        "en": "New features",
+        "fr": "Nouvelles fonctionnalités"
+      },
+      "items": [
+        {
+          "id": "item-0-0",
+          "text": {
+            "en": "**A window when the Steam account plays on another device.** Steam allows one playing session per account, so the ticket a game may need cannot be given while a PC plays. Instead of starting the game without a word, GamePort now asks in front of the game: cancel the launch, close the game of the other device and play here, or play without the Steam ticket, with what each choice means. Games have to be patched again to get it.",
+            "fr": "**Une fenêtre quand le compte Steam joue sur un autre appareil.** Steam n'autorise qu'une session de jeu par compte, donc le ticket dont un jeu peut avoir besoin ne peut pas être donné pendant qu'un PC joue. Au lieu de lancer le jeu sans rien dire, GamePort demande maintenant devant le jeu : annuler le lancement, fermer le jeu de l'autre appareil et jouer ici, ou jouer sans le ticket Steam, avec ce que chaque choix implique. Les jeux doivent être patchés de nouveau pour en profiter."
+          }
+        },
+        {
+          "id": "item-0-1",
+          "text": {
+            "en": "**Games confirmed as incompatible are set aside.** A game known not to run through GamePort is hidden from the home, and a window tells it once for each game of the library. Settings > Incompatible games lists them with the reason, and a switch shows them again to try them anyway.",
+            "fr": "**Les jeux confirmés comme incompatibles sont mis de côté.** Un jeu dont on sait qu'il ne fonctionne pas avec GamePort est caché de l'accueil, et une fenêtre le dit une seule fois pour chaque jeu de la bibliothèque. Réglages > Jeux incompatibles les liste avec la raison, et un interrupteur les réaffiche pour les essayer quand même."
+          }
+        },
+        {
+          "id": "item-0-2",
+          "text": {
+            "en": "**Players say whether a game worked.** When a game closes, a window asks whether it worked, did not work, or works only offline (its online or multiplayer part does not). It asks at most once for each game and each version of GamePort, and again once a day after a game that did not work. The answer is sent anonymously: only the game, the answer, the version of GamePort and the kind of device, with a random number that identifies nobody. No name, no address, no account. Settings > Account turns the sending off, and the answer then stays on the device.",
+            "fr": "**Les joueurs disent si un jeu a fonctionné.** Quand un jeu se ferme, une fenêtre demande s'il a fonctionné, s'il n'a pas fonctionné, ou s'il ne marche qu'hors ligne (sa partie en ligne ou multijoueur ne marche pas). Elle le demande au plus une fois pour chaque jeu et chaque version de GamePort, et de nouveau une fois par jour après un jeu qui n'avait pas fonctionné. La réponse est envoyée de façon anonyme : seulement le jeu, la réponse, la version de GamePort et le type d'appareil, avec un nombre aléatoire qui n'identifie personne. Ni nom, ni adresse, ni compte. Réglages > Compte coupe l'envoi, et la réponse reste alors sur l'appareil."
+          }
+        },
+        {
+          "id": "item-0-3",
+          "text": {
+            "en": "**What players say is shown on the games.** Once at least three players with the same kind of device have answered, the page of a game says Works on Quest, Offline only, Mixed or Problems, in the colour of the answer, and the home marks the cover with a check, a crossed-out network, an exclamation mark or a cross. A game tried with the offline mode is noted too: GamePort adds it by itself, only when the offline mode was chosen, the device had a network and no other device was playing. Before a game that most players could not run is installed, a window tells it.",
+            "fr": "**Ce que disent les joueurs apparaît sur les jeux.** Dès que trois joueurs au moins ayant le même type d'appareil ont répondu, la fiche d'un jeu dit Fonctionne sur Quest, Hors ligne seulement, Mitigé ou Problèmes, à la couleur de la réponse, et l'accueil marque la jaquette d'une coche, d'un réseau barré, d'un point d'exclamation ou d'une croix. Un jeu essayé avec le mode hors ligne est noté aussi : GamePort l'ajoute seule, seulement quand le mode hors ligne était choisi, que l'appareil avait un réseau et qu'aucun autre appareil ne jouait. Avant l'installation d'un jeu que la plupart des joueurs n'ont pas pu lancer, une fenêtre le dit."
+          }
+        }
+      ]
+    },
+    {
+      "id": "section-1",
+      "title": {
+        "en": "Fixes",
+        "fr": "Corrections"
+      },
+      "items": [
+        {
+          "id": "item-1-0",
+          "text": {
+            "en": "**Problem reports hide personal data more carefully** and no longer cut words that only look like a name or an e-mail address.",
+            "fr": "**Les rapports de problème masquent les données personnelles avec plus de soin** et ne coupent plus des mots qui ressemblent seulement à un nom ou à une adresse e-mail."
+          }
+        },
+        {
+          "id": "item-1-1",
+          "text": {
+            "en": "**Problem reports keep the previous runs of a game** and add a short diagnosis, so a game that closes by itself leaves something to read.",
+            "fr": "**Les rapports de problème gardent les parties précédentes d'un jeu** et ajoutent un court diagnostic, pour qu'un jeu qui se ferme tout seul laisse de quoi lire."
+          }
+        },
+        {
+          "id": "item-1-2",
+          "text": {
+            "en": "**A game no longer closes with GamePort.** The system stops GamePort a few seconds after a game starts, and a game connected to it could be stopped along with it. Its calls to GamePort no longer depend on it staying alive.",
+            "fr": "**Un jeu ne se ferme plus avec GamePort.** Le système arrête GamePort quelques secondes après le début d'un jeu, et un jeu relié à elle pouvait être arrêté avec. Ses appels vers GamePort ne dépendent plus de sa survie."
+          }
+        },
+        {
+          "id": "item-1-3",
+          "text": {
+            "en": "**The question after a game now comes.** In 0.7.2, the window asking whether a game worked never appeared, because a permission was missing. It now appears as soon as a game is left, or when GamePort opens if it was not running. Games have to be patched again so that GamePort learns at once that they closed.",
+            "fr": "**La question après un jeu arrive maintenant.** Dans la 0.7.2, la fenêtre qui demande si un jeu a fonctionné n'apparaissait jamais, car une permission manquait. Elle apparaît maintenant dès qu'on quitte un jeu, ou à l'ouverture de GamePort si elle n'était pas lancée. Les jeux doivent être patchés de nouveau pour que GamePort sache aussitôt qu'ils se sont fermés."
+          }
+        }
+      ]
+    },
+    {
+      "id": "section-2",
+      "title": {
+        "en": "Game compatibility",
+        "fr": "Compatibilité des jeux"
+      },
+      "items": [
+        {
+          "id": "item-2-0",
+          "text": {
+            "en": "**Not supported:** VRChat closes itself a few seconds after it starts once patched, its own protection detecting the change. It is hidden from the home, and can be shown again in Settings > Incompatible games.",
+            "fr": "**Non pris en charge :** VRChat se ferme de lui-même quelques secondes après son démarrage une fois patché, sa propre protection détectant le changement. Il est caché de l'accueil, et peut être réaffiché dans Réglages > Jeux incompatibles."
+          }
+        }
+      ]
+    }
+  ]
+}
