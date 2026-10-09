@@ -73,7 +73,7 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: test -n "$KEYSTORE_BASE64" || { echo "KEYSTORE_BASE64 is not set in the repository secrets"; exit 1; }
       - name: Build
-        run: ./gradlew assembleRelease testDebugUnitTest --stacktrace
+        run: ./gradlew assembleRelease testDebugUnitTest :core:model:test --stacktrace
       - name: Sign
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
