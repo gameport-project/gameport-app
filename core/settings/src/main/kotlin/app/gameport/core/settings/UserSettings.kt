@@ -8,6 +8,7 @@ import app.gameport.core.model.CoverSize
 import app.gameport.core.model.CoverSpacing
 import app.gameport.core.model.DisplaySettings
 import app.gameport.core.model.HoverAnimation
+import app.gameport.core.model.NewRailSize
 import app.gameport.core.model.PillSize
 import app.gameport.core.model.LibrarySort
 import app.gameport.core.model.ContinueScope
@@ -111,6 +112,7 @@ class UserSettings @Inject constructor(
             .putLong(KEY_ACCENT, updated.accent)
             .putBoolean(KEY_HERO, updated.heroBanner)
             .putString(KEY_PILL_SIZE, updated.pillSize.name)
+            .putString(KEY_NEW_RAIL_SIZE, updated.newRailSize.name)
             .putLong(KEY_GRADIENT_START, updated.gradientStart)
             .putLong(KEY_GRADIENT_END, updated.gradientEnd)
             .putString(KEY_CONTINUE_SCOPE, updated.continueScope.name)
@@ -145,6 +147,7 @@ class UserSettings @Inject constructor(
             accent = runCatching { prefs.getLong(KEY_ACCENT, defaults.accent) }.getOrDefault(defaults.accent),
             heroBanner = prefs.getBoolean(KEY_HERO, defaults.heroBanner),
             pillSize = enumOf(KEY_PILL_SIZE, defaults.pillSize),
+            newRailSize = enumOf(KEY_NEW_RAIL_SIZE, defaults.newRailSize),
             gradientStart = runCatching { prefs.getLong(KEY_GRADIENT_START, defaults.gradientStart) }.getOrDefault(defaults.gradientStart),
             gradientEnd = runCatching { prefs.getLong(KEY_GRADIENT_END, defaults.gradientEnd) }.getOrDefault(defaults.gradientEnd),
             continueScope = enumOf(KEY_CONTINUE_SCOPE, defaults.continueScope),
@@ -183,6 +186,7 @@ class UserSettings @Inject constructor(
         const val KEY_ACCENT = "accent_argb"
         const val KEY_HERO = "hero_title"
         const val KEY_PILL_SIZE = "pill_size"
+        const val KEY_NEW_RAIL_SIZE = "new_rail_size"
         const val KEY_GRADIENT_START = "gradient_start"
         const val KEY_GRADIENT_END = "gradient_end"
         const val KEY_CONTINUE_SCOPE = "continue_scope"

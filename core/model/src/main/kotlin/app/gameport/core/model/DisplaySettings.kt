@@ -28,6 +28,9 @@ object AccentPresets {
     )
 }
 
+/** How big the carousel of new Android versions is: as low as the covers, about half the width, or nearly the whole width with the next one in sight. */
+enum class NewRailSize { COMPACT, MEDIUM, WIDE }
+
 /** The size of the name pill above a highlighted cover: [slotDp] is the room kept for it above the covers. */
 enum class PillSize(val textSp: Int, val iconDp: Int, val slotDp: Int) {
     SMALL(11, 14, 28),
@@ -72,6 +75,7 @@ data class DisplaySettings(
     /** The pill above the highlighted cover: the game's name and a play icon. */
     val heroBanner: Boolean = true,
     val pillSize: PillSize = PillSize.MEDIUM,
+    val newRailSize: NewRailSize = NewRailSize.COMPACT,
     val continueScope: ContinueScope = ContinueScope.ALL,
     val showContinue: Boolean = true,
     val showFavorites: Boolean = true,
@@ -94,7 +98,7 @@ data class DisplaySettings(
     fun withDefaultHome(): DisplaySettings {
         val d = DisplaySettings()
         return copy(
-            heroBanner = d.heroBanner, pillSize = d.pillSize, coverTitles = d.coverTitles, continueScope = d.continueScope,
+            heroBanner = d.heroBanner, pillSize = d.pillSize, newRailSize = d.newRailSize, coverTitles = d.coverTitles, continueScope = d.continueScope,
             showContinue = d.showContinue, showFavorites = d.showFavorites, hideUninstalled = d.hideUninstalled, sort = d.sort,
         )
     }

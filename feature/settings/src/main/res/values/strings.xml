@@ -140,4 +140,9 @@
     <string name="settings_download_region">Download server</string>
     <string name="settings_download_region_description">The Steam region games are downloaded from. Automatic follows the location of the connection. Another region can be faster on a network whose route to the nearest server is poor. A change reconnects to Steam at once, and a download in progress stops and can be resumed.</string>
     <string name="settings_download_region_auto">Automatic</string>
+    <string name="settings_new_rail_size">Size of the new Android versions</string>
+    <string name="settings_new_rail_size_description">The carousel of the games whose Android version just arrived.</string>
+    <string name="settings_new_rail_compact">Compact</string>
+    <string name="settings_new_rail_medium">Medium</string>
+    <string name="settings_new_rail_wide">Wide</string>
 </resources>

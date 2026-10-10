@@ -46,6 +46,7 @@ import app.gameport.core.model.CoverSize
 import app.gameport.core.model.CoverSpacing
 import app.gameport.core.model.DisplaySettings
 import app.gameport.core.model.HoverAnimation
+import app.gameport.core.model.NewRailSize
 import app.gameport.core.model.PillSize
 import app.gameport.core.model.ContinueScope
 
@@ -130,6 +131,13 @@ internal fun HomeSection(display: DisplaySettings, isHeadset: Boolean, onChange:
     }
     SwitchRow(R.string.settings_home_favorites, R.string.settings_home_favorites_description, display.showFavorites, defaults.showFavorites) { value -> onChange { it.copy(showFavorites = value) } }
     SwitchRow(R.string.settings_hide_uninstalled, R.string.settings_hide_uninstalled_description, display.hideUninstalled, defaults.hideUninstalled) { value -> onChange { it.copy(hideUninstalled = value) } }
+
+    ChoiceRow(
+        R.string.settings_new_rail_size,
+        listOf(R.string.settings_new_rail_compact, R.string.settings_new_rail_medium, R.string.settings_new_rail_wide),
+        NewRailSize.entries.indexOf(display.newRailSize), NewRailSize.entries.indexOf(defaults.newRailSize),
+        description = R.string.settings_new_rail_size_description,
+    ) { index -> onChange { it.copy(newRailSize = NewRailSize.entries[index]) } }
 
     GroupTitle(R.string.settings_group_cover_names)
     SwitchRow(R.string.settings_cover_titles, R.string.settings_cover_titles_description, display.coverTitles, defaults.coverTitles) { value -> onChange { it.copy(coverTitles = value) } }
