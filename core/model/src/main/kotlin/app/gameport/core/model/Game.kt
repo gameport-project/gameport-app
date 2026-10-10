@@ -3,6 +3,9 @@ package app.gameport.core.model
 enum class Ownership {
     OWNED,
     FAMILY_SHARED,
+
+    /** A game players reported that the account does not have: its page can be seen, not installed. */
+    NOT_OWNED,
 }
 
 /** One Steam depot of the Android build, with the space it takes. */

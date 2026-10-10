@@ -9,6 +9,7 @@ import app.gameport.core.model.SteamConnection
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.rounded.ErrorOutline
+import app.gameport.core.designsystem.BackdropMenu
 import app.gameport.core.designsystem.GlassIconButton
 import android.view.KeyEvent as AndroidKeyEvent
 import android.content.Intent
@@ -100,6 +101,7 @@ import app.gameport.core.designsystem.GlassChip
 import app.gameport.core.designsystem.glass
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.MoreVert
 import app.gameport.core.designsystem.GlassSearchField
 import app.gameport.core.designsystem.PillTabs
 
@@ -110,6 +112,7 @@ fun LibraryScreen(
     onOpenSettings: () -> Unit,
     onOpenSteamSettings: () -> Unit,
     onOpenGameSettings: (Int) -> Unit,
+    onOpenCompat: () -> Unit,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -126,6 +129,7 @@ fun LibraryScreen(
         onOpenDownloads = onOpenDownloads,
         onOpenSettings = onOpenSettings,
         onOpenSteamSettings = onOpenSteamSettings,
+        onOpenCompat = onOpenCompat,
         onPatchAll = viewModel::onPatchAll,
         onStopPatchAll = viewModel::onStopPatchAll,
         onClosePatchAll = viewModel::onClosePatchAll,
@@ -153,6 +157,7 @@ internal fun LibraryContent(
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSteamSettings: () -> Unit,
+    onOpenCompat: () -> Unit = {},
     menu: GameMenuActions = GameMenuActions(),
     onPatchAll: () -> Unit = {},
     onStopPatchAll: () -> Unit = {},
@@ -161,7 +166,7 @@ internal fun LibraryContent(
     Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
         when (uiState) {
             LibraryUiState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-            is LibraryUiState.Content -> Shelf(uiState, onQueryChanged, onTabSelected, onSortSelected, onFiltersChanged, onPlay, onGameClick, onOpenDownloads, onOpenSettings, onOpenSteamSettings, menu, onPatchAll, onStopPatchAll, onClosePatchAll)
+            is LibraryUiState.Content -> Shelf(uiState, onQueryChanged, onTabSelected, onSortSelected, onFiltersChanged, onPlay, onGameClick, onOpenDownloads, onOpenSettings, onOpenSteamSettings, onOpenCompat, menu, onPatchAll, onStopPatchAll, onClosePatchAll)
         }
     }
 }
@@ -185,6 +190,7 @@ private fun Shelf(
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSteamSettings: () -> Unit,
+    onOpenCompat: () -> Unit,
     menu: GameMenuActions,
     onPatchAll: () -> Unit,
     onStopPatchAll: () -> Unit,
@@ -224,7 +230,7 @@ private fun Shelf(
         if (display.backdrop) Backdrop(highlighted, display.backdropStrength)
 
         Column(Modifier.fillMaxSize()) {
-            Header(state, onQueryChanged, onTabSelected, { filtersOpen = true }, onOpenDownloads, onOpenSettings, onOpenSteamSettings) {
+            Header(state, onQueryChanged, onTabSelected, { filtersOpen = true }, onOpenDownloads, onOpenSettings, onOpenSteamSettings, onOpenCompat) {
                 if (!state.patchAll.running) onPatchAll()
                 patchWindow = true
             }
@@ -475,6 +481,7 @@ private fun Header(
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSteamSettings: () -> Unit,
+    onOpenCompat: () -> Unit,
     onPatchAll: () -> Unit,
 ) {
     Column(
@@ -525,6 +532,17 @@ private fun Header(
                             .background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.CircleShape)
                             .wrapContentSize(Alignment.Center),
                     )
+                }
+            }
+            // More places to go than the bar has room for: a small menu, where later pages will join the compatibility one.
+            var moreOpen by remember { mutableStateOf(false) }
+            // Opens against its button; its entries are the lines of a cover's menu.
+            Box {
+                GlassIconButton(onClick = { moreOpen = true }) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.library_more))
+                }
+                BackdropMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
+                    MenuEntry(Icons.Filled.Build, R.string.library_compat, { moreOpen = false; onOpenCompat() }, tint = Color(0xFFFFB74D))
                 }
             }
             GlassIconButton(onClick = onOpenSettings) {

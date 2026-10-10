@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="compat_title">Compatibilité</string>
+    <string name="compat_subtitle">Ce que les joueurs rapportent pour chaque jeu, appareil par appareil</string>
+    <string name="compat_search_hint">Rechercher un jeu</string>
+    <string name="compat_unavailable">Les retours n\'ont pas encore pu être chargés. Ils apparaissent dès que le réseau est joignable.</string>
+    <string name="compat_empty">Aucun jeu n\'a été rapporté pour l\'instant.</string>
+    <string name="compat_no_match">Aucun jeu rapporté ne correspond à cette recherche.</string>
+    <string name="compat_unknown_game">Jeu %1$d</string>
+    <plurals name="compat_answers">
+        <item quantity="one">%1$d réponse</item>
+        <item quantity="other">%1$d réponses</item>
+    </plurals>
+    <string name="compat_this_device">%1$s (cet appareil)</string>
+    <string name="compat_few">Pas encore assez de réponses</string>
+    <string name="compat_count_works">%1$d fonctionne</string>
+    <string name="compat_count_offline_only">%1$d hors ligne seulement</string>
+    <string name="compat_count_fails">%1$d n\'a pas fonctionné</string>
+    <plurals name="compat_offline_tried">
+        <item quantity="one">%1$d l\'a essayé avec le mode hors ligne</item>
+        <item quantity="other">%1$d l\'ont essayé avec le mode hors ligne</item>
+    </plurals>
+    <string name="compat_level_works">Fonctionne</string>
+    <string name="compat_level_offline_only">Hors ligne seulement</string>
+    <string name="compat_level_mixed">Avis partagés</string>
+    <string name="compat_level_fails">Problèmes</string>
+    <string name="compat_device_quest">Meta Quest</string>
+    <string name="compat_device_pico">Pico</string>
+    <string name="compat_device_phone">Téléphone</string>
+    <string name="compat_device_tablet">Tablette</string>
+    <string name="compat_device_other">Autre</string>
+    <string name="compat_chip_works">Fonctionne sur %1$s</string>
+    <string name="compat_chip_offline_only">Hors ligne seulement sur %1$s</string>
+    <string name="compat_chip_mixed">Avis partagés sur %1$s</string>
+    <string name="compat_chip_fails">Problèmes sur %1$s</string>
+    <string name="compat_show_others">Tous les appareils</string>
+    <string name="compat_hide_others">Masquer les autres</string>
+    <string name="compat_filter_works">Fonctionne</string>
+    <string name="compat_filter_fails">Ne fonctionne pas</string>
+</resources>

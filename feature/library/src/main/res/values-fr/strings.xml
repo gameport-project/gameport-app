@@ -2,6 +2,8 @@
 <resources>
     <string name="library_search_hint">Rechercher un jeu</string>
     <string name="library_downloads">Téléchargements et jeux installés</string>
+    <string name="library_more">Plus</string>
+    <string name="library_compat">Tableau des compatibilités</string>
     <string name="library_settings">Paramètres</string>
     <string name="library_tab_flat">Plat</string>
     <string name="library_family_shared">Famille</string>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="compat_title">Compatibility</string>
+    <string name="compat_subtitle">What players report for each game, device by device</string>
+    <string name="compat_search_hint">Search a game</string>
+    <string name="compat_unavailable">The reports could not be loaded yet. They appear once the network is reachable.</string>
+    <string name="compat_empty">No game has been reported so far.</string>
+    <string name="compat_no_match">No reported game matches this search.</string>
+    <string name="compat_unknown_game">Game %1$d</string>
+    <plurals name="compat_answers">
+        <item quantity="one">%1$d answer</item>
+        <item quantity="other">%1$d answers</item>
+    </plurals>
+    <string name="compat_this_device">%1$s (this device)</string>
+    <string name="compat_few">Not enough answers yet</string>
+    <string name="compat_count_works">%1$d works</string>
+    <string name="compat_count_offline_only">%1$d offline only</string>
+    <string name="compat_count_fails">%1$d did not work</string>
+    <plurals name="compat_offline_tried">
+        <item quantity="one">%1$d tried it with the offline mode</item>
+        <item quantity="other">%1$d tried it with the offline mode</item>
+    </plurals>
+    <string name="compat_level_works">Works</string>
+    <string name="compat_level_offline_only">Offline only</string>
+    <string name="compat_level_mixed">Mixed</string>
+    <string name="compat_level_fails">Problems</string>
+    <string name="compat_device_quest">Meta Quest</string>
+    <string name="compat_device_pico">Pico</string>
+    <string name="compat_device_phone">Phone</string>
+    <string name="compat_device_tablet">Tablet</string>
+    <string name="compat_device_other">Other</string>
+    <string name="compat_chip_works">Works on %1$s</string>
+    <string name="compat_chip_offline_only">Offline only on %1$s</string>
+    <string name="compat_chip_mixed">Mixed on %1$s</string>
+    <string name="compat_chip_fails">Problems on %1$s</string>
+    <string name="compat_show_others">All devices</string>
+    <string name="compat_hide_others">Hide the others</string>
+    <string name="compat_filter_works">Works</string>
+    <string name="compat_filter_fails">Does not work</string>
+</resources>

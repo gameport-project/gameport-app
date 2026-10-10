@@ -16,10 +16,14 @@ import androidx.navigation.compose.rememberNavController
 import app.gameport.core.model.AuthState
 import app.gameport.feature.auth.AuthRoute
 import app.gameport.feature.auth.authScreen
+import app.gameport.feature.compat.CompatRoute
+import app.gameport.feature.compat.compatScreen
 import app.gameport.feature.downloads.DownloadsRoute
 import app.gameport.feature.downloads.downloadsScreen
 import app.gameport.feature.game.gameScreen
+import app.gameport.feature.game.gameCompatScreen
 import app.gameport.feature.game.gameControllersScreen
+import app.gameport.feature.game.navigateToGameCompat
 import app.gameport.feature.game.gameAchievementsScreen
 import app.gameport.feature.game.navigateToGameAchievements
 import app.gameport.feature.game.gameSavesScreen
@@ -73,11 +77,14 @@ private fun GamePortContent(viewModel: AppViewModel) {
             onOpenSettings = { navController.navigate(SettingsRoute()) },
             onOpenSteamSettings = { navController.navigate(SettingsRoute(account = true)) },
             onOpenGameSettings = navController::navigateToGameSettings,
+            onOpenCompat = { navController.navigate(CompatRoute) },
         )
+        compatScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame)
         settingsScreen(onBack = navController::goBack)
         downloadsScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame)
-        gameScreen(onBack = navController::goBack, onOpenSettings = navController::navigateToGameSettings, onOpenSaves = navController::navigateToGameSaves, onOpenControllers = navController::navigateToGameControllers, onOpenAchievements = navController::navigateToGameAchievements, onOpenSteamSettings = { navController.navigate(SettingsRoute(account = true)) })
+        gameScreen(onBack = navController::goBack, onOpenSettings = navController::navigateToGameSettings, onOpenSaves = navController::navigateToGameSaves, onOpenControllers = navController::navigateToGameControllers, onOpenCompat = navController::navigateToGameCompat, onOpenAchievements = navController::navigateToGameAchievements, onOpenSteamSettings = { navController.navigate(SettingsRoute(account = true)) })
         gameControllersScreen(onBack = navController::goBack)
+        gameCompatScreen(onBack = navController::goBack)
         gameAchievementsScreen(onBack = navController::goBack)
         gameSavesScreen(onBack = navController::goBack)
         gameSettingsScreen(onBack = navController::goBack)

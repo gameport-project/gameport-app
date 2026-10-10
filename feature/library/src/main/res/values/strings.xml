@@ -2,6 +2,8 @@
 <resources>
     <string name="library_search_hint">Search games</string>
     <string name="library_downloads">Downloads and installed games</string>
+    <string name="library_more">More</string>
+    <string name="library_compat">Compatibility table</string>
     <string name="library_settings">Settings</string>
     <string name="library_tab_vr">VR</string>
     <string name="library_tab_flat">Flat</string>

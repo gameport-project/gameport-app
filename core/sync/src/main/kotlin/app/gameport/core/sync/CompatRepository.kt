@@ -69,6 +69,9 @@ class CompatRepository @Inject constructor(@ApplicationContext private val conte
     /** The verdict of the players who use the same kind of device as this one, or null while there are too few answers (or none were ever read). */
     fun observe(appId: Int): Flow<Compat?> = summary.map { CompatRules.of(it?.of(appId), device.kind) }
 
+    /** Everything the relay publishes, for the page that lists the games and their numbers; null until something was read. */
+    fun observeSummary(): Flow<CompatSummary?> = summary
+
     /** What the players who use the same kind of device say of each game they said enough about: for the covers of the home. */
     fun observeLevels(): Flow<Map<Int, CompatLevel>> = summary.map { all ->
         all?.games.orEmpty().mapNotNull { counts -> CompatRules.of(counts, device.kind)?.let { counts.appId to it.level } }.toMap()

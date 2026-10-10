@@ -108,7 +108,7 @@ private val AttentionOrange = Color(0xFFFF9800)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MenuEntry(icon: ImageVector, label: Int, onClick: () -> Unit, primary: Boolean = false, tint: Color? = null, iconTint: Color? = null) {
+internal fun MenuEntry(icon: ImageVector, label: Int, onClick: () -> Unit, primary: Boolean = false, tint: Color? = null, iconTint: Color? = null) {
     val padding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
     val content: @Composable RowScope.() -> Unit = {
         Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = iconTint ?: LocalContentColor.current)

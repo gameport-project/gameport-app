@@ -48,6 +48,7 @@ dependencies {
     implementation(project(":core:settings"))
     implementation(project(":core:steam"))
     implementation(project(":feature:auth"))
+    implementation(project(":feature:compat"))
     implementation(project(":feature:downloads"))
     implementation(project(":feature:game"))
     implementation(project(":feature:library"))
