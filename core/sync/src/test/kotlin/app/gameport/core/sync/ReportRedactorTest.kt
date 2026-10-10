@@ -41,4 +41,10 @@ class ReportRedactorTest {
         assertEquals(text, ReportRedactor.clean(text))
         assertEquals("mail [email] and /x/lib@1.0.so", ReportRedactor.clean("mail a@b.example.com and /x/lib@1.0.so"))
     }
+
+    @Test
+    fun `the version of GamePort in an event line is kept`() {
+        val line = "2026-10-02 17:45:12 app=846470 gp=0.7.3 installed com.polyarc.MossGame"
+        assertEquals(line, ReportRedactor.clean(line, emptyList()))
+    }
 }

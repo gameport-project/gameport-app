@@ -12,18 +12,20 @@ import javax.inject.Singleton
 /**
  * What GamePort did for each game (downloads, patches, installs, their failures), kept for problem reports: the
  * errors of a patch are otherwise shown once and lost. A text file; lines older than a week are dropped when the
- * app starts ([purgeOlderThan]), and a game's lines go when it is uninstalled ([forget]). See [EventLogText].
+ * app starts ([purgeOlderThan]), and a game's lines go when it is uninstalled ([forget]). Each line says the version of GamePort that wrote it. See [EventLogText].
  */
 @Singleton
 class GameEventLog @Inject constructor(
     @ApplicationContext context: Context,
 ) {
+    // The version of GamePort that wrote the line: what a game went through depends on the version that did it.
+    private val version = runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "unknown"
     private val file = File(context.filesDir, "game-events.log")
     private val format = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
 
     @Synchronized
     fun note(appId: Int, message: String) {
-        runCatching { file.appendText("${format.format(Date())} app=$appId $message\n") }
+        runCatching { file.appendText("${format.format(Date())} app=$appId gp=$version $message\n") }
     }
 
     /** A failure with where it happened: the exception and its first frames. */

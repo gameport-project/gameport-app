@@ -76,6 +76,18 @@ class ProblemReporter @Inject constructor(
         SavedReport(name, uri)
     }
 
+    /**
+     * The report as bytes, to send it to the relay. A report larger than [maxBytes] is made again without its heaviest optional files (the list of
+     * the game's files, the engine's logs, the crash dump); when it is still too large, or the game is not installed, there is none.
+     */
+    suspend fun bytes(game: Game, maxBytes: Int = MAX_SENT_BYTES, installFailure: String? = null): ByteArray? = withContext(Dispatchers.IO) {
+        // A game whose install failed has no package yet: the report then holds the download and the events instead.
+        val packageName = installed.all()[game.appId]?.takeIf(packages::isInstalled)
+        if (packageName == null && installFailure == null) return@withContext null
+        fun build(lean: Boolean) = java.io.ByteArrayOutputStream().also { writeZip(game, packageName, installFailure, it, lean) }.toByteArray()
+        build(lean = false).takeIf { it.size <= maxBytes } ?: build(lean = true).takeIf { it.size <= maxBytes }
+    }
+
     /** The page that opens a new ticket on the project's tracker with the title and the facts filled in. */
     fun ticketUrl(game: Game, fileName: String?): Uri {
         val body = buildString {
@@ -96,7 +108,7 @@ class ProblemReporter @Inject constructor(
             .build()
     }
 
-    private fun writeZip(game: Game, packageName: String?, installFailure: String?, target: java.io.OutputStream) {
+    private fun writeZip(game: Game, packageName: String?, installFailure: String?, target: java.io.OutputStream, lean: Boolean = false) {
         val names = (auth.authState.value as? AuthState.SignedIn)?.account?.displayName?.let(::listOf).orEmpty()
         fun clean(text: String) = ReportRedactor.clean(text, names)
         ZipOutputStream(target, Charsets.UTF_8).use { zip ->
@@ -112,7 +124,7 @@ class ProblemReporter @Inject constructor(
             if (packageName != null) {
                 entry("performance.txt", clean(store.text(packageName, "performance.txt").ifBlank { "(no performance line received from the game: it has not run with the current patch, or the runtime printed none while it ran)" }))
                 entry("files.txt", clean(files(packageName)))
-                entry("apk-contents.txt", clean(apkContents(packageName)))
+                if (!lean) entry("apk-contents.txt", clean(apkContents(packageName)))
                 entry("steam-interfaces.txt", clean(steamInterfaces(packageName)))
                 entry("patch.txt", clean(patchFacts(packageName)))
                 entry("manifest.txt", clean(manifest(packageName)))
@@ -124,10 +136,10 @@ class ProblemReporter @Inject constructor(
                 // The run before the last one, when the last one began after it ended: the one that explains how it ended.
                 store.previousLogStart(packageName).takeIf { it.isNotBlank() }?.let { entry("previous-run-log-start.txt", clean(it)) }
                 store.previousHookLog(packageName).takeIf { it.isNotBlank() }?.let { entry("previous-run-log.txt", clean(it)) }
-                entry("engine-logs.txt", clean(store.text(packageName, "engine.log").ifBlank { "(no log file of the game's engine found)" }))
+                if (!lean) entry("engine-logs.txt", clean(store.text(packageName, "engine.log").ifBlank { "(no log file of the game's engine found)" }))
                 entry("last-exits.txt", clean(ExitReasons.withTimes(store.previousExit(packageName)).ifBlank { "(not available)" }))
-                entry("diagnosis.txt", ReportDiagnosis.of(store.text(packageName, "libraries.txt"), store.text(packageName, "log-start.txt"), store.previousExit(packageName), store.lastDataMillis(packageName)?.let { (System.currentTimeMillis() - it) / 1000 }))
-                store.bytes(packageName, "tombstone.pb")?.let { trace ->
+                entry("diagnosis.txt", ReportDiagnosis.of(store.text(packageName, "libraries.txt"), store.text(packageName, "log-start.txt"), store.previousExit(packageName), store.lastDataMillis(packageName)?.let { (System.currentTimeMillis() - it) / 1000 }, expansionFacts(packageName)))
+                store.bytes(packageName, "tombstone.pb")?.takeIf { !lean }?.let { trace ->
                     zip.putNextEntry(ZipEntry("crash-tombstone.pb"))
                     zip.write(trace)
                     zip.closeEntry()
@@ -158,6 +170,10 @@ class ProblemReporter @Inject constructor(
             "game.versionName" to info?.versionName,
             "game.versionCode" to info?.longVersionCode,
             "game.originalVersionCode" to originalCode,
+            // When Android installed and last updated the game, and by whom: a game GamePort installed has GamePort here, another store has its own.
+            "game.firstInstalledAt" to info?.firstInstallTime?.let(::dateTime),
+            "game.updatedAt" to info?.lastUpdateTime?.let(::dateTime),
+            "game.installedBy" to packageName?.let(::installerOf),
             "game.patchVersion" to patchVersion,
             "device.manufacturer" to Build.MANUFACTURER,
             "device.model" to Build.MODEL,
@@ -179,9 +195,33 @@ class ProblemReporter @Inject constructor(
         packages.apkFilesOf(packageName).forEach { appendLine("  ${it.name}  ${it.length()} bytes") }
         appendLine("Expansion files (Android/obb):")
         val obb = File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName")
-        obb.listFiles()?.sortedBy { it.name }?.forEach { appendLine("  ${it.name}  ${it.length()} bytes") }
-            ?: appendLine("  (none, or not readable)")
+        val listed = obb.listFiles()?.sortedBy { it.name }
+        when {
+            listed == null && obb.exists() -> appendLine("  (the folder is there but GamePort cannot list it)")
+            listed == null -> appendLine("  (no folder for this game, or GamePort cannot see it)")
+            listed.isEmpty() -> appendLine("  (the folder is empty)")
+            else -> listed.forEach { appendLine("  ${it.name}  ${it.length()} bytes") }
+        }
     }
+
+    /** What the game says it needs and what is there, for the diagnosis. */
+    private fun expansionFacts(packageName: String): ReportDiagnosis.Expansion {
+        val declared = runCatching {
+            context.packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA).metaData?.getBoolean("com.epicgames.ue4.GameActivity.bHasOBBFiles", false)
+        }.getOrNull() == true
+        val obb = File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName")
+        val listed = obb.listFiles()
+        val folder = when {
+            listed != null -> ReportDiagnosis.Expansion.Folder.READABLE
+            obb.exists() -> ReportDiagnosis.Expansion.Folder.NOT_READABLE
+            else -> ReportDiagnosis.Expansion.Folder.ABSENT
+        }
+        return ReportDiagnosis.Expansion(declared, folder, listed?.count { it.isFile } ?: 0)
+    }
+
+    private fun dateTime(millis: Long): String = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date(millis))
+
+    private fun installerOf(packageName: String): String? = runCatching { context.packageManager.getInstallSourceInfo(packageName).installingPackageName }.getOrNull()
 
     private fun manifest(packageName: String): String = buildString {
         val manager = context.packageManager
@@ -328,6 +368,9 @@ class ProblemReporter @Inject constructor(
 
     private companion object {
         const val MIB = 1024L * 1024L
+
+        /** What the relay accepts (see its README): a report is sent only when it fits. */
+        const val MAX_SENT_BYTES = 1_000_000
         const val MAX_APK_ENTRIES = 6000
         const val MAX_SCANNED_LIBRARY = 200L * 1024 * 1024
         val README = """
@@ -336,7 +379,7 @@ class ProblemReporter @Inject constructor(
             Made on the player's device to help find why one game does not work. Nothing was sent anywhere:
             the player chose to share this file.
 
-            diagnosis.txt         what the files show at once (the hook ran, the OpenXR loader and layer loaded, how the last runs ended) and how old the data is
+            diagnosis.txt         what the files show at once (the hook ran, the OpenXR loader and layer loaded, the expansion files, the controllers the game asked for, how the last runs ended) and how old the data is
             report.json           versions of GamePort, the game and the patch; the connection to Steam; why a report is suggested
             device.txt            the device, its system, storage, memory, VR features
             settings.txt          the player's choices for this game (seated mode, height, controller mapping), the save sync state
@@ -357,7 +400,7 @@ class ProblemReporter @Inject constructor(
             crash-tombstone.pb    Android's crash report of the last native crash, when there was one (binary; it holds
                                   the call stack and technical memory data of the game process)
             install.txt           for a failed install: the error, the download folder and what its APKs say about themselves
-            events.txt            what GamePort did for this game: download, patch, install and their errors
+            events.txt            what GamePort did for this game: download (and what it held besides the APK), patch, install and their errors, each line with the version of GamePort
             gameport-log.txt      GamePort's own warnings, errors and messages about this game
 
             Account numbers, e-mail addresses, network addresses and the account's display name are removed from every

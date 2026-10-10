@@ -213,6 +213,7 @@ class GameInstallRepository @Inject constructor(
                     }
 
                     events.note(game.appId, "download complete: ${everything.joinToString { it.name }}")
+                    events.note(game.appId, "the download also holds: ${besidesApks(directory)}")
                     val downloaded = chooseBuild(game.appId, everything) ?: return@launch clearState(game.appId).also { directory.deleteRecursively() }
                     events.note(game.appId, "build chosen: ${downloaded.joinToString { it.name }}")
                     val account = (auth.authState.value as? AuthState.SignedIn)?.account
@@ -572,6 +573,16 @@ class GameInstallRepository @Inject constructor(
         return InstallError.NotEnoughSpace(neededBytes = needed, freeBytes = free)
     }
 
+    /** What the download holds besides the APKs (names and sizes), to tell later whether a game came with expansion files. */
+    private fun besidesApks(directory: File): String {
+        val files = directory.walkTopDown().onEnter { it.name != PATCHED_DIR }
+            .filter { it.isFile && !it.extension.equals("apk", ignoreCase = true) }
+            .map { "${it.relativeTo(directory).path.replace('\\', '/')} (${it.length()} bytes)" }
+            .toList()
+        if (files.isEmpty()) return "nothing"
+        return files.take(MAX_PLACED_LISTED).joinToString() + if (files.size > MAX_PLACED_LISTED) " and ${files.size - MAX_PLACED_LISTED} more" else ""
+    }
+
     /** True when the download holds expansion files: a `.obb`, or an `obb/` folder the depot spells out. */
     private fun downloadHasExpansion(directory: File): Boolean = directory.walkTopDown().onEnter { it.name != PATCHED_DIR }.any { file ->
         file.isFile && (file.name.endsWith(".obb", ignoreCase = true) || file.relativeTo(directory).path.replace('\\', '/').startsWith("obb/"))
@@ -755,6 +766,8 @@ class GameInstallRepository @Inject constructor(
             val placed = ExpansionFiles.place(directory, target, packageName, skipped = PATCHED_DIR)
             if (placed.isNotEmpty()) {
                 events.note(appId, "placed in Android/obb/$packageName: ${placed.take(MAX_PLACED_LISTED).joinToString()}${if (placed.size > MAX_PLACED_LISTED) " and ${placed.size - MAX_PLACED_LISTED} more" else ""}")
+            } else {
+                events.note(appId, "no expansion file to place in Android/obb/$packageName")
             }
         }
         alignObbVersion(packageName)

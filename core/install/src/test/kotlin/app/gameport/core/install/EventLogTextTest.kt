@@ -45,4 +45,10 @@ class EventLogTextTest {
     fun `an empty log stays empty`() {
         assertEquals("", EventLogText.purgeOlderThan("", 0L))
     }
+
+    @Test
+    fun `a line that says the version of GamePort is still read as the entry of its game`() {
+        val text = "2026-10-02 09:00:00 app=7 gp=0.7.3 installed x\n2026-10-02 09:01:00 app=8 gp=0.7.3 installed y\n"
+        assertEquals("2026-10-02 09:00:00 app=7 gp=0.7.3 installed x\n", EventLogText.entriesOf(text, 7))
+    }
 }
