@@ -19,6 +19,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.animation.animateContentSize
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.ui.unit.dp
 import app.gameport.core.designsystem.CompatGlyph
 import app.gameport.core.designsystem.GlassChip
@@ -35,7 +42,7 @@ private val HeaderOrange = Color(0xFFFFB74D)
 @Composable
 internal fun CompatHeader(onBack: () -> Unit, subtitle: String) {
     PageHeader(onBack, stringResource(R.string.compat_title), subtitle) {
-        Icon(Icons.Filled.Build, contentDescription = null, tint = HeaderOrange, modifier = Modifier.size(52.dp))
+        app.gameport.core.designsystem.CompatToolsIcon(size = 52.dp)
     }
 }
 
@@ -70,7 +77,8 @@ internal fun deviceName(kind: String): String = stringResource(
 
 /** The label of the game's page: the verdict for this kind of device, in colour, with its mark before the words. */
 @Composable
-internal fun VerdictChip(level: CompatLevel, device: String) {
+fun VerdictChip(level: CompatLevel, deviceKind: String, small: Boolean = false, modifier: Modifier = Modifier) {
+    val device = deviceName(deviceKind)
     val (colour, glyph, _) = mark(level)
     val label = stringResource(
         when (level) {
@@ -81,8 +89,18 @@ internal fun VerdictChip(level: CompatLevel, device: String) {
         },
         device,
     )
-    val capitals = with(LocalDensity.current) { (MaterialTheme.typography.labelLarge.fontSize * CAPITAL_HEIGHT).toDp() }
-    GlassChip(label, accent = colour, leading = { CompatGlyph(glyph, colour, capitals) })
+    val style = if (small) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelLarge
+    val capitals = with(LocalDensity.current) { (style.fontSize * CAPITAL_HEIGHT).toDp() }
+    GlassChip(
+        label,
+        modifier = modifier,
+        accent = colour,
+        leading = { CompatGlyph(glyph, colour, capitals) },
+        textStyle = style,
+        verticalPadding = if (small) 2.dp else 6.dp,
+        horizontalPadding = if (small) 9.dp else 12.dp,
+        solid = small,
+    )
 }
 
 /** The height of a capital letter, as a share of the size of the font. */
@@ -106,10 +124,11 @@ internal fun DeviceLine(counts: CompatCounts, kind: String, own: DeviceCounts, m
                     CompatGlyph(glyph, colour, height = 14.dp)
                     Text(stringResource(label), color = colour, style = MaterialTheme.typography.labelMedium)
                 }
-                verdict == null -> Text(stringResource(R.string.compat_few), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
             }
             trailing?.invoke()
         }
+        // Too few answers for a verdict: said under the name, where it has the whole width, not beside it.
+        if (verdict == null) Text(stringResource(R.string.compat_few), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
         // Only the answers that exist: "0 did not work" is not worth a word.
         val parts = listOfNotNull(
             own.works.takeIf { it > 0 }?.let { stringResource(R.string.compat_count_works, it) },
@@ -127,4 +146,65 @@ internal fun DeviceLine(counts: CompatCounts, kind: String, own: DeviceCounts, m
             )
         }
     }
+}
+
+/** The verdict reduced to its mark, as the home shows it on a cover: the glyph in a tinted circle. */
+@Composable
+fun CompatMark(level: CompatLevel, size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier) {
+    val (colour, glyph, words) = mark(level)
+    val description = stringResource(words)
+    androidx.compose.foundation.layout.Box(
+        modifier
+            .size(size)
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .background(colour.copy(alpha = 0.22f))
+            .border(1.dp, colour.copy(alpha = 0.65f), androidx.compose.foundation.shape.CircleShape)
+            .semantics { contentDescription = description },
+    ) {
+        CompatGlyph(glyph, colour, height = size * (if (glyph == Glyph.NO_NETWORK) 0.5f else 0.46f), modifier = Modifier.align(Alignment.Center))
+    }
+}
+
+/**
+ * The verdict as a mark that unfolds: a small round mark with its glyph, and, while [expanded], the words beside it. It is one shape with one border all the
+ * time, so nothing jumps: the shape only grows from a circle to a pill, from where it is anchored, sideways, its height unchanged.
+ */
+@Composable
+fun CompatBadge(level: CompatLevel, deviceKind: String, expanded: Boolean, modifier: Modifier = Modifier) {
+    val (colour, glyph, words) = mark(level)
+    // The words of the verdict alone: the device is the one in hand, and one short line keeps the height still, so the badge only glides to the left.
+    val label = stringResource(words)
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(BADGE_SIZE / 2)
+    Row(
+        modifier
+            .animateContentSize(androidx.compose.animation.core.tween(240, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            .clip(shape)
+            .background(Color.Black.copy(alpha = 0.55f))
+            .background(colour.copy(alpha = 0.22f))
+            .border(1.dp, colour.copy(alpha = 0.65f), shape),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        androidx.compose.foundation.layout.Box(Modifier.size(BADGE_SIZE)) {
+            CompatGlyph(glyph, colour, height = BADGE_SIZE * (if (glyph == Glyph.NO_NETWORK) 0.5f else 0.46f), modifier = Modifier.align(Alignment.Center))
+        }
+        if (expanded) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.padding(end = 10.dp),
+            )
+        }
+    }
+}
+
+private val BADGE_SIZE = 20.dp
+
+private fun chipLabel(level: CompatLevel): Int = when (level) {
+    CompatLevel.WORKS -> R.string.compat_chip_works
+    CompatLevel.OFFLINE_ONLY -> R.string.compat_chip_offline_only
+    CompatLevel.MIXED -> R.string.compat_chip_mixed
+    CompatLevel.FAILS -> R.string.compat_chip_fails
 }

@@ -57,10 +57,10 @@ import app.gameport.core.model.SteamImages
 
 /**
  * What the players say of each game, device by device: the numbers behind the marks on the covers of the home. A game of the account opens its own
- * page, a game the account does not have opens the same page, which sends to Steam instead of installing.
+ * page, a game the account does not have opens the page of the store.
  */
 @Composable
-fun CompatScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, viewModel: CompatViewModel = hiltViewModel()) {
+fun CompatScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, onUnownedClick: (Int) -> Unit, viewModel: CompatViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp)) {
@@ -90,7 +90,7 @@ fun CompatScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, viewModel: Comp
                                 items(current.entries.chunked(columns), key = { row -> row.first().counts.appId }) { row ->
                                     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(CARD_GAP)) {
                                         row.forEach { entry ->
-                                            CompatCard(entry, current.deviceKind, Modifier.weight(1f).fillMaxHeight()) { onGameClick(entry.counts.appId) }
+                                            CompatCard(entry, current.deviceKind, Modifier.weight(1f).fillMaxHeight()) { if (entry.inLibrary) onGameClick(entry.counts.appId) else onUnownedClick(entry.counts.appId) }
                                         }
                                         // The last row keeps the width of its cards.
                                         repeat(columns - row.size) { Box(Modifier.weight(1f)) }
@@ -152,9 +152,12 @@ private fun CompatCard(entry: CompatEntry, deviceKind: String, modifier: Modifie
             }
             // The label stays at the bottom right, whatever the height the card takes.
             Spacer(Modifier.weight(1f))
-            Row(Modifier.fillMaxWidth().heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f))
-                if (verdict != null) VerdictChip(verdict.level, deviceName(deviceKind))
+            // Nothing is reserved for a label a game that has no verdict yet does not have.
+            if (verdict != null) {
+                Row(Modifier.fillMaxWidth().heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f))
+                    VerdictChip(verdict.level, deviceKind)
+                }
             }
         }
     }
