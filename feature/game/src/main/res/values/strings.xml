@@ -25,8 +25,6 @@
     <string name="game_compat_warning_install">Install anyway</string>
     <string name="game_compat_warning_cancel">Cancel</string>
     <string name="game_owned">Owned</string>
-    <string name="game_not_owned">Not owned</string>
-    <string name="game_open_steam">See on Steam</string>
     <string name="game_family_shared">Shared by family</string>
     <string name="game_kind_vr">VR</string>
     <string name="game_kind_flat">Flat</string>

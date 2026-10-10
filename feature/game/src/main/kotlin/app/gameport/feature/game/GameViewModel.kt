@@ -93,16 +93,11 @@ class GameViewModel @Inject constructor(
     achievementsRepository: app.gameport.core.steam.AchievementsRepository,
     saves: app.gameport.core.sync.SaveStateRepository,
     private val compat: app.gameport.core.sync.CompatRepository,
-    private val appNames: app.gameport.core.steam.AppNameRepository,
     incompatibleGames: app.gameport.core.settings.IncompatibleGames,
 ) : ViewModel() {
     init {
         // The totals of the players are asked again when they are old; what is kept shows meanwhile.
         viewModelScope.launch { compat.refreshIfStale() }
-        // A game the account does not have shows with the name Steam gives it.
-        viewModelScope.launch {
-            if (repository.observeLibrary().first { !it.isScanning }.games.none { it.appId == appId }) appNames.resolve(listOf(appId))
-        }
     }
 
     /** How GamePort stands with Steam. */
@@ -118,11 +113,7 @@ class GameViewModel @Inject constructor(
     private val appId = savedStateHandle.toRoute<GameRoute>().appId
 
     private val baseState: StateFlow<GameUiState> = combine(
-        combine(repository.observeLibrary(), appNames.names, compat.observeSummary()) { library, names, summary ->
-            // A game players reported is known to the table of compatibility, even when the account does not have it.
-            val unowned = if (summary?.of(appId) != null) Game(appId, names[appId] ?: appId.toString(), app.gameport.core.model.Ownership.NOT_OWNED, androidBuild = null) else null
-            gameStateOf(library, appId, unowned)
-        },
+        repository.observeLibrary().toGameState(appId),
         installer.observe(appId),
         issuesRepository.observe(appId),
         combine(controllerMappings.observe(appId), gameSettingsStore.stageFallback(appId), gameSettingsStore.observe(appId)) { mapping, fallback, own -> Triple(mapping, fallback && own.recenter == app.gameport.core.model.RecenterMode.AUTO, own) },

@@ -49,7 +49,6 @@ import app.gameport.core.designsystem.Glyph
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Warning
@@ -494,13 +493,7 @@ private fun GameDetails(
                         GlassChip(stringResource(if (vr) R.string.game_kind_vr else R.string.game_kind_flat))
                     }
                     GlassChip(
-                        stringResource(
-                            when (game.ownership) {
-                                Ownership.OWNED -> R.string.game_owned
-                                Ownership.FAMILY_SHARED -> R.string.game_family_shared
-                                Ownership.NOT_OWNED -> R.string.game_not_owned
-                            },
-                        ),
+                        stringResource(if (game.ownership == Ownership.OWNED) R.string.game_owned else R.string.game_family_shared),
                     )
                     when (game.kind) {
                         AppKind.DEMO -> GlassChip(stringResource(R.string.game_kind_demo), accent = KindBlue)
@@ -515,15 +508,7 @@ private fun GameDetails(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    val context = LocalContext.current
-                    if (game.ownership == Ownership.NOT_OWNED) {
-                        // A game the account does not have is not installed from here: its page on Steam is where it is bought.
-                        Button(onClick = { openOnSteam(context, game.appId) }, modifier = Modifier.widthIn(min = 240.dp).height(ACTION_HEIGHT)) {
-                            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.game_open_steam))
-                        }
-                    } else InstallActions(
+                    InstallActions(
                         install = install,
                         speedUnit = speedUnit,
                         onInstall = { if (compat?.level == app.gameport.core.model.CompatLevel.FAILS) warning = true else startInstall() },
@@ -580,25 +565,23 @@ private fun GameDetails(
                             )
                         }
                     }
-                    if (game.ownership != Ownership.NOT_OWNED) {
-                        GlassIconButton(onClick = onToggleFavorite) {
-                            Icon(
-                                Icons.Filled.Favorite,
-                                contentDescription = stringResource(if (favorite) R.string.game_unfavorite else R.string.game_favorite),
-                                tint = if (favorite) Color(0xFFE53935) else LocalContentColor.current,
-                            )
-                        }
-                        GlassIconButton(onClick = { if (hidden) onSetHidden(false) else confirmingHide = true }) {
-                            Icon(
-                                if (hidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                                contentDescription = stringResource(if (hidden) R.string.game_show_again else R.string.game_hide),
-                                // Hiding has the colour it has in the menu of a cover; showing again keeps the usual one.
-                                tint = if (hidden) LocalContentColor.current else HideRed,
-                            )
-                        }
-                        GlassIconButton(onClick = onOpenSettings, enabled = repatch !is Repatch.Running) {
-                            Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.game_settings_title))
-                        }
+                    GlassIconButton(onClick = onToggleFavorite) {
+                        Icon(
+                            Icons.Filled.Favorite,
+                            contentDescription = stringResource(if (favorite) R.string.game_unfavorite else R.string.game_favorite),
+                            tint = if (favorite) Color(0xFFE53935) else LocalContentColor.current,
+                        )
+                    }
+                    GlassIconButton(onClick = { if (hidden) onSetHidden(false) else confirmingHide = true }) {
+                        Icon(
+                            if (hidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                            contentDescription = stringResource(if (hidden) R.string.game_show_again else R.string.game_hide),
+                            // Hiding has the colour it has in the menu of a cover; showing again keeps the usual one.
+                            tint = if (hidden) LocalContentColor.current else HideRed,
+                        )
+                    }
+                    GlassIconButton(onClick = onOpenSettings, enabled = repatch !is Repatch.Running) {
+                        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.game_settings_title))
                     }
                 }
                 if (install is InstallState.Installed && (issues.isNotEmpty() || repatch != Repatch.None)) {
@@ -634,7 +617,7 @@ private fun GameDetails(
                     })
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp), content = details)
                     // Size and play time are not what the player came for: after everything else.
-                    if (game.ownership != Ownership.NOT_OWNED) InfoCard(game, installed, playtime, Modifier.fillMaxWidth())
+                    InfoCard(game, installed, playtime, Modifier.fillMaxWidth())
                 }
             } else {
                 Row(
@@ -648,7 +631,7 @@ private fun GameDetails(
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         cover(Modifier)
-                        if (game.ownership != Ownership.NOT_OWNED) InfoCard(game, installed, playtime, Modifier.fillMaxWidth())
+                        InfoCard(game, installed, playtime, Modifier.fillMaxWidth())
                     }
                     Column(Modifier.weight(1f).padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp), content = details)
                 }
@@ -1123,10 +1106,3 @@ private fun deviceName(kind: String): String = stringResource(
 
 /** The controllers button when the player forced the Steam Frame's controls. */
 private val ControllerForcedColor = Color(0xFFFFB74D)
-
-/** Opens the game's page on Steam, where it can be bought. Nothing happens on a device that has no browser. */
-private fun openOnSteam(context: android.content.Context, appId: Int) {
-    runCatching {
-        context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://store.steampowered.com/app/$appId")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    }
-}

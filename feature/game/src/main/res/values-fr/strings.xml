@@ -25,8 +25,6 @@
     <string name="game_compat_warning_install">Installer quand même</string>
     <string name="game_compat_warning_cancel">Annuler</string>
     <string name="game_owned">Possédé</string>
-    <string name="game_not_owned">Non possédé</string>
-    <string name="game_open_steam">Voir sur Steam</string>
     <string name="game_family_shared">Partagé par la famille</string>
     <string name="game_kind_flat">Plat</string>
     <string name="game_dlc_title">Ajouter du contenu supplémentaire ?</string>
