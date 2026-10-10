@@ -10,6 +10,7 @@ import `in`.dragonbra.javasteam.steam.authentication.IChallengeUrlChanged
 import `in`.dragonbra.javasteam.steam.handlers.steamuser.LogOnDetails
 import `in`.dragonbra.javasteam.steam.handlers.steamuser.SteamUser
 import `in`.dragonbra.javasteam.steam.handlers.steamuser.callback.LoggedOnCallback
+import `in`.dragonbra.javasteam.steam.handlers.steamuser.callback.WalletInfoCallback
 import `in`.dragonbra.javasteam.steam.steamclient.SteamClient
 import `in`.dragonbra.javasteam.steam.steamclient.callbackmgr.CallbackManager
 import `in`.dragonbra.javasteam.steam.steamclient.callbacks.ConnectedCallback
@@ -61,7 +62,7 @@ data class SessionIdentity(val steamId: Long, val displayName: String)
  * Thin wrapper around a JavaSteam client: connection, callback pump, QR authentication and
  * refresh-token log on. It exposes coroutines and knows nothing about Android or UI state.
  */
-class SteamSession(private val cellId: Int = 0) {
+class SteamSession(private val cellId: Int = 0, private val onAccountRegion: (currency: String?, country: String?) -> Unit = { _, _ -> }) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val traffic = ConcurrentHashMap<Int, AtomicLong>()
 
@@ -240,7 +241,10 @@ class SteamSession(private val cellId: Int = 0) {
             lost = true
             if (!closedOnPurpose) onLost?.invoke()
         }
-        callbacks.subscribe(LoggedOnCallback::class.java) { loggedOn?.complete(it) }
+        callbacks.subscribe(LoggedOnCallback::class.java) {
+            if (it.result == EResult.OK) onAccountRegion(null, it.ipCountryCode)
+            loggedOn?.complete(it)
+        }
         callbacks.subscribe(LoggedOffCallback::class.java) {
             if (it.result == EResult.LogonSessionReplaced) wasReplaced = true
             // Right after the account was declared as playing, it is Steam saying another session plays: it does not accept a second one.
@@ -248,6 +252,8 @@ class SteamSession(private val cellId: Int = 0) {
             android.util.Log.i("GPSteamTicket", "Steam logged this connection off: ${it.result}" + if (justDeclared) " (just after playing was declared)" else "")
             if (justDeclared) connectTokens.refusedPlaying()
         }
+        // The wallet tells what the account is billed in, which decides the prices shown.
+        callbacks.subscribe(WalletInfoCallback::class.java) { if (it.isHasWallet) onAccountRegion(it.currency?.name, null) }
         callbacks.subscribe(LicenseListCallback::class.java) { _licenses.value = it.licenseList }
         callbacks.subscribe(AccountInfoCallback::class.java) { accountName?.complete(it.personaName) }
         scope.launch {

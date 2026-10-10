@@ -43,6 +43,7 @@ class JavaSteamAuthRepository @Inject constructor(
     private val identities: SteamIdentityStore,
     private val achievementCache: app.gameport.core.steam.cache.AchievementCache,
     private val region: DownloadRegion,
+    private val accountRegion: AccountRegion,
 ) : SteamAuthRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val state = MutableStateFlow<AuthState>(AuthState.Connecting)
@@ -287,7 +288,7 @@ class JavaSteamAuthRepository @Inject constructor(
     private suspend fun reviveOnce(dead: SteamSession): Boolean {
         if (session !== dead) return true
         val stored = tokenStore.load() ?: return false
-        val fresh = SteamSession(region.cellId.value)
+        val fresh = SteamSession(region.cellId.value, accountRegion::update)
         return try {
             val identity = fresh.logOn(stored.accountName, stored.refreshToken, deviceName)
             session = fresh
@@ -308,7 +309,7 @@ class JavaSteamAuthRepository @Inject constructor(
 
     private fun newSession(): SteamSession {
         closeSession()
-        return SteamSession(region.cellId.value).also { session = it }
+        return SteamSession(region.cellId.value, accountRegion::update).also { session = it }
     }
 
     private fun closeSession() {
