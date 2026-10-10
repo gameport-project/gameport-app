@@ -9,7 +9,6 @@ import app.gameport.core.model.SteamConnection
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.rounded.ErrorOutline
-import app.gameport.core.designsystem.BackdropMenu
 import app.gameport.core.designsystem.GlassIconButton
 import android.view.KeyEvent as AndroidKeyEvent
 import android.content.Intent
@@ -56,6 +55,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.automirrored.filled.ListAlt
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.foundation.layout.wrapContentSize
@@ -101,7 +102,6 @@ import app.gameport.core.designsystem.GlassChip
 import app.gameport.core.designsystem.glass
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.MoreVert
 import app.gameport.core.designsystem.GlassSearchField
 import app.gameport.core.designsystem.PillTabs
 
@@ -113,6 +113,8 @@ fun LibraryScreen(
     onOpenSteamSettings: () -> Unit,
     onOpenGameSettings: (Int) -> Unit,
     onOpenCompat: () -> Unit,
+    onOpenStore: () -> Unit,
+    onOpenStoreGame: (Int) -> Unit,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -130,6 +132,8 @@ fun LibraryScreen(
         onOpenSettings = onOpenSettings,
         onOpenSteamSettings = onOpenSteamSettings,
         onOpenCompat = onOpenCompat,
+        onOpenStore = onOpenStore,
+        onOpenStoreGame = onOpenStoreGame,
         onPatchAll = viewModel::onPatchAll,
         onStopPatchAll = viewModel::onStopPatchAll,
         onClosePatchAll = viewModel::onClosePatchAll,
@@ -158,6 +162,8 @@ internal fun LibraryContent(
     onOpenSettings: () -> Unit,
     onOpenSteamSettings: () -> Unit,
     onOpenCompat: () -> Unit = {},
+    onOpenStore: () -> Unit = {},
+    onOpenStoreGame: (Int) -> Unit = {},
     menu: GameMenuActions = GameMenuActions(),
     onPatchAll: () -> Unit = {},
     onStopPatchAll: () -> Unit = {},
@@ -166,7 +172,7 @@ internal fun LibraryContent(
     Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
         when (uiState) {
             LibraryUiState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-            is LibraryUiState.Content -> Shelf(uiState, onQueryChanged, onTabSelected, onSortSelected, onFiltersChanged, onPlay, onGameClick, onOpenDownloads, onOpenSettings, onOpenSteamSettings, onOpenCompat, menu, onPatchAll, onStopPatchAll, onClosePatchAll)
+            is LibraryUiState.Content -> Shelf(uiState, onQueryChanged, onTabSelected, onSortSelected, onFiltersChanged, onPlay, onGameClick, onOpenDownloads, onOpenSettings, onOpenSteamSettings, onOpenCompat, onOpenStore, onOpenStoreGame, menu, onPatchAll, onStopPatchAll, onClosePatchAll)
         }
     }
 }
@@ -191,6 +197,8 @@ private fun Shelf(
     onOpenSettings: () -> Unit,
     onOpenSteamSettings: () -> Unit,
     onOpenCompat: () -> Unit,
+    onOpenStore: () -> Unit,
+    onOpenStoreGame: (Int) -> Unit,
     menu: GameMenuActions,
     onPatchAll: () -> Unit,
     onStopPatchAll: () -> Unit,
@@ -202,6 +210,8 @@ private fun Shelf(
     var patchWindow by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
     var highlightedId by remember(state.tab, state.query) { mutableStateOf<Int?>(null) }
+    // The game of the new-versions carousel being pointed at: its picture fills the page behind, as a cover's does.
+    var highlightedNew by remember(state.tab, state.query) { mutableStateOf<app.gameport.core.model.AndroidApp?>(null) }
     val highlighted = remember(state, highlightedId) {
         (state.continueGames + state.favoriteGames + state.allGames).firstOrNull { it.appId == highlightedId }
             ?: state.lastPlayed
@@ -227,20 +237,31 @@ private fun Shelf(
                 }
             },
     ) {
-        if (display.backdrop) Backdrop(highlighted, display.backdropStrength)
+        if (display.backdrop) Backdrop(highlightedNew?.let { BackdropArt(it.banner ?: it.header ?: it.cover.orEmpty(), listOfNotNull(it.header)) } ?: highlighted?.let { BackdropArt(it.heroUrl, it.heroFallbacks) }, display.backdropStrength)
 
         Column(Modifier.fillMaxSize()) {
-            Header(state, onQueryChanged, onTabSelected, { filtersOpen = true }, onOpenDownloads, onOpenSettings, onOpenSteamSettings, onOpenCompat) {
+            Header(state, onQueryChanged, onTabSelected, { filtersOpen = true }, onOpenDownloads, onOpenSettings, onOpenSteamSettings, onOpenCompat, onOpenStore) {
                 if (!state.patchAll.running) onPatchAll()
                 patchWindow = true
             }
 
             LazyColumn(
                 state = listState,
-                flingBehavior = rememberSnapFlingBehavior(listState),
+                flingBehavior = steadyPageFling(listState),
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = PaddingValues(bottom = 24.dp),
             ) {
+                if (state.newAndroid.isNotEmpty()) {
+                    item(key = "android-new") {
+                        NewAndroidRail(
+                            state.newAndroid,
+                            state.newPrices,
+                            display.coverSize.dp.dp,
+                            display.newRailSize,
+                            onHighlight = { app -> highlightedNew = app; if (app != null) highlightedId = null },
+                        ) { id -> if (state.anyKind.any { it.appId == id }) onGameClick(id) else onOpenStoreGame(id) }
+                    }
+                }
                 if (state.continueGames.isNotEmpty()) {
                     item(key = "continue") { Rail(RowKind.CONTINUE, state.continueGames, state, onGameClick, onPlay, onMenu = { menuGame = it }) { highlightedId = it } }
                 }
@@ -307,15 +328,36 @@ private fun Shelf(
     }
 }
 
+/**
+ * The page snaps to a row when it is let go, so the covers are always shown whole. A drag along a row of covers always carries a little vertical speed with it, and
+ * that was enough for the snap to carry the page to the row below: under [PAGE_FLICK_MIN] the page settles on the nearest row instead, as if let go without a flick.
+ */
+@Composable
+private fun steadyPageFling(listState: androidx.compose.foundation.lazy.LazyListState): androidx.compose.foundation.gestures.FlingBehavior {
+    val snap = rememberSnapFlingBehavior(listState)
+    return remember(snap) {
+        object : androidx.compose.foundation.gestures.FlingBehavior {
+            override suspend fun androidx.compose.foundation.gestures.ScrollScope.performFling(initialVelocity: Float): Float =
+                with(snap) { performFling(if (kotlin.math.abs(initialVelocity) < PAGE_FLICK_MIN) 0f else initialVelocity) }
+        }
+    }
+}
+
+/** The speed, in pixels a second, under which a let go is not a flick. */
+private const val PAGE_FLICK_MIN = 1200f
+
+/** A picture to show behind the library, and what to try when it is missing. */
+private data class BackdropArt(val url: String, val fallbacks: List<String>)
+
 /** The artwork of [game] behind the library: the weaker [strength] is, the darker and blurrier it gets. */
 @Composable
-private fun Backdrop(game: Game?, strength: Int) {
+private fun Backdrop(art: BackdropArt?, strength: Int) {
     // 50 is the look the library always had; below it the art is dimmed more and blurred, above it clearer.
     val dim = ((100 - strength) / 50f).coerceAtLeast(0.1f)
     val blur = (((50 - strength).coerceAtLeast(0)) * 0.4f).dp
-    Crossfade(targetState = game, label = "backdrop", modifier = Modifier.fillMaxSize()) { shown ->
+    Crossfade(targetState = art, label = "backdrop", modifier = Modifier.fillMaxSize()) { shown ->
         if (shown != null) {
-            GameImage(url = shown.heroUrl, fallbackUrl = shown.heroFallbacks.firstOrNull(), moreFallbacks = shown.heroFallbacks.drop(1), contentDescription = null, modifier = Modifier.fillMaxSize().blur(blur))
+            GameImage(url = shown.url, fallbackUrl = shown.fallbacks.firstOrNull(), moreFallbacks = shown.fallbacks.drop(1), contentDescription = null, modifier = Modifier.fillMaxSize().blur(blur))
         }
     }
     fun shade(alpha: Float) = Color(0xFF101418).copy(alpha = (alpha * dim).coerceIn(0f, 1f))
@@ -482,6 +524,7 @@ private fun Header(
     onOpenSettings: () -> Unit,
     onOpenSteamSettings: () -> Unit,
     onOpenCompat: () -> Unit,
+    onOpenStore: () -> Unit,
     onPatchAll: () -> Unit,
 ) {
     Column(
@@ -534,16 +577,13 @@ private fun Header(
                     )
                 }
             }
-            // More places to go than the bar has room for: a small menu, where later pages will join the compatibility one.
-            var moreOpen by remember { mutableStateOf(false) }
-            // Opens against its button; its entries are the lines of a cover's menu.
-            Box {
-                GlassIconButton(onClick = { moreOpen = true }) {
-                    Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.library_more))
-                }
-                BackdropMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
-                    MenuEntry(Icons.Filled.Build, R.string.library_compat, { moreOpen = false; onOpenCompat() }, tint = Color(0xFFFFB74D))
-                }
+            // The shop and the table of compatibility each have their own button.
+            GlassIconButton(onClick = onOpenStore) {
+                Icon(Icons.Filled.Storefront, contentDescription = stringResource(R.string.library_store), tint = Color(0xFF4FC3F7))
+            }
+            // The table of compatibility: a big wrench with a list, the same mark as the header of the table.
+            GlassIconButton(onClick = onOpenCompat) {
+                app.gameport.core.designsystem.CompatToolsIcon(size = 32.dp, contentDescription = stringResource(R.string.library_compat))
             }
             GlassIconButton(onClick = onOpenSettings) {
                 Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.library_settings))

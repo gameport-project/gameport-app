@@ -60,4 +60,6 @@
     <string name="card_offline_only">Fonctionne sur cet appareil, mais hors ligne seulement</string>
     <string name="card_mixed">Avis partagés sur cet appareil</string>
     <string name="card_fails">Problèmes signalés sur cet appareil</string>
+    <string name="library_row_new_android">Nouveautés avec une version Android</string>
+    <string name="library_store">Jeux Android</string>
 </resources>

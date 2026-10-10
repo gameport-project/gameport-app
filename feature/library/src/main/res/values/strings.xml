@@ -62,4 +62,6 @@
     <string name="card_offline_only">Works on this device, but only offline</string>
     <string name="card_mixed">Mixed reports on this device</string>
     <string name="card_fails">Problems reported on this device</string>
+    <string name="library_row_new_android">New with an Android version</string>
+    <string name="library_store">Android games</string>
 </resources>

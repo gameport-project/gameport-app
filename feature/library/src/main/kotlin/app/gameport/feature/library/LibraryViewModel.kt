@@ -13,6 +13,7 @@ import app.gameport.core.steam.SteamLibraryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import app.gameport.core.model.PatchAllInfo
 import javax.inject.Inject
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -63,6 +64,10 @@ sealed interface LibraryUiState {
         val patchAll: PatchAllInfo = PatchAllInfo(0, null),
         /** How many games are being installed, shown on the downloads button. */
         val installing: Int = 0,
+        /** The games whose Android version arrived this week, for the low row above the covers. */
+        val newAndroid: List<app.gameport.core.model.AndroidApp> = emptyList(),
+        /** What those games cost now in the country of the device, for the label on their banner. */
+        val newPrices: Map<Int, app.gameport.core.model.StorePrice> = emptyMap(),
     ) : LibraryUiState
 }
 
@@ -77,13 +82,14 @@ class LibraryViewModel @Inject constructor(
     history: HistorySource,
     private val actions: LibraryActions,
     private val updates: UpdatesSource,
+    private val catalog: AndroidCatalogSource,
 ) : ViewModel() {
     private val query = MutableStateFlow("")
     private val tab = MutableStateFlow(LibraryTab.VR)
     private val filters = MutableStateFlow(LibraryFilters())
     private val showTabs = headsetDetector.isHeadset()
 
-    val uiState: StateFlow<LibraryUiState> = combine(
+    private val shelf: Flow<LibraryUiState.Content> = combine(
         combine(repository.observeLibrary(), query, tab, attention.observe(), combine(appearance.observe(), history.observe(), filters) { shown, played, narrowed -> Triple(shown, played, narrowed) }) { library, query, tab, outdated, (shown, played, narrowed) ->
             library.toUiState(query, tab, showTabs).copy(attention = outdated, compat = played.compat).arranged(shown, played, narrowed)
         },
@@ -91,11 +97,25 @@ class LibraryViewModel @Inject constructor(
             combine(updates.observe(), updates.observeApp(), updates.observeConnection(), updates.observeIds(), updates.observePatchAll()) { games, app, connection, ids, patchAll -> HeaderInfo(games, app, connection, ids, patchAll) },
             updates.observeInstalling(),
         ) { info, installing -> HeaderInfo(info.games, info.app, info.connection, info.ids, info.patchAll, installing) },
-    ) { state, info -> state.copy(updates = info.games, appUpdate = info.app, connection = info.connection, updatable = info.ids, patchAll = info.patchAll, installing = info.installing) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LibraryUiState.Loading)
+    ) { state, info -> state.copy(updates = info.games, appUpdate = info.app, connection = info.connection, updatable = info.ids, patchAll = info.patchAll, installing = info.installing) }
+
+    val uiState: StateFlow<LibraryUiState> = combine(shelf, catalog.observe(), tab, catalog.observePrices()) { state, android, shownTab, prices ->
+        // A search looks through the library and shows no row; a device without VR is shown flat games only.
+        val vr = if (state.showTabs) shownTab == LibraryTab.VR else false
+        // The new versions of the games the account does not have, the latest arrival first (the catalog sorts them); the games it has are in its library.
+        val owned = state.anyKind.map { it.appId }.toSet()
+        val arrivals = if (state.query.isBlank()) android?.arrivals(java.time.LocalDate.now(), vr = vr).orEmpty().filter { it.appid !in owned } else emptyList()
+        state.copy(
+            newAndroid = arrivals,
+            newPrices = arrivals.mapNotNull { app -> prices[app.appid]?.let { app.appid to it } }.toMap(),
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LibraryUiState.Loading)
 
     init {
         // Asked when the library opens (that is, when the app starts).
         viewModelScope.launch { runCatching { updates.check() } }
+        // The catalog of the Android versions is asked again when the one kept is a few hours old.
+        viewModelScope.launch { runCatching { catalog.refreshIfStale() } }
     }
 
     fun onQueryChanged(value: String) = query.update { value }
