@@ -25,6 +25,8 @@
     <string name="game_compat_warning_install">Installer quand même</string>
     <string name="game_compat_warning_cancel">Annuler</string>
     <string name="game_owned">Possédé</string>
+    <string name="game_not_owned">Non possédé</string>
+    <string name="game_open_steam">Voir sur Steam</string>
     <string name="game_family_shared">Partagé par la famille</string>
     <string name="game_kind_flat">Plat</string>
     <string name="game_dlc_title">Ajouter du contenu supplémentaire ?</string>
@@ -103,7 +105,7 @@
     <string name="issue_stage_queued">Mise à jour en attente de son tour…</string>
     <string name="issue_stage_downloading">Téléchargement de la mise à jour… %1$d %%</string>
     <string name="controllers_title">Manettes</string>
-    <string name="controllers_explanation">Ce jeu n\'a pas de commandes pour les manettes de cet appareil : celles du %1$s sont donc émulées. Chaque commande et sa destination sont listées ci-dessous. Une commande se remappe en la sélectionnant, puis en choisissant sa destination dans la liste.</string>
+    <string name="controllers_explanation">Chaque commande et sa destination sont listées ci-dessous. Une commande se remappe en la sélectionnant, puis en choisissant sa destination dans la liste.</string>
     <string name="controllers_customise">Personnaliser les commandes</string>
     <string name="controllers_customise_off">Désactivé : le mappage par défaut de GamePort s\'applique.</string>
     <string name="controllers_customise_on">Activé : les choix ci-dessous s\'appliquent à ce jeu.</string>
@@ -113,6 +115,15 @@
     <string name="controllers_right_short">Droite</string>
     <string name="controllers_none">Aucune commande vue pour l\'instant.</string>
     <string name="controllers_nothing">Rien</string>
+    <string name="controllers_status_automatic">Ce jeu n\'a pas de commandes pour les manettes de cet appareil. Celles du Steam Frame y sont placées par défaut, et peuvent être personnalisées si certaines ne fonctionnent pas bien.</string>
+    <string name="controllers_customise_unavailable">Disponible lorsque les commandes du Steam Frame sont placées sur les manettes de cet appareil.</string>
+    <string name="controllers_use_frame">Forcer la détection des manettes du Steam Frame</string>
+    <string name="controllers_use_frame_legend">Utile quand le jeu démarre mais ne réagit pas aux manettes. Ne change rien si le jeu n\'a pas de commandes pour les manettes du Steam Frame.</string>
+    <string name="controllers_use_frame_warning">Aucune commande pour les manettes du Steam Frame n\'a été vue au dernier lancement du jeu. Essayer reste possible, et si rien ne change, le désactiver est plus prudent.</string>
+    <string name="controllers_shared">Un même bouton de cet appareil déclenche alors plusieurs actions : %1$s. Personnaliser les commandes ci-dessous permet de le modifier.</string>
+    <string name="controllers_choose_hint">Plusieurs boutons peuvent être cochés, et aucun signifie que rien ne se passe.</string>
+    <string name="controllers_apply">Appliquer</string>
+    <string name="controllers_add">Ajouter un bouton</string>
     <string name="controllers_target">%1$s · %2$s</string>
     <string name="controllers_reset">Rétablir le mappage par défaut</string>
     <string name="controllers_reset_title">Rétablir le mappage par défaut ?</string>
@@ -131,6 +142,10 @@
     <string name="control_button">Bouton %1$s</string>
     <string name="issue_controllers">Ce jeu n\'a pas de commandes pour les manettes de cet appareil : celles du %1$s sont émulées et peuvent être remappées.</string>
     <string name="issue_controllers_action">Remapper</string>
+    <string name="issue_controllers_silent">Le jeu semble bien démarrer, mais il ne semble pas réagir aux manettes. Si c\'est le cas, activer la prise en charge des commandes du Steam Frame peut aider.</string>
+    <string name="issue_controllers_silent_action">Activer</string>
+    <string name="issue_controllers_silent_done">La prise en charge des commandes du Steam Frame est activée pour ce jeu, dès son prochain lancement. Si rien ne change, elle peut être désactivée avec le bouton manette de la fiche du jeu.</string>
+    <string name="issue_controllers_silent_open">Ouvrir</string>
     <string name="controllers_family_valve">Steam Frame</string>
     <string name="controllers_family_touch">Quest</string>
     <string name="controllers_choose_title">Choisir la destination de « %1$s »</string>
@@ -162,13 +177,9 @@
     <string name="game_version_flat">Version sans VR</string>
     <string name="report_open">Signaler un problème</string>
     <string name="report_title">Signaler un problème</string>
-    <string name="report_message">Cela crée un fichier qui aide à comprendre pourquoi %1$s ne fonctionne pas. Il est enregistré dans le dossier Téléchargements et rien n\'est envoyé : il peut être joint à un ticket ou transmis aux développeurs.</string>
+    <string name="report_message">Cela envoie au projet un fichier qui aide à comprendre pourquoi %1$s ne fonctionne pas. Il ne contient que des informations techniques, sans données personnelles. Un ticket sur GitHub peut aussi être ouvert.</string>
     <string name="report_contents">Il contient les versions de GamePort, du jeu et de son patch.\nL\'appareil et son système.\nLes choix du joueur pour le jeu, et la façon dont il a tourné, images par seconde comprises.\nLes fichiers du jeu et tout ce que contient son APK.\nLes interfaces Steam qu\'il demande.\nLe journal du jeu, son démarrage et ses dernières lignes, et celui de GamePort.\nLa façon dont ses dernières exécutions se sont terminées, avec le rapport de plantage gardé par Android.\nCe que GamePort a fait pour lui, comme le téléchargement, le patch et l\'installation.\nLes numéros de compte, les adresses e-mail, les adresses réseau et le nom du compte sont retirés des fichiers texte.</string>
-    <string name="report_save">Enregistrer le rapport</string>
     <string name="report_working">Préparation du rapport…</string>
-    <string name="report_saved">Enregistré dans Téléchargements : %1$s</string>
-    <string name="report_failed">Le rapport n\'a pas pu être enregistré.</string>
-    <string name="report_share">Partager le fichier</string>
     <string name="report_ticket">Créer un ticket sur GitHub</string>
     <string name="report_close">Fermer</string>
     <string name="issue_problem_short">Ce jeu s\'est fermé presque tout de suite. Un rapport aide à comprendre pourquoi.</string>
@@ -187,4 +198,17 @@
     <string name="achievements_hidden">Succès caché, affiché une fois débloqué.</string>
     <string name="achievements_empty">Ce jeu n\'a pas de succès.</string>
     <string name="achievements_source">Lu depuis le compte Steam. Rien n\'est modifié sur Steam depuis ici.</string>
+    <string name="gamecompat_title">Compatibilité</string>
+    <string name="gamecompat_button">Options de compatibilité</string>
+    <string name="gamecompat_recenter">Suivre le recentrage du casque</string>
+    <string name="gamecompat_recenter_legend">Utile quand le recentrage ne ramène pas le jeu devant. Le jeu utilise alors l\'espace de jeu que le recentrage déplace, avec le sol à la bonne hauteur. La position du contenu peut changer.</string>
+    <string name="gamecompat_recenter_auto">Fait automatiquement pour ce jeu : le casque n\'a pas de zone de jeu.</string>
+    <string name="gamecompat_mode_auto">Automatique</string>
+    <string name="gamecompat_mode_on">Activé</string>
+    <string name="gamecompat_mode_off">Désactivé</string>
+    <string name="report_send">Envoyer le rapport</string>
+    <string name="report_status_sent">Rapport envoyé, merci.</string>
+    <string name="report_status_waiting">Le rapport sera envoyé dès que cet appareil sera en ligne.</string>
+    <string name="report_status_refused">Le rapport n\'a pas pu être envoyé.</string>
+    <string name="report_status_unavailable">Aucun rapport n\'a pu être fait pour ce jeu.</string>
 </resources>

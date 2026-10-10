@@ -102,9 +102,13 @@ class CloudProvider : ContentProvider() {
             val settings = appId?.let { entryPoint.gameSettings().get(it) }
             Bundle().apply {
                 putBoolean("seated", settings?.seated == true)
+                // The player asked for the play space that the headset's recentering moves, for a game that keeps a fixed one: auto (where the headset has no play area), on or off.
+                putString("xrRecenter", (settings?.recenter ?: app.gameport.core.model.RecenterMode.AUTO).name.lowercase())
                 putInt("eyeCm", appId?.let { entryPoint.gameSettings().eyeHeightCm(it) } ?: 0)
                 // The player's controller mapping for the game, empty unless they customise it.
                 putString("xrMap", appId?.let { entryPoint.controllerMappings().layerConfig(it) }.orEmpty())
+                // The player chose the Steam Frame's controls for a game that also has its own (off by default).
+                putBoolean("xrPreferFrame", appId?.let { entryPoint.controllerMappings().get(it).useFrame } == true)
                 // The kind of headset (meta, pico, openxr), so the layer knows which controllers to translate onto.
                 putString("xrFamily", entryPoint.deviceProfile().vrPlatform?.id.orEmpty())
                 // For which games to open GamePort again when the game closes. Hooks from before the choice only know the first answer.
@@ -117,7 +121,9 @@ class CloudProvider : ContentProvider() {
         "controller_profile" -> {
             val appId = entryPoint.installedGames().all().entries.firstOrNull { it.value == packageName }?.key
             val controls = extras.getStringArray("controls").orEmpty().mapNotNull(app.gameport.core.model.ControlRef::parse)
-            if (appId != null && controls.isNotEmpty()) entryPoint.controllerMappings().setDetected(appId, controls, extras.getString("source").orEmpty())
+            // The same file also says whether the layer gave the game a space that follows the recentering by itself.
+            if (appId != null) entryPoint.gameSettings().setStageFallback(appId, extras.getBoolean("stageFallback"))
+            if (appId != null) entryPoint.controllerMappings().setDetected(appId, controls, extras.getString("source").orEmpty(), extras.getBoolean("both"), extras.getBoolean("silent"))
             Bundle().apply { putString(STATUS, OK) }
         }
         // The game came to the screen, is still there, or left it: the time it is on screen is counted (see PlaytimeTracker).

@@ -36,4 +36,9 @@ class GameSettingsTest {
     fun `seated mode is off until the player asks for it`() {
         assertFalse(GameSettings().seated)
     }
+
+    @Test
+    fun `following the recentering of the headset is left to GamePort until the player chooses`() {
+        assertEquals(RecenterMode.AUTO, GameSettings().recenter)
+    }
 }

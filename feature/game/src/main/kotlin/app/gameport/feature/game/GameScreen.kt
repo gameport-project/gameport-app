@@ -49,6 +49,7 @@ import app.gameport.core.designsystem.Glyph
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Warning
@@ -143,7 +144,7 @@ import app.gameport.core.model.SpeedUnit
 import app.gameport.core.model.Ownership
 
 @Composable
-fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -> Unit, onOpenControllers: () -> Unit, onOpenAchievements: () -> Unit, onOpenSteamSettings: () -> Unit, viewModel: GameViewModel = hiltViewModel()) {
+fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -> Unit, onOpenControllers: () -> Unit, onOpenCompat: () -> Unit, onOpenAchievements: () -> Unit, onOpenSteamSettings: () -> Unit, viewModel: GameViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val speedUnit by viewModel.speedUnit.collectAsStateWithLifecycle()
@@ -184,14 +185,8 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
     val report = ReportActions(
         suspicion = suspicion,
         progress = reportProgress,
-        onSave = { shownGame?.let(viewModel::onSaveReport) },
+        onSend = { shownGame?.let(viewModel::onSendReport) },
         onTicket = { shownGame?.let { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, viewModel.ticketUri(it))) } } },
-        onShare = {
-            (reportProgress as? ReportProgress.Saved)?.let { saved ->
-                val send = Intent(Intent.ACTION_SEND).setType("application/zip").putExtra(Intent.EXTRA_STREAM, saved.uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                runCatching { context.startActivity(Intent.createChooser(send, null)) }
-            }
-        },
         onDismissProblem = viewModel::onDismissProblem,
         onResetProgress = viewModel::onResetReport,
     )
@@ -204,6 +199,8 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onOpenSettings = onOpenSettings,
         onOpenSaves = onOpenSaves,
         onOpenControllers = onOpenControllers,
+        onOpenCompat = onOpenCompat,
+        onActivateFrame = viewModel::onActivateFrame,
         achievements = achievements,
         onOpenAchievements = onOpenAchievements,
         artworkHeight = artworkHeight,
@@ -237,6 +234,8 @@ internal fun GameContent(
     onOpenSettings: () -> Unit,
     onOpenSaves: () -> Unit,
     onOpenControllers: () -> Unit,
+    onOpenCompat: () -> Unit,
+    onActivateFrame: () -> Unit,
     onToggleFavorite: () -> Unit,
     onSetHidden: (Boolean) -> Unit,
     onBack: () -> Unit,
@@ -285,11 +284,16 @@ internal fun GameContent(
                     onOpenSettings = onOpenSettings,
                     onOpenSaves = onOpenSaves,
                     controllerProfile = uiState.controllerProfile,
+                    controllerFrame = uiState.controllerFrame,
+                    controllerAutomatic = uiState.controllerAutomatic,
+                    compatNotice = uiState.compatNotice,
                     savesNotSynced = uiState.savesNotSynced,
                     compat = uiState.compat,
                     incompatible = uiState.incompatible,
                     vrDevice = uiState.vrDevice,
                     onOpenControllers = onOpenControllers,
+                    onOpenCompat = onOpenCompat,
+                    onActivateFrame = onActivateFrame,
                     onToggleFavorite = onToggleFavorite,
                     onSetHidden = onSetHidden,
                     hidden = uiState.hidden,
@@ -337,6 +341,12 @@ private fun GameDetails(
     onOpenSettings: () -> Unit,
     onOpenSaves: () -> Unit,
     controllerProfile: Boolean,
+    /** The Steam Frame's controls are in use for this game: the controllers button is coloured. */
+    controllerFrame: Boolean,
+    /** GamePort puts the Steam Frame's controls on the controllers by itself for this game: the button has another colour. */
+    controllerAutomatic: Boolean,
+    /** The layer adapted the game by itself: a small mark on the compatibility button. */
+    compatNotice: Boolean,
     savesNotSynced: Boolean,
     compat: app.gameport.core.model.Compat?,
     incompatible: app.gameport.core.model.IncompatibleReason?,
@@ -345,6 +355,8 @@ private fun GameDetails(
     playtime: Playtime,
     vrDevice: Boolean,
     onOpenControllers: () -> Unit,
+    onOpenCompat: () -> Unit,
+    onActivateFrame: () -> Unit,
     onToggleFavorite: () -> Unit,
     onSetHidden: (Boolean) -> Unit,
     onOpenPermissions: () -> Unit,
@@ -463,7 +475,7 @@ private fun GameDetails(
                     )
                     if (install is InstallState.Installed) {
                         // Orange for what needs attention, green when the only news is an update.
-                        val attention = issues.any { it !is GameIssue.ControllerMappingAvailable && it !is GameIssue.UpdateAvailable }
+                        val attention = issues.any { it !is GameIssue.ControllerMappingAvailable && it !is GameIssue.ControllerSilent && it !is GameIssue.UpdateAvailable }
                         val update = GameIssue.UpdateAvailable in issues
                         if (attention || update) {
                             Row(Modifier.align(Alignment.TopStart).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -482,7 +494,13 @@ private fun GameDetails(
                         GlassChip(stringResource(if (vr) R.string.game_kind_vr else R.string.game_kind_flat))
                     }
                     GlassChip(
-                        stringResource(if (game.ownership == Ownership.OWNED) R.string.game_owned else R.string.game_family_shared),
+                        stringResource(
+                            when (game.ownership) {
+                                Ownership.OWNED -> R.string.game_owned
+                                Ownership.FAMILY_SHARED -> R.string.game_family_shared
+                                Ownership.NOT_OWNED -> R.string.game_not_owned
+                            },
+                        ),
                     )
                     when (game.kind) {
                         AppKind.DEMO -> GlassChip(stringResource(R.string.game_kind_demo), accent = KindBlue)
@@ -497,7 +515,15 @@ private fun GameDetails(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    InstallActions(
+                    val context = LocalContext.current
+                    if (game.ownership == Ownership.NOT_OWNED) {
+                        // A game the account does not have is not installed from here: its page on Steam is where it is bought.
+                        Button(onClick = { openOnSteam(context, game.appId) }, modifier = Modifier.widthIn(min = 240.dp).height(ACTION_HEIGHT)) {
+                            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.game_open_steam))
+                        }
+                    } else InstallActions(
                         install = install,
                         speedUnit = speedUnit,
                         onInstall = { if (compat?.level == app.gameport.core.model.CompatLevel.FAILS) warning = true else startInstall() },
@@ -530,28 +556,49 @@ private fun GameDetails(
                             Icon(Icons.Filled.BugReport, contentDescription = stringResource(R.string.report_open))
                         }
                     }
-                    if (install is InstallState.Installed && controllerProfile) {
-                        GlassIconButton(onClick = onOpenControllers, enabled = repatch !is Repatch.Running) {
-                            Icon(Icons.Filled.SportsEsports, contentDescription = stringResource(R.string.controllers_title))
+                    if (install is InstallState.Installed && vrDevice && game.androidBuild?.isVr != false) {
+                        // The options that make a game work: orange as the compatibility labels, with a small mark when GamePort adapted the game by itself.
+                        Box {
+                            GlassIconButton(onClick = onOpenCompat, enabled = repatch !is Repatch.Running) {
+                                Icon(Icons.Filled.Build, contentDescription = stringResource(R.string.gamecompat_button), tint = CompatOrange)
+                            }
+                            if (compatNotice) {
+                                Box(Modifier.align(Alignment.TopEnd).size(12.dp).clip(CircleShape).background(CompatOrange))
+                            }
                         }
                     }
-                    GlassIconButton(onClick = onToggleFavorite) {
-                        Icon(
-                            Icons.Filled.Favorite,
-                            contentDescription = stringResource(if (favorite) R.string.game_unfavorite else R.string.game_favorite),
-                            tint = if (favorite) Color(0xFFE53935) else LocalContentColor.current,
-                        )
+                    if (install is InstallState.Installed && controllerProfile) {
+                        GlassIconButton(onClick = onOpenControllers, enabled = repatch !is Repatch.Running) {
+                            Icon(
+                                Icons.Filled.SportsEsports,
+                                contentDescription = stringResource(R.string.controllers_title),
+                                tint = when {
+                                    controllerFrame -> ControllerForcedColor
+                                    controllerAutomatic -> KindBlue
+                                    else -> LocalContentColor.current
+                                },
+                            )
+                        }
                     }
-                    GlassIconButton(onClick = { if (hidden) onSetHidden(false) else confirmingHide = true }) {
-                        Icon(
-                            if (hidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                            contentDescription = stringResource(if (hidden) R.string.game_show_again else R.string.game_hide),
-                            // Hiding has the colour it has in the menu of a cover; showing again keeps the usual one.
-                            tint = if (hidden) LocalContentColor.current else HideRed,
-                        )
-                    }
-                    GlassIconButton(onClick = onOpenSettings, enabled = repatch !is Repatch.Running) {
-                        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.game_settings_title))
+                    if (game.ownership != Ownership.NOT_OWNED) {
+                        GlassIconButton(onClick = onToggleFavorite) {
+                            Icon(
+                                Icons.Filled.Favorite,
+                                contentDescription = stringResource(if (favorite) R.string.game_unfavorite else R.string.game_favorite),
+                                tint = if (favorite) Color(0xFFE53935) else LocalContentColor.current,
+                            )
+                        }
+                        GlassIconButton(onClick = { if (hidden) onSetHidden(false) else confirmingHide = true }) {
+                            Icon(
+                                if (hidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                                contentDescription = stringResource(if (hidden) R.string.game_show_again else R.string.game_hide),
+                                // Hiding has the colour it has in the menu of a cover; showing again keeps the usual one.
+                                tint = if (hidden) LocalContentColor.current else HideRed,
+                            )
+                        }
+                        GlassIconButton(onClick = onOpenSettings, enabled = repatch !is Repatch.Running) {
+                            Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.game_settings_title))
+                        }
                     }
                 }
                 if (install is InstallState.Installed && (issues.isNotEmpty() || repatch != Repatch.None)) {
@@ -565,6 +612,7 @@ private fun GameDetails(
                         onPermissions = onOpenPermissions,
                         onConflict = onResolveConflict,
                         onControllers = onOpenControllers,
+                        onActivateFrame = onActivateFrame,
                         onReport = { reporting = true },
                         onDismissProblem = report.onDismissProblem,
                     )
@@ -586,7 +634,7 @@ private fun GameDetails(
                     })
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp), content = details)
                     // Size and play time are not what the player came for: after everything else.
-                    InfoCard(game, installed, playtime, Modifier.fillMaxWidth())
+                    if (game.ownership != Ownership.NOT_OWNED) InfoCard(game, installed, playtime, Modifier.fillMaxWidth())
                 }
             } else {
                 Row(
@@ -600,7 +648,7 @@ private fun GameDetails(
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         cover(Modifier)
-                        InfoCard(game, installed, playtime, Modifier.fillMaxWidth())
+                        if (game.ownership != Ownership.NOT_OWNED) InfoCard(game, installed, playtime, Modifier.fillMaxWidth())
                     }
                     Column(Modifier.weight(1f).padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp), content = details)
                 }
@@ -813,6 +861,7 @@ private fun IssuesPanel(
     onPermissions: () -> Unit,
     onConflict: () -> Unit,
     onControllers: () -> Unit,
+    onActivateFrame: () -> Unit,
     onReport: () -> Unit,
     onDismissProblem: () -> Unit,
 ) {
@@ -864,6 +913,9 @@ private fun IssuesPanel(
                     IssueRow(stringResource(R.string.issue_save_conflict), stringResource(R.string.issue_save_conflict_action), onConflict, enabled = !busy)
                 is GameIssue.SaveSyncFailed ->
                     IssueRow(stringResource(if (issue.offline) R.string.issue_sync_offline else R.string.issue_sync_failed))
+                is GameIssue.ControllerSilent ->
+                    if (issue.activated) IssueRow(stringResource(R.string.issue_controllers_silent_done), stringResource(R.string.issue_controllers_silent_open), onControllers, enabled = !busy, info = true)
+                    else IssueRow(stringResource(R.string.issue_controllers_silent), stringResource(R.string.issue_controllers_silent_action), onActivateFrame, enabled = !busy, info = true)
                 is GameIssue.ControllerMappingAvailable ->
                     IssueRow(stringResource(R.string.issue_controllers, sourceFamilyName(issue.source)), stringResource(R.string.issue_controllers_action), onControllers, enabled = !busy, info = true)
             }
@@ -1068,3 +1120,13 @@ private fun deviceName(kind: String): String = stringResource(
         else -> R.string.game_device_other
     },
 )
+
+/** The controllers button when the player forced the Steam Frame's controls. */
+private val ControllerForcedColor = Color(0xFFFFB74D)
+
+/** Opens the game's page on Steam, where it can be bought. Nothing happens on a device that has no browser. */
+private fun openOnSteam(context: android.content.Context, appId: Int) {
+    runCatching {
+        context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://store.steampowered.com/app/$appId")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+}

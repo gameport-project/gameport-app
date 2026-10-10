@@ -66,7 +66,7 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
 
     Scaffold { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp).verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
+            Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Row(
@@ -80,85 +80,87 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
                     Text(gameName, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            if (installState is InstallState.Installed || installState is InstallState.Patching || installState is InstallState.Installing) {
-                val busy = installState !is InstallState.Installed
-                Text(stringResource(R.string.game_settings_patch), style = MaterialTheme.typography.headlineSmall)
-                Column(Modifier.widthIn(max = 720.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        stringResource(
-                            when {
-                                busy -> R.string.game_settings_patch_running
-                                patchRemoved -> R.string.game_settings_patch_removed
-                                patchOutdated -> R.string.game_settings_patch_outdated
-                                else -> R.string.game_settings_patch_current
-                            },
-                        ),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(stringResource(R.string.game_settings_patch_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        if (patchOutdated || patchRemoved) {
-                            Button(onClick = viewModel::onRepatch, enabled = !busy) {
-                                Text(stringResource(if (patchRemoved) R.string.game_settings_apply_patch else R.string.game_settings_repatch))
-                            }
-                        } else {
-                            GlassButton(onClick = viewModel::onRepatch, enabled = !busy) { Text(stringResource(R.string.game_settings_repatch)) }
-                        }
-                        if (!patchRemoved) {
-                            DangerButton(onClick = { confirmingRemoval = true }, enabled = !busy) {
-                                Text(stringResource(R.string.game_settings_remove_patch))
-                            }
-                        }
-                    }
-                }
-            }
-            if (installState is InstallState.Installed) {
-                val context = LocalContext.current
-                Text(stringResource(R.string.game_settings_permissions), style = MaterialTheme.typography.headlineSmall)
-                Column(Modifier.widthIn(max = 720.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.game_settings_permissions_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    GlassButton(onClick = { viewModel.appSettingsIntent()?.let { runCatching { context.startActivity(it) } } }) {
-                        Text(stringResource(R.string.game_settings_permissions_open))
-                    }
-                }
-            }
-            if (viewModel.isHeadset && isVrGame) {
-                Text(stringResource(R.string.game_settings_vr), style = MaterialTheme.typography.headlineSmall)
-                Row(Modifier.widthIn(max = 720.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.game_settings_seated), style = MaterialTheme.typography.titleMedium)
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                if (installState is InstallState.Installed || installState is InstallState.Patching || installState is InstallState.Installing) {
+                    val busy = installState !is InstallState.Installed
+                    Text(stringResource(R.string.game_settings_patch), style = MaterialTheme.typography.headlineSmall)
+                    Column(Modifier.widthIn(max = 720.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            stringResource(R.string.game_settings_seated_description),
+                            stringResource(
+                                when {
+                                    busy -> R.string.game_settings_patch_running
+                                    patchRemoved -> R.string.game_settings_patch_removed
+                                    patchOutdated -> R.string.game_settings_patch_outdated
+                                    else -> R.string.game_settings_patch_current
+                                },
+                            ),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Text(stringResource(R.string.game_settings_patch_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            if (patchOutdated || patchRemoved) {
+                                Button(onClick = viewModel::onRepatch, enabled = !busy) {
+                                    Text(stringResource(if (patchRemoved) R.string.game_settings_apply_patch else R.string.game_settings_repatch))
+                                }
+                            } else {
+                                GlassButton(onClick = viewModel::onRepatch, enabled = !busy) { Text(stringResource(R.string.game_settings_repatch)) }
+                            }
+                            if (!patchRemoved) {
+                                DangerButton(onClick = { confirmingRemoval = true }, enabled = !busy) {
+                                    Text(stringResource(R.string.game_settings_remove_patch))
+                                }
+                            }
+                        }
+                    }
+                }
+                if (installState is InstallState.Installed) {
+                    val context = LocalContext.current
+                    Text(stringResource(R.string.game_settings_permissions), style = MaterialTheme.typography.headlineSmall)
+                    Column(Modifier.widthIn(max = 720.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.game_settings_permissions_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        GlassButton(onClick = { viewModel.appSettingsIntent()?.let { runCatching { context.startActivity(it) } } }) {
+                            Text(stringResource(R.string.game_settings_permissions_open))
+                        }
+                    }
+                }
+                if (viewModel.isHeadset && isVrGame) {
+                    Text(stringResource(R.string.game_settings_vr), style = MaterialTheme.typography.headlineSmall)
+                    Row(Modifier.widthIn(max = 720.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.game_settings_seated), style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                stringResource(R.string.game_settings_seated_description),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(checked = settings.seated, onCheckedChange = viewModel::onSeatedChanged)
+                    }
+                    val height = settings.effectiveHeightCm(defaults)
+                    Column(Modifier.widthIn(max = 720.dp).fillMaxWidth()) {
+                        Text(stringResource(R.string.game_settings_height, height), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(if (settings.followsDefaults) R.string.game_settings_height_global else R.string.game_settings_height_own),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Slider(
+                            value = height.toFloat(),
+                            onValueChange = { viewModel.onHeightChanged(it.toInt()) },
+                            valueRange = PlayerDefaults.HEIGHT_RANGE_CM.first.toFloat()..PlayerDefaults.HEIGHT_RANGE_CM.last.toFloat(),
+                            enabled = settings.seated,
+                        )
+                        if (!settings.followsDefaults) {
+                            GlassButton(onClick = viewModel::onUseGlobalConfiguration) {
+                                Text(stringResource(R.string.game_settings_use_global, defaults.heightCm))
+                            }
+                        }
+                        Text(
+                            stringResource(R.string.game_settings_height_description),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Switch(checked = settings.seated, onCheckedChange = viewModel::onSeatedChanged)
+                } else {
+                    Text(stringResource(R.string.game_settings_nothing), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                val height = settings.effectiveHeightCm(defaults)
-                Column(Modifier.widthIn(max = 720.dp).fillMaxWidth()) {
-                    Text(stringResource(R.string.game_settings_height, height), style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        stringResource(if (settings.followsDefaults) R.string.game_settings_height_global else R.string.game_settings_height_own),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Slider(
-                        value = height.toFloat(),
-                        onValueChange = { viewModel.onHeightChanged(it.toInt()) },
-                        valueRange = PlayerDefaults.HEIGHT_RANGE_CM.first.toFloat()..PlayerDefaults.HEIGHT_RANGE_CM.last.toFloat(),
-                        enabled = settings.seated,
-                    )
-                    if (!settings.followsDefaults) {
-                        GlassButton(onClick = viewModel::onUseGlobalConfiguration) {
-                            Text(stringResource(R.string.game_settings_use_global, defaults.heightCm))
-                        }
-                    }
-                    Text(
-                        stringResource(R.string.game_settings_height_description),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            } else {
-                Text(stringResource(R.string.game_settings_nothing), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

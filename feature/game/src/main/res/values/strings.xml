@@ -25,6 +25,8 @@
     <string name="game_compat_warning_install">Install anyway</string>
     <string name="game_compat_warning_cancel">Cancel</string>
     <string name="game_owned">Owned</string>
+    <string name="game_not_owned">Not owned</string>
+    <string name="game_open_steam">See on Steam</string>
     <string name="game_family_shared">Shared by family</string>
     <string name="game_kind_vr">VR</string>
     <string name="game_kind_flat">Flat</string>
@@ -104,7 +106,7 @@
     <string name="issue_stage_queued">Update waiting for its turn…</string>
     <string name="issue_stage_downloading">Downloading the update… %1$d%%</string>
     <string name="controllers_title">Controllers</string>
-    <string name="controllers_explanation">This game has no controls for this device\'s controllers, so those of the %1$s are emulated. Each control and where it goes are listed below. A control is remapped by selecting it, then choosing its destination in the list.</string>
+    <string name="controllers_explanation">Each control and where it goes are listed below. A control is remapped by selecting it, then choosing its destination in the list.</string>
     <string name="controllers_customise">Customise the controls</string>
     <string name="controllers_customise_off">Off: GamePort\'s default mapping applies.</string>
     <string name="controllers_customise_on">On: the choices below apply to this game.</string>
@@ -114,6 +116,15 @@
     <string name="controllers_right_short">Right</string>
     <string name="controllers_none">No control seen yet.</string>
     <string name="controllers_nothing">Nothing</string>
+    <string name="controllers_status_automatic">This game has no controls for this device\'s controllers. The Steam Frame\'s controls are put on them by default, and can be customised if some do not work well.</string>
+    <string name="controllers_customise_unavailable">Available once the Steam Frame\'s controls are put on this device\'s controllers.</string>
+    <string name="controllers_use_frame">Force the detection of the Steam Frame\'s controllers</string>
+    <string name="controllers_use_frame_legend">Useful when the game starts but does not react to the controllers. Changes nothing if the game has no controls for the Steam Frame\'s controllers.</string>
+    <string name="controllers_use_frame_warning">No control for the Steam Frame\'s controllers was seen the last time the game ran. Trying anyway is possible, and if nothing changes, switching it off is safer.</string>
+    <string name="controllers_shared">A button of this device then does several things at once: %1$s. Customising the controls below can change it.</string>
+    <string name="controllers_choose_hint">Several buttons can be ticked, and none means nothing happens.</string>
+    <string name="controllers_apply">Apply</string>
+    <string name="controllers_add">Add a button</string>
     <string name="controllers_target">%1$s · %2$s</string>
     <string name="controllers_reset">Restore the default mapping</string>
     <string name="controllers_reset_title">Restore the default mapping?</string>
@@ -132,6 +143,10 @@
     <string name="control_button">Button %1$s</string>
     <string name="issue_controllers">This game has no controls for this device\'s controllers: the %1$s ones are emulated and can be remapped.</string>
     <string name="issue_controllers_action">Remap</string>
+    <string name="issue_controllers_silent">The game seems to start well, but it does not seem to react to the controllers. If that is the case, turning on support for the Steam Frame\'s controls may help.</string>
+    <string name="issue_controllers_silent_action">Turn on</string>
+    <string name="issue_controllers_silent_done">Support for the Steam Frame\'s controls is on for this game, from its next start. If nothing changes, it can be turned off with the controllers button on the game\'s page.</string>
+    <string name="issue_controllers_silent_open">Open</string>
     <string name="controllers_family_valve">Steam Frame</string>
     <string name="controllers_family_touch">Quest</string>
     <string name="controllers_choose_title">Choose where “%1$s” goes</string>
@@ -163,13 +178,9 @@
     <string name="game_version_flat">Version without VR</string>
     <string name="report_open">Report a problem</string>
     <string name="report_title">Report a problem</string>
-    <string name="report_message">This creates a file that helps find why %1$s does not work. It is saved in the Downloads folder and nothing is sent anywhere: it can be attached to a ticket or sent to the developers.</string>
+    <string name="report_message">This sends the project a file that helps find why %1$s does not work. It holds technical facts only and no personal data; a ticket on GitHub can be opened too.</string>
     <string name="report_contents">It contains the versions of GamePort, of the game and of its patch.\nThe device and its system.\nThe player\'s choices for the game, and how it ran, frame rate included.\nThe game\'s files and everything inside its APK.\nThe Steam interfaces it asks for.\nThe game\'s log, its start and its latest lines, and GamePort\'s.\nHow its last runs ended, with the crash report Android kept.\nWhat GamePort did for it, such as the download, the patch and the install.\nAccount numbers, e-mail addresses, network addresses and the account name are removed from the text files.</string>
-    <string name="report_save">Save the report</string>
     <string name="report_working">Preparing the report…</string>
-    <string name="report_saved">Saved in Downloads: %1$s</string>
-    <string name="report_failed">The report could not be saved.</string>
-    <string name="report_share">Share the file</string>
     <string name="report_ticket">Create a ticket on GitHub</string>
     <string name="report_close">Close</string>
     <string name="issue_problem_short">This game closed almost right away. A report can help find out why.</string>
@@ -188,4 +199,17 @@
     <string name="achievements_hidden">Hidden achievement, shown once unlocked.</string>
     <string name="achievements_empty">This game has no achievements.</string>
     <string name="achievements_source">Read from the Steam account. Nothing is changed on Steam from here.</string>
+    <string name="gamecompat_title">Compatibility</string>
+    <string name="gamecompat_button">Compatibility options</string>
+    <string name="gamecompat_recenter">Follow the headset\'s recentering</string>
+    <string name="gamecompat_recenter_legend">Useful when recentering does not bring the game back in front. The game then uses the play space that recentering moves, with the floor at the right height. Where the content stands may change.</string>
+    <string name="gamecompat_recenter_auto">Done automatically for this game: the headset has no play area.</string>
+    <string name="gamecompat_mode_auto">Automatic</string>
+    <string name="gamecompat_mode_on">On</string>
+    <string name="gamecompat_mode_off">Off</string>
+    <string name="report_send">Send the report</string>
+    <string name="report_status_sent">Report sent, thanks.</string>
+    <string name="report_status_waiting">The report will be sent as soon as this device is online.</string>
+    <string name="report_status_refused">The report could not be sent.</string>
+    <string name="report_status_unavailable">No report could be made for this game.</string>
 </resources>

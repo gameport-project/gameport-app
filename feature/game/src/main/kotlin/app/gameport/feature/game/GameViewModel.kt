@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -39,6 +40,10 @@ sealed interface GameUiState {
         val repatch: Repatch = Repatch.None,
         /** The game was seen using the Steam Frame's controllers: its controller page is offered. */
         val controllerProfile: Boolean = false,
+        val controllerFrame: Boolean = false,
+        val controllerAutomatic: Boolean = false,
+        /** The layer adapted the game by itself (the headset has no play area): a small mark on the compatibility button. */
+        val compatNotice: Boolean = false,
         /** The player starred the game: it is listed in the library's favorites. */
         val favorite: Boolean = false,
         /** The player hid the game in GamePort (Steam is not concerned). */
@@ -74,7 +79,8 @@ class GameViewModel @Inject constructor(
     repository: SteamLibraryRepository,
     private val installer: GameInstallRepository,
     private val issuesRepository: GameIssuesRepository,
-    controllerMappings: ControllerMappingStore,
+    private val controllerMappings: ControllerMappingStore,
+    gameSettingsStore: app.gameport.core.settings.GameSettingsStore,
     device: DeviceProfile,
     settings: UserSettings,
     private val playHistory: app.gameport.core.settings.PlayHistoryStore,
@@ -83,14 +89,20 @@ class GameViewModel @Inject constructor(
     auth: app.gameport.core.steam.SteamAuthRepository,
     private val reports: app.gameport.core.sync.ReportStore,
     private val reporter: app.gameport.core.sync.ProblemReporter,
+    private val reportSender: app.gameport.core.sync.ReportSender,
     achievementsRepository: app.gameport.core.steam.AchievementsRepository,
     saves: app.gameport.core.sync.SaveStateRepository,
     private val compat: app.gameport.core.sync.CompatRepository,
+    private val appNames: app.gameport.core.steam.AppNameRepository,
     incompatibleGames: app.gameport.core.settings.IncompatibleGames,
 ) : ViewModel() {
     init {
         // The totals of the players are asked again when they are old; what is kept shows meanwhile.
         viewModelScope.launch { compat.refreshIfStale() }
+        // A game the account does not have shows with the name Steam gives it.
+        viewModelScope.launch {
+            if (repository.observeLibrary().first { !it.isScanning }.games.none { it.appId == appId }) appNames.resolve(listOf(appId))
+        }
     }
 
     /** How GamePort stands with Steam. */
@@ -106,12 +118,16 @@ class GameViewModel @Inject constructor(
     private val appId = savedStateHandle.toRoute<GameRoute>().appId
 
     private val baseState: StateFlow<GameUiState> = combine(
-        repository.observeLibrary().toGameState(appId),
+        combine(repository.observeLibrary(), appNames.names, compat.observeSummary()) { library, names, summary ->
+            // A game players reported is known to the table of compatibility, even when the account does not have it.
+            val unowned = if (summary?.of(appId) != null) Game(appId, names[appId] ?: appId.toString(), app.gameport.core.model.Ownership.NOT_OWNED, androidBuild = null) else null
+            gameStateOf(library, appId, unowned)
+        },
         installer.observe(appId),
         issuesRepository.observe(appId),
-        controllerMappings.observe(appId),
+        combine(controllerMappings.observe(appId), gameSettingsStore.stageFallback(appId), gameSettingsStore.observe(appId)) { mapping, fallback, own -> Triple(mapping, fallback && own.recenter == app.gameport.core.model.RecenterMode.AUTO, own) },
         combine(playHistory.favorites, playHistory.hidden) { starred, hidden -> starred to hidden },
-    ) { game, install, issues, controllers, (favorites, hidden) ->
+    ) { game, install, issues, (controllers, compatNotice), (favorites, hidden) ->
         if (game !is GameUiState.Content) return@combine game
         // Patching or updating a game that is already installed is not a first install: the game
         // keeps its Play and uninstall buttons, and the panel shows the progress.
@@ -126,7 +142,7 @@ class GameViewModel @Inject constructor(
             else -> Repatch.None
         }
         val shown = if (repatch != Repatch.None && installedPackage != null) InstallState.Installed(installedPackage) else install
-        game.copy(install = shown, issues = issues, repatch = repatch, controllerProfile = device.isHeadset && controllers.detected.isNotEmpty(), favorite = appId in favorites, hidden = appId in hidden, vrDevice = device.isHeadset)
+        game.copy(install = shown, issues = issues, repatch = repatch, controllerProfile = device.isHeadset, controllerFrame = device.isHeadset && controllers.forced, controllerAutomatic = device.isHeadset && controllers.automatic, compatNotice = device.isHeadset && compatNotice, favorite = appId in favorites, hidden = appId in hidden, vrDevice = device.isHeadset)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), GameUiState.Loading)
 
@@ -183,20 +199,23 @@ class GameViewModel @Inject constructor(
     private val _reportProgress = MutableStateFlow<ReportProgress>(ReportProgress.Idle)
     internal val reportProgress: StateFlow<ReportProgress> = _reportProgress
 
-    internal fun onSaveReport(game: Game) {
+    /** The report is made now and sent to the project, even when the automatic sending is off: the player asked. */
+    internal fun onSendReport(game: Game) {
         if (_reportProgress.value == ReportProgress.Working) return
         viewModelScope.launch {
             _reportProgress.value = ReportProgress.Working
             val failure = ((uiState.value as? GameUiState.Content)?.install as? InstallState.Failed)?.error?.takeIf { it.reportable }?.toString()
-            val saved = reporter.save(game, failure)
-            _reportProgress.value = if (saved != null) ReportProgress.Saved(saved.fileName, saved.uri) else ReportProgress.Failed
+            val status = reportSender.sendByHand(game, failure)
+            _reportProgress.value = ReportProgress.Done(status)
             // The report said why it was made; the notice has done its job.
-            if (saved != null) onDismissProblem()
+            if (status == app.gameport.core.sync.ReportStatus.SENT || status == app.gameport.core.sync.ReportStatus.WAITING) onDismissProblem()
         }
     }
 
-    internal fun ticketUri(game: Game): android.net.Uri =
-        reporter.ticketUrl(game, (_reportProgress.value as? ReportProgress.Saved)?.fileName)
+    internal fun ticketUri(game: Game): android.net.Uri = reporter.ticketUrl(game, null)
+
+    /** Puts the Steam Frame's controls on this game's controllers, from its next start. */
+    fun onActivateFrame() = controllerMappings.setUseFrame(appId, true)
 
     fun onDismissProblem() {
         installer.installedPackage(appId)?.let(reports::dismiss)

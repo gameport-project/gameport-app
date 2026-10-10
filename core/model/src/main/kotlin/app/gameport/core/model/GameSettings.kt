@@ -10,12 +10,17 @@ data class PlayerDefaults(
     }
 }
 
+/** Whether a game gets the play space that the headset's recentering moves: by itself where the headset has no play area, always, or never. */
+enum class RecenterMode { AUTO, ON, OFF }
+
 /** What the player chose for one game. */
 data class GameSettings(
     /** Play seated while the game believes the player stands. */
     val seated: Boolean = false,
     /** This game's own height; null means the game follows [PlayerDefaults]. */
     val heightCm: Int? = null,
+    /** The game follows the headset's recentering: it gets the play space that recentering moves, in place of a fixed one. */
+    val recenter: RecenterMode = RecenterMode.AUTO,
 ) {
     val followsDefaults: Boolean get() = heightCm == null
 
