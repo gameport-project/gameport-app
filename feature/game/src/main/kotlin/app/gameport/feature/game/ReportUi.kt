@@ -1,13 +1,11 @@
 package app.gameport.feature.game
 
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.FlowRow
 import app.gameport.core.designsystem.BackdropDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
@@ -19,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.gameport.core.designsystem.GlassChip
+import app.gameport.core.sync.ReportStatus
 import app.gameport.core.sync.Suspicion
 
 /** Where the problem report stands. */
@@ -27,23 +26,21 @@ internal sealed interface ReportProgress {
 
     data object Working : ReportProgress
 
-    data class Saved(val fileName: String, val uri: Uri) : ReportProgress
-
-    data object Failed : ReportProgress
+    /** The report was made and handed to the sender; [status] is where it stands. */
+    data class Done(val status: ReportStatus) : ReportProgress
 }
 
 /** What the game page needs to offer a problem report. */
 internal class ReportActions(
     val suspicion: Suspicion?,
     val progress: ReportProgress,
-    val onSave: () -> Unit,
+    val onSend: () -> Unit,
     val onTicket: () -> Unit,
-    val onShare: () -> Unit,
     val onDismissProblem: () -> Unit,
     val onResetProgress: () -> Unit,
 ) {
     companion object {
-        val None = ReportActions(null, ReportProgress.Idle, {}, {}, {}, {}, {})
+        val None = ReportActions(null, ReportProgress.Idle, {}, {}, {}, {})
     }
 }
 
@@ -62,19 +59,27 @@ internal fun ReportDialog(gameName: String, report: ReportActions, onClose: () -
                         Text(stringResource(R.string.report_working))
                         LinearProgressIndicator(Modifier.fillMaxWidth())
                     }
-                    is ReportProgress.Saved -> GlassChip(stringResource(R.string.report_saved, progress.fileName))
-                    ReportProgress.Failed -> Text(stringResource(R.string.report_failed), color = MaterialTheme.colorScheme.error)
+                    is ReportProgress.Done -> ReportOutcome(progress.status)
                 }
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-                    if (report.progress is ReportProgress.Saved) {
-                        OutlinedButton(onClick = report.onShare) { Text(stringResource(R.string.report_share)) }
-                    } else {
-                        Button(onClick = report.onSave, enabled = report.progress != ReportProgress.Working) { Text(stringResource(R.string.report_save)) }
-                    }
-                    OutlinedButton(onClick = report.onTicket) { Text(stringResource(R.string.report_ticket)) }
+                // The two buttons share the width of the window.
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                    Button(onClick = report.onSend, enabled = report.progress != ReportProgress.Working, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.report_send)) }
+                    OutlinedButton(onClick = report.onTicket, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.report_ticket)) }
                 }
             }
         },
         confirmButton = { OutlinedButton(onClick = onClose) { Text(stringResource(R.string.report_close)) } },
     )
+}
+
+/** What became of the report the player sent. */
+@Composable
+private fun ReportOutcome(status: ReportStatus) {
+    val (text, error) = when (status) {
+        ReportStatus.SENT -> R.string.report_status_sent to false
+        ReportStatus.WAITING -> R.string.report_status_waiting to false
+        ReportStatus.REFUSED, ReportStatus.OFF -> R.string.report_status_refused to true
+        ReportStatus.UNAVAILABLE -> R.string.report_status_unavailable to true
+    }
+    if (error) Text(stringResource(text), color = MaterialTheme.colorScheme.error) else GlassChip(stringResource(text))
 }

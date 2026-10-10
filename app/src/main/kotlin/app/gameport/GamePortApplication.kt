@@ -11,6 +11,7 @@ class GamePortApplication : Application() {
     @Inject lateinit var saveCatchUp: app.gameport.core.sync.SaveCatchUp
     @Inject lateinit var connectionKeeper: app.gameport.core.sync.ConnectionKeeper
     @Inject lateinit var verdictSender: app.gameport.core.sync.VerdictSender
+    @Inject lateinit var reportSender: app.gameport.core.sync.ReportSender
     @Inject lateinit var compat: app.gameport.core.sync.CompatRepository
     @Inject lateinit var verdictAsker: app.gameport.core.sync.VerdictAsker
 
@@ -26,6 +27,7 @@ class GamePortApplication : Application() {
         connectionKeeper.start()
         // The answers the player gave about games are sent to the relay of the project (if they chose to share them).
         verdictSender.start()
+        reportSender.start()
         // What the players say about the games is read when GamePort starts (and when a page opens, if what is kept is old).
         compat.start()
         // The end of a game is also seen from the follow-up of the time played, for a game the system kills without it saying so.

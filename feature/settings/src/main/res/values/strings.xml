@@ -124,7 +124,7 @@
     <string name="settings_hidden_empty">No game is hidden from the app.</string>
     <string name="settings_hidden_show">Show again</string>
     <string name="settings_share_verdicts">Share whether games work</string>
-    <string name="settings_share_verdicts_description">After a game closes, GamePort asks whether it worked. The answer stays on this device, and when this is on it is also sent to the project to show which games work. It carries only the game, the answer, the version of GamePort and the kind of device, with a random number that identifies nobody. No name, address or account.</string>
+    <string name="settings_share_verdicts_description">After a game closes, GamePort asks whether it worked. The answer stays on this device, and when this is on it is also sent to the project to show which games work. It carries only the game, the answer, the version of GamePort and the kind of device, with a random number that identifies nobody. No name, address or account. After \"It did not work\" or \"Works offline only\", a technical report is sent too: the versions, files and logs of the game, without any name, e-mail address or account.</string>
     <string name="settings_category_incompatible">Incompatible games</string>
     <string name="settings_incompatible_description">Games confirmed as not running through GamePort. They are left out of the home and stay in the Steam library, where nothing changes.</string>
     <string name="settings_incompatible_show_title">Show them anyway</string>
