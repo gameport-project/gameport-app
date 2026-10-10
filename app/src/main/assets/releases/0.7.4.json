@@ -1,0 +1,118 @@
+{
+  "version": "0.7.4",
+  "previous": "0.7.3",
+  "code": 704,
+  "patchNeeded": true,
+  "window": {
+    "items": [
+      {
+        "id": "compat-table",
+        "icon": "check",
+        "text": {
+          "en": "A table shows what players report for each game, device by device, with quick filters. It opens from the three dots on the home.",
+          "fr": "Un tableau montre ce que les joueurs rapportent pour chaque jeu, appareil par appareil, avec des filtres rapides. Il s'ouvre depuis les trois points de l'accueil."
+        }
+      },
+      {
+        "id": "compat-options",
+        "icon": "build",
+        "text": {
+          "en": "An orange wrench on the page of each game gathers what can be turned on when it does not work as it should: the Steam Frame's controllers, and the recentering of the device.",
+          "fr": "Une clé orange sur la fiche de chaque jeu rassemble ce qu'on peut activer quand il ne fonctionne pas comme il devrait : les manettes du Steam Frame, et le recentrage de l'appareil."
+        }
+      },
+      {
+        "id": "frame-controls",
+        "icon": "info",
+        "text": {
+          "en": "The Steam Frame's controls are placed on this device's controllers according to what each game uses, and one control can go to several buttons.",
+          "fr": "Les commandes du Steam Frame sont placées sur les manettes de cet appareil selon ce que chaque jeu utilise, et une commande peut aller sur plusieurs boutons."
+        }
+      },
+      {
+        "id": "reports-sent",
+        "icon": "warning",
+        "text": {
+          "en": "When a game did not work, its technical report is sent to the project, unless sending is off in Settings > Account. It can also be sent by hand from the game's page.",
+          "fr": "Quand un jeu n'a pas fonctionné, son rapport technique est envoyé au projet, sauf si l'envoi est coupé dans Réglages > Compte. Il peut aussi être envoyé à la main depuis la fiche du jeu."
+        }
+      }
+    ]
+  },
+  "notes": [
+    {
+      "id": "section-0",
+      "title": {
+        "en": "New features",
+        "fr": "Nouvelles fonctionnalités"
+      },
+      "items": [
+        {
+          "id": "item-0-0",
+          "text": {
+            "en": "**A table of what players report.** The three dots on the home open the compatibility table: every game players answered about, with the numbers for the kind of device in hand and, on request, for the others. The colour of a card and its label at the bottom right are the verdict for this kind of device, as on the page of the game. Quick filters show the games that work or do not, and a search finds a game. A game the account does not have opens its own page, with its name read from Steam, and a button to its page on Steam.",
+            "fr": "**Un tableau de ce que les joueurs rapportent.** Les trois points de l'accueil ouvrent le tableau de compatibilité : tous les jeux sur lesquels des joueurs ont répondu, avec les chiffres pour le type d'appareil en main et, sur demande, pour les autres. La couleur d'une carte et son label en bas à droite sont le verdict pour ce type d'appareil, comme sur la fiche du jeu. Des filtres rapides montrent les jeux qui fonctionnent ou non, et une recherche retrouve un jeu. Un jeu que le compte n'a pas ouvre sa propre fiche, avec son nom lu chez Steam, et un bouton vers sa page sur Steam."
+          }
+        },
+        {
+          "id": "item-0-1",
+          "text": {
+            "en": "**Compatibility options for each game.** An orange wrench on the page of a game opens what can be turned on when it does not work as it should. *Force the detection of the Steam Frame's controllers* is for a game that has controls for both, and is off by default. *Follow the recentering* gives a game the play space that the recentering of the device moves: it is done by itself where the device has no play area, which is what stopped some games from coming back in front after a recentering, and it can be turned on or off for a game. A small mark on the wrench says when GamePort did it by itself.",
+            "fr": "**Des options de compatibilité pour chaque jeu.** Une clé orange sur la fiche d'un jeu ouvre ce qu'on peut activer quand il ne fonctionne pas comme il devrait. *Forcer la détection des manettes du Steam Frame* concerne un jeu qui a des commandes pour les deux, et est désactivé par défaut. *Suivre le recentrage* donne à un jeu l'espace de jeu que le recentrage de l'appareil déplace : c'est fait tout seul là où l'appareil n'a pas de zone de jeu, ce qui empêchait certains jeux de revenir devant après un recentrage, et cela peut être activé ou désactivé pour un jeu. Un petit point sur la clé indique quand GamePort l'a fait seule."
+          }
+        },
+        {
+          "id": "item-0-2",
+          "text": {
+            "en": "**The Steam Frame's controls follow what each game uses.** GamePort no longer uses a fixed table: it places each control of the Steam Frame on the controllers of this device by what the game really binds, and one control can go to several buttons, with a warning when a button then does several things at once. A mapping the player customised is kept as it was, whatever the defaults become. The button of the controllers on a game's page is blue when GamePort places the controls by itself and orange when they are forced.",
+            "fr": "**Les commandes du Steam Frame suivent ce que chaque jeu utilise.** GamePort n'utilise plus un tableau fixe : il place chaque commande du Steam Frame sur les manettes de cet appareil selon ce que le jeu lie vraiment, et une commande peut aller sur plusieurs boutons, avec un avertissement quand un bouton fait alors plusieurs choses à la fois. Un mappage personnalisé par le joueur est gardé tel qu'il était, quoi que deviennent les réglages par défaut. Le bouton des manettes sur la fiche d'un jeu est bleu quand GamePort place les commandes seule et orange quand elles sont forcées."
+          }
+        },
+        {
+          "id": "item-0-3",
+          "text": {
+            "en": "**A hint when a game does not hear the controllers.** If, half a minute after a game started asking for its controls, none ever answered, the page of the game says so and offers to turn on the support of the Steam Frame's controls in one touch.",
+            "fr": "**Un conseil quand un jeu n'entend pas les manettes.** Si, une demi-minute après que le jeu a commencé à demander ses commandes, aucune n'a jamais répondu, la fiche du jeu le dit et propose d'activer la prise en charge des commandes du Steam Frame en un geste."
+          }
+        },
+        {
+          "id": "item-0-4",
+          "text": {
+            "en": "**Problem reports are sent.** When the answer after a game is that it did not work, or works only offline, its technical report is made and sent to the project at once if the device has a network, and kept for later otherwise. It holds technical facts only (versions, device, how the game ran, its logs) with account numbers, e-mail addresses, network addresses and the account name removed. A window offers to download it or to send it again, and the bug button on the page of a game now sends it too. Settings > Account turns the sending off, answers and reports alike. This is more than the 0.7.3 sent, which was only the answer.",
+            "fr": "**Les rapports de problème sont envoyés.** Quand la réponse après un jeu est qu'il n'a pas fonctionné, ou qu'il ne marche qu'hors ligne, son rapport technique est fait et envoyé au projet aussitôt si l'appareil a un réseau, et gardé pour plus tard sinon. Il ne contient que des informations techniques (versions, appareil, déroulement du jeu, journaux), avec les numéros de compte, adresses e-mail, adresses réseau et nom du compte retirés. Une fenêtre propose de le télécharger ou de le renvoyer, et le bouton bug de la fiche d'un jeu l'envoie aussi maintenant. Réglages > Compte coupe l'envoi, réponses et rapports. C'est plus que ce qu'envoyait la 0.7.3, qui n'envoyait que la réponse."
+          }
+        }
+      ]
+    },
+    {
+      "id": "section-1",
+      "title": {
+        "en": "Fixes",
+        "fr": "Corrections"
+      },
+      "items": [
+        {
+          "id": "item-1-0",
+          "text": {
+            "en": "**A game with one bad control no longer loses all of them.** When the system refuses a whole table of controls because of one binding the game got wrong, GamePort now finds it, names it in the report, and gives the others, so the game has its controllers again.",
+            "fr": "**Un jeu avec une commande fautive ne les perd plus toutes.** Quand le système refuse toute une table de commandes à cause d'une liaison que le jeu a mal faite, GamePort la trouve maintenant, la nomme dans le rapport, et donne les autres, si bien que le jeu retrouve ses manettes."
+          }
+        },
+        {
+          "id": "item-1-1",
+          "text": {
+            "en": "**The back arrow stays at the top of every page** instead of scrolling away with the content.",
+            "fr": "**La flèche de retour reste en haut de chaque page** au lieu de défiler avec le contenu."
+          }
+        },
+        {
+          "id": "item-1-2",
+          "text": {
+            "en": "**Problem reports say more:** which GamePort installed the game, whether its expansion files are there, and what controls it uses.",
+            "fr": "**Les rapports de problème en disent plus :** quel GamePort a installé le jeu, si ses fichiers d'extension sont là, et quelles commandes il utilise."
+          }
+        }
+      ]
+    }
+  ]
+}
