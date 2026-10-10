@@ -37,7 +37,7 @@ class ControllersViewModel @Inject constructor(
 
     fun onEnabledChanged(enabled: Boolean) = store.setEnabled(appId, enabled)
 
-    fun onTargetChosen(source: ControlRef, target: ControlRef?) = store.setOverride(appId, source, target)
+    fun onTargetsChosen(source: ControlRef, targets: List<ControlRef>) = store.setOverride(appId, source, targets)
 
     fun onReset() = store.reset(appId)
 

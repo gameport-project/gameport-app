@@ -41,13 +41,20 @@ class GameIssuesRepository @Inject constructor(
         coordinator.conflicts,
         syncStatus.statuses,
         combine(recheck, updates.updates, controllers.observe(appId)) { _, list, mapping ->
-            list.any { it.appId == appId } to mapping.takeIf { device.isHeadset && it.detected.isNotEmpty() && !it.noticeSeen }?.source
+            Triple(
+                list.any { it.appId == appId },
+                mapping.takeIf { device.isHeadset && it.detected.isNotEmpty() && !it.noticeSeen && !it.both }?.source,
+                if (device.isHeadset && mapping.both && mapping.silent) mapping.useFrame else null,
+            )
         },
         reports.suspected,
-    ) { patchOutdated, conflicts, statuses, (updateAvailable, mappingNoticeSource), suspected ->
+    ) { patchOutdated, conflicts, statuses, (updateAvailable, mappingNoticeSource, silent), suspected ->
         // The controller notice is informative: it is listed on the game's page but never lights the cover badge.
         issuesFor(appId, patchOutdated, conflicts.keys, statuses, updateAvailable, suspected) +
-            if (mappingNoticeSource != null) listOf(GameIssue.ControllerMappingAvailable(mappingNoticeSource)) else emptyList()
+            listOfNotNull(
+                mappingNoticeSource?.let { GameIssue.ControllerMappingAvailable(it) },
+                silent?.let { GameIssue.ControllerSilent(activated = it) },
+            )
     }
 
     /** Ids of the installed games with at least one issue that needs attention. A newer version is good news and is not one. */

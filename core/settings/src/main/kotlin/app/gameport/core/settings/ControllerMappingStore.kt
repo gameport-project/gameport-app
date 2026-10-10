@@ -28,14 +28,18 @@ class ControllerMappingStore @Inject constructor(
     fun get(appId: Int): ControllerMapping = state.value[appId] ?: ControllerMapping()
 
     /** What the game's hook was told about the controls the game uses; a game seen for the first time gets the page. */
-    fun setDetected(appId: Int, controls: List<ControlRef>, source: String) =
-        update(appId) { it.copy(detected = controls.sortedBy { c -> c.key }, source = source) }
+    fun setDetected(appId: Int, controls: List<ControlRef>, source: String, both: Boolean = false, silent: Boolean = false) =
+        update(appId) { it.copy(detected = controls.sortedBy { c -> c.key }, source = source, both = both, silent = silent) }
 
-    fun setEnabled(appId: Int, enabled: Boolean) = update(appId) { it.copy(enabled = enabled) }
+    /** Customising starts from what the game does now, so a later change of the defaults does not move a control the player did not touch. */
+    fun setEnabled(appId: Int, enabled: Boolean) = update(appId) { if (enabled && !it.enabled) it.frozenAsNow().copy(enabled = true) else it.copy(enabled = enabled) }
 
-    /** Sends [source] to [target] (null: to nothing) instead of its default. */
-    fun setOverride(appId: Int, source: ControlRef, target: ControlRef?) =
-        update(appId) { it.copy(overrides = it.overrides + (source.key to (target?.key ?: "none"))) }
+    /** The Steam Frame's controls for a game that also has its own: off by default. */
+    fun setUseFrame(appId: Int, useFrame: Boolean) = update(appId) { it.copy(useFrame = useFrame) }
+
+    /** Sends [source] to [targets] (none: to nothing) instead of its default. */
+    fun setOverride(appId: Int, source: ControlRef, targets: List<ControlRef>) =
+        update(appId) { it.copy(overrides = it.overrides + (source.key to ControllerLayout.encodeTargets(targets))) }
 
     /** Back to GamePort's own mapping. */
     fun reset(appId: Int) = update(appId) { it.copy(overrides = emptyMap()) }
@@ -63,10 +67,20 @@ class ControllerMappingStore @Inject constructor(
         mapping.overrides.entries.joinToString(";") { "${it.key}=${it.value}" },
         if (mapping.noticeSeen) "1" else "0",
         mapping.source,
+        VERSION,
+        if (mapping.useFrame) "1" else "0",
+        if (mapping.both) "1" else "0",
+        if (mapping.silent) "1" else "0",
     ).joinToString("|")
 
+    /** A mapping written before the version was kept, and customised, is frozen as it worked then: the rules have changed since. */
     private fun decode(text: String): ControllerMapping {
         val parts = text.split('|')
+        val mapping = decodeParts(parts)
+        return if (parts.getOrNull(5) == VERSION) mapping else mapping.frozenAsBefore()
+    }
+
+    private fun decodeParts(parts: List<String>): ControllerMapping {
         return ControllerMapping(
             detected = parts.getOrNull(0).orEmpty().split(',').mapNotNull(ControlRef::parse),
             enabled = parts.getOrNull(1) == "1",
@@ -75,10 +89,23 @@ class ControllerMappingStore @Inject constructor(
             }.toMap(),
             noticeSeen = parts.getOrNull(3) == "1",
             source = parts.getOrNull(4).orEmpty(),
+            useFrame = parts.getOrNull(6) == "1",
+            both = parts.getOrNull(7) == "1",
+            silent = parts.getOrNull(8) == "1",
         )
     }
 
     private fun readAll(): Map<Int, ControllerMapping> = prefs.all.mapNotNull { (key, value) ->
-        key.toIntOrNull()?.let { it to decode(value.toString()) }
+        key.toIntOrNull()?.let { appId ->
+            val mapping = decode(value.toString())
+            // Written back in the new form, so the freezing is done once.
+            if (value.toString().split('|').getOrNull(5) != VERSION) prefs.edit().putString(key, encode(mapping)).apply()
+            appId to mapping
+        }
     }.toMap()
+
+    private companion object {
+        /** Marks a mapping written since the defaults changed (0.7.4); the ones before it have no mark. */
+        const val VERSION = "v2"
+    }
 }

@@ -1,6 +1,13 @@
 package app.gameport.feature.game
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.draw.clip
 import app.gameport.core.designsystem.GlassChip
@@ -73,24 +80,33 @@ fun ControllersScreen(onBack: () -> Unit, viewModel: ControllersViewModel = hilt
     }
 
     capturing?.let { source ->
-        val assign = { target: ControlRef? -> viewModel.onTargetChosen(source, target); capturing = null }
+        // One control of the Steam Frame may go to several of this device: the ones ticked here. None ticked: nowhere.
+        var picked by remember(source) { mutableStateOf(mapping.targetsFor(source)) }
         BackdropDialog(
             onDismissRequest = { capturing = null },
             title = { Text(stringResource(R.string.controllers_choose_title, controlLabel(source.group))) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
-                    TextButton(onClick = { assign(null) }) { Text(stringResource(R.string.controllers_nothing)) }
-                    ControllerLayout.targets.forEach { target -> TextButton(onClick = { assign(target) }) { Text(targetLabel(target)) } }
+                    Text(stringResource(R.string.controllers_choose_hint), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    ControllerLayout.targets.forEach { target ->
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { picked = if (target in picked) picked - target else picked + target },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(checked = target in picked, onCheckedChange = null, modifier = Modifier.padding(12.dp))
+                            Text(targetLabel(target))
+                        }
+                    }
                 }
             },
-            confirmButton = {},
+            confirmButton = { GlassButton(onClick = { viewModel.onTargetsChosen(source, picked); capturing = null }) { Text(stringResource(R.string.controllers_apply)) } },
             dismissButton = { DangerTextButton(onClick = { capturing = null }) { Text(stringResource(R.string.game_settings_cancel)) } },
         )
     }
 
     Scaffold { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp).verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
+            Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -100,40 +116,59 @@ fun ControllersScreen(onBack: () -> Unit, viewModel: ControllersViewModel = hilt
                     Text(gameName, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Only what GamePort does by itself is told here; forcing the Steam Frame's controls adds no message above.
+                if (mapping.automatic) {
+                    Text(stringResource(R.string.controllers_status_automatic), style = MaterialTheme.typography.titleMedium, modifier = Modifier.widthIn(max = 720.dp))
+                }
+                Row(
+                    Modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.controllers_customise), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(if (!mapping.translated) R.string.controllers_customise_unavailable else if (mapping.enabled) R.string.controllers_customise_on else R.string.controllers_customise_off),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Switch(checked = mapping.enabled, onCheckedChange = viewModel::onEnabledChanged, enabled = mapping.translated)
+                }
 
-            Text(
-                stringResource(R.string.controllers_explanation, sourceFamilyName(mapping.source)),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.widthIn(max = 720.dp),
-            )
-
-            Row(
-                Modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.controllers_customise), style = MaterialTheme.typography.titleMedium)
+                // Nothing to remap while GamePort puts nothing on the controllers.
+                if (mapping.translated) {
                     Text(
-                        stringResource(if (mapping.enabled) R.string.controllers_customise_on else R.string.controllers_customise_off),
+                        stringResource(R.string.controllers_explanation),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.widthIn(max = 720.dp),
                     )
-                }
-                Switch(checked = mapping.enabled, onCheckedChange = viewModel::onEnabledChanged)
-            }
 
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val wide = maxWidth >= 720.dp
-                val cards: @Composable (Modifier) -> Unit = { modifier ->
-                    ControllerCard(Hand.LEFT, mapping, { capturing = it }, modifier)
-                    ControllerCard(Hand.RIGHT, mapping, { capturing = it }, modifier)
-                }
-                if (wide) Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) { cards(Modifier.weight(1f)) }
-                else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { cards(Modifier.fillMaxWidth()) }
-            }
+                    val shared = mapping.sharedTargets().keys.toList()
+                    if (shared.isNotEmpty()) {
+                        Text(
+                            stringResource(R.string.controllers_shared, shared.map { targetLabel(it) }.joinToString(", ")),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.widthIn(max = 720.dp),
+                        )
+                    }
 
-            GlassButton(onClick = { confirmingReset = true }, enabled = mapping.overrides.isNotEmpty(), modifier = Modifier.padding(bottom = 24.dp)) {
-                Text(stringResource(R.string.controllers_reset))
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        val wide = maxWidth >= 720.dp
+                        val cards: @Composable (Modifier) -> Unit = { modifier ->
+                            ControllerCard(Hand.LEFT, mapping, { capturing = it }, modifier)
+                            ControllerCard(Hand.RIGHT, mapping, { capturing = it }, modifier)
+                        }
+                        if (wide) Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) { cards(Modifier.weight(1f)) }
+                        else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { cards(Modifier.fillMaxWidth()) }
+                    }
+
+                    GlassButton(onClick = { confirmingReset = true }, enabled = mapping.overrides.isNotEmpty(), modifier = Modifier.padding(bottom = 24.dp)) {
+                        Text(stringResource(R.string.controllers_reset))
+                    }
+                }
             }
         }
     }
@@ -155,10 +190,14 @@ private fun ControllerCard(hand: Hand, mapping: ControllerMapping, onSelect: (Co
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(controlLabel(source.group), modifier = Modifier.weight(1f))
-                GlassChip(
-                    label = mapping.targetFor(source)?.let { targetLabel(it) } ?: stringResource(R.string.controllers_nothing),
-                    contentColor = if (mapping.enabled) Color.White else Color.White.copy(alpha = 0.5f),
-                )
+                val targets = mapping.targetsFor(source)
+                val color = if (mapping.enabled) Color.White else Color.White.copy(alpha = 0.5f)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (targets.isEmpty()) GlassChip(label = stringResource(R.string.controllers_nothing), contentColor = color)
+                    targets.forEach { GlassChip(label = targetLabel(it), contentColor = color) }
+                    // Adding a button: the same window, where more than one can be ticked.
+                    if (mapping.enabled) Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.controllers_add), tint = color, modifier = Modifier.size(20.dp))
+                }
             }
         }
     }

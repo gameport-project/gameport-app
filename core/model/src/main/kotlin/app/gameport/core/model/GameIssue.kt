@@ -5,6 +5,9 @@ sealed interface GameIssue {
     /** The game was seen using the Steam Frame's controllers, whose mapping can be changed; a notice, not a problem. */
     data class ControllerMappingAvailable(val source: String) : GameIssue
 
+    /** The game did not react to the controllers in use, and has the Steam Frame's controls as another way. */
+    data class ControllerSilent(val activated: Boolean) : GameIssue
+
     /** Steam published a new version of the game. */
     data object UpdateAvailable : GameIssue
 
