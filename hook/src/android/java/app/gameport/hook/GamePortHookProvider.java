@@ -98,6 +98,7 @@ public final class GamePortHookProvider extends ContentProvider {
             pullAchievementsFromSteam(context);
             watchAchievements(context);
             reportControllerProfile(context);
+            reportControllerProfileLater(context);
 
             watchForUploads(context);
             // What the game says in the system log, for a problem report.
@@ -288,6 +289,33 @@ public final class GamePortHookProvider extends ContentProvider {
      * The OpenXR layer leaves the kind of controllers it translated (Steam Frame or Meta) and the controls the game used the last time it ran.
      * GamePort is told, so its controller page is offered for this game.
      */
+    /**
+     * The layer writes that file when the game attaches its controls, a few seconds after the start: it is read again then, and once more later, so the
+     * controller page knows this run's controls during the run and not only at the next start.
+     */
+    private void reportControllerProfileLater(final Context context) {
+        final Context app = context.getApplicationContext();
+        Thread later = new Thread(new Runnable() {
+            @Override public void run() {
+                try {
+                    Thread.sleep(12_000);
+                    reportControllerProfile(app);
+                    Thread.sleep(40_000);
+                    reportControllerProfile(app);
+                    // The layer decides half a minute after the game starts asking for its actions that the game cannot hear the controllers.
+                    Thread.sleep(25_000);
+                    reportControllerProfile(app);
+                    Thread.sleep(30_000);
+                    reportControllerProfile(app);
+                } catch (InterruptedException ignored) {
+                    // The game is closing.
+                }
+            }
+        }, "gameport-controls");
+        later.setDaemon(true);
+        later.start();
+    }
+
     private void reportControllerProfile(Context context) {
         try {
             File files = context.getExternalFilesDir(null);
@@ -295,21 +323,29 @@ public final class GamePortHookProvider extends ContentProvider {
             if (!marker.isFile()) return;
             java.util.List<String> controls = new java.util.ArrayList<>();
             String source = "";
+            boolean both = false;
             java.io.BufferedReader in = new java.io.BufferedReader(new java.io.FileReader(marker));
             try {
                 String line;
                 while ((line = in.readLine()) != null) {
                     line = line.trim();
                     if (line.startsWith("source=")) source = line.substring("source=".length());
-                    else if (!line.isEmpty()) controls.add(line);
+                    else if (line.equals("both=1")) both = true;
+                    // Other "name=value" lines are for the log and for people; a control is "hand:group".
+                    else if (!line.isEmpty() && line.indexOf('=') < 0) controls.add(line);
                 }
             } finally {
                 in.close();
             }
-            if (controls.isEmpty()) return;
+            // A file with no control says there is nothing to remap (any more): the app is told too, so an old offer goes.
             Bundle extras = new Bundle();
             extras.putString("source", source);
             extras.putStringArray("controls", controls.toArray(new String[0]));
+            extras.putBoolean("both", both);
+            // The layer leaves this mark when, after a minute, not one action of the game answered active.
+            extras.putBoolean("silent", new File(marker.getParentFile(), "xr_silent.txt").isFile());
+            // The layer leaves this mark when the headset has no play area and it gave the game a space that follows the recentering.
+            extras.putBoolean("stageFallback", new File(marker.getParentFile(), "xr_stage_fallback.txt").isFile());
             Calls.call(context, Owner.cloud(context), "controller_profile", context.getPackageName(), extras);
             Log.i(TAG, "reported " + controls.size() + " " + source + " controls");
         } catch (Throwable t) {
@@ -562,6 +598,8 @@ public final class GamePortHookProvider extends ContentProvider {
         String eyeCm = "0";
         String controls = "";
         String family = "";
+        String preferFrame = "0";
+        String localFloor = "auto";
         try {
             Bundle config = Calls.call(context, Owner.cloud(context), "config", context.getPackageName(), null);
             if (config == null) throw new java.io.IOException("no answer");
@@ -571,11 +609,14 @@ public final class GamePortHookProvider extends ContentProvider {
             controls = map == null ? "" : map;
             String platform = config.getString("xrFamily");
             family = platform == null ? "" : platform;
+            preferFrame = config.getBoolean("xrPreferFrame") ? "1" : "0";
+            String recenter = config.getString("xrRecenter");
+            localFloor = recenter == null || recenter.isEmpty() ? "auto" : recenter;
             String mode = config.getString("returnMode");
             // A GamePort from before the choice only says whether to come back for a game it started.
             returnMode = mode != null ? mode : (config.getBoolean("returnToGamePort") ? "app" : "never");
             java.io.FileWriter out = new java.io.FileWriter(cache);
-            out.write(seated + "\n" + eyeCm + "\n" + controls + "\n" + family + "\n");
+            out.write(seated + "\n" + eyeCm + "\n" + controls + "\n" + family + "\n" + preferFrame + "\n" + localFloor + "\n");
             out.close();
         } catch (Throwable t) {
             try {
@@ -586,6 +627,10 @@ public final class GamePortHookProvider extends ContentProvider {
                 controls = map == null ? "" : map;
                 String platform = in.readLine();
                 family = platform == null ? "" : platform;
+                String again = in.readLine();
+                preferFrame = again == null ? "0" : again;
+                String floor = in.readLine();
+                localFloor = floor == null || floor.equals("0") ? "auto" : (floor.equals("1") ? "on" : floor);
                 in.close();
             } catch (Throwable ignored) {
                 // No earlier answer either: seated mode stays off.
@@ -598,6 +643,10 @@ public final class GamePortHookProvider extends ContentProvider {
             android.system.Os.setenv("GAMEPORT_XR_MAP", controls, true);
             // The kind of controllers this device has, from GamePort's own platform detection.
             android.system.Os.setenv("GAMEPORT_XR_FAMILY", family, true);
+            // The Steam Frame's controls, for a game that also has its own for the device's controllers (off by default).
+            android.system.Os.setenv("GAMEPORT_XR_PREFER_FRAME", preferFrame, true);
+            // The play space that the headset's recentering moves, in place of the fixed one a game asks for (auto, on or off).
+            android.system.Os.setenv("GAMEPORT_XR_LOCAL_FLOOR", localFloor, true);
             Log.i(TAG, "seated mode " + seated + ", eye height " + eyeCm + " cm, controller overrides " + (controls.isEmpty() ? "none" : controls));
         } catch (Throwable t) {
             Log.w(TAG, "could not pass the seated settings on", t);

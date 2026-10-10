@@ -22,7 +22,9 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <mutex>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -31,6 +33,8 @@
 #include <openxr/openxr.h>
 #include <openxr/openxr_loader_negotiation.h>
 #include <openxr/openxr_platform.h>
+
+#include "controller_allocation.h"
 
 #define TAG "GPXR"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -61,6 +65,10 @@ PFN_xrPathToString g_pathToString = nullptr;
 PFN_xrGetCurrentInteractionProfile g_getCurrentProfile = nullptr;
 
 PFN_xrAttachSessionActionSets g_attachActionSets = nullptr;
+PFN_xrPollEvent g_pollEvent = nullptr;
+PFN_xrGetReferenceSpaceBoundsRect g_getBounds = nullptr;
+PFN_xrGetActionStateBoolean g_getActionBoolean = nullptr;
+PFN_xrGetActionStateFloat g_getActionFloat = nullptr;
 PFN_xrGetInstanceProperties g_getInstanceProperties = nullptr;
 PFN_xrEnumerateViewConfigurationViews g_enumerateViews = nullptr;
 
@@ -108,7 +116,48 @@ XrPosef IdentityPose() {
 
 XrResult XRAPI_CALL Layer_xrCreateSession(XrInstance, const XrSessionCreateInfo*, XrSession*);
 
+std::string GamePortFolder();
+// Whether a game that asks for a stage gets the play space the headset's recentering moves: 0 where the headset has no play area, 1 always, 2 never (GAMEPORT_XR_LOCAL_FLOOR).
+std::atomic<int> g_recenterMode{0};
+
 XrResult XRAPI_CALL Layer_xrCreateReferenceSpace(XrSession session, const XrReferenceSpaceCreateInfo* info, XrSpace* space) {
+    // A stage is fixed to the play area, which the headset's recentering does not move: a game that places its content there stays where it was. The local floor
+    // has the floor at the same height and follows the recentering. When the runtime has no local floor, the game gets the stage it asked for.
+    // The player can ask for it for a game; and it is done by itself on a headset whose stage is only the fallback of a missing play area.
+    if (info && space && info->referenceSpaceType == XR_REFERENCE_SPACE_TYPE_STAGE) {
+        const int mode = g_recenterMode.load();
+        const bool asked = mode == 1;
+        bool fallback = false;
+        if (mode == 0 && g_getBounds) {
+            XrExtent2Df bounds{};
+            const XrResult read = g_getBounds(session, XR_REFERENCE_SPACE_TYPE_STAGE, &bounds);
+            fallback = XR_SUCCEEDED(read) && gp::StageLooksLikeFallback(read == XR_SUCCESS, bounds.width, bounds.height);
+            static std::atomic<int> measured{0};
+            if (measured.fetch_add(1) < 2) LOGI("the stage of this headset: bounds %s, %.2f x %.2f m%s", read == XR_SUCCESS ? "given" : "unavailable", bounds.width, bounds.height, fallback ? ": no play area" : "");
+        }
+        if (asked || fallback) {
+            XrReferenceSpaceCreateInfo floor = *info;
+            floor.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL_FLOOR;
+            const XrResult swapped = g_createReferenceSpace(session, &floor, space);
+            if (XR_SUCCEEDED(swapped)) {
+                {
+                    std::lock_guard<std::mutex> lock(g_mutex);
+                    g_floorBased[*space] = true;
+                }
+                static std::atomic<int> logged{0};
+                if (logged.fetch_add(1) < 4) LOGI("the game asked for a stage space: given a local floor, which follows the recentering (%s)", asked ? "as the player asked" : "the headset has no play area");
+                // GamePort is told the layer did it by itself, to say so on the game's page.
+                if (!asked) {
+                    FILE* mark = fopen((GamePortFolder() + "xr_stage_fallback.txt").c_str(), "w");
+                    if (mark) {
+                        fputs("1\n", mark);
+                        fclose(mark);
+                    }
+                }
+                return swapped;
+            }
+        }
+    }
     XrResult result = g_createReferenceSpace(session, info, space);
     if (XR_SUCCEEDED(result) && info && space) {
         std::lock_guard<std::mutex> lock(g_mutex);
@@ -388,19 +437,18 @@ XrResult XRAPI_CALL Layer_xrEnumerateViewConfigurationViews(XrInstance instance,
 // A game may know no controller profile of the device it runs on: a Steam Frame build knows Valve's, a
 // Quest game knows Meta's, a Pico game knows Pico's. Once the game has told the runtime everything it
 // knows (right before its action sets are attached), the layer decides, in this order:
-//   1. the game has bindings for a profile of this device: nothing to do;
+//   1. the game has bindings for a profile of this device: nothing to do (the log says how its Steam Frame table compares, when it has one);
 //   2. else the game has bindings for the Meta (Touch) controllers: they are translated onto the device;
 //   3. else the game has bindings for the Steam Frame's controllers: they are translated onto the device.
 // A translation moves each control (a hand and a group: "left:thumbstick", "right:a") onto the device's
 // own; the player can override any control per game (GAMEPORT_XR_MAP, filled from GamePort's controller
-// page): "left:dpad_up=right:a;right:menu=left:menu;left:view=none". The game is told that the profile it
+// page): "left:dpad_up=left:y+left:x;right:menu=left:menu;left:view=none" (a control may go to several, joined by +). The game is told that the profile it
 // knows is the active one, so it keeps reading the controllers.
 // The device family comes from GamePort (GAMEPORT_XR_FAMILY, from its VrPlatform: "meta" or "pico"), else
 // from the runtime's name.
 
 enum class Family { Unknown, Meta, Pico };
 
-constexpr const char* kValveProfile = "/interaction_profiles/valve/frame_controller_valve";
 const char* const kMetaProfiles[] = {"/interaction_profiles/meta/touch_controller_plus", "/interaction_profiles/facebook/touch_controller_pro",
                                      "/interaction_profiles/oculus/touch_controller"};
 const char* const kPicoProfiles[] = {"/interaction_profiles/bytedance/pico4_controller", "/interaction_profiles/bytedance/pico_neo3_controller"};
@@ -408,12 +456,23 @@ const char* const kPicoProfiles[] = {"/interaction_profiles/bytedance/pico4_cont
 Family g_family = Family::Unknown;
 std::unordered_map<std::string, std::vector<XrActionSuggestedBinding>> g_stash;  // every suggestion of the game, by profile (g_mutex)
 std::atomic<bool> g_emulating{false};
+std::atomic<bool> g_gameHasBoth{false};  // the game has its own controls for the device's controllers and the Steam Frame's
+std::atomic<bool> g_preferFrame{false};  // the player asked for the Steam Frame's controls even when the game has its own for the device (GAMEPORT_XR_PREFER_FRAME)
+// The strings the game gave xrStringToPath for interaction profiles: a runtime may not give a profile it does not know back (g_namesMutex).
+std::mutex g_namesMutex;
+std::unordered_map<XrPath, std::string> g_pathNames;
 XrPath g_emulatedSourcePath = XR_NULL_PATH;  // the profile the game knows and is told is active
+std::unordered_map<std::string, XrPath> g_profileHandles;  // by profile name, the handle the game itself used for it (g_mutex)
 
 std::string PathText(XrInstance instance, XrPath path) {
     char text[XR_MAX_PATH_LENGTH] = {0};
     uint32_t written = 0;
     if (g_pathToString && path != XR_NULL_PATH) g_pathToString(instance, path, sizeof(text), &written, text);
+    if (text[0] == 0 && path != XR_NULL_PATH) {
+        std::lock_guard<std::mutex> lock(g_namesMutex);
+        auto known = g_pathNames.find(path);
+        if (known != g_pathNames.end()) return known->second;
+    }
     return text;
 }
 
@@ -446,135 +505,158 @@ bool ParseInput(const std::string& path, Control& out) {
 
 // Meta and Pico controllers share this layout: trigger, grip, joystick, thumb rest, X/Y and menu on the
 // left, A/B on the right.
-bool DeviceHasGroup(const std::string& hand, const std::string& group) {
-    static const char* both[] = {"trigger", "squeeze", "thumbstick", "thumbrest", "grip", "aim"};
-    for (const char* g : both) if (group == g) return true;
-    if (hand == "left") return group == "x" || group == "y" || group == "menu";
-    return group == "a" || group == "b";
-}
+bool DeviceHasGroup(const std::string& hand, const std::string& group) { return gp::DeviceHasControl(hand, group); }
 
 // The sub-input the device offers for a source sub-input: true with [out] set ("" meaning the group
 // itself, as the joystick's two-axis value has no sub-input), or false when it has nothing for it.
-bool DeviceSub(const std::string& group, const std::string& sub, std::string& out) {
-    auto pick = [&](const char* value) { out = value; return true; };
-    const bool pico = g_family == Family::Pico;
-    if (group == "trigger") {
-        if (sub == "click") return pick(pico ? "click" : "value");
-        if (sub == "value") return pick("value");
-        if (sub == "touch") return pick("touch");
-        return false;
+bool DeviceSub(const std::string& group, const std::string& sub, std::string& out) { return gp::DeviceSubFor(group, sub, g_family == Family::Pico, out); }
+
+bool IsValveProfile(const std::string& profile) { return profile.find("valve/frame_controller") != std::string::npos; }
+
+// The controls ("hand:group") the game binds in [bindings], the poses left out.
+std::vector<std::string> ControlsOf(XrInstance instance, const std::vector<XrActionSuggestedBinding>& bindings) {
+    std::vector<std::string> keys;
+    for (const XrActionSuggestedBinding& binding : bindings) {
+        Control control;
+        if (!ParseInput(PathText(instance, binding.binding), control) || control.group == "grip" || control.group == "aim") continue;
+        const std::string key = control.hand + ":" + control.group;
+        if (std::find(keys.begin(), keys.end(), key) == keys.end()) keys.push_back(key);
     }
-    if (group == "squeeze") {
-        if (sub == "click") return pick(pico ? "click" : "value");
-        return sub == "value" ? pick("value") : false;
-    }
-    if (group == "thumbstick") {
-        if (sub.empty()) return pick("");
-        return (sub == "x" || sub == "y" || sub == "click" || sub == "touch") ? pick(sub.c_str()) : false;
-    }
-    if (group == "thumbrest") return sub == "touch" ? pick("touch") : false;
-    if (group == "grip" || group == "aim") return sub == "pose" ? pick("pose") : false;
-    // Buttons: a, b, x, y, menu. A float "value" also serves a boolean action (the runtime thresholds it).
-    if (sub == "click" || sub == "value") return pick("click");
-    if (sub == "touch" && group != "menu") return pick("touch");
-    return false;
+    return keys;
 }
 
-// "left:dpad_up=right:a;right:menu=left:menu;left:view=none" -> overrides by source control.
-std::unordered_map<std::string, std::string> ParseOverrides() {
-    std::unordered_map<std::string, std::string> overrides;
-    const char* raw = getenv("GAMEPORT_XR_MAP");
-    if (!raw) return overrides;
-    std::string all = raw;
-    size_t start = 0;
-    while (start < all.size()) {
-        size_t end = all.find(';', start);
-        if (end == std::string::npos) end = all.size();
-        const std::string entry = all.substr(start, end - start);
-        const size_t eq = entry.find('=');
-        if (eq != std::string::npos) overrides[entry.substr(0, eq)] = entry.substr(eq + 1);
-        start = end + 1;
-    }
-    return overrides;
-}
-
-// Where a source control goes: "hand:group", or "" for nowhere.
-std::string TargetFor(const Control& source, const std::unordered_map<std::string, std::string>& overrides, bool useOverrides) {
-    const std::string key = source.hand + ":" + source.group;
-    if (useOverrides) {
-        auto it = overrides.find(key);
-        if (it != overrides.end()) return it->second == "none" ? "" : it->second;
-    }
-    if (DeviceHasGroup(source.hand, source.group)) return key;
-    // The Steam Frame's left D-pad has no equivalent here: up goes to Y and down to X, the buttons above and below it.
-    if (source.hand == "left" && source.group == "dpad_up") return "left:y";
-    if (source.hand == "left" && source.group == "dpad_down") return "left:x";
-    // The Steam Frame has its menu button on the right controller; these controllers only have one, on the left.
-    if (source.hand == "right" && source.group == "menu") return "left:menu";
-    return "";
-}
-
-// Tells GamePort which family the game was translated from and which controls it uses, so the controller
-// page is offered for this game.
-void WriteDetectedControls(const char* source, const std::vector<std::string>& groups) {
+// The folder GamePort reads what the layer leaves for it: the game's own files folder, "gameport" in it.
+std::string GamePortFolder() {
     char cmd[256] = {0};
     FILE* in = fopen("/proc/self/cmdline", "r");
-    if (!in) return;
+    if (!in) return "";
     size_t n = fread(cmd, 1, sizeof(cmd) - 1, in);
     fclose(in);
     cmd[n] = 0;
-    const std::string path = std::string("/storage/emulated/0/Android/data/") + cmd + "/files/gameport/xr_controls.txt";
-    FILE* out = fopen(path.c_str(), "w");
+    return std::string("/storage/emulated/0/Android/data/") + cmd + "/files/gameport/";
+}
+
+std::atomic<uint32_t> g_actionPolls{0};
+std::atomic<uint32_t> g_actionActive{0};
+std::atomic<int64_t> g_firstPollMs{0};
+std::atomic<bool> g_silentChecked{false};
+std::atomic<bool> g_silentMarked{false};
+
+// Counts what the runtime answers when the game asks for the state of its actions. A game whose actions are all inactive after half a minute cannot hear the
+// controllers: a marker is left for GamePort (and taken back if an action ever becomes active).
+void NoteActionAnswer(bool active) {
+    const int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    int64_t zero = 0;
+    g_firstPollMs.compare_exchange_strong(zero, now);
+    const uint32_t polls = g_actionPolls.fetch_add(1) + 1;
+    const uint32_t actives = active ? g_actionActive.fetch_add(1) + 1 : g_actionActive.load();
+    if (active && g_silentMarked.exchange(false)) {
+        LOGI("an action of the game became active: the marker that the game cannot hear the controllers is taken back");
+        remove((GamePortFolder() + "xr_silent.txt").c_str());
+    remove((GamePortFolder() + "xr_stage_fallback.txt").c_str());
+    }
+    const int64_t elapsed = now - g_firstPollMs.load();
+    if (!g_silentChecked.load() && elapsed >= 30000 && !g_silentChecked.exchange(true)) {
+        const bool silent = gp::ActionsLookSilent(polls, actives, elapsed);
+        LOGI("input check after %lld s: %u answers about the game's actions, %u active%s", (long long)(elapsed / 1000), polls, actives,
+             silent ? ": none, the game cannot hear the controllers" : "");
+        if (silent) {
+            FILE* out = fopen((GamePortFolder() + "xr_silent.txt").c_str(), "w");
+            if (out) {
+                fputs("1\n", out);
+                fclose(out);
+                g_silentMarked.store(true);
+            }
+        }
+    }
+}
+
+XrResult XRAPI_CALL Layer_xrGetActionStateBoolean(XrSession session, const XrActionStateGetInfo* info, XrActionStateBoolean* state) {
+    XrResult result = g_getActionBoolean(session, info, state);
+    if (XR_SUCCEEDED(result) && state) NoteActionAnswer(state->isActive == XR_TRUE);
+    return result;
+}
+
+XrResult XRAPI_CALL Layer_xrGetActionStateFloat(XrSession session, const XrActionStateGetInfo* info, XrActionStateFloat* state) {
+    XrResult result = g_getActionFloat(session, info, state);
+    if (XR_SUCCEEDED(result) && state) NoteActionAnswer(state->isActive == XR_TRUE);
+    return result;
+}
+
+// Tells GamePort which family the game was translated from and which controls it uses, so the controller page is offered for this game; and which
+// controls of the device take more than one control of the game. "none" as the family says there is nothing to remap, so an old offer goes. "both":
+// the game has its own controls for the device and the Steam Frame's, and the player may choose the second.
+void WriteDetectedControls(const char* source, const std::vector<std::string>& groups, const std::vector<std::string>& shared) {
+    const std::string folder = GamePortFolder();
+    if (folder.empty()) return;
+    FILE* out = fopen((folder + "xr_controls.txt").c_str(), "w");
     if (!out) return;
     fprintf(out, "source=%s\n", source);
+    // Said every time the file is written, whoever writes it: a file that forgot it would take the choice away from the player.
+    if (g_gameHasBoth.load()) fprintf(out, "both=1\n");
+    for (const auto& s : shared) fprintf(out, "shared=%s\n", s.c_str());
     for (const auto& g : groups) fprintf(out, "%s\n", g.c_str());
     fclose(out);
 }
 
 // Translates the game's bindings for [source] onto the device's primary profile.
 bool EmulateFrom(XrInstance instance, const std::string& sourceProfile, const char* sourceKind, const std::vector<XrActionSuggestedBinding>& given) {
-    const auto overrides = ParseOverrides();
-    std::vector<std::string> detected;
+    const auto overrides = gp::ParseOverrides(getenv("GAMEPORT_XR_MAP"));
     std::string dropped;
     int droppedCount = 0;
+    std::map<std::string, std::vector<std::string>> sharedMap;
+    std::string tableText;  // where each control of the game went, for the log
 
     struct Built { XrActionSuggestedBinding binding; bool crossHand; };
     auto build = [&](bool useOverrides) {
         std::vector<Built> built;
-        detected.clear();
         dropped.clear();
         droppedCount = 0;
+        // The controls that compete for the device's: those the game binds.
+        std::set<std::string> used;
+        for (const XrActionSuggestedBinding& binding : given) {
+            Control control;
+            if (ParseInput(PathText(instance, binding.binding), control) && control.group != "grip" && control.group != "aim") used.insert(control.hand + ":" + control.group);
+        }
+        const auto allocation = gp::Allocate(used, overrides, useOverrides);
+        sharedMap = gp::SharedTargets(allocation);
+        tableText.clear();
+        for (const auto& [source, targets] : allocation) {
+            tableText += " " + source + "->";
+            if (targets.empty()) tableText += "nothing";
+            for (size_t i = 0; i < targets.size(); i++) tableText += (i ? "+" : "") + targets[i];
+        }
         for (const XrActionSuggestedBinding& binding : given) {
             const std::string source = PathText(instance, binding.binding);
-            std::string mapped;
-            bool cross = false;
+            std::vector<std::pair<std::string, bool>> mapped;  // the device's paths for this one, and whether each moves to the other hand
             Control control;
             if (ParseInput(source, control)) {
-                if (control.group != "grip" && control.group != "aim") {
-                    const std::string key = control.hand + ":" + control.group;
-                    if (std::find(detected.begin(), detected.end(), key) == detected.end()) detected.push_back(key);
+                const std::string key = control.hand + ":" + control.group;
+                std::vector<std::string> targets;
+                if (control.group == "grip" || control.group == "aim") {
+                    targets = {key};
+                } else {
+                    auto it = allocation.find(key);
+                    if (it != allocation.end()) targets = it->second;
                 }
-                const std::string target = TargetFor(control, overrides, useOverrides);
-                const size_t colon = target.find(':');
-                if (colon != std::string::npos) {
-                    const std::string thand = target.substr(0, colon), tgroup = target.substr(colon + 1);
-                    std::string tsub;
-                    if (DeviceHasGroup(thand, tgroup) && DeviceSub(tgroup, control.sub, tsub)) {
-                        mapped = "/user/hand/" + thand + "/input/" + tgroup + (tsub.empty() ? "" : "/" + tsub);
-                        cross = thand != control.hand;
-                    }
+                for (const std::string& target : targets) {
+                    std::string thand, tgroup, tsub;
+                    if (!gp::SplitKey(target, thand, tgroup) || !DeviceHasGroup(thand, tgroup) || !DeviceSub(tgroup, control.sub, tsub)) continue;
+                    mapped.push_back({"/user/hand/" + thand + "/input/" + tgroup + (tsub.empty() ? "" : "/" + tsub), thand != control.hand});
                 }
             } else if (source == "/user/hand/left/output/haptic" || source == "/user/hand/right/output/haptic") {
-                mapped = source;
+                mapped.push_back({source, false});
             }
-            XrPath mappedPath = XR_NULL_PATH;
-            if (mapped.empty() || XR_FAILED(g_stringToPath(instance, mapped.c_str(), &mappedPath))) {
-                if (droppedCount++ < 24) dropped += " " + source;
-                continue;
+            bool any = false;
+            for (const auto& [path, cross] : mapped) {
+                XrPath mappedPath = XR_NULL_PATH;
+                if (XR_FAILED(g_stringToPath(instance, path.c_str(), &mappedPath))) continue;
+                any = true;
+                bool duplicate = false;
+                for (const auto& existing : built) if (existing.binding.action == binding.action && existing.binding.binding == mappedPath) duplicate = true;
+                if (!duplicate) built.push_back({{binding.action, mappedPath}, cross});
             }
-            bool duplicate = false;
-            for (const auto& existing : built) if (existing.binding.action == binding.action && existing.binding.binding == mappedPath) duplicate = true;
-            if (!duplicate) built.push_back({{binding.action, mappedPath}, cross});
+            if (!any && droppedCount++ < 24) dropped += " " + source;
         }
         return built;
     };
@@ -598,16 +680,87 @@ bool EmulateFrom(XrInstance instance, const std::string& sourceProfile, const ch
              attempt == 0 ? "with the overrides" : attempt == 1 ? "without moves between hands" : "with the defaults only",
              (unsigned)bindings.size(), (unsigned)given.size(), droppedCount, dropped.c_str(), (int)result);
     }
+    LOGI("%s controls, where each went:%s", sourceKind, tableText.c_str());
+    std::vector<std::string> shared;
+    for (const auto& [device, sources] : sharedMap) {
+        std::string line;
+        for (const auto& s : sources) line += " " + s;
+        LOGI("the device's %s takes %zu controls of the game, so its actions fire together:%s", device.c_str(), sources.size(), line.c_str());
+        shared.push_back(device);
+    }
     static bool reported = false;
     if (!reported) {
         reported = true;
-        WriteDetectedControls(sourceKind, detected);
+        WriteDetectedControls(sourceKind, ControlsOf(instance, given), shared);
     }
     if (XR_SUCCEEDED(result)) {
-        g_stringToPath(instance, sourceProfile.c_str(), &g_emulatedSourcePath);
+        // The game is told the profile with the very handle it used to suggest its bindings: it compares handles, and a name read back or guessed may not be
+        // the one it made (the runtime cannot always give it back).
+        {
+            std::lock_guard<std::mutex> lock(g_mutex);
+            auto known = g_profileHandles.find(sourceProfile);
+            if (known != g_profileHandles.end()) g_emulatedSourcePath = known->second;
+            else g_stringToPath(instance, sourceProfile.c_str(), &g_emulatedSourcePath);
+        }
         g_emulating.store(true);
     }
     return XR_SUCCEEDED(result);
+}
+
+// A runtime may refuse a whole table for the sake of one binding (an action it no longer knows, a path the profile does not have), and the game is then left
+// with no control at all. The bindings are tried one at a time, to find which it refuses, and the others are given together. Only runs after a refusal.
+XrResult SuggestTolerant(XrInstance instance, const XrInteractionProfileSuggestedBinding* suggested, const char* profile) {
+    XrResult whole = g_suggestBindings(instance, suggested);
+    if (XR_SUCCEEDED(whole) || whole == XR_ERROR_PATH_UNSUPPORTED || !suggested || suggested->countSuggestedBindings < 2) return whole;
+    std::vector<XrActionSuggestedBinding> accepted;
+    std::vector<std::string> refused;
+    size_t mended = 0;
+    for (uint32_t i = 0; i < suggested->countSuggestedBindings; i++) {
+        XrInteractionProfileSuggestedBinding one = *suggested;
+        one.countSuggestedBindings = 1;
+        one.suggestedBindings = &suggested->suggestedBindings[i];
+        if (XR_SUCCEEDED(g_suggestBindings(instance, &one))) {
+            accepted.push_back(suggested->suggestedBindings[i]);
+            continue;
+        }
+        const std::string name = PathText(instance, suggested->suggestedBindings[i].binding);
+        // A trigger or a squeeze bound without saying which of its values is the game's slip: it means the analog value.
+        auto endsWith = [&name](const char* tail) { const size_t n = strlen(tail); return name.size() > n && name.compare(name.size() - n, n, tail) == 0; };
+        if (g_stringToPath && (endsWith("/input/trigger") || endsWith("/input/squeeze"))) {
+            XrActionSuggestedBinding fixed = suggested->suggestedBindings[i];
+            one.suggestedBindings = &fixed;
+            if (XR_SUCCEEDED(g_stringToPath(instance, (name + "/value").c_str(), &fixed.binding)) && XR_SUCCEEDED(g_suggestBindings(instance, &one))) {
+                accepted.push_back(fixed);
+                mended++;
+                LOGI("%s has no value named: given as %s/value", name.c_str(), name.c_str());
+                continue;
+            }
+        }
+        refused.push_back(name);
+    }
+    // Nothing accepted alone, or nothing refused or mended: there is no other table to give than the one that was refused.
+    if (accepted.empty() || (refused.empty() && mended == 0)) return whole;
+    XrInteractionProfileSuggestedBinding rest = *suggested;
+    rest.countSuggestedBindings = (uint32_t)accepted.size();
+    rest.suggestedBindings = accepted.data();
+    const XrResult result = g_suggestBindings(instance, &rest);
+    std::string names;
+    for (const std::string& name : refused) names += " " + name;
+    LOGI("the runtime refused the %u bindings of %s (%d); %zu of them are refused one by one:%s, %zu mended; the %zu left are given: %d", suggested->countSuggestedBindings,
+         profile, (int)whole, refused.size(), names.c_str(), mended, accepted.size(), (int)result);
+    return result;
+}
+
+// The game's own bindings for the device's controllers, given to the runtime after all (they were kept back, see Layer_xrSuggestInteractionProfileBindings).
+void ReplayDeviceProfiles(XrInstance instance, const std::unordered_map<std::string, std::vector<XrActionSuggestedBinding>>& stash) {
+    for (const auto& [profile, bindings] : stash) {
+        if (!IsNativeProfile(profile) || bindings.empty()) continue;
+        XrInteractionProfileSuggestedBinding suggestion{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
+        if (XR_FAILED(g_stringToPath(instance, profile.c_str(), &suggestion.interactionProfile))) continue;
+        suggestion.countSuggestedBindings = (uint32_t)bindings.size();
+        suggestion.suggestedBindings = bindings.data();
+        LOGI("kept-back bindings for %s given to the runtime: %u -> %d", profile.c_str(), suggestion.countSuggestedBindings, (int)SuggestTolerant(instance, &suggestion, profile.c_str()));
+    }
 }
 
 // Runs once the game has said everything it knows, right before it attaches its action sets.
@@ -618,12 +771,53 @@ void EmulateIfNeeded(XrInstance instance) {
         std::lock_guard<std::mutex> lock(g_mutex);
         stash = g_stash;
     }
+    // The device's own profile the game has the most bindings for, and the Steam Frame's.
+    std::string native, valve;
     for (const auto& [profile, bindings] : stash) {
-        if (IsNativeProfile(profile)) {
-            LOGI("the game has its own bindings for this device's controllers (%s): nothing to translate", profile.c_str());
-            g_emulating.store(false);
+        if (IsNativeProfile(profile) && (native.empty() || bindings.size() > stash[native].size())) native = profile;
+        if (IsValveProfile(profile) && (valve.empty() || bindings.size() > stash[valve].size())) valve = profile;
+    }
+    if (!native.empty()) {
+        g_emulating.store(false);
+        // The game has controls for the device's controllers: nothing to translate. When it also has the Steam Frame's, the log says how the two compare. Unity
+        // and Unreal make their own actions for each profile (a few shared ones aside), so the Steam Frame's are not missing on the device's: they are
+        // read when that profile is the active one.
+        if (!valve.empty()) {
+            // The player may choose the Steam Frame's controls for this game: the page is offered, and the choice is read from GAMEPORT_XR_PREFER_FRAME.
+            g_gameHasBoth.store(true);
+            static bool offered = false;
+            if (!offered) {
+                offered = true;
+                WriteDetectedControls("valve", ControlsOf(instance, stash[valve]), {});
+            }
+            std::set<XrAction> frameActions;
+            for (const auto& binding : stash[valve]) frameActions.insert(binding.action);
+            std::vector<std::set<XrAction>> deviceTables;
+            for (const auto& [profile, bindings] : stash) {
+                if (!IsNativeProfile(profile)) continue;
+                deviceTables.emplace_back();
+                for (const auto& binding : bindings) deviceTables.back().insert(binding.action);
+            }
+            const gp::Gaps<XrAction> gaps = gp::FindGaps(frameActions, deviceTables);
+            LOGI("the game has bindings for %zu profile(s) of this device's controllers (the richest: %s) and for the Steam Frame's (%s: %zu actions): %zu actions in common, the others are its own to that profile: nothing to translate",
+                 deviceTables.size(), native.c_str(), valve.c_str(), frameActions.size(), gaps.shared);
+        } else {
+            LOGI("the game has its own bindings for this device's controllers (%s): nothing to translate", native.c_str());
+        }
+        if (!valve.empty() && g_preferFrame.load() && EmulateFrom(instance, valve, "valve", stash[valve])) {
+            LOGI("the game uses the Steam Frame's controls, as the player asked");
             return;
         }
+        if (valve.empty()) {
+            static bool reported = false;
+            if (!reported) {
+                reported = true;
+                WriteDetectedControls("none", {}, {});
+            }
+        }
+        // What was kept back for the Steam Frame's controls goes to the runtime after all.
+        if (g_preferFrame.load()) ReplayDeviceProfiles(instance, stash);
+        return;
     }
     // The device's own family first, then the Steam Frame's. The richest suggestion of a family is the source.
     auto richest = [&](const char* const* profiles, size_t count) -> std::string {
@@ -639,23 +833,69 @@ void EmulateIfNeeded(XrInstance instance) {
         const std::string touch = richest(kMetaProfiles, sizeof(kMetaProfiles) / sizeof(*kMetaProfiles));
         if (!touch.empty() && EmulateFrom(instance, touch, "touch", stash[touch])) return;
     }
-    auto valve = stash.find(kValveProfile);
-    if (valve != stash.end()) EmulateFrom(instance, kValveProfile, "valve", valve->second);
+    if (!valve.empty()) EmulateFrom(instance, valve, "valve", stash[valve]);
 }
 
 XrResult XRAPI_CALL Layer_xrSuggestInteractionProfileBindings(XrInstance instance, const XrInteractionProfileSuggestedBinding* suggested) {
     std::string profile;
+    size_t actions = 0;
     if (suggested && g_pathToString) {
         profile = PathText(instance, suggested->interactionProfile);
+        // A runtime that does not know a profile may not give its name back (Unreal games ask for the Steam Frame's that way): its controls tell.
+        if (profile.empty()) {
+            for (uint32_t i = 0; i < suggested->countSuggestedBindings; i++) {
+                if (gp::IsFrameControlPath(PathText(instance, suggested->suggestedBindings[i].binding))) {
+                    profile = "/interaction_profiles/valve/frame_controller_valve";
+                    LOGI("a profile without a name binds controls only the Steam Frame's controllers have: taken for %s", profile.c_str());
+                    break;
+                }
+            }
+        }
+        std::set<XrAction> distinct;
+        for (uint32_t i = 0; i < suggested->countSuggestedBindings; i++) distinct.insert(suggested->suggestedBindings[i].action);
+        actions = distinct.size();
         std::lock_guard<std::mutex> lock(g_mutex);
         g_stash[profile].assign(suggested->suggestedBindings, suggested->suggestedBindings + suggested->countSuggestedBindings);
+        g_profileHandles[profile] = suggested->interactionProfile;
     }
-    XrResult result = g_suggestBindings(instance, suggested);
+    // When the player wants the Steam Frame's controls, the game's own tables for the device's controllers are kept back until it attaches its actions:
+    // if it has the Steam Frame's, these are then given to the runtime on the device's profile, which is the only one it knows, so it is the one in use.
+    if (suggested && g_preferFrame.load() && !profile.empty() && IsNativeProfile(profile)) {
+        LOGI("xrSuggestInteractionProfileBindings(%s, %u bindings, %zu actions) -> kept back", profile.c_str(), suggested->countSuggestedBindings, actions);
+        return XR_SUCCESS;
+    }
+    XrResult result = SuggestTolerant(instance, suggested, profile.c_str());
     if (suggested) {
-        LOGI("xrSuggestInteractionProfileBindings(%s, %u bindings) -> %d", profile.c_str(), suggested->countSuggestedBindings, (int)result);
+        LOGI("xrSuggestInteractionProfileBindings(%s, %u bindings, %zu actions) -> %d", profile.empty() ? "<unnamed profile>" : profile.c_str(),
+             suggested->countSuggestedBindings, actions, (int)result);
     }
     // A profile the device does not have is not an error worth failing the game over: it may be translated later.
     if (result == XR_ERROR_PATH_UNSUPPORTED && g_family != Family::Unknown && !IsNativeProfile(profile)) return XR_SUCCESS;
+    return result;
+}
+
+// Remembers the names of the interaction profiles the game creates, in case the runtime does not give them back.
+XrResult XRAPI_CALL Layer_xrStringToPath(XrInstance instance, const char* pathString, XrPath* path) {
+    if (!g_stringToPath) return XR_ERROR_HANDLE_INVALID;
+    XrResult result = g_stringToPath(instance, pathString, path);
+    if (XR_SUCCEEDED(result) && pathString && path && strncmp(pathString, "/interaction_profiles/", 22) == 0) {
+        std::lock_guard<std::mutex> lock(g_namesMutex);
+        g_pathNames[*path] = pathString;
+    }
+    return result;
+}
+
+// Only watches: the runtime announces a recentering with an event, and what the game does with it is the game's. The first ones are written in the log.
+XrResult XRAPI_CALL Layer_xrPollEvent(XrInstance instance, XrEventDataBuffer* data) {
+    XrResult result = g_pollEvent(instance, data);
+    if (result == XR_SUCCESS && data && data->type == XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING) {
+        const auto* change = reinterpret_cast<const XrEventDataReferenceSpaceChangePending*>(data);
+        static std::atomic<int> logged{0};
+        if (logged.fetch_add(1) < 20) {
+            LOGI("the runtime announces a change of the reference space (type %d, new pose %s): the game is to recenter on it", (int)change->referenceSpaceType,
+                 change->poseValid ? "given" : "not given");
+        }
+    }
     return result;
 }
 
@@ -667,8 +907,15 @@ XrResult XRAPI_CALL Layer_xrAttachSessionActionSets(XrSession session, const XrS
 // While a translation is on, the game is told that the profile it knows is the one in use.
 XrResult XRAPI_CALL Layer_xrGetCurrentInteractionProfile(XrSession session, XrPath userPath, XrInteractionProfileState* state) {
     XrResult result = g_getCurrentProfile(session, userPath, state);
+    static std::atomic<int> logged{0};
+    const bool log = logged.fetch_add(1) < 8;
     if (XR_SUCCEEDED(result) && state && g_emulating.load() && state->interactionProfile != XR_NULL_PATH) {
-        if (IsNativeProfile(PathText(g_instance, state->interactionProfile))) state->interactionProfile = g_emulatedSourcePath;
+        const std::string actual = PathText(g_instance, state->interactionProfile);
+        const bool replaced = IsNativeProfile(actual);
+        if (replaced) state->interactionProfile = g_emulatedSourcePath;
+        if (log) LOGI("the game asks which controllers are in use (%s): the runtime says %s, the game is told %s", PathText(g_instance, userPath).c_str(), actual.c_str(), replaced ? "the Steam Frame's" : "the same");
+    } else if (log && state) {
+        LOGI("the game asks which controllers are in use (%s): %s", PathText(g_instance, userPath).c_str(), g_emulating.load() ? "no profile yet" : "left as the runtime says");
     }
     return result;
 }
@@ -695,6 +942,10 @@ XrResult XRAPI_CALL Layer_xrGetInstanceProcAddr(XrInstance instance, const char*
         {"xrGetCurrentInteractionProfile", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrGetCurrentInteractionProfile)},
         {"xrAttachSessionActionSets", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrAttachSessionActionSets)},
         {"xrSuggestInteractionProfileBindings", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrSuggestInteractionProfileBindings)},
+        {"xrPollEvent", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrPollEvent)},
+        {"xrStringToPath", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrStringToPath)},
+        {"xrGetActionStateBoolean", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrGetActionStateBoolean)},
+        {"xrGetActionStateFloat", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrGetActionStateFloat)},
     };
     if (name) {
         for (const Entry& entry : entries) {
@@ -744,6 +995,12 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
     Load("xrGetCurrentInteractionProfile", g_getCurrentProfile);
     Load("xrEnumerateViewConfigurationViews", g_enumerateViews);
     Load("xrAttachSessionActionSets", g_attachActionSets);
+    Load("xrPollEvent", g_pollEvent);
+    Load("xrGetReferenceSpaceBoundsRect", g_getBounds);
+    Load("xrGetActionStateBoolean", g_getActionBoolean);
+    Load("xrGetActionStateFloat", g_getActionFloat);
+    // A new run starts without the mark of the last one.
+    remove((GamePortFolder() + "xr_silent.txt").c_str());
     Load("xrGetInstanceProperties", g_getInstanceProperties);
 
     // Which controllers this device has: GamePort says (its VrPlatform), else the runtime's name tells.
@@ -759,6 +1016,12 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
     g_family = familyOf(said ? Lower(said) : "");
     if (g_family == Family::Unknown) g_family = familyOf(runtime);
     LOGI("controller family %d (GamePort said '%s', runtime '%s')", (int)g_family, said ? said : "", runtime.c_str());
+    const char* prefer = getenv("GAMEPORT_XR_PREFER_FRAME");
+    g_preferFrame = prefer && strcmp(prefer, "1") == 0;
+    const char* floor = getenv("GAMEPORT_XR_LOCAL_FLOOR");
+    g_recenterMode = floor && (strcmp(floor, "on") == 0 || strcmp(floor, "1") == 0) ? 1 : (floor && strcmp(floor, "off") == 0 ? 2 : 0);
+    if (g_recenterMode.load() != 0) LOGI("recentering of the headset: %s, as the player chose", g_recenterMode.load() == 1 ? "followed" : "left to the game");
+    if (g_preferFrame) LOGI("the player asked for the Steam Frame's controls where the game has them");
 
     const char* seated = getenv("GAMEPORT_XR_SEATED");
     const char* eye = getenv("GAMEPORT_XR_EYE_CM");
