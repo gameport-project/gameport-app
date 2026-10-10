@@ -34,11 +34,14 @@ fun PillTabs(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    /** A lower bar, with a smaller text, where the page has little room. */
+    height: androidx.compose.ui.unit.Dp = TAB_HEIGHT,
+    textStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.labelLarge,
 ) {
     val shape = RoundedCornerShape(50)
     BoxWithConstraints(
         modifier
-            .height(TAB_HEIGHT)
+            .height(height)
             .clip(shape)
             .background(Color.White.copy(alpha = 0.10f))
             .border(1.dp, Color.White.copy(alpha = 0.14f), shape),
@@ -50,7 +53,7 @@ fun PillTabs(
                 .offset(x = indicatorOffset)
                 .width(tabWidth)
                 .fillMaxHeight()
-                .padding(4.dp)
+                .padding(if (height < TAB_HEIGHT) 3.dp else 4.dp)
                 .clip(shape)
                 .background(Color.White.copy(alpha = 0.92f)),
         )
@@ -64,7 +67,7 @@ fun PillTabs(
                     Modifier.width(tabWidth).fillMaxHeight().clip(shape).clickable { onSelect(index) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(text = label, color = color, style = MaterialTheme.typography.labelLarge)
+                    Text(text = label, color = color, style = textStyle, maxLines = 1)
                 }
             }
         }

@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 
@@ -48,16 +49,26 @@ fun GlassChip(
     leading: (@Composable () -> Unit)? = null,
     /** Room above and below the label; less makes a chip that fits in a line of text. */
     verticalPadding: androidx.compose.ui.unit.Dp = 6.dp,
+    /** The size of the label; a smaller style makes a smaller chip. */
+    textStyle: androidx.compose.ui.text.TextStyle = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+    horizontalPadding: androidx.compose.ui.unit.Dp = 12.dp,
+    /** An opaque fill, for a chip over a picture, where a see-through one is hard to read. */
+    solid: Boolean = false,
 ) {
     val shape = androidx.compose.foundation.shape.RoundedCornerShape(50)
     androidx.compose.foundation.layout.Box(
         modifier
             .then(
-                if (accent == null) Modifier.glass(shape)
+                if (solid) {
+                    val base = Color(0xFF14181D)
+                    val fill = (accent?.copy(alpha = 0.30f) ?: Color.White.copy(alpha = 0.14f)).compositeOver(base)
+                    Modifier.clip(shape).background(fill).border(1.dp, accent?.copy(alpha = 0.7f) ?: Color.White.copy(alpha = 0.25f), shape)
+                } else if (accent == null) Modifier.glass(shape)
                 else Modifier.clip(shape).background(accent.copy(alpha = 0.22f)).border(1.dp, accent.copy(alpha = 0.65f), shape),
             )
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 12.dp, vertical = verticalPadding),
+            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+        contentAlignment = androidx.compose.ui.Alignment.Center,
     ) {
         // The eye centres on the capitals, which sit a little above the middle of the line of text: the icon is moved to where they are.
         var lift by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
@@ -72,7 +83,7 @@ fun GlassChip(
             androidx.compose.material3.Text(
                 label,
                 color = contentColor,
-                style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+                style = textStyle,
                 onTextLayout = { layout ->
                     val capitals = with(density) { layout.layoutInput.style.fontSize.toPx() } * CAPITAL_HEIGHT_SHARE
                     val middleOfCapitals = layout.getLineBaseline(0) - capitals / 2

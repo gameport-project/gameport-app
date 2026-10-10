@@ -12,4 +12,5 @@ dependencies {
     api(libs.coil.compose)
     api(libs.androidx.compose.material.icons.extended)
     implementation(libs.coil.network.okhttp)
+    implementation(libs.androidx.activity.compose)
 }
