@@ -4,6 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/gameport-project/gameport-app?label=release)](https://github.com/gameport-project/gameport-app/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/gameport-project/gameport-app/total?label=downloads)](https://github.com/gameport-project/gameport-app/releases)
 [![Stars](https://img.shields.io/github/stars/gameport-project/gameport-app?style=flat&label=stars)](https://github.com/gameport-project/gameport-app/stargazers)
+[![Discord](https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&logoColor=white)](https://discord.gg/yWXXAC2AKc)
 
 **Your Steam games for Steam Frame, on your Quest, Pico or any Android device.**
 
@@ -77,6 +78,12 @@ Open the game's page and press the bug button, or the **Report a problem** butto
 - **Nothing is sent by GamePort.** You choose what to do with the file: attach it to a [ticket](https://github.com/gameport-project/gameport-app/issues/new?template=game-problem.md), or send it to the developers by any means.
 - **Your identity stays out.** Account numbers, e-mail addresses, network addresses and your account name are removed from the text files. The crash report Android keeps, when there is one, is a binary file and is not filtered.
 - **It cleans up after itself.** What GamePort keeps for reports is deleted after a week, and when the game is uninstalled. The zips you saved are yours and are never touched.
+
+## Join the community
+
+A friendly place to ask for help, share which games run well on your device, follow new releases and suggest ideas. GamePort lives there together with the Decky plugins and the other small projects of the same author.
+
+[![Discord](https://img.shields.io/badge/Discord-Join%20the%20Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/yWXXAC2AKc)
 
 ## Your privacy
 

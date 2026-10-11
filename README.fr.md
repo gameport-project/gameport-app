@@ -4,6 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/gameport-project/gameport-app?label=release)](https://github.com/gameport-project/gameport-app/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/gameport-project/gameport-app/total?label=downloads)](https://github.com/gameport-project/gameport-app/releases)
 [![Stars](https://img.shields.io/github/stars/gameport-project/gameport-app?style=flat&label=stars)](https://github.com/gameport-project/gameport-app/stargazers)
+[![Discord](https://img.shields.io/badge/Discord-Rejoindre%20la%20communaut%C3%A9-5865F2?logo=discord&logoColor=white)](https://discord.gg/yWXXAC2AKc)
 
 **Tes jeux Steam Frame sur ton Quest, ton Pico ou n'importe quel appareil Android.**
 
@@ -77,6 +78,12 @@ Ouvre la page du jeu et appuie sur le bouton bug, ou sur **Signaler un problème
 - **GamePort n'envoie rien.** Tu choisis quoi faire du fichier : le joindre à un [ticket](https://github.com/gameport-project/gameport-app/issues/new?template=game-problem.md), ou l'envoyer aux développeurs par n'importe quel moyen.
 - **Ton identité reste dehors.** Les numéros de compte, les adresses e-mail, les adresses réseau et le nom de ton compte sont retirés des fichiers texte. Le rapport de plantage gardé par Android, quand il y en a un, est un fichier binaire et n'est pas filtré.
 - **Il fait le ménage.** Ce que GamePort garde pour les rapports est supprimé après une semaine, et quand le jeu est désinstallé. Les zips que tu as enregistrés t'appartiennent et ne sont jamais touchés.
+
+## Rejoindre la communauté
+
+Un endroit sympa pour demander de l'aide, dire quels jeux tournent bien sur ton appareil, suivre les nouvelles versions et proposer des idées. GamePort y côtoie les plugins Decky et les autres petits projets du même auteur.
+
+[![Discord](https://img.shields.io/badge/Discord-Rejoindre%20le%20Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/yWXXAC2AKc)
 
 ## Ta vie privée
 
