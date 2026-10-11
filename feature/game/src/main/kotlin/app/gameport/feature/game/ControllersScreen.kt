@@ -86,7 +86,8 @@ fun ControllersScreen(onBack: () -> Unit, viewModel: ControllersViewModel = hilt
             onDismissRequest = { capturing = null },
             title = { Text(stringResource(R.string.controllers_choose_title, controlLabel(source.group))) },
             text = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
+                // No scrolling of its own: the dialog already scrolls its text, and a scrolling column inside it is measured without a limit, which crashes.
+                Column {
                     Text(stringResource(R.string.controllers_choose_hint), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     ControllerLayout.targets.forEach { target ->
                         Row(
