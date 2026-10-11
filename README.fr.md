@@ -11,6 +11,7 @@ GamePort est une appli gratuite et open source. Elle se connecte à ton compte S
 
 <p align="center">
   <a href="https://discord.gg/yWXXAC2AKc"><img alt="Rejoindre le Discord" src="https://img.shields.io/badge/Rejoindre%20le%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white"></a>
+  <a href="https://gameport-project.github.io/"><img alt="Voir les jeux" src="https://img.shields.io/badge/Voir%20les%20jeux-3C4C7A?style=for-the-badge&logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cGF0aCBkPSJNMzQ4LjIsMTczIEExMjQsMTI0IDAgMSAwIDM4MCwyNTYgTDI3MiwyNTYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSI0OCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8%2BPHBhdGggZD0iTTE5NCwyMTQgTDE5NCwyOTggUTE5NCwzMTIgMjA2LDMwNSBMMjcyLDI2MyBRMjgyLDI1NiAyNzIsMjQ5IEwyMDYsMjA3IFExOTQsMjAwIDE5NCwyMTQgWiIgZmlsbD0iI2ZmZiIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjgiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4%3D"></a>
 </p>
 
 > GamePort est un projet communautaire indépendant. Il n'est ni créé par Valve, Meta ou Pico, ni affilié à eux.
@@ -31,6 +32,8 @@ Tous les jeux Steam qui ont une version Android, au même endroit, avec ce qu'il
 - **Ce que disent les joueurs sur ton appareil**, et les verdicts de Valve pour la Steam Frame et le Steam Deck, à côté des langues (texte, voix, sous-titres) comme Steam les montre.
 - **Des filtres qui tiennent sur deux lignes.** VR ou plat, installable ou à venir, possédé ou non, compatible ou non ; puis les langues et les genres, et huit façons de trier : nom, note, sortie, prix, remise.
 - **Une rangée des jeux en promotion que tu ne possèdes pas**, et les nouvelles versions Android de la semaine sur l'accueil.
+
+La liste de ces jeux est aussi sur le site, à consulter depuis n'importe quel ordinateur ou téléphone : [tous les jeux qui ont une version Android, avec ce que les joueurs rapportent pour chaque type d'appareil](https://gameport-project.github.io/).
 
 <table>
 <tr><td width="50%"><img src="docs/screenshots/store.png" alt="La liste des jeux Android : les filtres, une rangée des jeux en promotion, et les jeux avec leur prix" width="100%"></td><td width="50%"><img src="docs/screenshots/store-game.png" alt="La page d'un jeu dans le store : son prix, le plus bas relevé, la dernière promotion, et si ça vaut le coup" width="100%"></td></tr>

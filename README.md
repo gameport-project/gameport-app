@@ -11,6 +11,7 @@ GamePort is a free, open-source app that signs in to your Steam account, shows t
 
 <p align="center">
   <a href="https://discord.gg/yWXXAC2AKc"><img alt="Join the Discord" src="https://img.shields.io/badge/Join%20the%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white"></a>
+  <a href="https://gameport-project.github.io/"><img alt="Browse the games" src="https://img.shields.io/badge/Browse%20the%20games-3C4C7A?style=for-the-badge&logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cGF0aCBkPSJNMzQ4LjIsMTczIEExMjQsMTI0IDAgMSAwIDM4MCwyNTYgTDI3MiwyNTYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSI0OCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8%2BPHBhdGggZD0iTTE5NCwyMTQgTDE5NCwyOTggUTE5NCwzMTIgMjA2LDMwNSBMMjcyLDI2MyBRMjgyLDI1NiAyNzIsMjQ5IEwyMDYsMjA3IFExOTQsMjAwIDE5NCwyMTQgWiIgZmlsbD0iI2ZmZiIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjgiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4%3D"></a>
 </p>
 
 > GamePort is an independent community project. It is not made by, or affiliated with, Valve, Meta or Pico.
@@ -31,6 +32,8 @@ Every Steam game that has an Android version, in one place, with what you need t
 - **What players say of it on your device**, and Valve's own verdicts for Steam Frame and Steam Deck, next to the languages (text, voices, subtitles) as Steam shows them.
 - **Filters that fit on two lines.** VR or flat, installable or coming, owned or not, compatible or not; then languages and genres, and eight ways to sort: by name, rating, release, price, discount.
 - **A row of the games on sale that you do not own**, and the new Android versions of the week on the home.
+
+The list of these games is also on the website, to browse from any computer or phone: [every game that has an Android version, with what players report for each kind of device](https://gameport-project.github.io/).
 
 <table>
 <tr><td width="50%"><img src="docs/screenshots/store.png" alt="The list of the Android games: filters, a row of the games on sale, and the games with their price" width="100%"></td><td width="50%"><img src="docs/screenshots/store-game.png" alt="The page of a game in the store: its price, the lowest price seen, the last sale, and whether it is worth it" width="100%"></td></tr>
