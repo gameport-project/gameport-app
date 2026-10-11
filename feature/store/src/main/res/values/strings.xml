@@ -65,6 +65,13 @@
     <string name="store_language_subtitles">Subtitles</string>
     <string name="store_pick_languages">Any language</string>
     <string name="store_pick_genres">Any genre</string>
+    <string name="store_group_types">Type</string>
+    <string name="store_pick_types">Any type</string>
+    <string name="store_type_game">Games</string>
+    <string name="store_type_demo">Demos</string>
+    <string name="store_type_beta">Betas</string>
+    <string name="store_type_application">Applications</string>
+    <string name="store_type_other">Other</string>
     <string name="store_reset">Reset</string>
     <string name="store_keep">Keep these filters</string>
     <string name="store_kept">Filters kept</string>

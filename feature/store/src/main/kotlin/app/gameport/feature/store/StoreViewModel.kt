@@ -75,6 +75,8 @@ sealed interface StoreUiState {
         /** The languages the games have, for the list the filter looks at. */
         val languageOptions: List<LanguageOption>,
         val tagOptions: List<TagOption>,
+        /** The kinds of app the catalog holds (games, demos, betas, applications), for the filter. */
+        val typeOptions: List<TypeOption> = emptyList(),
     ) : StoreUiState
 }
 
@@ -151,6 +153,7 @@ class StoreViewModel @Inject constructor(
             coverWidth = userSettings.display.value.coverSize.dp,
             languageOptions = languageOptions(forDevice, chosen.languageKind),
             tagOptions = tagOptions(forDevice, nameOf),
+            typeOptions = typeOptions(forDevice),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), StoreUiState.Loading)
 
@@ -180,6 +183,8 @@ class StoreViewModel @Inject constructor(
     fun onLanguageToggled(code: String) = filters.update { it.withLanguage(code) }
 
     fun onTagToggled(tagId: Int) = filters.update { it.withTag(tagId) }
+
+    fun onTypeToggled(type: String) = filters.update { it.withType(type) }
 
     /** The list button: 2 columns, then 3, then 4, then 2 again. */
     fun onListColumnsToggled() {

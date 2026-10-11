@@ -22,9 +22,10 @@ class StoreFiltersTest {
         audio: List<String> = emptyList(),
         subtitles: List<String> = emptyList(),
         tags: List<Int> = emptyList(),
+        type: String = "game",
     ) = AndroidApp(
         appid = id, name = name, vr = vr, installable = installable, android = if (installable) "ready" else "unreleased", androidSince = since,
-        reviewPercent = review, developer = listOfNotNull(developer), languages = languages, audio = audio, subtitles = subtitles, tags = tags,
+        reviewPercent = review, developer = listOfNotNull(developer), languages = languages, audio = audio, subtitles = subtitles, tags = tags, type = type,
     )
 
     private val apps = listOf(
@@ -104,6 +105,46 @@ class StoreFiltersTest {
     fun `what narrows the list is counted, the languages as one and the tags as one`() {
         assertEquals(0, StoreFilters().activeCount)
         assertEquals(4, StoreFilters(quick = setOf(StoreFilter.VR, StoreFilter.NEW), languages = setOf("fr", "en"), tags = setOf(1, 2, 3)).activeCount)
+    }
+
+    @Test
+    fun `the types narrow the list to any one of those chosen, and none chosen is every type`() {
+        val mixed = listOf(app(1, "A game"), app(2, "A demo", type = "demo"), app(3, "A beta", type = "beta"), app(4, "A tool", type = "application"))
+        fun ids(types: Set<String>) = storeList(mixed, "", StoreFilters(types = types), emptySet(), today, true).map { it.appid }.sorted()
+        assertEquals(listOf(1, 2, 3, 4), ids(emptySet()))
+        assertEquals(listOf(2), ids(setOf("demo")))
+        assertEquals(listOf(2, 3), ids(setOf("demo", "beta")))
+        assertEquals(listOf(1, 4), ids(setOf("game", "application")))
+        // Other filters still apply on top.
+        assertEquals(listOf(3), storeList(mixed, "beta", StoreFilters(types = setOf("demo", "beta")), emptySet(), today, true).map { it.appid })
+    }
+
+    @Test
+    fun `a type is toggled on and off, and counts as one narrowing filter`() {
+        val on = StoreFilters().withType("demo").withType("beta")
+        assertEquals(setOf("demo", "beta"), on.types)
+        assertEquals(1, on.activeCount)
+        assertEquals(setOf("beta"), on.withType("demo").types)
+        assertEquals(false, on.isEmpty)
+        assertEquals(true, StoreFilters().withType("demo").withType("demo").isEmpty)
+    }
+
+    @Test
+    fun `the type options are every kind, games first, with their counts and zero for a kind the catalog does not hold yet`() {
+        val mixed = listOf(app(1, type = "demo"), app(2), app(3, type = "demo"), app(4, type = "application"), app(5, type = "newkind"), app(6, type = "beta"))
+        assertEquals(
+            listOf(TypeOption("game", 1), TypeOption("demo", 2), TypeOption("beta", 1), TypeOption("application", 1), TypeOption("newkind", 1)),
+            typeOptions(mixed),
+        )
+        assertEquals(listOf(TypeOption("game", 2), TypeOption("demo", 0), TypeOption("beta", 0), TypeOption("application", 0)), typeOptions(listOf(app(1), app(2))))
+    }
+
+    @Test
+    fun `the types kept are read back, and what an earlier version kept has none`() {
+        val filters = StoreFilters(setOf(StoreFilter.VR), LanguageKind.TEXT, setOf("fr"), setOf(19), setOf("demo", "beta"))
+        assertEquals(filters, StoreFilters.decode(filters.encode()))
+        assertEquals(StoreFilters(quick = setOf(StoreFilter.VR), languages = setOf("fr"), tags = setOf(19)), StoreFilters.decode("VR|TEXT|fr|19"))
+        assertEquals(setOf("demo"), StoreFilters.decode("|TEXT|||demo,unknown,").types)
     }
 
     @Test

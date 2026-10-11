@@ -65,6 +65,13 @@
     <string name="store_language_subtitles">Sous-titres</string>
     <string name="store_pick_languages">Toutes les langues</string>
     <string name="store_pick_genres">Tous les genres</string>
+    <string name="store_group_types">Type</string>
+    <string name="store_pick_types">Tous les types</string>
+    <string name="store_type_game">Jeux</string>
+    <string name="store_type_demo">Démos</string>
+    <string name="store_type_beta">Bêtas</string>
+    <string name="store_type_application">Applications</string>
+    <string name="store_type_other">Autres</string>
     <string name="store_reset">Réinitialiser</string>
     <string name="store_keep">Conserver ces filtres</string>
     <string name="store_kept">Filtres conservés</string>

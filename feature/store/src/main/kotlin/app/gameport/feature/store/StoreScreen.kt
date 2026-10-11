@@ -629,6 +629,14 @@ private fun FilterPanel(open: Boolean, state: StoreUiState.Content, viewModel: S
                 )
             }
         }
+        PanelGroup(stringResource(R.string.store_group_types)) {
+            MultiSelect(
+                placeholder = stringResource(R.string.store_pick_types),
+                options = state.typeOptions.map { Option(it.type, "${typeName(it.type)} (${it.games})", typeName(it.type)) },
+                selected = state.filters.types,
+                onToggle = viewModel::onTypeToggled,
+            )
+        }
         PanelGroup(stringResource(R.string.store_group_genres)) {
             MultiSelect(
                 placeholder = stringResource(R.string.store_pick_genres),
@@ -639,6 +647,18 @@ private fun FilterPanel(open: Boolean, state: StoreUiState.Content, viewModel: S
         }
     }
 }
+
+/** The name of a kind of app, in the plural, in the language of the device. */
+@Composable
+private fun typeName(type: String): String = stringResource(
+    when (type) {
+        "game" -> R.string.store_type_game
+        "demo" -> R.string.store_type_demo
+        "beta" -> R.string.store_type_beta
+        "application" -> R.string.store_type_application
+        else -> R.string.store_type_other
+    },
+)
 
 /** A choice of a dropdown: the key it stands for, the line it has in the list, and the short name it has in the summary. */
 private data class Option(val key: String, val line: String, val short: String)

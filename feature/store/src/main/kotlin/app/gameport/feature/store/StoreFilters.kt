@@ -51,11 +51,13 @@ data class StoreFilters(
     val languageKind: LanguageKind = LanguageKind.TEXT,
     val languages: Set<String> = emptySet(),
     val tags: Set<Int> = emptySet(),
+    /** The kinds of app the list is limited to (game, demo, beta, application): an app passes with any one of those chosen. */
+    val types: Set<String> = emptySet(),
 ) {
-    val isEmpty: Boolean get() = quick.isEmpty() && languages.isEmpty() && tags.isEmpty()
+    val isEmpty: Boolean get() = quick.isEmpty() && languages.isEmpty() && tags.isEmpty() && types.isEmpty()
 
-    /** How many things are narrowing the list: each quick filter, the languages as one, the tags as one. */
-    val activeCount: Int get() = quick.size + (if (languages.isEmpty()) 0 else 1) + (if (tags.isEmpty()) 0 else 1)
+    /** How many things are narrowing the list: each quick filter, the languages as one, the tags as one, the types as one. */
+    val activeCount: Int get() = quick.size + (if (languages.isEmpty()) 0 else 1) + (if (tags.isEmpty()) 0 else 1) + (if (types.isEmpty()) 0 else 1)
 
     /** After touching a quick filter: one touched again goes off; one that turns on takes off the one it excludes. */
     fun toggled(filter: StoreFilter): StoreFilters = copy(quick = if (filter in quick) quick - filter else (quick - filter.excludes()) + filter)
@@ -64,24 +66,31 @@ data class StoreFilters(
 
     fun withTag(tagId: Int): StoreFilters = copy(tags = tags.toggled(tagId))
 
+    fun withType(type: String): StoreFilters = copy(types = types.toggled(type))
+
     /** Written as one line, to be kept on the device. */
-    fun encode(): String = listOf(quick.joinToString(",") { it.name }, languageKind.name, languages.sorted().joinToString(","), tags.sorted().joinToString(",")).joinToString("|")
+    fun encode(): String = listOf(quick.joinToString(",") { it.name }, languageKind.name, languages.sorted().joinToString(","), tags.sorted().joinToString(","), types.sorted().joinToString(",")).joinToString("|")
 
     companion object {
         /** The filters written by [encode]; the default ones for anything else. */
         fun decode(text: String?): StoreFilters {
             val parts = text.orEmpty().split('|')
-            if (parts.size != 4) return StoreFilters()
+            // Four parts: what an earlier version kept, with no types.
+            if (parts.size != 4 && parts.size != 5) return StoreFilters()
             fun <T> list(part: String, read: (String) -> T?) = part.split(',').filter { it.isNotBlank() }.mapNotNull(read).toSet()
             return StoreFilters(
                 quick = list(parts[0]) { name -> StoreFilter.entries.firstOrNull { it.name == name } },
                 languageKind = LanguageKind.entries.firstOrNull { it.name == parts[1] } ?: LanguageKind.TEXT,
                 languages = list(parts[2]) { it },
                 tags = list(parts[3]) { it.toIntOrNull() },
+                types = if (parts.size == 5) list(parts[4]) { it.takeIf { type -> type in KNOWN_TYPES } } else emptySet(),
             )
         }
     }
 }
+
+/** The kinds of app the catalog lists, in the order the filter shows them. */
+internal val KNOWN_TYPES = listOf("game", "demo", "beta", "application")
 
 private fun <T> Set<T>.toggled(item: T): Set<T> = if (item in this) this - item else this + item
 
@@ -142,6 +151,7 @@ internal fun storeList(
         }
         .filter { filters.languages.isEmpty() || app(it, filters).any { code -> code in filters.languages } }
         .filter { filters.tags.isEmpty() || it.tags.any { tag -> tag in filters.tags } }
+        .filter { filters.types.isEmpty() || it.type in filters.types }
         .sortedWith(
             compareByDescending<AndroidApp> { it.appid in newIds }
                 .thenByDescending { it.arrival }
@@ -182,6 +192,18 @@ data class TagOption(val id: Int, val name: String, val games: Int)
 /** The languages of the games for the list [kind] names, the most common first. */
 internal fun languageOptions(apps: List<AndroidApp>, kind: LanguageKind): List<LanguageOption> =
     apps.flatMap { it.languagesOf(kind).distinct() }.groupingBy { it }.eachCount().map { LanguageOption(it.key, it.value) }.sortedWith(compareByDescending<LanguageOption> { it.games }.thenBy { it.code })
+
+/** A kind of app the filter offers, with the number of apps of that kind. */
+data class TypeOption(val type: String, val games: Int)
+
+/**
+ * Every kind of app, in the order of [KNOWN_TYPES] with the count of each (zero when the catalog has none yet, so the choice is always there); a kind the
+ * catalog gains later comes last.
+ */
+internal fun typeOptions(apps: List<AndroidApp>): List<TypeOption> {
+    val counts = apps.groupingBy { it.type }.eachCount()
+    return (KNOWN_TYPES + counts.keys.filter { it !in KNOWN_TYPES }.sorted()).map { TypeOption(it, counts[it] ?: 0) }
+}
 
 /** The tags of the games that have a name, the most common first. */
 internal fun tagOptions(apps: List<AndroidApp>, nameOf: (Int) -> String?): List<TagOption> =
