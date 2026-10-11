@@ -18,6 +18,10 @@ import app.gameport.feature.auth.AuthRoute
 import app.gameport.feature.auth.authScreen
 import app.gameport.feature.compat.CompatRoute
 import app.gameport.feature.compat.compatScreen
+import app.gameport.feature.store.StoreGameRoute
+import app.gameport.feature.store.StoreRoute
+import app.gameport.feature.store.storeGameScreen
+import app.gameport.feature.store.storeScreen
 import app.gameport.feature.downloads.DownloadsRoute
 import app.gameport.feature.downloads.downloadsScreen
 import app.gameport.feature.game.gameScreen
@@ -78,8 +82,12 @@ private fun GamePortContent(viewModel: AppViewModel) {
             onOpenSteamSettings = { navController.navigate(SettingsRoute(account = true)) },
             onOpenGameSettings = navController::navigateToGameSettings,
             onOpenCompat = { navController.navigate(CompatRoute) },
+            onOpenStore = { navController.navigate(StoreRoute) },
+            onOpenStoreGame = { navController.navigate(StoreGameRoute(it)) },
         )
-        compatScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame)
+        compatScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame, onUnownedClick = { navController.navigate(StoreGameRoute(it)) })
+        storeScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame, onStoreGame = { navController.navigate(StoreGameRoute(it)) })
+        storeGameScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame)
         settingsScreen(onBack = navController::goBack)
         downloadsScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame)
         gameScreen(onBack = navController::goBack, onOpenSettings = navController::navigateToGameSettings, onOpenSaves = navController::navigateToGameSaves, onOpenControllers = navController::navigateToGameControllers, onOpenCompat = navController::navigateToGameCompat, onOpenAchievements = navController::navigateToGameAchievements, onOpenSteamSettings = { navController.navigate(SettingsRoute(account = true)) })
