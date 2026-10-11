@@ -22,8 +22,8 @@ class StoreFilterStore @Inject constructor(@ApplicationContext context: Context)
 
     fun setViewMode(mode: StoreViewMode) = prefs.edit().putString(VIEW, mode.name).apply()
 
-    /** How many games a row of the list holds, 2 to 4. */
-    fun listColumns(): Int = prefs.getInt(COLUMNS, 2).coerceIn(2, 4)
+    /** How many games a row of the list holds, 2 to 4: four until the player chooses otherwise. */
+    fun listColumns(): Int = prefs.getInt(COLUMNS, 4).coerceIn(2, 4)
 
     fun setListColumns(count: Int) = prefs.edit().putInt(COLUMNS, count.coerceIn(2, 4)).apply()
 

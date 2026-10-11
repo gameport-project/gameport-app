@@ -58,6 +58,7 @@ import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.Button
@@ -220,6 +221,10 @@ fun StoreScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, onStoreGame: (In
                                             onPointed = { app, on -> if (on) pointed = app else if (pointed?.appid == app.appid) pointed = null },
                                             onOpen = onStoreGame,
                                         )
+                                    }
+                                    // The list has its own title under the sales, so the two read as two things.
+                                    item(key = "all-games", span = { GridItemSpan(maxLineSpan) }) {
+                                        Text(stringResource(R.string.store_all_games), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 10.dp))
                                     }
                                 }
                                 items(current.apps, key = { it.appid }) { app ->
@@ -540,8 +545,12 @@ private fun GameRow(app: AndroidApp, owned: Boolean, isNew: Boolean, level: Comp
 /** The games on sale that the account does not have, as a low row of cards above the list. */
 @Composable
 private fun PromoRail(apps: List<AndroidApp>, prices: Map<Int, StorePrice>, levels: Map<Int, CompatLevel>, deviceKind: String, onPointed: (AndroidApp, Boolean) -> Unit, onOpen: (Int) -> Unit) {
-    Column(Modifier.padding(bottom = 4.dp)) {
-        Text(stringResource(R.string.store_promos), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+    // The sales have their own title and their own row, with nothing behind them.
+    Column(Modifier.padding(bottom = 4.dp).fillMaxWidth()) {
+        Row(Modifier.padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.LocalOffer, contentDescription = null, tint = Mint, modifier = Modifier.size(18.dp))
+            Text(stringResource(R.string.store_promos), style = MaterialTheme.typography.titleMedium)
+        }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(apps, key = { it.appid }) { app ->
                 val shape = RoundedCornerShape(14.dp)

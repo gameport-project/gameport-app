@@ -398,7 +398,7 @@ private fun Stat(label: Int, value: String, fine: String?, dot: Color?) {
 private fun Fact(label: Int, value: String?) {
     if (value == null) return
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(stringResource(label), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(170.dp), softWrap = false)
+        Text(stringResource(label), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(215.dp), softWrap = false)
         Text(value, modifier = Modifier.weight(1f))
     }
 }

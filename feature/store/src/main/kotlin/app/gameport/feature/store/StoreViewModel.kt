@@ -65,7 +65,7 @@ sealed interface StoreUiState {
         val backdropStrength: Int = 50,
         val viewMode: StoreViewMode,
         /** How many games a row of the list holds, 2 to 4. */
-        val listColumns: Int = 2,
+        val listColumns: Int = 4,
         /** How the list is ordered. */
         val sort: StoreSort = StoreSort.DEFAULT,
         /** What Steam sells the games for now in the country of the device, from the history the catalog keeps. */

@@ -110,4 +110,5 @@
     <string name="storegame_price_sale_fine_on">%1$s · on now</string>
     <string name="storegame_price_sale_fine_past">%1$s · on %2$s</string>
     <string name="storegame_price_instead_of">instead of %1$s</string>
+    <string name="store_all_games">All games</string>
 </resources>
