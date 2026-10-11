@@ -13,6 +13,10 @@
         <receiver
             android:name="app.gameport.debug.WhatsNewPreviewReceiver"
             android:exported="true" />
+        <!-- Development only: asks the catalog repository for the catalog, the texts and the prices now, and logs what the device holds. -->
+        <receiver
+            android:name="app.gameport.debug.CatalogRefreshDebugReceiver"
+            android:exported="true" />
         <!-- Development only: reads what Steam publishes for a game (depots, branches, files of a depot). -->
         <receiver
             android:name="app.gameport.debug.SteamInspectReceiver"
