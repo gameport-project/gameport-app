@@ -23,11 +23,11 @@ class PayloadTest(unittest.TestCase):
         body = d.payload("0.8.0", release=RELEASE, chosen={"images": [], "intro": "Big one."}, exists=ALWAYS)
         self.assertTrue(body["embeds"][0]["description"].startswith("Big one.\n\n• A store."))
 
-    def test_the_chosen_pictures_are_read_from_the_tag_and_shown_as_one_gallery(self):
+    def test_the_chosen_pictures_are_read_from_main_and_shown_as_one_gallery(self):
         chosen = {"images": ["docs/screenshots/a.png", "docs/screenshots/b.png", "docs/screenshots/c.png"], "intro": None}
         body = d.payload("0.8.0", release=RELEASE, chosen=chosen, exists=ALWAYS)
         first, *others = body["embeds"]
-        self.assertTrue(first["image"]["url"].endswith("/v0.8.0/docs/screenshots/a.png"))
+        self.assertTrue(first["image"]["url"].endswith("/main/docs/screenshots/a.png"))
         self.assertEqual(2, len(others))
         # The same link makes Discord group the pictures.
         self.assertTrue(all(e["url"] == first["url"] for e in others))

@@ -9,7 +9,7 @@ The text comes from the news of the version (app/src/main/assets/releases/<versi
     {"0.8.0": {"images": ["docs/screenshots/store.png", "docs/screenshots/store-game.png"], "intro": "An optional sentence to open with."}}
 
 A version that is not in that file is announced without pictures. Up to four pictures are shown together, as a gallery; the first is the one under the text.
-The pictures are read by Discord from the repository at the tag of the release, so they have to be committed.
+The pictures are read by Discord from the main branch of the repository, so they have to be committed and pushed, and a picture can be corrected after the release.
 """
 import json
 import os
@@ -61,7 +61,7 @@ def payload(version, lang="en", chosen=None, release=None, exists=lambda path: (
     footer = "Free and open source. Not made by or affiliated with Valve, Meta or Pico." if lang == "en" else "Gratuite et open source. Ni créée par Valve, Meta ou Pico, ni affiliée à eux."
     first = {"title": title, "url": page, "description": description, "color": BLURPLE, "footer": {"text": footer}}
     embeds = [first]
-    urls = [f"https://raw.githubusercontent.com/{REPO}/{tag}/{path}" for path in images]
+    urls = [f"https://raw.githubusercontent.com/{REPO}/main/{path}" for path in images]
     if urls:
         first["image"] = {"url": urls[0]}
         # Embeds that share a link are shown together by Discord, as one gallery.
