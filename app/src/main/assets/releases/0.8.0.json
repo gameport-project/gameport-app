@@ -1,0 +1,111 @@
+{
+  "version": "0.8.0",
+  "previous": "0.7.4",
+  "code": 800,
+  "patchNeeded": false,
+  "window": {
+    "items": [
+      {
+        "id": "store",
+        "icon": "check",
+        "text": {
+          "en": "A store lists every Steam game that has an Android version, with its price, its price history and a plain verdict. It opens from the store button on the home.",
+          "fr": "Un store liste tous les jeux Steam qui ont une version Android, avec leur prix, l'historique de ce prix et un verdict simple. Il s'ouvre depuis le bouton du store sur l'accueil."
+        }
+      },
+      {
+        "id": "new-versions",
+        "icon": "info",
+        "text": {
+          "en": "The home shows a row of the Android versions that just arrived for games the account does not have, with their price. A setting in Settings > Home sets its size.",
+          "fr": "L'accueil montre une rangée des versions Android qui viennent d'arriver pour des jeux que le compte n'a pas, avec leur prix. Un réglage dans Réglages > Accueil en choisit la taille."
+        }
+      },
+      {
+        "id": "prices-currency",
+        "icon": "info",
+        "text": {
+          "en": "Prices are in the currency your Steam account is billed in, read when GamePort signs in.",
+          "fr": "Les prix sont dans la monnaie dans laquelle ton compte Steam est facturé, lue quand GamePort se connecte."
+        }
+      },
+      {
+        "id": "compat-icon",
+        "icon": "build",
+        "text": {
+          "en": "The compatibility table has a new icon, a list with a wrench, on the home next to the store button. The three dots are gone.",
+          "fr": "Le tableau de compatibilité a une nouvelle icône, une liste avec une clé, sur l'accueil à côté du bouton du store. Les trois points ont disparu."
+        }
+      }
+    ]
+  },
+  "notes": [
+    {
+      "id": "section-0",
+      "title": {
+        "en": "New features",
+        "fr": "Nouvelles fonctionnalités"
+      },
+      "items": [
+        {
+          "id": "item-0-0",
+          "text": {
+            "en": "**A store for the Android versions.** The store lists the Steam games that have an Android version, from a catalog that GamePort reads from a public repository about every three hours. Tabs for all, VR or flat; switches for what can be installed or is coming, what the account owns or not, and what players say works or not; filters for languages and genres; eight ways to sort (new first, name, rating, most reviewed, release, price up or down, biggest discount); the list in two to four columns, or as covers; and a row of the games on sale that the account does not have. It opens on the VR games the account does not have, on a headset.",
+            "fr": "**Un store pour les versions Android.** Le store liste les jeux Steam qui ont une version Android, à partir d'un catalogue que GamePort lit dans un dépôt public environ toutes les trois heures. Des onglets pour tous, VR ou plat ; des interrupteurs pour ce qui s'installe ou est à venir, ce que le compte possède ou non, et ce que les joueurs disent qui marche ou non ; des filtres pour les langues et les genres ; huit façons de trier (nouveautés, nom, note, plus commentés, sortie, prix croissant ou décroissant, plus grosse promotion) ; la liste en deux à quatre colonnes, ou en jaquettes ; et une rangée des jeux en promotion que le compte n'a pas. Sur un casque, il s'ouvre sur les jeux VR que le compte n'a pas."
+          }
+        },
+        {
+          "id": "item-0-1",
+          "text": {
+            "en": "**The price, its history and a verdict.** The page of a game in the store shows its price in your account's currency, a button to its page on Steam, the lowest price seen, the last sale, and a plain verdict, from *Lowest ever seen* to *Better to wait*. The history goes back two years for the United States, France and the United Kingdom, and starts now for the other countries. Prices come from Steam's public data and the past from IsThereAnyDeal; the Steam page has the last word.",
+            "fr": "**Le prix, son historique et un verdict.** La fiche d'un jeu dans le store montre son prix dans la monnaie de ton compte, un bouton vers sa page sur Steam, le prix le plus bas relevé, la dernière promotion, et un verdict simple, de *Au plus bas* à *Mieux vaut attendre*. L'historique remonte à deux ans pour les États-Unis, la France et le Royaume-Uni, et commence maintenant pour les autres pays. Les prix viennent des données publiques de Steam et le passé d'IsThereAnyDeal ; la page Steam a le dernier mot."
+          }
+        },
+        {
+          "id": "item-0-2",
+          "text": {
+            "en": "**New Android versions on the home.** A row of banners shows the Android versions that arrived in the last week for games the account does not have, the latest first, for the tab shown, with their price. Its size is a setting: compact, medium, or wide with the next one in sight. Pointing at a banner changes the background, as for a cover.",
+            "fr": "**Les nouvelles versions Android sur l'accueil.** Une rangée de bannières montre les versions Android arrivées la semaine passée pour des jeux que le compte n'a pas, la plus récente d'abord, pour l'onglet affiché, avec leur prix. Sa taille est un réglage : compacte, moyenne, ou large avec la suivante en vue. Pointer une bannière change le fond, comme pour une jaquette."
+          }
+        },
+        {
+          "id": "item-0-3",
+          "text": {
+            "en": "**Compatibility, everywhere.** The round mark of what players say, as on the covers of the home, is on the cards of the store and unfolds into its words when a card is pointed at. The table of compatibility is a button of the home, with a new icon.",
+            "fr": "**La compatibilité, partout.** La pastille ronde de ce que disent les joueurs, comme sur les jaquettes de l'accueil, est sur les cartes du store et se déplie en ses mots quand on pointe une carte. Le tableau de compatibilité est un bouton de l'accueil, avec une nouvelle icône."
+          }
+        },
+        {
+          "id": "item-0-4",
+          "text": {
+            "en": "**A Discord.** The README has a button to the community server, for help, compatibility reports and news.",
+            "fr": "**Un Discord.** Le README a un bouton vers le serveur de la communauté, pour de l'aide, des rapports de compatibilité et les nouveautés."
+          }
+        }
+      ]
+    },
+    {
+      "id": "section-1",
+      "title": {
+        "en": "Fixes",
+        "fr": "Corrections"
+      },
+      "items": [
+        {
+          "id": "item-1-0",
+          "text": {
+            "en": "A drag along a row of the home no longer carries the page to the row below.",
+            "fr": "Un glissement le long d'une rangée de l'accueil n'emporte plus la page vers la rangée du dessous."
+          }
+        },
+        {
+          "id": "item-1-1",
+          "text": {
+            "en": "The page of a game that the account does not have no longer appears in the library: those games have their own page in the store.",
+            "fr": "La page d'un jeu que le compte n'a pas n'apparaît plus dans la bibliothèque : ces jeux ont leur propre page dans le store."
+          }
+        }
+      ]
+    }
+  ]
+}
