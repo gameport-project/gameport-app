@@ -115,11 +115,11 @@ private fun Banner(app: AndroidApp, price: StorePrice?, width: Dp, height: Dp, s
             GameImage(url = image, fallbackUrl = if (wide) app.header else app.banner, contentDescription = null, modifier = Modifier.fillMaxWidth().height(height))
         }
         // The name stays readable on any picture.
-        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f)))).padding(start = 10.dp, top = if (wide) 40.dp else 16.dp, bottom = if (wide) 12.dp else 6.dp, end = if (price != null) 120.dp else 10.dp)) {
+        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f)))).padding(start = 10.dp, top = if (wide) 40.dp else 16.dp, bottom = if (wide) 12.dp else 6.dp, end = 10.dp)) {
             Text(app.name, style = if (wide) MaterialTheme.typography.titleLarge else MaterialTheme.typography.labelLarge, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        // What it costs, in the label of the store, at the bottom right.
-        price?.let { PricePill(it, modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp), compact = !wide) }
+        // The price at the top left, so the name keeps the whole width at the bottom.
+        price?.let { PricePill(it, modifier = Modifier.align(Alignment.TopStart).padding(8.dp), compact = !wide) }
         if (app.vr) {
             GlassChip(stringResource(R.string.library_tab_vr), modifier = Modifier.align(Alignment.TopEnd).padding(6.dp), verticalPadding = 2.dp)
         }
