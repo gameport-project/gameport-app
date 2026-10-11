@@ -1089,7 +1089,7 @@ private fun CompatDetails(compat: app.gameport.core.model.Compat?, incompatible:
     when {
         incompatible != null -> Text(incompatible.title.pick(language) + incompatible.separator(language) + incompatible.text.pick(language), style = style, color = muted)
         compat != null && compat.offlineTested -> Text(stringResource(R.string.game_compat_offline), style = style, color = muted)
-        compat != null && compat.unreliable -> Text(stringResource(R.string.game_compat_unreliable), style = style, color = muted)
+        compat != null && compat.unreliable -> app.gameport.core.designsystem.FewAnswersNote(stringResource(R.string.game_compat_unreliable))
     }
 }
 

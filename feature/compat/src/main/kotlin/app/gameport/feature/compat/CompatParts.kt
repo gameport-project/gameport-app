@@ -32,6 +32,7 @@ import app.gameport.core.designsystem.GlassChip
 import app.gameport.core.designsystem.Glyph
 import app.gameport.core.model.CompatCounts
 import app.gameport.core.model.CompatLevel
+import app.gameport.core.designsystem.FewAnswersNote
 import app.gameport.core.model.CompatRules
 import app.gameport.core.model.DeviceCounts
 
@@ -129,7 +130,7 @@ internal fun DeviceLine(counts: CompatCounts, kind: String, own: DeviceCounts, m
         }
         // Few answers: the verdict is shown, and said to be possibly unreliable under the name, where it has the whole width, not beside it.
         if (verdict == null) Text(stringResource(R.string.compat_few), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
-        else if (verdict.unreliable) Text(stringResource(R.string.compat_unreliable), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+        else if (verdict.unreliable) FewAnswersNote(stringResource(R.string.compat_unreliable))
         // Only the answers that exist: "0 did not work" is not worth a word.
         val parts = listOfNotNull(
             own.works.takeIf { it > 0 }?.let { stringResource(R.string.compat_count_works, it) },
