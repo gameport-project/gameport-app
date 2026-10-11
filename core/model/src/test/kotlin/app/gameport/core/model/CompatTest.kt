@@ -13,13 +13,19 @@ class CompatTest {
     private fun level(works: Int, fails: Int) = CompatRules.of(counts(works, fails), "quest")?.level
 
     @Test
-    fun `nothing is said about a game with too few answers`() {
+    fun `nothing is said about a game nobody answered for`() {
         assertNull(CompatRules.of(null, "quest"))
         assertNull(level(0, 0))
-        assertNull(level(1, 0))
-        assertNull(level(2, 0))
-        assertNull(level(1, 1))
-        assertNull(level(0, 2))
+    }
+
+    @Test
+    fun `a single answer is a verdict, said to be possibly unreliable`() {
+        assertEquals(CompatLevel.WORKS, level(1, 0))
+        assertEquals(CompatLevel.FAILS, level(0, 1))
+        assertEquals(CompatLevel.MIXED, level(1, 1))
+        assertTrue(CompatRules.of(counts(1, 0), "quest")!!.unreliable)
+        assertTrue(CompatRules.of(counts(1, 1), "quest")!!.unreliable)
+        assertFalse(CompatRules.of(counts(3, 0), "quest")!!.unreliable)
     }
 
     @Test
@@ -66,7 +72,8 @@ class CompatTest {
         // 1 works, 1 offline only, 1 fails: two thirds are happy, which is mixed, as 2 works and 1 fails would be.
         assertEquals(CompatLevel.MIXED, offline(1, 1, 1))
         assertEquals(CompatLevel.FAILS, offline(0, 1, 3))
-        assertNull(offline(1, 1, 0))
+        // Two answers are enough for a verdict, and half of them being offline only is the offline verdict.
+        assertEquals(CompatLevel.OFFLINE_ONLY, offline(1, 1, 0))
         assertEquals(3, CompatRules.of(CompatCounts(1, 1, 0, 0, mapOf("quest" to DeviceCounts(1, 0, 0, 2)), 2), "quest")!!.players)
     }
 

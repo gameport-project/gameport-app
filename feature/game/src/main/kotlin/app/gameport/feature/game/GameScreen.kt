@@ -1080,7 +1080,7 @@ private fun CompatChip(label: String, colour: Color, glyph: Glyph) {
 /** The height of a capital letter, as a share of the size of the font. */
 private const val CAPITAL_HEIGHT = 0.72f
 
-/** What stands behind the label: why the game is incompatible, or that players tried it with the offline mode. No numbers: the label says it. */
+/** What stands behind the label: why the game is incompatible, that players tried it with the offline mode, or that few answered so far. No numbers: the label says it. */
 @Composable
 private fun CompatDetails(compat: app.gameport.core.model.Compat?, incompatible: app.gameport.core.model.IncompatibleReason?) {
     val language = LocalConfiguration.current.locales[0].language
@@ -1089,6 +1089,7 @@ private fun CompatDetails(compat: app.gameport.core.model.Compat?, incompatible:
     when {
         incompatible != null -> Text(incompatible.title.pick(language) + incompatible.separator(language) + incompatible.text.pick(language), style = style, color = muted)
         compat != null && compat.offlineTested -> Text(stringResource(R.string.game_compat_offline), style = style, color = muted)
+        compat != null && compat.unreliable -> Text(stringResource(R.string.game_compat_unreliable), style = style, color = muted)
     }
 }
 

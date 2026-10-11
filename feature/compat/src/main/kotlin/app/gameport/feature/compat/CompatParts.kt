@@ -106,7 +106,7 @@ fun VerdictChip(level: CompatLevel, deviceKind: String, small: Boolean = false, 
 /** The height of a capital letter, as a share of the size of the font. */
 internal const val CAPITAL_HEIGHT = 0.72f
 
-/** What the players of one kind of device said: the kind, its verdict when there are enough answers, and the numbers. */
+/** What the players of one kind of device said: the kind, its verdict when there is an answer, and the numbers. */
 @Composable
 internal fun DeviceLine(counts: CompatCounts, kind: String, own: DeviceCounts, mine: Boolean, trailing: (@Composable () -> Unit)? = null) {
     val verdict = CompatRules.of(counts, kind)
@@ -127,8 +127,9 @@ internal fun DeviceLine(counts: CompatCounts, kind: String, own: DeviceCounts, m
             }
             trailing?.invoke()
         }
-        // Too few answers for a verdict: said under the name, where it has the whole width, not beside it.
+        // Few answers: the verdict is shown, and said to be possibly unreliable under the name, where it has the whole width, not beside it.
         if (verdict == null) Text(stringResource(R.string.compat_few), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+        else if (verdict.unreliable) Text(stringResource(R.string.compat_unreliable), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
         // Only the answers that exist: "0 did not work" is not worth a word.
         val parts = listOfNotNull(
             own.works.takeIf { it > 0 }?.let { stringResource(R.string.compat_count_works, it) },

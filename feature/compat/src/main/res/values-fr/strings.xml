@@ -12,7 +12,8 @@
         <item quantity="other">%1$d réponses</item>
     </plurals>
     <string name="compat_this_device">%1$s (cet appareil)</string>
-    <string name="compat_few">Pas encore assez de réponses</string>
+    <string name="compat_few">Aucune réponse pour l\'instant</string>
+    <string name="compat_unreliable">Peu de réponses pour l\'instant : le résultat peut ne pas être fiable</string>
     <string name="compat_count_works">%1$d fonctionne</string>
     <string name="compat_count_offline_only">%1$d hors ligne seulement</string>
     <string name="compat_count_fails">%1$d n\'a pas fonctionné</string>

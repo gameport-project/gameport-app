@@ -47,23 +47,26 @@ enum class CompatLevel {
 data class Compat(val level: CompatLevel, val device: String, val works: Int, val offlineOnly: Int, val fails: Int, val worksOffline: Int) {
     val players: Int get() = works + offlineOnly + fails
 
+    /** Few players answered: the verdict is shown, but it may not be reliable. */
+    val unreliable: Boolean get() = players < CompatRules.MIN_PLAYERS
+
     /** Enough players tried it with the offline mode on to say so. */
     val offlineTested: Boolean get() = worksOffline >= CompatRules.MIN_PLAYERS
 }
 
 object CompatRules {
-    /** Under this many answers nothing is said about a game: one player's luck is not a verdict. */
+    /** Under this many answers the verdict is shown with a warning, since one player's luck is not a verdict; it also takes this many to say a game was tried offline. */
     const val MIN_PLAYERS = 3
 
     /** Share of the answers from which a game is said to work, and under which it is said not to. */
     private const val WORKS_SHARE = 0.75
     private const val FAILS_SHARE = 0.25
 
-    /** What the players of [device] (a kind of device) say of the game, or null while too few of them said anything: what players of another kind said does not count. */
+    /** What the players of [device] (a kind of device) say of the game, or null while none of them said anything: what players of another kind said does not count. */
     fun of(counts: CompatCounts?, device: String): Compat? {
         val own = counts?.devices?.get(device) ?: return null
         val total = own.works + own.offlineOnly + own.fails
-        if (total < MIN_PLAYERS) return null
+        if (total == 0) return null
         // A game that works without the network works, for this: the answers "it works" and "it works offline only" are on the same side.
         val positive = own.works + own.offlineOnly
         val share = positive.toDouble() / total
