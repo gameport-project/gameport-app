@@ -1,0 +1,75 @@
+{
+  "version": "0.8.1",
+  "previous": "0.8.0",
+  "code": 801,
+  "patchNeeded": false,
+  "window": {
+    "items": [
+      {
+        "id": "types",
+        "icon": "info",
+        "text": {
+          "en": "Demos, betas and applications that have an Android version are listed too, and the filters of the store have a new choice of type.",
+          "fr": "Les démos, les bêtas et les applications qui ont une version Android sont listées aussi, et les filtres du store ont un nouveau choix de type."
+        }
+      },
+      {
+        "id": "first-answer",
+        "icon": "info",
+        "text": {
+          "en": "What players report shows from the first answer. With only a few answers, an orange line says the result may not be reliable.",
+          "fr": "Ce que rapportent les joueurs s'affiche dès la première réponse. Avec seulement quelques réponses, une ligne orange dit que le résultat peut ne pas être fiable."
+        }
+      },
+      {
+        "id": "mapping-fix",
+        "icon": "check",
+        "text": {
+          "en": "The window that picks where a controller button goes no longer closes GamePort when it opens.",
+          "fr": "La fenêtre qui choisit où va un bouton de manette ne ferme plus GamePort quand elle s'ouvre."
+        }
+      }
+    ]
+  },
+  "notes": [
+    {
+      "id": "section-0",
+      "title": {
+        "en": "New features",
+        "fr": "Nouvelles fonctionnalités"
+      },
+      "items": [
+        {
+          "id": "item-0-0",
+          "text": {
+            "en": "**Demos, betas and applications.** The catalog lists them when they have an Android version, as it lists games, and the filters of the store have a choice of type: games, demos, betas, applications, one or several at once.",
+            "fr": "**Les démos, les bêtas et les applications.** Le catalogue les liste quand elles ont une version Android, comme il liste les jeux, et les filtres du store ont un choix de type : jeux, démos, bêtas, applications, un ou plusieurs à la fois."
+          }
+        },
+        {
+          "id": "item-0-1",
+          "text": {
+            "en": "**A verdict from the first answer.** What players report shows as soon as one player has answered. Under three answers, an orange line with an exclamation mark says the result may not be reliable.",
+            "fr": "**Un verdict dès la première réponse.** Ce que rapportent les joueurs s'affiche dès qu'un joueur a répondu. Sous trois réponses, une ligne orange avec un point d'exclamation dit que le résultat peut ne pas être fiable."
+          }
+        }
+      ]
+    },
+    {
+      "id": "section-1",
+      "title": {
+        "en": "Fixes",
+        "fr": "Corrections"
+      },
+      "items": [
+        {
+          "id": "item-1-0",
+          "text": {
+            "en": "Touching a control in the mapping of a game's controllers no longer closes GamePort: the list of places it can go opens.",
+            "fr": "Toucher une commande dans le mapping des manettes d'un jeu ne ferme plus GamePort : la liste des endroits où elle peut aller s'ouvre."
+          }
+        }
+      ]
+    }
+  ]
+}

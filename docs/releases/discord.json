@@ -7,5 +7,9 @@
       "docs/screenshots/compatibility.png"
     ],
     "intro": "The store is here: every Steam game that has an Android version, with its price, its price history and a verdict."
+  },
+  "0.8.1": {
+    "images": [],
+    "intro": "A small release: a fix for the controller mapping, and demos, betas and applications in the store."
   }
 }
