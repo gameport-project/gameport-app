@@ -82,10 +82,11 @@ class AndroidCatalogRepositoryTest {
     }
 
     @Test
-    fun `no network keeps what there is and asks again next time`() = runBlocking {
+    fun `no network keeps what there is and asks again once the pause is over`() = runBlocking {
         val place = Place(CatalogAnswer.Unavailable)
         val repository = repository(place)
         repository.refreshIfStale()
+        clock += 11 * 60 * 1000L
         repository.refreshIfStale()
         assertEquals(2, place.asked.size)
         assertEquals(listOf("Shipped"), repository.names())
@@ -94,5 +95,18 @@ class AndroidCatalogRepositoryTest {
     @Test
     fun `without a shipped catalog or a kept one there is none`() {
         assertNull(runBlocking { repository(Place(CatalogAnswer.Unavailable), shipped = null).observe().first() })
+    }
+
+    @Test
+    fun `a network that gave no answer is left alone for a few minutes, then asked again`() = runBlocking {
+        val place = Place(CatalogAnswer.Unavailable)
+        val repository = repository(place)
+        repository.refreshIfStale()
+        repository.refreshIfStale()
+        repository.refreshIfStale()
+        assertEquals(1, place.asked.size)
+        clock += 11 * 60 * 1000L
+        repository.refreshIfStale()
+        assertEquals(2, place.asked.size)
     }
 }

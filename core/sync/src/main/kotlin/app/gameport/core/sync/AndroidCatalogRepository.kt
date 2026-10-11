@@ -40,12 +40,15 @@ class HttpCatalogTransport(private val base: String = BASE) : CatalogTransport {
             connection.connectTimeout = TIMEOUT_MS
             connection.readTimeout = TIMEOUT_MS
             if (etag != null) connection.setRequestProperty("If-None-Match", etag)
-            when (connection.responseCode) {
+            val code = connection.responseCode
+            android.util.Log.i("GPCatalog", "$path: $code")
+            when (code) {
                 HttpURLConnection.HTTP_OK -> CatalogAnswer.Body(connection.inputStream.bufferedReader().use { it.readText() }, connection.getHeaderField("ETag"))
                 HttpURLConnection.HTTP_NOT_MODIFIED -> CatalogAnswer.NotModified
                 else -> CatalogAnswer.Unavailable
             }
         } catch (e: java.io.IOException) {
+            android.util.Log.i("GPCatalog", "$path: ${e.javaClass.simpleName} ${e.message}")
             CatalogAnswer.Unavailable
         } finally {
             connection.disconnect()
@@ -59,6 +62,9 @@ class HttpCatalogTransport(private val base: String = BASE) : CatalogTransport {
         const val BASE = "https://raw.githubusercontent.com/gameport-project/gameport-catalog/main"
     }
 }
+
+/** How long the network is left alone after it gave no answer. */
+private const val RETRY_AFTER_MS = 10 * 60 * 1000L
 
 /**
  * A file of the catalog repository kept on the device: asked again when it is old, with a conditional request so a file that did not change costs
@@ -75,14 +81,18 @@ internal class KeptFile(
     private val file = File(folder, name)
     private val etagFile = File(folder, "$name.etag")
 
+    /** When the network last gave no answer: it is not asked again for a few minutes, so a screen that opens again and again does not call again and again. */
+    @Volatile private var failedAt = 0L
+
     fun read(): String? = runCatching { file.readText() }.getOrNull()
 
     /** The text of the new file when an answer replaced the one kept; null when nothing changed (still fresh, not modified, no answer, or an answer refused). */
     suspend fun refreshIfStale(accepts: (String) -> Boolean): String? {
         if (file.exists() && now() - file.lastModified() < maxAgeMs) return null
+        if (failedAt != 0L && now() - failedAt < RETRY_AFTER_MS) return null
         when (val answer = transport.get(path, etag = etagFile.takeIf { file.exists() && it.exists() }?.readText())) {
             CatalogAnswer.NotModified -> file.setLastModified(now())
-            CatalogAnswer.Unavailable -> Unit
+            CatalogAnswer.Unavailable -> failedAt = now()
             is CatalogAnswer.Body -> {
                 if (!accepts(answer.text)) return null
                 val temporary = File(folder, "$name.tmp")

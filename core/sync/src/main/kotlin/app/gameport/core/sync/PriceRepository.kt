@@ -36,7 +36,9 @@ class PriceRepository internal constructor(
     )
 
     private val lock = Mutex()
-    private fun kept(name: String, path: String, maxAgeMs: Long) = KeptFile(folder, name, path, transport, now, maxAgeMs)
+    // One KeptFile for each file, so what it remembers (the network gave no answer a moment ago) lasts from one call to the next.
+    private val files = ConcurrentHashMap<String, KeptFile>()
+    private fun kept(name: String, path: String, maxAgeMs: Long) = files.getOrPut("$name|$path") { KeptFile(folder, name, path, transport, now, maxAgeMs) }
 
     private val indexFile = kept("index.json", "$REMOTE/index.json", REFRESH_MS)
     private val index = MutableStateFlow(PriceIndex.parse(indexFile.read()) ?: PriceIndex.parse(asset("index.json")))
