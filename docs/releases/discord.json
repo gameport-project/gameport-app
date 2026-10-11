@@ -1,0 +1,11 @@
+{
+  "0.8.0": {
+    "images": [
+      "docs/screenshots/store.png",
+      "docs/screenshots/store-game.png",
+      "docs/screenshots/home.png",
+      "docs/screenshots/compatibility.png"
+    ],
+    "intro": "The store is here: every Steam game that has an Android version, with its price, its price history and a verdict."
+  }
+}

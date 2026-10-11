@@ -113,3 +113,11 @@ jobs:
             echo "**Signing certificate (SHA-256):** \`$("$tools/apksigner" verify --print-certs "$apk" | sed -n 's/.*certificate SHA-256 digest: //p' | head -1)\`"
           } >> "$body"
           gh release create "$TAG" "$apk" --verify-tag --title "GamePort ${TAG}" --notes-file "$body"
+      # Told on Discord once the release exists. Skipped without the secret; a failure here does not undo the release. The pictures are the ones chosen in docs/releases/discord.json.
+      - name: Announce on Discord
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [[ -z "$DISCORD_WEBHOOK_URL" ]]; then echo "DISCORD_WEBHOOK_URL is not set: nothing announced"; exit 0; fi
+          python3 scripts/discord_announce.py "${TAG#v}"
