@@ -25,7 +25,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -247,7 +246,6 @@ private fun Shelf(
 
             LazyColumn(
                 state = listState,
-                flingBehavior = steadyPageFling(listState),
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = PaddingValues(bottom = 24.dp),
             ) {
@@ -327,24 +325,6 @@ private fun Shelf(
         FilterOverlay(open = filtersOpen, filters = state.filters, onChange = onFiltersChanged, onClose = { filtersOpen = false })
     }
 }
-
-/**
- * The page snaps to a row when it is let go, so the covers are always shown whole. A drag along a row of covers always carries a little vertical speed with it, and
- * that was enough for the snap to carry the page to the row below: under [PAGE_FLICK_MIN] the page settles on the nearest row instead, as if let go without a flick.
- */
-@Composable
-private fun steadyPageFling(listState: androidx.compose.foundation.lazy.LazyListState): androidx.compose.foundation.gestures.FlingBehavior {
-    val snap = rememberSnapFlingBehavior(listState)
-    return remember(snap) {
-        object : androidx.compose.foundation.gestures.FlingBehavior {
-            override suspend fun androidx.compose.foundation.gestures.ScrollScope.performFling(initialVelocity: Float): Float =
-                with(snap) { performFling(if (kotlin.math.abs(initialVelocity) < PAGE_FLICK_MIN) 0f else initialVelocity) }
-        }
-    }
-}
-
-/** The speed, in pixels a second, under which a let go is not a flick. */
-private const val PAGE_FLICK_MIN = 1200f
 
 /** A picture to show behind the library, and what to try when it is missing. */
 private data class BackdropArt(val url: String, val fallbacks: List<String>)
