@@ -120,6 +120,50 @@ class StoreFiltersTest {
     }
 
     @Test
+    fun `an app with nudity or sexual content is adult, whatever else it is tagged`() {
+        assertEquals(true, app(1, tags = listOf(19, 6650)).isAdult)
+        assertEquals(true, app(1, tags = listOf(12095)).isAdult)
+        assertEquals(false, app(1, tags = listOf(19, 21)).isAdult)
+        assertEquals(false, app(1).isAdult)
+    }
+
+    @Test
+    fun `the adult filter lists only those, its opposite leaves them out, and none lists every app`() {
+        val mixed = listOf(app(1, tags = listOf(6650)), app(2, tags = listOf(19)), app(3, tags = listOf(12095, 21)), app(4))
+        fun ids(filter: StoreFilter?) = storeList(mixed, "", StoreFilters(quick = setOfNotNull(filter)), emptySet(), today, true).map { it.appid }.sorted()
+        assertEquals(listOf(1, 2, 3, 4), ids(null))
+        assertEquals(listOf(1, 3), ids(StoreFilter.ADULT))
+        assertEquals(listOf(2, 4), ids(StoreFilter.NOT_ADULT))
+    }
+
+    @Test
+    fun `the price filter lists everything free, a demo whose price is not known too, and an app with no known price is otherwise in neither`() {
+        val paid = { cents: Long, initial: Long -> StorePrice.Paid(finalCents = cents, initialCents = initial, currency = "EUR", discountPercent = if (initial > 0) (100 - cents * 100 / initial).toInt() else 0) }
+        val prices = mapOf(1 to StorePrice.Free, 2 to paid(999, 999), 3 to paid(100, 400), 5 to paid(0, 1999))
+        val priced = listOf(app(1), app(2), app(3), app(4), app(5), app(6, type = "demo"), app(7, type = "demo"))
+        fun ids(filter: StoreFilter?) = storeList(priced, "", StoreFilters(quick = setOfNotNull(filter)), emptySet(), today, true, prices + (7 to StorePrice.Free)).map { it.appid }.sorted()
+        assertEquals(listOf(1, 2, 3, 4, 5, 6, 7), ids(null))
+        // The free game, the game on sale down to zero, the demo with no price, the demo priced at zero.
+        assertEquals(listOf(1, 5, 6, 7), ids(StoreFilter.FREE))
+        // What costs something, however little: the app at 1.00 and the one at 9.99. A game at zero for now is not "paid".
+        assertEquals(listOf(2, 3), ids(StoreFilter.PAID))
+    }
+
+    @Test
+    fun `free and paid cannot hold together`() {
+        assertEquals(setOf(StoreFilter.PAID), StoreFilters().toggled(StoreFilter.FREE).toggled(StoreFilter.PAID).quick)
+        assertEquals(1, StoreFilters().toggled(StoreFilter.FREE).activeCount)
+    }
+
+    @Test
+    fun `adult and not adult cannot hold together, and each counts as one narrowing filter`() {
+        val on = StoreFilters().toggled(StoreFilter.ADULT)
+        assertEquals(setOf(StoreFilter.ADULT), on.quick)
+        assertEquals(setOf(StoreFilter.NOT_ADULT), on.toggled(StoreFilter.NOT_ADULT).quick)
+        assertEquals(1, on.activeCount)
+    }
+
+    @Test
     fun `a type is toggled on and off, and counts as one narrowing filter`() {
         val on = StoreFilters().withType("demo").withType("beta")
         assertEquals(setOf("demo", "beta"), on.types)

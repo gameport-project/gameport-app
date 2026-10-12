@@ -75,6 +75,12 @@
     <string name="store_language_subtitles">Subtitles</string>
     <string name="store_pick_languages">Any language</string>
     <string name="store_pick_genres">Any genre</string>
+    <string name="store_group_price">Price</string>
+    <string name="store_price_free">Free</string>
+    <string name="store_price_paid">Paid</string>
+    <string name="store_group_adult">Adult content</string>
+    <string name="store_adult_only">Only</string>
+    <string name="store_adult_hidden">Hidden</string>
     <string name="store_group_types">Type</string>
     <string name="store_pick_types">Any type</string>
     <string name="store_type_game">Games</string>

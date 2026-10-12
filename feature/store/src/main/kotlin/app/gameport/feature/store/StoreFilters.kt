@@ -31,6 +31,18 @@ enum class StoreFilter {
 
     /** The players say it does not work on this device. */
     INCOMPATIBLE,
+
+    /** Only the apps with nudity or sexual content. */
+    ADULT,
+
+    /** Leaves out the apps with nudity or sexual content. */
+    NOT_ADULT,
+
+    /** Everything that costs nothing: the free games, the demos, and what is on sale down to zero. */
+    FREE,
+
+    /** Only what has a price above zero. An app whose price is not known, other than a demo, is in neither this nor [FREE]. */
+    PAID,
 }
 
 /** How the list is ordered: the newest Android versions first, by name, the best liked, the most reviewed, the latest release, the cheapest or dearest, or the biggest discount. */
@@ -104,6 +116,10 @@ private fun StoreFilter.excludes(): Set<StoreFilter> = when (this) {
     StoreFilter.NOT_OWNED -> setOf(StoreFilter.OWNED)
     StoreFilter.COMPATIBLE -> setOf(StoreFilter.INCOMPATIBLE)
     StoreFilter.INCOMPATIBLE -> setOf(StoreFilter.COMPATIBLE)
+    StoreFilter.ADULT -> setOf(StoreFilter.NOT_ADULT)
+    StoreFilter.NOT_ADULT -> setOf(StoreFilter.ADULT)
+    StoreFilter.FREE -> setOf(StoreFilter.PAID)
+    StoreFilter.PAID -> setOf(StoreFilter.FREE)
     else -> emptySet()
 }
 
@@ -145,6 +161,10 @@ internal fun storeList(
                     StoreFilter.OWNED -> app.appid in ownedIds
                     StoreFilter.NOT_OWNED -> app.appid !in ownedIds
                     StoreFilter.INCOMPATIBLE -> levels[app.appid] == CompatLevel.FAILS
+                    StoreFilter.ADULT -> app.isAdult
+                    StoreFilter.NOT_ADULT -> !app.isAdult
+                    StoreFilter.FREE -> app.isFree(prices[app.appid])
+                    StoreFilter.PAID -> prices[app.appid].let { it is StorePrice.Paid && it.finalCents > 0 }
                     StoreFilter.COMPATIBLE -> levels[app.appid].let { it == CompatLevel.WORKS || it == CompatLevel.OFFLINE_ONLY || it == CompatLevel.MIXED }
                 }
             }
@@ -171,6 +191,16 @@ internal fun storeList(
         // The games on sale first, the biggest discount at the top.
         StoreSort.DISCOUNT -> ordered.sortedByDescending { prices[it.appid].discount() }
     }
+}
+
+/**
+ * Costs nothing: a price of zero, a game on sale down to zero (free for now), or a demo whose price is not known yet, since a demo is always free. An app with no
+ * known price that is not a demo is neither free nor paid.
+ */
+internal fun AndroidApp.isFree(price: StorePrice?): Boolean = when (price) {
+    StorePrice.Free -> true
+    is StorePrice.Paid -> price.finalCents == 0L
+    null -> type == "demo"
 }
 
 private fun StorePrice?.cents(): Long? = when (this) {

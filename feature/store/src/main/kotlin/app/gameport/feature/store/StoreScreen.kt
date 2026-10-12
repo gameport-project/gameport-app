@@ -629,6 +629,36 @@ private fun FilterPanel(open: Boolean, state: StoreUiState.Content, viewModel: S
                 )
             }
         }
+        PanelGroup(stringResource(R.string.store_group_price)) {
+            val price = setOf(StoreFilter.FREE, StoreFilter.PAID)
+            PillTabs(
+                labels = listOf(stringResource(R.string.store_all), stringResource(R.string.store_price_free), stringResource(R.string.store_price_paid)),
+                selectedIndex = when {
+                    StoreFilter.FREE in state.filters.quick -> 1
+                    StoreFilter.PAID in state.filters.quick -> 2
+                    else -> 0
+                },
+                onSelect = { viewModel.onGroupChosen(price, listOf(null, StoreFilter.FREE, StoreFilter.PAID)[it]) },
+                modifier = Modifier.fillMaxWidth(),
+                height = 34.dp,
+                textStyle = MaterialTheme.typography.labelMedium,
+            )
+        }
+        PanelGroup(stringResource(R.string.store_group_adult)) {
+            val adult = setOf(StoreFilter.ADULT, StoreFilter.NOT_ADULT)
+            PillTabs(
+                labels = listOf(stringResource(R.string.store_all), stringResource(R.string.store_adult_only), stringResource(R.string.store_adult_hidden)),
+                selectedIndex = when {
+                    StoreFilter.ADULT in state.filters.quick -> 1
+                    StoreFilter.NOT_ADULT in state.filters.quick -> 2
+                    else -> 0
+                },
+                onSelect = { viewModel.onGroupChosen(adult, listOf(null, StoreFilter.ADULT, StoreFilter.NOT_ADULT)[it]) },
+                modifier = Modifier.fillMaxWidth(),
+                height = 34.dp,
+                textStyle = MaterialTheme.typography.labelMedium,
+            )
+        }
         PanelGroup(stringResource(R.string.store_group_types)) {
             MultiSelect(
                 placeholder = stringResource(R.string.store_pick_types),

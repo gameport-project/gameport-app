@@ -75,6 +75,12 @@
     <string name="store_language_subtitles">Sous-titres</string>
     <string name="store_pick_languages">Toutes les langues</string>
     <string name="store_pick_genres">Tous les genres</string>
+    <string name="store_group_price">Prix</string>
+    <string name="store_price_free">Gratuits</string>
+    <string name="store_price_paid">Payants</string>
+    <string name="store_group_adult">Contenu pour adultes</string>
+    <string name="store_adult_only">Seulement</string>
+    <string name="store_adult_hidden">Masqué</string>
     <string name="store_group_types">Type</string>
     <string name="store_pick_types">Tous les types</string>
     <string name="store_type_game">Jeux</string>

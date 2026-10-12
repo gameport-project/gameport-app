@@ -49,6 +49,14 @@ data class AndroidApp(
 ) {
     /** The day [androidSince] names, when it is a date. */
     val arrival: LocalDate? get() = androidSince?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+
+    /** The store says it holds nudity or sexual content: one of the tags that tell it is among the ones the catalog keeps for the app. */
+    val isAdult: Boolean get() = tags.any { it in ADULT_TAGS }
+
+    companion object {
+        /** The store tags of adult content: Nudity, Sexual Content, NSFW and Hentai. */
+        val ADULT_TAGS = setOf(6650, 12095, 24904, 9130)
+    }
 }
 
 @Serializable
