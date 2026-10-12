@@ -148,7 +148,7 @@ class GameViewModel @Inject constructor(
     /** What is said about the game by the players, and by the list of incompatible games. */
     private class Opinion(val compat: app.gameport.core.model.Compat?, val incompatible: app.gameport.core.model.IncompatibleReason?)
 
-    private val opinion: Flow<Opinion> = compat.observe(appId).map { community -> Opinion(community, incompatibleGames.list.reasonOf(appId)) }
+    private val opinion: Flow<Opinion> = combine(compat.observe(appId), incompatibleGames.lists) { community, confirmed -> Opinion(community, confirmed.reasonOf(appId)) }
 
     val uiState: StateFlow<GameUiState> = combine(
         baseState,

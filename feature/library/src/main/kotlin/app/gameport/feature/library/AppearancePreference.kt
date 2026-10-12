@@ -76,8 +76,8 @@ internal class StoredHistorySource @Inject constructor(
             .map { installed.all().mapNotNull { (appId, packageName) -> packages.installTimeOf(packageName)?.let { appId to it } }.toMap() }
             .flowOn(Dispatchers.IO)
         // A game confirmed as incompatible is hidden like one the player hid, unless they chose to show those anyway.
-        return combine(history.lastPlayed, history.favorites, installedAt, history.hidden, combine(incompatible.showAnyway, compat.observeLevels()) { show, levels -> show to levels }) { played, starred, at, hidden, (showAnyway, levels) ->
-            PlayHistory(played, starred, at, hidden + incompatible.hiddenIds(showAnyway), levels)
+        return combine(history.lastPlayed, history.favorites, installedAt, history.hidden, combine(incompatible.showAnyway, compat.observeLevels(), incompatible.lists) { show, levels, confirmed -> Triple(show, levels, confirmed) }) { played, starred, at, hidden, (showAnyway, levels, confirmed) ->
+            PlayHistory(played, starred, at, hidden + incompatible.hiddenIds(showAnyway, confirmed), levels)
         }
     }
 }

@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.border
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
@@ -1088,9 +1089,27 @@ private fun CompatDetails(compat: app.gameport.core.model.Compat?, incompatible:
     val style = MaterialTheme.typography.bodySmall
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     when {
-        incompatible != null -> Text(incompatible.title.pick(language) + incompatible.separator(language) + incompatible.text.pick(language), style = style, color = muted)
+        incompatible != null -> IncompatibleNote(incompatible.title.pick(language), incompatible.text.pick(language))
         compat != null && compat.offlineTested -> Text(stringResource(R.string.game_compat_offline), style = style, color = muted)
         compat != null && compat.unreliable -> app.gameport.core.designsystem.FewAnswersNote(stringResource(R.string.game_compat_unreliable))
+    }
+}
+
+/** Why the game cannot run: in red, with a cross, so it is the first thing seen on the page of a game that cannot be played. */
+@Composable
+private fun IncompatibleNote(title: String, text: String) {
+    val shape = RoundedCornerShape(16.dp)
+    val capitals = with(LocalDensity.current) { (MaterialTheme.typography.titleSmall.fontSize * CAPITAL_HEIGHT).toDp() }
+    Row(
+        Modifier.fillMaxWidth().glass(shape).border(1.dp, CompatRed.copy(alpha = 0.7f), shape).padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(Modifier.padding(top = 3.dp)) { CompatGlyph(Glyph.CROSS, CompatRed, capitals) }
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = CompatRed)
+            Text(text.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }
 

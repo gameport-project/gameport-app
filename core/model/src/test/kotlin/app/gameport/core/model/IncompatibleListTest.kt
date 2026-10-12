@@ -36,4 +36,27 @@ class IncompatibleListTest {
         assertTrue("no text in fr" in problems)
         assertTrue("semicolon" in problems)
     }
+
+    @Test
+    fun `the list of the relay gives each game the reason of the table of reasons, in both languages`() {
+        val relay = IncompatibleList.fromRelay(
+            """{"v":1,"reasons":{"anti-tamper":{"title":{"en":"Protected","fr":"Protégé"},"text":{"en":"it closes","fr":"il se ferme"}}},""" +
+                """"games":[{"appId":438100,"name":"VRChat","reason":"anti-tamper"}]}""",
+        )!!
+        assertEquals("VRChat", relay.game(438100)?.name)
+        assertEquals("Protégé", relay.reasonOf(438100)?.title?.get("fr"))
+        assertTrue(relay.problems(listOf("en", "fr")).isEmpty())
+    }
+
+    @Test
+    fun `an empty list of the relay is a list, so a game made compatible is no longer hidden`() {
+        assertEquals(0, IncompatibleList.fromRelay("""{"v":1,"games":[]}""")!!.games.size)
+    }
+
+    @Test
+    fun `an answer that is not the list gives nothing`() {
+        assertNull(IncompatibleList.fromRelay("""{"error":"not found"}"""))
+        assertNull(IncompatibleList.fromRelay("""{"v":2,"games":[]}"""))
+        assertNull(IncompatibleList.fromRelay("not json"))
+    }
 }

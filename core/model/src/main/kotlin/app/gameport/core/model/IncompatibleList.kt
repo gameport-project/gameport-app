@@ -45,7 +45,21 @@ data class IncompatibleList(val reasons: Map<String, IncompatibleReason> = empty
 
     companion object {
         private val json = Json { ignoreUnknownKeys = false }
+        private val relayJson = Json { ignoreUnknownKeys = true }
 
         fun parse(text: String): IncompatibleList = json.decodeFromString(serializer(), text)
+
+        /**
+         * The list the relay publishes (`/incompatible`): a table of reasons, in both languages, and the games, each naming one. Null when the text is not that
+         * list, so a bad answer never replaces a good one.
+         */
+        fun fromRelay(text: String): IncompatibleList? = runCatching {
+            val read = relayJson.decodeFromString(RelayList.serializer(), text)
+            if (read.v != 1) return null
+            IncompatibleList(reasons = read.reasons, games = read.games)
+        }.getOrNull()
     }
+
+    @Serializable
+    private class RelayList(val v: Int = 0, val reasons: Map<String, IncompatibleReason> = emptyMap(), val games: List<IncompatibleGame> = emptyList())
 }

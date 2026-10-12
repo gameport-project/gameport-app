@@ -15,6 +15,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -55,7 +56,7 @@ class HttpSummaryTransport(private val address: String) : SummaryTransport {
  * a connection. It is asked again when it is older than a few minutes; an answer that cannot be read never replaces the one kept.
  */
 @Singleton
-class CompatRepository @Inject constructor(@ApplicationContext private val context: Context, private val device: app.gameport.core.device.DeviceProfile) {
+class CompatRepository @Inject constructor(@ApplicationContext private val context: Context, private val device: app.gameport.core.device.DeviceProfile, private val incompatible: app.gameport.core.settings.IncompatibleGames) {
     private val file = File(context.cacheDir, "compat-summary.json")
     private val lock = Mutex()
     private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
@@ -73,8 +74,9 @@ class CompatRepository @Inject constructor(@ApplicationContext private val conte
     fun observeSummary(): Flow<CompatSummary?> = summary
 
     /** What the players who use the same kind of device say of each game they said enough about: for the covers of the home. */
-    fun observeLevels(): Flow<Map<Int, CompatLevel>> = summary.map { all ->
-        all?.games.orEmpty().mapNotNull { counts -> CompatRules.of(counts, device.kind)?.let { counts.appId to it.level } }.toMap()
+    fun observeLevels(): Flow<Map<Int, CompatLevel>> = combine(summary, incompatible.lists) { all, confirmed ->
+        // A game confirmed as incompatible is shown as one that fails, whatever the players said.
+        all?.games.orEmpty().mapNotNull { counts -> CompatRules.of(counts, device.kind)?.let { counts.appId to it.level } }.toMap() + confirmed.games.associate { it.appId to CompatLevel.FAILS }
     }
 
     /** Reads the totals when GamePort starts, and asks again when it is opened later and what is kept is old. */
@@ -84,6 +86,7 @@ class CompatRepository @Inject constructor(@ApplicationContext private val conte
 
     /** Asks the relay again when what is kept is old. Safe to call whenever a page opens. */
     suspend fun refreshIfStale() {
+        incompatible.refreshIfStale()
         lock.withLock {
             if (now() - file.lastModified() < refreshMs && summary.value != null) return
             val text = transport.get() ?: return

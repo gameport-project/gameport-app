@@ -60,13 +60,13 @@ class IncompatibleNoticeViewModel @Inject constructor(
     private val incompatible: IncompatibleGames,
 ) : ViewModel() {
     val notices: StateFlow<List<IncompatibleNotice>> = combine(
-        auth.authState, library.observeLibrary(), incompatible.acknowledged, incompatible.showAnyway,
-    ) { authState, loaded, told, showAnyway ->
+        auth.authState, library.observeLibrary(), incompatible.acknowledged, incompatible.showAnyway, incompatible.lists,
+    ) { authState, loaded, told, showAnyway, confirmed ->
         if (authState !is AuthState.SignedIn || showAnyway) emptyList()
         else loaded.games
-            .filter { incompatible.list.game(it.appId) != null && it.appId !in told }
+            .filter { confirmed.game(it.appId) != null && it.appId !in told }
             .sortedBy { it.name.lowercase() }
-            .map { IncompatibleNotice(it.appId, it.name, incompatible.list.reasonOf(it.appId)) }
+            .map { IncompatibleNotice(it.appId, it.name, confirmed.reasonOf(it.appId)) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun onGotIt() = incompatible.acknowledge(notices.value.map { it.appId })

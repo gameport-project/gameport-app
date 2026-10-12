@@ -54,9 +54,9 @@ class SettingsViewModel @Inject constructor(
     class IncompatibleEntry(val game: Game, val reason: app.gameport.core.model.IncompatibleReason?)
 
     /** The games of the library confirmed as incompatible. */
-    val incompatibleGames: StateFlow<List<IncompatibleEntry>> = library.observeLibrary().map { loaded ->
-        loaded.games.filter { incompatible.list.game(it.appId) != null }.sortedBy { it.name.lowercase() }
-            .map { IncompatibleEntry(it, incompatible.list.reasonOf(it.appId)) }
+    val incompatibleGames: StateFlow<List<IncompatibleEntry>> = combine(library.observeLibrary(), incompatible.lists) { loaded, confirmed ->
+        loaded.games.filter { confirmed.game(it.appId) != null }.sortedBy { it.name.lowercase() }
+            .map { IncompatibleEntry(it, confirmed.reasonOf(it.appId)) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     val showIncompatible: StateFlow<Boolean> = incompatible.showAnyway
