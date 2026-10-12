@@ -20,7 +20,11 @@ import androidx.compose.ui.unit.dp
  * with the exclamation mark in a tinted circle, as on the covers.
  */
 @Composable
-fun FewAnswersNote(text: String, modifier: Modifier = Modifier) {
+fun FewAnswersNote(text: String, modifier: Modifier = Modifier) = CautionNote(text, modifier)
+
+/** A word of caution on a line of its own: the exclamation mark in a tinted circle and the text, in the orange of everything about compatibility. */
+@Composable
+fun CautionNote(text: String, modifier: Modifier = Modifier) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier

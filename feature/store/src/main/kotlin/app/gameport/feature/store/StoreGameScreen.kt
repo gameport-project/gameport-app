@@ -51,6 +51,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import app.gameport.core.designsystem.BackdropDialog
+import app.gameport.core.designsystem.CautionNote
 import app.gameport.core.steam.FreeLicenseOutcome
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -163,6 +164,12 @@ private fun Details(content: StoreGameUiState.Content, app: AndroidApp, onGameCl
                 }
             }
         }
+        // A game with a multiplayer or co-op part: its online side does not work on these devices for now, and the game itself may not even start.
+        if (app.modes.any { it == "multi" || it == "coop" }) {
+            Column(Modifier.widthIn(max = CONTENT_WIDTH).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                CautionNote(stringResource(R.string.storegame_multi_warning))
+                Text(stringResource(R.string.storegame_multi_warning_detail), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 26.dp))
+            }
         }
         if (content.summary != null || content.tags.isNotEmpty()) {
             // The text comes straight, with no title over it.
