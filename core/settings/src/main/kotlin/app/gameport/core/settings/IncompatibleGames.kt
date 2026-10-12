@@ -1,7 +1,6 @@
 package app.gameport.core.settings
 
 import android.content.Context
-import android.util.Log
 import app.gameport.core.model.IncompatibleList
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -22,7 +21,8 @@ import kotlinx.coroutines.withContext
  * for each of them that is in the library: [acknowledged] keeps the games already told.
  *
  * The list is kept by the developer in the relay, so a game made compatible there is so for everyone at once: the last list read is kept on this device
- * and asked again when it is old. Until one was read, the list shipped with the app stands in; a list that cannot be read never replaces the one in use.
+ * and asked again when it is old. Until one was read (the very first start without a network) the list is empty, so nothing is hidden by mistake; a list that
+ * cannot be read never replaces the one in use.
  */
 @Singleton
 class IncompatibleGames @Inject constructor(@ApplicationContext private val context: Context) {
@@ -36,13 +36,7 @@ class IncompatibleGames @Inject constructor(@ApplicationContext private val cont
     internal var fetch: suspend () -> String? = { download(if (debuggable) "$RELAY/test/incompatible" else "$RELAY/incompatible") }
     internal var now: () -> Long = System::currentTimeMillis
 
-    /** The list shipped with the app; empty when it cannot be read, so a mistake in it never hides a game by accident. */
-    private val shipped: IncompatibleList by lazy {
-        runCatching { context.assets.open(FILE).bufferedReader().use { IncompatibleList.parse(it.readText()) } }
-            .onFailure { Log.w("GPIncompatible", "$FILE not read", it) }
-            .getOrDefault(IncompatibleList())
-    }
-    private val _list = MutableStateFlow(runCatching { kept.readText() }.getOrNull()?.let(IncompatibleList::fromRelay) ?: shipped)
+    private val _list = MutableStateFlow(runCatching { kept.readText() }.getOrNull()?.let(IncompatibleList::fromRelay) ?: IncompatibleList())
 
     /** The list in use, and what it becomes when the relay says otherwise. */
     val lists: StateFlow<IncompatibleList> = _list.asStateFlow()
@@ -95,7 +89,6 @@ class IncompatibleGames @Inject constructor(@ApplicationContext private val cont
     }
 
     private companion object {
-        const val FILE = "incompatible.json"
         const val RELAY = "https://gameport-relay.gameport.workers.dev"
         const val TIMEOUT_MS = 10_000
         const val REFRESH_MS = 10 * 60 * 1000L

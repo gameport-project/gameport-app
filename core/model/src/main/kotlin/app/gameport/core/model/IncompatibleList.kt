@@ -15,7 +15,7 @@ data class IncompatibleReason(val title: Localized, val text: Localized) {
 data class IncompatibleGame(val appId: Int, val name: String, val reason: String)
 
 /**
- * The games confirmed as incompatible (`incompatible.json` in the assets). They are hidden from the home, and the player is told once for each
+ * The games confirmed as incompatible (kept in the relay, edited in the developer's console). They are hidden from the home, and the player is told once for each
  * game that is in the library. Only a game proven not to run belongs here, never one that merely failed once.
  */
 @Serializable
@@ -44,10 +44,7 @@ data class IncompatibleList(val reasons: Map<String, IncompatibleReason> = empty
     }
 
     companion object {
-        private val json = Json { ignoreUnknownKeys = false }
         private val relayJson = Json { ignoreUnknownKeys = true }
-
-        fun parse(text: String): IncompatibleList = json.decodeFromString(serializer(), text)
 
         /**
          * The list the relay publishes (`/incompatible`): a table of reasons, in both languages, and the games, each naming one. Null when the text is not that

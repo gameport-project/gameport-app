@@ -1,6 +1,5 @@
 package app.gameport.core.model
 
-import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -8,18 +7,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class IncompatibleListTest {
-    // The real file, as the app ships it.
-    private val list = IncompatibleList.parse(File("../settings/src/main/assets/incompatible.json").readText())
+    private val list = IncompatibleList.fromRelay(
+        """{"v":1,"reasons":{"anti-tamper":{"title":{"en":"Protected","fr":"Protégé"},"text":{"en":"it closes","fr":"il se ferme"}}},""" +
+            """"games":[{"appId":438100,"name":"VRChat","reason":"anti-tamper"}]}""",
+    )!!
 
     @Test
-    fun `VRChat is listed, found by its app id, with a reason in both languages`() {
+    fun `a game is found by its app id, with a reason in both languages`() {
         assertEquals("VRChat", list.game(438100)?.name)
         assertNotNull(list.reasonOf(438100)?.text?.get("fr"))
         assertNull(list.game(1))
     }
 
     @Test
-    fun `the shipped file is complete in every language`() {
+    fun `a list that comes from the relay is complete in every language`() {
         val problems = list.problems(listOf("en", "fr"))
         assertTrue(problems.joinToString("\n"), problems.isEmpty())
     }
