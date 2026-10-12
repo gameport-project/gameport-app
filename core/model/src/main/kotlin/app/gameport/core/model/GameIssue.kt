@@ -23,6 +23,12 @@ sealed interface GameIssue {
     /** The game closed within seconds of starting, or crashed: a problem report can help. [crash] tells which. */
     data class ProblemSuspected(val crash: Boolean) : GameIssue
 
+    /**
+     * The game has expansion files and its version was raised by an earlier patch, so its files and its code may disagree: if it does not start, installing it
+     * again from scratch puts them right. A notice, not a problem: it never lights the cover badge.
+     */
+    data object ReinstallMayHelp : GameIssue
+
     /** The last save sync could not reach Steam ([offline]) or could not send the saves. */
     data class SaveSyncFailed(val offline: Boolean) : GameIssue
 }

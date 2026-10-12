@@ -15,6 +15,11 @@ data class PatchContext(
     val gameName: String? = null,
     /** The version code of the game as installed on this device, when it is: a patched game never gets a lower one, which Android refuses. */
     val installedVersionCode: Long? = null,
+    /**
+     * The game has expansion files, whose names carry the version code (`main.<code>.<package>.obb`) and which some engines expect under the code the game was built with:
+     * its version code is left as it is, never raised ([app.gameport.core.patch.patches.VersionCodePatch]).
+     */
+    val keepVersionCode: Boolean = false,
     /** The patch version to record in the game ([PatchVersioning.current]). */
     val patchVersion: Int = PatchVersioning.GENERATION * 1_000,
     /** The game's achievements (JSON, see [app.gameport.core.model.ShimAchievements]) for the Steamworks shim; null to bake none. */

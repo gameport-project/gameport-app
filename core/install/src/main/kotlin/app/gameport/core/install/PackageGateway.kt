@@ -73,6 +73,14 @@ class PackageGateway @Inject constructor(
 
     fun versionCodeOf(packageName: String): Long? = runCatching { packageManager.getPackageInfo(packageName, 0).longVersionCode }.getOrNull()
 
+    /** The version code the game had before GamePort raised it (written into the patched APK), or null for a package GamePort did not patch that way. */
+    fun originalVersionCodeOf(packageName: String): Long? = metaDataInt(packageName, "app.gameport.original_version_code")?.toLong()
+
+    /** True for an Unreal game: its manifest carries the engine's own entries (`com.epicgames.ue4.GameActivity.*`, `com.epicgames.unreal.GameActivity.*`). */
+    fun isUnreal(packageName: String): Boolean = runCatching {
+        packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA).metaData?.keySet()?.any { it.startsWith("com.epicgames.") } == true
+    }.getOrDefault(false)
+
     /**
      * True when Android updates this game without asking: GamePort installed it, and the system is Android 12 or later with a game that targets
      * Android 12 or later (the ones that target an older version still ask, and Android 11 always asks). Seen on a device, it is the system

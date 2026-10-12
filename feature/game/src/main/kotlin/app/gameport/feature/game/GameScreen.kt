@@ -474,7 +474,7 @@ private fun GameDetails(
                     )
                     if (install is InstallState.Installed) {
                         // Orange for what needs attention, green when the only news is an update.
-                        val attention = issues.any { it !is GameIssue.ControllerMappingAvailable && it !is GameIssue.ControllerSilent && it !is GameIssue.UpdateAvailable }
+                        val attention = issues.any { it !is GameIssue.ControllerMappingAvailable && it !is GameIssue.ControllerSilent && it !is GameIssue.UpdateAvailable && it !is GameIssue.ReinstallMayHelp }
                         val update = GameIssue.UpdateAvailable in issues
                         if (attention || update) {
                             Row(Modifier.align(Alignment.TopStart).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -890,6 +890,7 @@ private fun IssuesPanel(
                         secondAction = stringResource(R.string.issue_dismiss),
                         onSecondAction = onDismissProblem,
                     )
+                GameIssue.ReinstallMayHelp -> IssueRow(stringResource(R.string.issue_reinstall_may_help), info = true)
                 GameIssue.StoragePermissionMissing ->
                     IssueRow(stringResource(R.string.issue_storage_permission), stringResource(R.string.game_storage_open), onPermissions, enabled = !busy)
                 GameIssue.SaveConflict ->

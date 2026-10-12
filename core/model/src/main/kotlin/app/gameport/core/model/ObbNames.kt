@@ -24,6 +24,13 @@ object ObbNames {
     }
 
     /**
+     * The version code the expansion files must be named after: the one of the APK installed now, which patching raises (Unity reads that one), except for an
+     * Unreal game, whose own code writes the version of its expansion file down when it is built and asks for exactly that, so its files keep the version the game
+     * had before patching. Null when that version is not known: nothing is renamed then.
+     */
+    fun versionFor(installed: Long, original: Long?, unreal: Boolean): Long? = if (unreal) original else installed
+
+    /**
      * The name [fileName] must have to belong to the APK of version [code], or null when it is not an expansion file of [packageName],
      * or already has that name. Patching raises the version code of the APK, so its expansion files follow it.
      */

@@ -183,6 +183,7 @@
     <string name="report_close">Fermer</string>
     <string name="issue_problem_short">Ce jeu s\'est fermé presque tout de suite. Un rapport aide à comprendre pourquoi.</string>
     <string name="issue_problem_crash">Ce jeu semble avoir planté. Un rapport aide à comprendre pourquoi.</string>
+    <string name="issue_reinstall_may_help">Ce jeu a des fichiers d\'extension qu\'un ancien patch a nommés d\'après une version augmentée. S\'il ne démarre pas, le désinstaller puis le réinstaller règle cela.</string>
     <string name="issue_problem_action">Signaler</string>
     <string name="game_hide">Cacher le jeu</string>
     <string name="game_show_again">Réafficher le jeu</string>

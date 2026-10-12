@@ -27,6 +27,28 @@ class ExpansionFilesTest {
     }
 
     @Test
+    fun `an Unreal game's file goes back to the version the game had before patching`() {
+        val dir = folder.newFolder("obb-unreal")
+        File(dir, "main.1034.$pkg.obb").writeText("data")
+        val code = app.gameport.core.model.ObbNames.versionFor(installed = 1034, original = 964, unreal = true)!!
+        assertEquals(listOf("main.964.$pkg.obb"), ExpansionFiles.align(dir, pkg, code))
+        assertEquals(listOf("main.964.$pkg.obb"), dir.list()!!.toList())
+    }
+
+    @Test
+    fun `a Unity game's file follows the patched version`() {
+        val dir = folder.newFolder("obb-unity")
+        File(dir, "main.964.$pkg.obb").writeText("data")
+        val code = app.gameport.core.model.ObbNames.versionFor(installed = 1034, original = 964, unreal = false)!!
+        assertEquals(listOf("main.1034.$pkg.obb"), ExpansionFiles.align(dir, pkg, code))
+    }
+
+    @Test
+    fun `an Unreal game without a known original version is left as it is`() {
+        assertEquals(null, app.gameport.core.model.ObbNames.versionFor(installed = 1034, original = null, unreal = true))
+    }
+
+    @Test
     fun `the patched APKs and what the downloader keeps are left alone`() {
         val downloaded = download("app.apk", "patched/app.apk", ".DepotDownloader/state")
         assertEquals(emptyList<String>(), place(downloaded))

@@ -25,4 +25,16 @@ class VersionCodePatchTest {
 
     @Test
     fun `a code that would not fit is left alone`() = assertNull(VersionCodePatch.raisedCode(Int.MAX_VALUE - 1, Int.MAX_VALUE - 1, null))
+
+    @Test
+    fun `a game with expansion files keeps the code it came with`() = assertEquals(964, VersionCodePatch.raisedCode(964, 964, null, keep = true))
+
+    @Test
+    fun `a game with expansion files is never given a lower code than it has, which Android refuses`() {
+        assertEquals(1034, VersionCodePatch.raisedCode(964, 1034, 1034L, keep = true))
+        assertEquals(1034, VersionCodePatch.raisedCode(964, 964, 1034L, keep = true))
+    }
+
+    @Test
+    fun `a newer build of a game with expansion files takes its own code, not an offset over it`() = assertEquals(970, VersionCodePatch.raisedCode(970, 970, 964L, keep = true))
 }

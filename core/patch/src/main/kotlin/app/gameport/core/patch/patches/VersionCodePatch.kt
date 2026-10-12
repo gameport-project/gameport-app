@@ -26,6 +26,10 @@ import com.reandroid.json.JSONObject
  * corrected, would keep showing the old one. The code the game came with is recorded, so patching
  * the same game again never raises it twice, and a newer build from Steam, patched the same way,
  * always ends up higher than the one it replaces. A game never gets a lower code than it already has.
+ *
+ * A game with expansion files is left at the code it came with ([PatchContext.keepVersionCode]): the files are named after the code, an Unreal game writes
+ * the name it asks for into its own code, and raising the code made the game and its files disagree, so nothing could be put right for both. The cost is that
+ * Horizon may keep showing the name and icon it already knows for such a game until its code changes by an update of the game itself.
  */
 object VersionCodePatch : ApkPatch {
     override val id = "version_code"
@@ -59,7 +63,7 @@ object VersionCodePatch : ApkPatch {
         }
         val base = original ?: current ?: return
         original = base
-        val raised = raisedCode(base, current, context.installedVersionCode) ?: return
+        val raised = raisedCode(base, current, context.installedVersionCode, context.keepVersionCode) ?: return
         session.manifest.takeNodesEach({ named("manifest") }) {
             takeAttributes {
                 elemEach<JSONObject> { named("versionCode") }.forEach { it.put("data", raised) }
@@ -86,8 +90,8 @@ object VersionCodePatch : ApkPatch {
      * lower code over a higher one (a re-patch, or an update from Steam, must stay installable). Null when
      * it would not fit.
      */
-    fun raisedCode(base: Int, current: Int?, installed: Long?): Int? =
-        maxOf(base.toLong() + offset, (current ?: 0).toLong(), installed ?: 0L).takeIf { it <= Int.MAX_VALUE }?.toInt()
+    fun raisedCode(base: Int, current: Int?, installed: Long?, keep: Boolean = false): Int? =
+        maxOf(if (keep) base.toLong() else base.toLong() + offset, (current ?: 0).toLong(), installed ?: 0L).takeIf { it <= Int.MAX_VALUE }?.toInt()
 
     private fun JSONObject.valueAttribute(): Int? =
         elem<JSONArray>("attributes").elemEach<JSONObject> { named("value") }.firstOrNull()?.opt("data").let { (it as? Number)?.toInt() }

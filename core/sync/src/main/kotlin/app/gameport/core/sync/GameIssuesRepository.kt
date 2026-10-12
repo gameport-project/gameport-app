@@ -90,6 +90,7 @@ class GameIssuesRepository @Inject constructor(
             if (updateAvailable) add(GameIssue.UpdateAvailable)
             if (patchOutdated) add(GameIssue.PatchOutdated)
             if (installer.shouldExplainStoragePermission(appId)) add(GameIssue.StoragePermissionMissing)
+            if (installer.reinstallMayHelp(packageName)) add(GameIssue.ReinstallMayHelp)
             if (packageName in conflictPackages) add(GameIssue.SaveConflict)
             suspected[packageName]?.let { add(GameIssue.ProblemSuspected(crash = it == Suspicion.CRASH)) }
             when (statuses[appId]) {

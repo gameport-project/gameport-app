@@ -231,7 +231,7 @@ class GameInstallRepository @Inject constructor(
                         // Written under another name and renamed when complete, so an interrupted
                         // patch is never mistaken for a finished one.
                         val partial = File(patched.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlcOf(game), missingDlc = missingDlcOf(game), familyShared = game.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = downloadHasExpansion(directory), owner = context.packageName))
+                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || installed.all()[game.appId]?.let(::deviceHasExpansion) == true, achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlcOf(game), missingDlc = missingDlcOf(game), familyShared = game.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = downloadHasExpansion(directory), owner = context.packageName))
                         check(partial.renameTo(patched)) { "Could not finish the patched APK." }
                         // Keep only one copy of a multi-gigabyte game on disk.
                         original.delete()
@@ -439,7 +439,7 @@ class GameInstallRepository @Inject constructor(
                         val result = File(patchedDirectory(directory), original.name)
                         result.parentFile?.mkdirs()
                         val partial = File(result.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = game?.let(::ownedDlcOf), missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = deviceHasExpansion(packageName), owner = context.packageName), patches)
+                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || deviceHasExpansion(packageName), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = game?.let(::ownedDlcOf), missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = deviceHasExpansion(packageName), owner = context.packageName), patches)
                         check(partial.renameTo(result)) { "Could not finish the patched APK." }
                         result
                     }
@@ -586,6 +586,16 @@ class GameInstallRepository @Inject constructor(
     /** True when the download holds expansion files: a `.obb`, or an `obb/` folder the depot spells out. */
     private fun downloadHasExpansion(directory: File): Boolean = directory.walkTopDown().onEnter { it.name != PATCHED_DIR }.any { file ->
         file.isFile && (file.name.endsWith(".obb", ignoreCase = true) || file.relativeTo(directory).path.replace('\\', '/').startsWith("obb/"))
+    }
+
+    /**
+     * True for an installed game that has expansion files and whose version code an earlier patch raised: the version its files are named after and the one it
+     * has may then disagree (some engines write the name they ask for into their own code). A game installed from scratch keeps its version and never is.
+     */
+    fun reinstallMayHelp(packageName: String): Boolean {
+        val original = packages.originalVersionCodeOf(packageName) ?: return false
+        val installedCode = packages.versionCodeOf(packageName) ?: return false
+        return original != installedCode && deviceHasExpansion(packageName)
     }
 
     /** True when the game already has files under `Android/obb`, for a game patched again. */
@@ -778,11 +788,15 @@ class GameInstallRepository @Inject constructor(
      * the game looks for exactly that name (see [app.gameport.core.model.ObbNames], which also covers the overflow files of the largest Unreal games). Patching raises the version code, so the files are renamed to follow it;
      * otherwise the game starts its expansion downloader and never gets going. Best effort, like placing them. Unity reads the same name:
      * its Application.dataPath only points at the expansion file when it is found under the installed version code.
+     * An Unreal game is the other way round: its code holds the version of its expansion file (and the size) as the game was built, and asks for that name
+     * whatever its APK says. Renaming the file after the patched version sends such a game to its expansion downloader, which cannot work here. Its files are
+     * named after the version the game had before patching, which also puts back the ones an earlier GamePort renamed.
      */
     private fun alignObbVersion(packageName: String) {
         if (belongsToOtherGamePort(packageName)) return
         runCatching {
-            val code = packages.versionCodeOf(packageName) ?: return
+            val installed = packages.versionCodeOf(packageName) ?: return
+            val code = app.gameport.core.model.ObbNames.versionFor(installed, packages.originalVersionCodeOf(packageName), packages.isUnreal(packageName)) ?: return
             ExpansionFiles.align(File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName"), packageName, code)
         }
     }
