@@ -8,6 +8,8 @@ import app.gameport.core.steam.session.TokenStore
 import app.gameport.core.steam.GameDownloader
 import app.gameport.core.steam.JavaSteamGameDownloader
 import app.gameport.core.steam.JavaSteamLibraryRepository
+import app.gameport.core.steam.FreeLicenseRepository
+import app.gameport.core.steam.JavaSteamFreeLicenseRepository
 import app.gameport.core.steam.cache.FileLibraryCacheStore
 import app.gameport.core.steam.cache.LibraryCacheStore
 import dagger.Binds
@@ -32,4 +34,7 @@ abstract class SteamModule {
 
     @Binds
     abstract fun bindLibraryRepository(impl: JavaSteamLibraryRepository): SteamLibraryRepository
+
+    @Binds
+    abstract fun bindFreeLicenseRepository(impl: JavaSteamFreeLicenseRepository): FreeLicenseRepository
 }

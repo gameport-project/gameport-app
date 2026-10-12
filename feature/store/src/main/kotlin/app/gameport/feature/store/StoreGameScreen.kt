@@ -33,6 +33,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.LibraryAdd
 import androidx.compose.material.icons.filled.VideogameAsset
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.ThumbUp
@@ -46,6 +47,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import app.gameport.core.designsystem.BackdropDialog
+import app.gameport.core.steam.FreeLicenseOutcome
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -110,7 +116,7 @@ fun StoreGameScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, viewModel: S
                     Text(stringResource(R.string.storegame_not_listed), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     SteamButton(null) { openOnSteam(context, content.appId) }
                 }
-                else -> Details(content, content.app, onGameClick, context)
+                else -> Details(content, content.app, onGameClick, viewModel::onAddToLibrary, context)
             }
         }
     }
@@ -125,7 +131,7 @@ private fun Modifier.pullUp(amount: Dp): Modifier = layout { measurable, constra
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Details(content: StoreGameUiState.Content, app: AndroidApp, onGameClick: (Int) -> Unit, context: Context) {
+private fun Details(content: StoreGameUiState.Content, app: AndroidApp, onGameClick: (Int) -> Unit, onAdd: () -> Unit, context: Context) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.fillMaxWidth().widthIn(max = CONTENT_WIDTH)) {
             Box {
@@ -152,10 +158,11 @@ private fun Details(content: StoreGameUiState.Content, app: AndroidApp, onGameCl
                 )
                 Column(Modifier.weight(1f).height(COVER_WIDTH * 1.5f), verticalArrangement = Arrangement.Bottom) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
-                        Buttons(content, app, onGameClick, context)
+                        Buttons(content, app, onGameClick, onAdd, context)
                     }
                 }
             }
+        }
         }
         if (content.summary != null || content.tags.isNotEmpty()) {
             // The text comes straight, with no title over it.
@@ -188,7 +195,7 @@ private fun Details(content: StoreGameUiState.Content, app: AndroidApp, onGameCl
 }
 
 @Composable
-private fun Buttons(content: StoreGameUiState.Content, app: AndroidApp, onGameClick: (Int) -> Unit, context: Context) {
+private fun Buttons(content: StoreGameUiState.Content, app: AndroidApp, onGameClick: (Int) -> Unit, onAdd: () -> Unit, context: Context) {
     // The button with its note under it, then the figures of the history, each as high as the button and centred on it.
     Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -199,6 +206,46 @@ private fun Buttons(content: StoreGameUiState.Content, app: AndroidApp, onGameCl
     }
     if (content.owned) {
         GlassButton(onClick = { onGameClick(app.appid) }, modifier = Modifier.height(ROW_HEIGHT), contentPadding = BUTTON_PADDING) { Text(stringResource(R.string.storegame_open_library)) }
+    } else if (content.price == StorePrice.Free) {
+        AddToLibrary(content, app, onAdd)
+    }
+}
+
+/**
+ * The button that adds a free game or demo to the library, and what came of it. The account is only written to after the player confirms, in a window that
+ * names the game. Nothing is bought: it is only offered for what costs nothing.
+ */
+@Composable
+private fun AddToLibrary(content: StoreGameUiState.Content, app: AndroidApp, onAdd: () -> Unit) {
+    var asking by rememberSaveable { mutableStateOf(false) }
+    if (asking) {
+        BackdropDialog(
+            onDismissRequest = { asking = false },
+            title = { Text(stringResource(R.string.storegame_add_title)) },
+            text = { Text(stringResource(R.string.storegame_add_text, app.name)) },
+            confirmButton = { GlassButton(onClick = { asking = false; onAdd() }) { Text(stringResource(R.string.storegame_add_confirm)) } },
+            dismissButton = { GlassButton(onClick = { asking = false }) { Text(stringResource(R.string.storegame_add_cancel)) } },
+        )
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        GlassButton(onClick = { asking = true }, enabled = !content.adding, modifier = Modifier.height(ROW_HEIGHT), contentPadding = BUTTON_PADDING) {
+            if (content.adding) {
+                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+            } else {
+                Icon(Icons.Filled.LibraryAdd, contentDescription = null, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(if (content.adding) R.string.storegame_adding else R.string.storegame_add))
+        }
+        // Said under the button, in orange when Steam did not add it: the page does not claim more than Steam said.
+        val note = when (content.added) {
+            FreeLicenseOutcome.NotFree -> R.string.storegame_add_not_free
+            FreeLicenseOutcome.NotConnected -> R.string.storegame_add_not_connected
+            FreeLicenseOutcome.Failed -> R.string.storegame_add_failed
+            FreeLicenseOutcome.AlreadyOwned -> R.string.storegame_add_already
+            else -> null
+        }
+        note?.let { Text(stringResource(it), style = MaterialTheme.typography.labelMedium, color = StoreOrange) }
     }
 }
 

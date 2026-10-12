@@ -34,6 +34,16 @@
     <string name="storegame_players_fails">Problèmes, selon les joueurs</string>
     <string name="storegame_metacritic">Metacritic %1$d</string>
     <string name="storegame_open_steam">Voir sur Steam</string>
+    <string name="storegame_add">Ajouter à la bibliothèque</string>
+    <string name="storegame_adding">Ajout…</string>
+    <string name="storegame_add_title">Ajouter à la bibliothèque</string>
+    <string name="storegame_add_text">%1$s est gratuit. Il sera ajouté à la bibliothèque du compte Steam connecté.</string>
+    <string name="storegame_add_confirm">Ajouter</string>
+    <string name="storegame_add_cancel">Annuler</string>
+    <string name="storegame_add_not_free">Steam ne l\'a pas ajouté d\'ici. Il peut demander sa page Steam, un code ou une promotion.</string>
+    <string name="storegame_add_not_connected">Pas connecté à Steam.</string>
+    <string name="storegame_add_failed">Steam n\'a pas répondu. Réessayer dans un instant.</string>
+    <string name="storegame_add_already">Le compte l\'a déjà.</string>
     <string name="storegame_open_library">Ouvrir sa page dans ma bibliothèque</string>
     <string name="storegame_details">Détails</string>
     <string name="storegame_developer">Développeur</string>

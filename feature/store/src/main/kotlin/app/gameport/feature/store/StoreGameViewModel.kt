@@ -10,6 +10,8 @@ import app.gameport.core.model.Compat
 import app.gameport.core.model.PriceStory
 import app.gameport.core.model.StorePrice
 import app.gameport.core.steam.AccountRegion
+import app.gameport.core.steam.FreeLicenseOutcome
+import app.gameport.core.steam.FreeLicenseRepository
 import app.gameport.core.steam.SteamLibraryRepository
 import app.gameport.core.sync.AndroidCatalogRepository
 import app.gameport.core.sync.CatalogTextsRepository
@@ -53,6 +55,10 @@ sealed interface StoreGameUiState {
         val story: PriceStory?,
         /** The history of the price is being read: its place shows a skeleton. */
         val storyLoading: Boolean = false,
+        /** Steam is being asked to add the game to the library. */
+        val adding: Boolean = false,
+        /** What came of the last request to add it, until the page is left or another request starts. */
+        val added: FreeLicenseOutcome? = null,
     ) : StoreGameUiState
 }
 
@@ -65,6 +71,7 @@ class StoreGameViewModel @Inject constructor(
     compat: CompatRepository,
     private val priceRepository: PriceRepository,
     private val accountRegion: AccountRegion,
+    private val freeLicenses: FreeLicenseRepository,
 ) : ViewModel() {
     private val appId = savedStateHandle.toRoute<StoreGameRoute>().appId
     private val language = CatalogLanguages.of(Locale.getDefault())
@@ -92,9 +99,25 @@ class StoreGameViewModel @Inject constructor(
         }
     }
 
+    /** The request to add the game to the library: running, and what it ended with. */
+    private data class Adding(val running: Boolean = false, val outcome: FreeLicenseOutcome? = null)
+
+    private val adding = MutableStateFlow(Adding())
+
+    /** Asks Steam to add the game to the account. Only for a free game the account does not have, and only one request at a time. */
+    fun onAddToLibrary() {
+        val shown = uiState.value as? StoreGameUiState.Content ?: return
+        if (shown.owned || shown.adding || shown.price != StorePrice.Free) return
+        adding.value = Adding(running = true)
+        viewModelScope.launch {
+            val outcome = freeLicenses.add(appId)
+            adding.value = Adding(outcome = outcome)
+        }
+    }
+
     val uiState: StateFlow<StoreGameUiState> = combine(
-        catalog.observe(), texts.observe(language), texts.observe(ENGLISH), library.observeLibrary(), combine(compat.observe(appId), pricing) { players, priced -> players to priced },
-    ) { listed, mine, english, owned, (players, priced) ->
+        catalog.observe(), texts.observe(language), texts.observe(ENGLISH), library.observeLibrary(), combine(compat.observe(appId), pricing, adding) { players, priced, request -> Triple(players, priced, request) },
+    ) { listed, mine, english, owned, (players, priced, request) ->
         val app = listed?.of(appId)
         StoreGameUiState.Content(
             app = app,
@@ -106,6 +129,8 @@ class StoreGameViewModel @Inject constructor(
             price = priced.price,
             story = priced.story,
             storyLoading = priced.loading,
+            adding = request.running,
+            added = request.outcome,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), StoreGameUiState.Loading)
 

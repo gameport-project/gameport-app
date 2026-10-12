@@ -35,6 +35,16 @@
     <string name="storegame_metacritic">Metacritic %1$d</string>
     <string name="storegame_open_steam">See on Steam</string>
     <string name="storegame_open_library">Open its page in my library</string>
+    <string name="storegame_add">Add to the library</string>
+    <string name="storegame_adding">Adding…</string>
+    <string name="storegame_add_title">Add to the library</string>
+    <string name="storegame_add_text">%1$s is free. It will be added to the library of the signed-in Steam account.</string>
+    <string name="storegame_add_confirm">Add</string>
+    <string name="storegame_add_cancel">Cancel</string>
+    <string name="storegame_add_not_free">Steam did not add it from here. It may need its Steam page, a code or a promotion.</string>
+    <string name="storegame_add_not_connected">Not connected to Steam.</string>
+    <string name="storegame_add_failed">Steam did not answer. Try again in a moment.</string>
+    <string name="storegame_add_already">The account already has it.</string>
     <string name="storegame_details">Details</string>
     <string name="storegame_developer">Developer</string>
     <string name="storegame_publisher">Publisher</string>

@@ -16,6 +16,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
@@ -31,8 +33,13 @@ class JavaSteamLibraryRepository @Inject constructor(
 ) : SteamLibraryRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    /** Raised each time the library has to be read again although nothing about the session changed: a free app was added to the account. */
+    private val rescans = MutableStateFlow(0)
+
+    fun rescan() = rescans.update { it + 1 }
+
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val library: Flow<Library> = combine(sessions.current, auth.offline, auth.authState) { session, offline, state -> Triple(session, offline, state) }
+    private val library: Flow<Library> = combine(sessions.current, auth.offline, auth.authState, rescans) { session, offline, state, round -> Scan(session, offline, state, round) }
         .distinctUntilChanged()
         .flatMapLatest { (session, offline, state) ->
             when {
@@ -47,6 +54,9 @@ class JavaSteamLibraryRepository @Inject constructor(
     override fun observeLibrary(): Flow<Library> = library
 
     override fun observeGame(appId: Int): Flow<Game?> = library.map { lib -> lib.games.firstOrNull { it.appId == appId } }
+
+    /** What a scan depends on: the session, the connection, who is signed in, and how many times it was asked again. */
+    private data class Scan(val session: app.gameport.core.steam.session.SteamSession?, val offline: Boolean, val state: AuthState, val round: Int)
 
     private companion object {
         const val STOP_TIMEOUT_MS = 30_000L
