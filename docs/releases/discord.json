@@ -11,5 +11,13 @@
   "0.8.1": {
     "images": [],
     "intro": "A small release: a fix for the controller mapping, and demos, betas and applications in the store."
+  },
+  "0.8.2": {
+    "images": [
+      "docs/screenshots/store-add-free-game.png",
+      "docs/screenshots/store-filters-price.png",
+      "docs/screenshots/game-incompatible.png"
+    ],
+    "intro": "Free games and demos can now be added to the library from the store, the store has more filters, and the games that cannot run are marked online."
   }
 }

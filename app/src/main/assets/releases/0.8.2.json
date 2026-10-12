@@ -1,0 +1,112 @@
+{
+  "version": "0.8.2",
+  "previous": "0.8.1",
+  "code": 802,
+  "patchNeeded": true,
+  "window": {
+    "items": [
+      {
+        "id": "add-free-game",
+        "icon": "download",
+        "text": {
+          "en": "A free game or demo can be added to the library from its page in the store, with one button and a confirmation.",
+          "fr": "Un jeu ou une démo gratuits s'ajoutent à la bibliothèque depuis leur page du store, avec un bouton et une confirmation."
+        }
+      },
+      {
+        "id": "store-filters",
+        "icon": "info",
+        "text": {
+          "en": "The filters of the store have a choice of price (free or paid) and of adult content.",
+          "fr": "Les filtres du store ont un choix de prix (gratuit ou payant) et de contenu pour adultes."
+        }
+      },
+      {
+        "id": "multiplayer-warning",
+        "icon": "warning",
+        "text": {
+          "en": "The page of a game with a multiplayer part says it plainly: the online side does not work for now, and the game may not even start.",
+          "fr": "La page d'un jeu qui a une partie multijoueur le dit clairement : la partie en ligne ne fonctionne pas pour le moment, et le jeu peut même ne pas démarrer."
+        }
+      },
+      {
+        "id": "incompatible-online",
+        "icon": "info",
+        "text": {
+          "en": "The list of games that cannot run is now kept online: a game is marked as incompatible, with the reason in red on its page, as soon as it is confirmed, and no longer needs a new version of GamePort.",
+          "fr": "La liste des jeux qui ne peuvent pas fonctionner est maintenant tenue en ligne : un jeu est marqué incompatible, avec la raison en rouge sur sa page, dès qu'il est confirmé, sans attendre une nouvelle version de GamePort."
+        }
+      },
+      {
+        "id": "expansion-files",
+        "icon": "check",
+        "text": {
+          "en": "A game with expansion files keeps its own version number when it is patched, so the files it looks for are the ones that are there. When a reinstall may help, its page says so.",
+          "fr": "Un jeu avec des fichiers d'extension garde son propre numéro de version quand il est patché, pour que les fichiers qu'il cherche soient bien ceux qui sont là. Quand une réinstallation peut aider, sa page le dit."
+        }
+      }
+    ]
+  },
+  "notes": [
+    {
+      "id": "section-0",
+      "title": {
+        "en": "New features",
+        "fr": "Nouvelles fonctionnalités"
+      },
+      "items": [
+        {
+          "id": "item-0-0",
+          "text": {
+            "en": "**Add a free game to the library.** On the page of a free game or demo in the store, a button adds it to the library of the signed-in Steam account, after a confirmation that names the game. It only offers what costs nothing, and says under the button when Steam did not add it.",
+            "fr": "**Ajouter un jeu gratuit à la bibliothèque.** Sur la page d'un jeu ou d'une démo gratuits dans le store, un bouton l'ajoute à la bibliothèque du compte Steam connecté, après une confirmation qui nomme le jeu. Il ne propose que ce qui ne coûte rien, et dit sous le bouton quand Steam ne l'a pas ajouté."
+          }
+        },
+        {
+          "id": "item-0-1",
+          "text": {
+            "en": "**More filters in the store.** Free or paid, and adult content only or hidden, next to the choice of type, with the choices that cannot go together kept apart.",
+            "fr": "**Plus de filtres dans le store.** Gratuit ou payant, et contenu pour adultes seulement ou masqué, à côté du choix de type, avec les choix qui ne vont pas ensemble tenus à part."
+          }
+        },
+        {
+          "id": "item-0-2",
+          "text": {
+            "en": "**A warning on multiplayer games.** The page of a game with a multiplayer or co-op part says that its online side does not work for now, and that the game may not start. GamePort focuses on single player and saves.",
+            "fr": "**Un avertissement sur les jeux multijoueurs.** La page d'un jeu avec une partie multijoueur ou coopérative dit que sa partie en ligne ne fonctionne pas pour le moment, et que le jeu peut ne pas démarrer. GamePort se concentre sur le solo et les sauvegardes."
+          }
+        },
+        {
+          "id": "item-0-3",
+          "text": {
+            "en": "**Incompatible games, kept online.** A game confirmed as unable to run is shown as incompatible in the store, in the library and on its own page, with the reason in red. The list and its reasons are updated online, so a game that starts working again is back at once, with no new version.",
+            "fr": "**Les jeux incompatibles, tenus en ligne.** Un jeu confirmé comme impossible à faire fonctionner est montré comme incompatible dans le store, dans la bibliothèque et sur sa propre page, avec la raison en rouge. La liste et ses raisons se mettent à jour en ligne : un jeu qui refonctionne revient aussitôt, sans nouvelle version."
+          }
+        },
+        {
+          "id": "item-0-4",
+          "text": {
+            "en": "**A clearer problem report.** The report a player sends now holds a readable summary of the last crash (the signal, the address, the thread and the top of its stack), and the log of the game is saved more often at the start and again at the moment of a crash, so a game that quits at once leaves something to read.",
+            "fr": "**Un rapport de problème plus clair.** Le rapport qu'un joueur envoie contient maintenant un résumé lisible du dernier plantage (le signal, l'adresse, le fil d'exécution et le haut de sa pile), et le journal du jeu est enregistré plus souvent au début et au moment d'un plantage, pour qu'un jeu qui quitte aussitôt laisse quelque chose à lire."
+          }
+        }
+      ]
+    },
+    {
+      "id": "section-1",
+      "title": {
+        "en": "Fixes",
+        "fr": "Corrections"
+      },
+      "items": [
+        {
+          "id": "item-1-0",
+          "text": {
+            "en": "A game with expansion files no longer gets a raised version number when it is patched: the files named after its version are the ones the game finds. When uninstalling and installing it again may help, its page says so.",
+            "fr": "Un jeu avec des fichiers d'extension ne reçoit plus un numéro de version relevé quand il est patché : les fichiers nommés d'après sa version sont ceux que le jeu trouve. Quand le désinstaller puis le réinstaller peut aider, sa page le dit."
+          }
+        }
+      ]
+    }
+  ]
+}
