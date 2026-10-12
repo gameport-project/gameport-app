@@ -39,7 +39,8 @@ final class SessionLog {
     private static final int MAX_ENGINE_BYTES = 120_000;
     private static final int MAX_TRACE_BYTES = 1_500_000;
     /** The first minutes are the ones that explain a game that closes at once: send often, then rarely. */
-    private static final long[] EARLY_FLUSHES_MS = {2_000, 5_000, 10_000, 20_000, 40_000};
+    // Close together at first: an engine writes its log in bursts, and a game that fails does so within seconds of its start.
+    private static final long[] EARLY_FLUSHES_MS = {2_000, 4_000, 6_000, 8_000, 10_000, 14_000, 20_000, 30_000, 40_000};
     private static final long LATER_FLUSH_MS = 30_000;
 
     private final Context context;
@@ -59,6 +60,7 @@ final class SessionLog {
     private String sentLibraries = "";
     private volatile String launchInfo = "";
     private String lastEngineDigest = "";
+    private volatile boolean crashFlushed = false;
 
     SessionLog(Context context) {
         this.context = context.getApplicationContext();
@@ -130,6 +132,12 @@ final class SessionLog {
                         if (tail.size() > TAIL_LINES) tail.removeFirst();
                     }
                     version++;
+                }
+                // A native crash writes this line from the crashing process, which then waits a moment for the crash dumper: that moment is enough to send the log
+                // and the engine's own log files, which would be lost with the process otherwise.
+                if (!crashFlushed && line.contains("Fatal signal ")) {
+                    crashFlushed = true;
+                    try { flush(); } catch (Throwable t) { Log.w(TAG, "the log cannot be sent at the crash", t); }
                 }
             }
         } catch (Throwable t) {

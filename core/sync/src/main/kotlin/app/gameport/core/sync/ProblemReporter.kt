@@ -139,6 +139,8 @@ class ProblemReporter @Inject constructor(
                 if (!lean) entry("engine-logs.txt", clean(store.text(packageName, "engine.log").ifBlank { "(no log file of the game's engine found)" }))
                 entry("last-exits.txt", clean(ExitReasons.withTimes(store.previousExit(packageName)).ifBlank { "(not available)" }))
                 entry("diagnosis.txt", ReportDiagnosis.of(store.text(packageName, "libraries.txt"), store.text(packageName, "log-start.txt"), store.previousExit(packageName), store.lastDataMillis(packageName)?.let { (System.currentTimeMillis() - it) / 1000 }, expansionFacts(packageName)))
+                // The crash in words, in every report (it is a few lines); the trace itself only in the full one.
+                store.bytes(packageName, "tombstone.pb")?.let { trace -> CrashSummary.of(trace)?.let { entry("crash-summary.txt", clean(it)) } }
                 store.bytes(packageName, "tombstone.pb")?.takeIf { !lean }?.let { trace ->
                     zip.putNextEntry(ZipEntry("crash-tombstone.pb"))
                     zip.write(trace)
@@ -397,6 +399,7 @@ class ProblemReporter @Inject constructor(
             previous-run-log-*.txt the same for the run before the last one, when there was one
             engine-logs.txt       log files the game's engine wrote in the game's folders, when there are some
             last-exits.txt        how the last runs ended, as Android recorded it
+            crash-summary.txt     the last native crash in words: the signal, the address that faulted, the thread that crashed and the top of its call stack
             crash-tombstone.pb    Android's crash report of the last native crash, when there was one (binary; it holds
                                   the call stack and technical memory data of the game process)
             install.txt           for a failed install: the error, the download folder and what its APKs say about themselves

@@ -15,7 +15,8 @@ object ReportDiagnosis {
         val known = libraries.isNotBlank() && !libraries.startsWith("(")
         appendLine("hook of GamePort ran in the game: " + if (startLog.isBlank() || startLog.startsWith("(")) "unknown (no log handed over)" else yes(startLog.contains("GPHook")))
         if (known) {
-            appendLine("OpenXR loader loaded: " + yes(libraries.contains("libopenxr_loader")))
+            val loader = libraries.contains("libopenxr_loader") || libraries.contains("libopenxr_forwardloader")
+            appendLine("OpenXR loader loaded: " + if (loader) "yes" else "not in this list (the game may use a vendor SDK instead, which says nothing against it, or load it later)")
             appendLine("OpenXR layer of GamePort loaded: " + yes(libraries.contains("XrApiLayer_gameport")))
             appendLine("Steam library loaded: " + yes(libraries.contains("libsteam_api") || libraries.contains("libsteamclient")))
         } else {
