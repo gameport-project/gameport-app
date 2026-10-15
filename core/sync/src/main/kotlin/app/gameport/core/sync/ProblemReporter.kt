@@ -138,7 +138,7 @@ class ProblemReporter @Inject constructor(
                 store.previousHookLog(packageName).takeIf { it.isNotBlank() }?.let { entry("previous-run-log.txt", clean(it)) }
                 if (!lean) entry("engine-logs.txt", clean(store.text(packageName, "engine.log").ifBlank { "(no log file of the game's engine found)" }))
                 entry("last-exits.txt", clean(ExitReasons.withTimes(store.previousExit(packageName)).ifBlank { "(not available)" }))
-                entry("diagnosis.txt", ReportDiagnosis.of(store.text(packageName, "libraries.txt"), store.text(packageName, "log-start.txt"), store.previousExit(packageName), store.lastDataMillis(packageName)?.let { (System.currentTimeMillis() - it) / 1000 }, expansionFacts(packageName)))
+                entry("diagnosis.txt", ReportDiagnosis.of(store.text(packageName, "libraries.txt"), store.text(packageName, "log-start.txt"), store.previousExit(packageName), store.lastDataMillis(packageName)?.let { (System.currentTimeMillis() - it) / 1000 }, expansionFacts(packageName), ReportDiagnosis.Launch(events.lastTimeOf(game.appId, app.gameport.core.install.LAUNCH_NOTE), store.lastDataMillis(packageName), System.currentTimeMillis(), onPico = device.vrPlatform?.id == "pico"), vendorChecks(packageName)))
                 // The crash in words, in every report (it is a few lines); the trace itself only in the full one.
                 store.bytes(packageName, "tombstone.pb")?.let { trace -> CrashSummary.of(trace)?.let { entry("crash-summary.txt", clean(it)) } }
                 store.bytes(packageName, "tombstone.pb")?.takeIf { !lean }?.let { trace ->
@@ -284,6 +284,15 @@ class ProblemReporter @Inject constructor(
         val interesting = listOf("vr", "xr", "oculus", "pico", "meta", "tracking", "passthrough", "controller", "openxr", "vulkan", "opengl")
         context.packageManager.systemAvailableFeatures.mapNotNull { it.name }.filter { name -> interesting.any { name.contains(it, ignoreCase = true) } }.sorted()
             .forEach { appendLine("  $it") }
+    }
+
+    /** The checks of the headset's maker the game carries (see [ReportDiagnosis.vendorChecks]), read from its manifest and the names inside its APK. */
+    private fun vendorChecks(packageName: String): List<String> {
+        val info = runCatching { context.packageManager.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS or PackageManager.GET_META_DATA) }.getOrNull()
+        val entries = packages.apkFilesOf(packageName).flatMap { apk ->
+            runCatching { java.util.zip.ZipFile(apk).use { zip -> zip.entries().asSequence().map { it.name }.toList() } }.getOrDefault(emptyList())
+        }
+        return ReportDiagnosis.vendorChecks(info?.requestedPermissions?.toList().orEmpty(), info?.applicationInfo?.metaData?.keySet()?.toList().orEmpty(), entries)
     }
 
     private fun apkContents(packageName: String): String = buildString {

@@ -10,7 +10,24 @@ object ReportDiagnosis {
         enum class Folder { ABSENT, NOT_READABLE, READABLE }
     }
 
-    fun of(libraries: String, startLog: String, previousExit: String, dataAgeSeconds: Long?, expansion: Expansion? = null): String = buildString {
+    /**
+     * When GamePort last started the game ([launchedAtMillis], null when it never recorded one) and when the game last handed something over ([dataAtMillis]):
+     * a game that was started and handed nothing over after that closed, or was refused, before its hook ran.
+     */
+    data class Launch(val launchedAtMillis: Long?, val dataAtMillis: Long?, val nowMillis: Long, val onPico: Boolean = false)
+
+    /**
+     * The checks a headset maker builds into its own store apps, found in the game's manifest and APK. GamePort re-signs the game to patch it, and such a check
+     * can refuse the re-signed game at start (Pico shows "illegal signature") without a single line in any log.
+     */
+    fun vendorChecks(permissions: List<String>, metaKeys: List<String>, apkEntries: List<String>): List<String> = buildList {
+        if (permissions.any { it.contains("tobactivate", ignoreCase = true) || it.endsWith("AUTH_CHECK") }) add("Pico: the permission ${permissions.first { it.contains("tobactivate", ignoreCase = true) || it.endsWith("AUTH_CHECK") }} (the headset checks the app with its maker)")
+        if ("pvr.app.id" in metaKeys) add("Pico: the app id pvr.app.id (the app is registered with the Pico store, whose check looks at the signature)")
+        if (apkEntries.any { it.endsWith("libpxrplatformloader.so") }) add("Pico: libpxrplatformloader.so (the Pico platform SDK, which can check the app's licence)")
+        if (apkEntries.any { it.endsWith("libovrplatformloader.so") }) add("Meta: libovrplatformloader.so (the Meta platform SDK, which can check the app's entitlement)")
+    }
+
+    fun of(libraries: String, startLog: String, previousExit: String, dataAgeSeconds: Long?, expansion: Expansion? = null, launch: Launch? = null, vendorChecks: List<String> = emptyList()): String = buildString {
         fun yes(value: Boolean) = if (value) "yes" else "no"
         val known = libraries.isNotBlank() && !libraries.startsWith("(")
         appendLine("hook of GamePort ran in the game: " + if (startLog.isBlank() || startLog.startsWith("(")) "unknown (no log handed over)" else yes(startLog.contains("GPHook")))
@@ -26,6 +43,11 @@ object ReportDiagnosis {
             appendLine("last data from the game: $it s before this report")
             if (it > STALE_SECONDS) appendLine("  (old: what the lists hold may be from the start of the run, not from now)")
         }
+        launch?.let { appendLaunch(it, vendorChecks.isNotEmpty()) }
+        if (vendorChecks.isNotEmpty()) {
+            appendLine("checks built into the game by the headset's maker (a re-signed game can be refused by them, at start and without a log line):")
+            vendorChecks.forEach { appendLine("  $it") }
+        }
         expansion?.let { appendExpansion(it) }
         appendControllers(startLog)
         val exits = previousExit.lineSequence().filter { it.startsWith("time=") }.toList()
@@ -35,6 +57,25 @@ object ReportDiagnosis {
             val summary = exits.groupingBy { line -> field(line, "reason") + (field(line, "status").takeIf { line.contains("reason=SIGNALED") }?.let { "/$it" } ?: "") }.eachCount()
             appendLine("last exits (newest first, as Android recorded them): " + summary.entries.joinToString(", ") { "${it.key} x${it.value}" })
             appendLine("  A game closed from the system menu can also end as SIGNALED/9: this alone does not say it failed.")
+        }
+    }
+
+    private fun StringBuilder.appendLaunch(launch: Launch, hasVendorChecks: Boolean) {
+        val at = launch.launchedAtMillis
+        if (at == null) {
+            appendLine("launch from GamePort: none recorded (the game was not started from GamePort, or this GamePort did not record it)")
+            return
+        }
+        appendLine("last launch from GamePort: ${(launch.nowMillis - at) / 1000} s before this report")
+        val answered = launch.dataAtMillis != null && launch.dataAtMillis >= at
+        appendLine("the game answered after that launch (its hook handed something over): " + if (answered) "yes" else "no")
+        if (!answered) {
+            appendLine("  The game was started and nothing came back from it: it was closed, or refused by the system, before its hook ran.")
+            appendLine("  A dialog of the system leaves no line in any log; ask the player what appeared on screen." + if (hasVendorChecks) " The checks below may explain it." else "")
+            if (launch.onPico) {
+                appendLine("  On a Pico, the system itself refuses a re-signed game with \"Verification failed: illegal signature\" (Cancel / Buy now), before the game runs.")
+                appendLine("  It was seen on games whose manifest carries no Pico marker, so a game without the checks below can be refused as well.")
+            }
         }
     }
 

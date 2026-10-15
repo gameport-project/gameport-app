@@ -557,9 +557,14 @@ class GameInstallRepository @Inject constructor(
 
     /** The intent that starts the installed game, or null when it is not installed. */
     /** [isVr] false starts a flat game as a normal window, without the immersive categories of a headset. */
-    fun launchIntent(appId: Int, isVr: Boolean? = null) = installed.all()[appId]?.takeIf { !belongsToOtherGamePort(it) }?.also(::alignObbVersion)?.let { packages.launchIntent(it, immersive = isVr != false) }
+    fun launchIntent(appId: Int, isVr: Boolean? = null): Intent? {
+        val packageName = installed.all()[appId]?.takeIf { !belongsToOtherGamePort(it) } ?: return null
+        alignObbVersion(packageName)
         // The patched game reads this mark to know GamePort started it, so it can open GamePort again when it closes.
-        ?.also { it.putExtra("app.gameport.launched", true); playHistory.markPlayed(appId) }
+        return packages.launchIntent(packageName, immersive = isVr != false)
+            ?.also { it.putExtra("app.gameport.launched", true); playHistory.markPlayed(appId); events.note(appId, "$LAUNCH_NOTE: ${it.component?.flattenToShortString() ?: it.`package`}") }
+    }
+
 
     /** Checked before the download: see [SpaceNeeds]. Games whose size Steam does not tell are not checked. */
     private fun notEnoughSpace(appId: Int, depots: List<AndroidDepot>): InstallError? {
@@ -773,13 +778,18 @@ class GameInstallRepository @Inject constructor(
     private suspend fun placeExpansionFiles(appId: Int, directory: File, packageName: String) = withContext(Dispatchers.IO) {
         runCatching {
             val target = File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName")
-            val placed = ExpansionFiles.place(directory, target, packageName, skipped = PATCHED_DIR)
+            val problems = mutableListOf<String>()
+            val placed = ExpansionFiles.place(directory, target, packageName, skipped = PATCHED_DIR, problems = problems)
             if (placed.isNotEmpty()) {
                 events.note(appId, "placed in Android/obb/$packageName: ${placed.take(MAX_PLACED_LISTED).joinToString()}${if (placed.size > MAX_PLACED_LISTED) " and ${placed.size - MAX_PLACED_LISTED} more" else ""}")
-            } else {
+            } else if (problems.isEmpty()) {
                 events.note(appId, "no expansion file to place in Android/obb/$packageName")
             }
-        }
+            // A file that could not be placed is lost with the download folder: the report says which one and why.
+            if (problems.isNotEmpty()) {
+                events.note(appId, "${problems.size} expansion file(s) could NOT be placed in Android/obb/$packageName (the download is deleted afterwards): " + problems.take(MAX_PLACED_LISTED).joinToString("; "))
+            }
+        }.onFailure { events.failure(appId, "placing the expansion files", it) }
         alignObbVersion(packageName)
     }
 
@@ -822,6 +832,9 @@ class GameInstallRepository @Inject constructor(
 }
 
 private const val PATCHED_DIR = "patched"
+
+/** What the event log says each time the game is started from GamePort: a problem report reads it back to tell whether the game answered. */
+const val LAUNCH_NOTE = "launch requested from GamePort"
 
 /** How long "patch all" waits for a confirmation of the system before it gives a game up and goes on. */
 private const val RUN_CONFIRM_TIMEOUT_MS = 3 * 60_000L

@@ -14,9 +14,10 @@ internal object ExpansionFiles {
      * placed, relative to [target]. A game whose download holds only its APK has nothing to move and [target] is not even created.
      * [skipped] names a folder of [downloaded] that holds the patched APKs and is left alone. A file is moved when it can be, so one of
      * several gigabytes is not copied while its download is still on the disk; it is copied and removed when it cannot.
-     * One file that fails does not stop the others. Each file is made readable by all.
+     * One file that fails does not stop the others. Each file is made readable by all. What went wrong is added to [problems], one line each (the file and the
+     * error), so a report can say why nothing was placed instead of saying there was nothing to place.
      */
-    fun place(downloaded: File, target: File, packageName: String, skipped: String): List<String> {
+    fun place(downloaded: File, target: File, packageName: String, skipped: String, problems: MutableList<String> = mutableListOf()): List<String> {
         val files = downloaded.walkTopDown()
             .onEnter { it.name != skipped }
             .filter { it.isFile }
@@ -28,7 +29,7 @@ internal object ExpansionFiles {
                 if (inFolder.isEmpty()) all else all.filter { (file, _) -> file in inFolder.map { it.first } || file.name.endsWith(".obb", ignoreCase = true) }
             }
         if (files.isEmpty()) return emptyList()
-        target.mkdirs()
+        if (!target.mkdirs() && !target.isDirectory) problems += "the folder ${target.path} cannot be created (exists=${target.exists()}, parent writable=${target.parentFile?.canWrite()})"
         // A new version of the game replaces the expansion files of the old one, whatever code they were renamed to.
         ObbNames.superseded(target.list().orEmpty().toList(), files.map { it.second }, packageName).forEach { File(target, it).delete() }
         val placed = mutableListOf<String>()
@@ -43,7 +44,7 @@ internal object ExpansionFiles {
                 // A file that GamePort puts there is GamePort's, with a mode that keeps everyone else out; the game is not its owner, and
                 // can only read it when it is open to all (Android treats the `.obb` apart, which is why those were never a problem).
                 destination.setReadable(true, false)
-            }.onSuccess { placed += relative }
+            }.onSuccess { placed += relative }.onFailure { problems += "$relative (${file.length()} bytes): ${it.javaClass.simpleName}: ${it.message}" }
         }
         return placed
     }

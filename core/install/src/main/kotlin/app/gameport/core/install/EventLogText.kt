@@ -22,6 +22,19 @@ object EventLogText {
     /** Only the entries of [appId]. */
     fun entriesOf(text: String, appId: Int): String = filter(text) { _, id -> id == appId.toString() }
 
+    /** The time of the last entry of [appId] whose message starts with [message] (after the version of GamePort), or null. */
+    fun lastTimeOf(text: String, appId: Int, message: String): Long? {
+        val format = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+        var found: Long? = null
+        for (line in text.lineSequence()) {
+            val match = header.find(line) ?: continue
+            if (match.groupValues[2] != appId.toString()) continue
+            val rest = line.substring(match.range.last + 1).substringAfter(" ", "")
+            if (rest.startsWith(message)) found = runCatching { format.parse(match.groupValues[1])!!.time }.getOrNull() ?: found
+        }
+        return found
+    }
+
     private fun filter(text: String, keep: (time: String, appId: String) -> Boolean): String {
         val out = StringBuilder()
         var keeping = true

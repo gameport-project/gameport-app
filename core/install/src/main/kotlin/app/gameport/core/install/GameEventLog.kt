@@ -36,6 +36,10 @@ class GameEventLog @Inject constructor(
     @Synchronized
     fun read(appId: Int): String = runCatching { EventLogText.entriesOf(file.readText(), appId) }.getOrDefault("")
 
+    /** When the last entry of [appId] that starts with [message] was written, in milliseconds, or null when there is none. */
+    @Synchronized
+    fun lastTimeOf(appId: Int, message: String): Long? = runCatching { EventLogText.lastTimeOf(file.readText(), appId, message) }.getOrNull()
+
     @Synchronized
     fun purgeOlderThan(cutoffMillis: Long) = rewrite { EventLogText.purgeOlderThan(it, cutoffMillis) }
 

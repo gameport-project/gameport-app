@@ -51,4 +51,16 @@ class EventLogTextTest {
         val text = "2026-10-02 09:00:00 app=7 gp=0.7.3 installed x\n2026-10-02 09:01:00 app=8 gp=0.7.3 installed y\n"
         assertEquals("2026-10-02 09:00:00 app=7 gp=0.7.3 installed x\n", EventLogText.entriesOf(text, 7))
     }
+
+    @Test
+    fun `the time of the last launch of a game is found, and only for that game`() {
+        val log = "2026-10-15 09:00:00 app=1 gp=0.8.2 launch requested from GamePort: x/y\n" +
+            "2026-10-15 09:30:00 app=2 gp=0.8.2 launch requested from GamePort: x/z\n" +
+            "2026-10-15 10:00:00 app=1 gp=0.8.2 launch requested from GamePort: x/y\n" +
+            "2026-10-15 10:05:00 app=1 gp=0.8.2 installed something\n"
+        val format = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+        assertEquals(format.parse("2026-10-15 10:00:00")!!.time, EventLogText.lastTimeOf(log, 1, "launch requested"))
+        assertEquals(format.parse("2026-10-15 09:30:00")!!.time, EventLogText.lastTimeOf(log, 2, "launch requested"))
+        assertEquals(null, EventLogText.lastTimeOf(log, 3, "launch requested"))
+    }
 }

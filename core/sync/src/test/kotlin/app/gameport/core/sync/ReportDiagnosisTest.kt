@@ -89,4 +89,43 @@ class ReportDiagnosisTest {
         assertTrue(!ReportDiagnosis.of("", "", "", null).contains("controllers"))
         assertTrue(!ReportDiagnosis.of("", "(the game has not handed over its log yet)", "", null).contains("controllers"))
     }
+
+    @Test
+    fun `a game that was started and never answered is said so, with the checks of the maker`() {
+        val checks = ReportDiagnosis.vendorChecks(
+            permissions = listOf("android.permission.INTERNET", "com.pvr.tobactivate.permission.AUTH_CHECK"),
+            metaKeys = listOf("unity.splash-mode", "pvr.app.id"),
+            apkEntries = listOf("lib/arm64-v8a/libpxrplatformloader.so", "lib/arm64-v8a/libil2cpp.so"),
+        )
+        assertTrue(checks.toString(), checks.size == 3 && checks.all { it.startsWith("Pico") })
+        val text = ReportDiagnosis.of("", "", "", null, launch = ReportDiagnosis.Launch(launchedAtMillis = 1_000_000, dataAtMillis = null, nowMillis = 1_060_000), vendorChecks = checks)
+        assertTrue(text, text.contains("last launch from GamePort: 60 s before this report"))
+        assertTrue(text, text.contains("its hook handed something over): no"))
+        assertTrue(text, text.contains("The checks below may explain it"))
+        assertTrue(text, text.contains("pvr.app.id"))
+    }
+
+    @Test
+    fun `data older than the launch is not an answer, newer data is`() {
+        fun say(data: Long?) = ReportDiagnosis.of("", "", "", null, launch = ReportDiagnosis.Launch(launchedAtMillis = 5_000, dataAtMillis = data, nowMillis = 9_000))
+        assertTrue(say(1_000).contains("handed something over): no"))
+        assertTrue(say(6_000).contains("handed something over): yes"))
+        assertTrue(!say(6_000).contains("nothing came back"))
+    }
+
+    @Test
+    fun `no launch recorded is said, and no maker check is said when there is none`() {
+        val text = ReportDiagnosis.of("", "", "", null, launch = ReportDiagnosis.Launch(null, null, 1_000))
+        assertTrue(text, text.contains("launch from GamePort: none recorded"))
+        assertTrue(text, !text.contains("checks built into the game"))
+        assertTrue(ReportDiagnosis.vendorChecks(listOf("android.permission.INTERNET"), listOf("unity.splash-mode"), listOf("lib/arm64-v8a/libunity.so")).isEmpty())
+    }
+
+    @Test
+    fun `on a Pico a game that never answered gets the line about the illegal signature even without a marker`() {
+        val text = ReportDiagnosis.of("", "", "", null, launch = ReportDiagnosis.Launch(1_000, null, 2_000, onPico = true))
+        assertTrue(text, text.contains("Verification failed: illegal signature"))
+        assertTrue(text, text.contains("no Pico marker"))
+        assertTrue(text, !ReportDiagnosis.of("", "", "", null, launch = ReportDiagnosis.Launch(1_000, null, 2_000)).contains("Verification failed"))
+    }
 }

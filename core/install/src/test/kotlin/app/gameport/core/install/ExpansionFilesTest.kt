@@ -27,6 +27,17 @@ class ExpansionFilesTest {
     }
 
     @Test
+    fun `a file that cannot be placed is told with the reason, not passed off as nothing to place`() {
+        // "obb" is a file, so the folder of the game cannot be made under it: every placement fails.
+        File(folder.root, "obb").writeText("not a folder")
+        val problems = mutableListOf<String>()
+        val placed = ExpansionFiles.place(download("main.5.$pkg.obb"), File(folder.root, "obb/$pkg"), pkg, skipped = "patched", problems = problems)
+        assertEquals(emptyList<String>(), placed)
+        assertTrue(problems.toString(), problems.any { it.contains("cannot be created") })
+        assertTrue(problems.toString(), problems.any { it.startsWith("main.5.$pkg.obb") })
+    }
+
+    @Test
     fun `an Unreal game's file goes back to the version the game had before patching`() {
         val dir = folder.newFolder("obb-unreal")
         File(dir, "main.1034.$pkg.obb").writeText("data")
