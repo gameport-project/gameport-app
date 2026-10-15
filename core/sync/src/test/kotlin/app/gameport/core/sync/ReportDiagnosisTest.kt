@@ -128,4 +128,13 @@ class ReportDiagnosisTest {
         assertTrue(text, text.contains("no Pico marker"))
         assertTrue(text, !ReportDiagnosis.of("", "", "", null, launch = ReportDiagnosis.Launch(1_000, null, 2_000)).contains("Verification failed"))
     }
+
+    @Test
+    fun `the report says whether GamePort has the access to all files and can write the obb folder`() {
+        val text = ReportDiagnosis.of("", "", "", null, ReportDiagnosis.Expansion(declared = true, folder = ReportDiagnosis.Expansion.Folder.ABSENT, files = 0, allFilesAccess = false, obbFolderWritable = false))
+        assertTrue(text, text.contains("access to all files given to GamePort: no"))
+        assertTrue(text, text.contains("Android/obb folder can be written by GamePort: no"))
+        val given = ReportDiagnosis.of("", "", "", null, ReportDiagnosis.Expansion(declared = true, folder = ReportDiagnosis.Expansion.Folder.READABLE, files = 3, allFilesAccess = true, obbFolderWritable = true))
+        assertTrue(given, given.contains("access to all files given to GamePort: yes"))
+    }
 }

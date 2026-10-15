@@ -61,6 +61,7 @@ class GameInstallRepository @Inject constructor(
     private val patcher: GamePatcher,
     private val packages: PackageGateway,
     private val installed: InstalledGames,
+    private val incomplete: IncompleteInstalls,
     private val builds: InstalledBuilds,
     private val updates: GameUpdatesRepository,
     private val library: app.gameport.core.steam.SteamLibraryRepository,
@@ -106,12 +107,15 @@ class GameInstallRepository @Inject constructor(
     /** Every game that is being installed, left half-installed, or installed: the downloads page. */
     fun observeAll(): Flow<Map<Int, InstallState>> =
         combine(operations, packages.packageChanges()) { ops, _ ->
-            (ops.keys + installed.all().keys + leftoverIds()).associateWith { stateOf(it, ops) }
+            (ops.keys + installed.all().keys + incomplete.all().keys + leftoverIds()).associateWith { stateOf(it, ops) }
                 .filterValues { it !is InstallState.NotInstalled }
         }
 
     private fun stateOf(appId: Int, ops: Map<Int, InstallState>): InstallState =
         ops[appId]
+            // The APK is on the device but the game's data is not in place: not installed, and said so until it is put right or removed. Looked at before the
+            // list of installed games, which can still hold the entry of the version this one replaced.
+            ?: incomplete.all()[appId]?.takeIf(packages::isInstalled)?.let { InstallState.Failed(InstallError.ExpansionFiles) }
             ?: installed.all()[appId]?.takeIf(packages::isInstalled)?.let { InstallState.Installed(it, otherGamePortOf(it)) }
             ?: if (hasLeftovers(appId)) InstallState.Interrupted else InstallState.NotInstalled
 
@@ -244,13 +248,32 @@ class GameInstallRepository @Inject constructor(
                     return@launch clearState(game.appId)
                 }
 
+                // Access to all files is checked for every game that has expansion files, and asked once: when it is given it stays. A device that has no page
+                // for it is not stopped (the files are tried anyway).
+                if (ExpansionAccessRule.mustAsk(downloadHasExpansion(directory), android.os.Build.VERSION.SDK_INT, hasAllFilesAccess(), ExpansionStorageAccess.settingsPageExists(context))) {
+                    events.note(game.appId, "waiting for GamePort to be given access to all files before installing a game with expansion files")
+                    return@launch fail(game.appId, InstallError.ExpansionStoragePermission)
+                }
+
+                // A game that was left incomplete is already on the device: only its data is placed again.
+                val alreadyOnDevice = incomplete.all()[game.appId] == packageName && packages.isInstalled(packageName)
+                if (alreadyOnDevice) events.note(game.appId, "$packageName is already on the device, incomplete: only its expansion files are placed again")
                 setState(game.appId, InstallState.Installing)
-                when (val outcome = packages.install(apks)) {
+                when (val outcome = if (alreadyOnDevice) PackageGateway.Outcome.Success else packages.install(apks)) {
                     PackageGateway.Outcome.Success -> {
-                        events.note(game.appId, "installed $packageName")
+                        if (!alreadyOnDevice) events.note(game.appId, "installed $packageName")
                         // Not playable yet: the expansion files have to be in place, under the name the game looks for.
                         setState(game.appId, InstallState.Finishing)
-                        placeExpansionFiles(game.appId, directory, packageName)
+                        if (!placeExpansionFiles(game.appId, directory, packageName)) {
+                            // Not installed, not removed: the game is incomplete, its download is kept to place the files again, and the player chooses to try again or to remove it.
+                            incomplete.put(game.appId, packageName)
+                            // An update that fails leaves the entry of the version it replaced: the game is no longer offered to play, nor followed for updates.
+                            installed.remove(game.appId)
+                            builds.remove(game.appId)
+                            events.note(game.appId, "the game is incomplete: its expansion files could not be placed, the download is kept")
+                            return@launch fail(game.appId, InstallError.ExpansionFiles)
+                        }
+                        incomplete.remove(game.appId)
                         installed.put(game.appId, packageName)
                         // What this install came from, to recognise a newer build later.
                         builds.put(game.appId, InstalledBuild(depots.associate { it.id to it.manifestId }, chosen))
@@ -508,9 +531,15 @@ class GameInstallRepository @Inject constructor(
         scope.launch { runCatching { resumeInterrupted() } }
     }
 
-    /** Throws away an interrupted download. */
+    /** Throws away an interrupted download, and removes a game that was left incomplete (the system asks to confirm its uninstall). */
     fun discard(appId: Int) {
         scope.launch {
+            val leftOnDevice = incomplete.all()[appId]
+            if (leftOnDevice != null && packages.isInstalled(leftOnDevice)) {
+                if (packages.uninstall(leftOnDevice) != PackageGateway.Outcome.Success) return@launch
+                _uninstalled.tryEmit(leftOnDevice)
+            }
+            incomplete.remove(appId)
             downloadDirectory(appId).deleteRecursively()
             clearState(appId)
         }
@@ -733,7 +762,7 @@ class GameInstallRepository @Inject constructor(
      * Nothing is uninstalled without that answer, and Android asks to confirm the uninstall as well.
      */
     private suspend fun settleDuplicate(appId: Int, packageName: String): Boolean {
-        if (!packages.isInstalled(packageName) || installed.all()[appId] == packageName) return true
+        if (!packages.isInstalled(packageName) || installed.all()[appId] == packageName || incomplete.all()[appId] == packageName) return true
         // Another GamePort on the device (the released one next to a test build) keeps its games: the player is told whose it is.
         val other = packages.ownerOf(packageName)?.takeIf { it != context.packageName }
         events.note(appId, "$packageName is already on the device and was not installed by this GamePort${other?.let { " ($it did)" }.orEmpty()}: the player is asked")
@@ -772,11 +801,11 @@ class GameInstallRepository @Inject constructor(
             .toList()
 
     /**
-     * Best effort: an OBB expansion belongs under Android/obb/<package>, which Android 11+ only
-     * lets an app with "all files access" write to.
+     * Places expansion files under Android/obb/<package>. Scoped storage can deny GamePort access
+     * to that protected directory; in that case the APK install must not be reported as ready.
      */
-    private suspend fun placeExpansionFiles(appId: Int, directory: File, packageName: String) = withContext(Dispatchers.IO) {
-        runCatching {
+    private suspend fun placeExpansionFiles(appId: Int, directory: File, packageName: String): Boolean = withContext(Dispatchers.IO) {
+        val placedSuccessfully = runCatching {
             val target = File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName")
             val problems = mutableListOf<String>()
             val placed = ExpansionFiles.place(directory, target, packageName, skipped = PATCHED_DIR, problems = problems)
@@ -787,10 +816,12 @@ class GameInstallRepository @Inject constructor(
             }
             // A file that could not be placed is lost with the download folder: the report says which one and why.
             if (problems.isNotEmpty()) {
-                events.note(appId, "${problems.size} expansion file(s) could NOT be placed in Android/obb/$packageName (the download is deleted afterwards): " + problems.take(MAX_PLACED_LISTED).joinToString("; "))
+                events.note(appId, "${problems.size} expansion file(s) could NOT be placed in Android/obb/$packageName: " + problems.take(MAX_PLACED_LISTED).joinToString("; "))
             }
-        }.onFailure { events.failure(appId, "placing the expansion files", it) }
-        alignObbVersion(packageName)
+            problems.isEmpty()
+        }.onFailure { events.failure(appId, "placing the expansion files", it) }.getOrDefault(false)
+        if (placedSuccessfully) alignObbVersion(packageName)
+        placedSuccessfully
     }
 
     /**
@@ -825,10 +856,16 @@ class GameInstallRepository @Inject constructor(
 
     private fun fail(appId: Int, error: InstallError): Unit {
         events.note(appId, "failed: $error")
-        // A failure that comes from the download itself is not tried again by itself at the next start.
-        if (error.reportable) runCatching { downloadDirectory(appId).takeIf { it.exists() }?.let { File(it, FAILED_FILE).createNewFile() } }
+        // Failures needing a report, and ones waiting for a player action, are not tried again by themselves at the next start.
+        if (error.reportable || error == InstallError.ExpansionStoragePermission) {
+            runCatching { downloadDirectory(appId).takeIf { it.exists() }?.let { File(it, FAILED_FILE).createNewFile() } }
+        }
         setState(appId, InstallState.Failed(error))
     }
+
+    /** True when GamePort has the special access to all files (Android 11 and later), which a game's expansion files may need. */
+    private fun hasAllFilesAccess(): Boolean =
+        android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R || Environment.isExternalStorageManager()
 }
 
 private const val PATCHED_DIR = "patched"

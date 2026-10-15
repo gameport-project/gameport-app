@@ -218,7 +218,9 @@ class ProblemReporter @Inject constructor(
             obb.exists() -> ReportDiagnosis.Expansion.Folder.NOT_READABLE
             else -> ReportDiagnosis.Expansion.Folder.ABSENT
         }
-        return ReportDiagnosis.Expansion(declared, folder, listed?.count { it.isFile } ?: 0)
+        val access = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Environment.isExternalStorageManager() else null
+        val obbRoot = File(Environment.getExternalStorageDirectory(), "Android/obb")
+        return ReportDiagnosis.Expansion(declared, folder, listed?.count { it.isFile } ?: 0, access, obbRoot.canWrite())
     }
 
     private fun dateTime(millis: Long): String = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date(millis))

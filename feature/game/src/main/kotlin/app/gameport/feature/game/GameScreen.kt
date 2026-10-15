@@ -142,6 +142,7 @@ import app.gameport.core.model.AchievementList
 import app.gameport.core.model.InstallState
 import app.gameport.core.model.SpeedUnit
 import app.gameport.core.model.Ownership
+import app.gameport.core.install.ExpansionStorageAccess
 
 @Composable
 fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -> Unit, onOpenControllers: () -> Unit, onOpenCompat: () -> Unit, onOpenAchievements: () -> Unit, onOpenSteamSettings: () -> Unit, viewModel: GameViewModel = hiltViewModel()) {
@@ -672,6 +673,7 @@ private fun InstallActions(
     busy: Boolean = false,
     onReport: () -> Unit = {},
 ) {
+    val installContext = LocalContext.current
     when (install) {
         InstallState.NotInstalled -> Button(onClick = onInstall, modifier = Modifier.widthIn(min = 240.dp).height(ACTION_HEIGHT)) {
             Text(stringResource(R.string.game_install))
@@ -710,6 +712,9 @@ private fun InstallActions(
                 color = MaterialTheme.colorScheme.error,
             )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (install.error == InstallError.ExpansionStoragePermission || install.error == InstallError.ExpansionFiles) {
+                    OutlinedButton(onClick = { ExpansionStorageAccess.openSettings(installContext) }) { Text(stringResource(app.gameport.core.designsystem.R.string.game_error_expansion_storage_open)) }
+                }
                 Button(onClick = onInstall) { Text(stringResource(R.string.game_retry)) }
                 // Removes whatever was downloaded, so a failed attempt never has to keep gigabytes.
                 DangerButton(onClick = onDiscard) { Text(stringResource(R.string.game_discard)) }

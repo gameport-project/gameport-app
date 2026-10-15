@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- To know whether the device has a network when a game ends (a normal permission: nothing is asked on the screen). -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- PICO 4 Ultra (Android 14) requires user-granted special access for Android/obb writes. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
     <application
         android:name=".GamePortApplication"

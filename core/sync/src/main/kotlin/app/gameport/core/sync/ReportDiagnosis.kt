@@ -6,7 +6,7 @@ package app.gameport.core.sync
  */
 object ReportDiagnosis {
     /** How the folder of expansion files looks from GamePort: [declared] is what the game says in its manifest. */
-    data class Expansion(val declared: Boolean, val folder: Folder, val files: Int) {
+    data class Expansion(val declared: Boolean, val folder: Folder, val files: Int, val allFilesAccess: Boolean? = null, val obbFolderWritable: Boolean? = null) {
         enum class Folder { ABSENT, NOT_READABLE, READABLE }
     }
 
@@ -116,6 +116,8 @@ object ReportDiagnosis {
             else -> "${expansion.files} file(s) in Android/obb"
         }
         appendLine("expansion files declared by the game: ${if (expansion.declared) "yes" else "no"}; $where")
+        expansion.allFilesAccess?.let { appendLine("access to all files given to GamePort: ${if (it) "yes" else "no (GamePort asks for it before it installs a game with expansion files)"}") }
+        expansion.obbFolderWritable?.let { appendLine("the Android/obb folder can be written by GamePort: ${if (it) "yes" else "no"}") }
         if (!expansion.declared || expansion.files > 0) return
         if (expansion.folder == Expansion.Folder.NOT_READABLE) {
             appendLine("  The game announces expansion files, and this report cannot tell whether they are there.")

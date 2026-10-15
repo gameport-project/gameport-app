@@ -56,6 +56,8 @@ import app.gameport.core.designsystem.speedText
 import app.gameport.core.model.stage
 import app.gameport.core.model.InstallState
 import app.gameport.core.model.SpeedUnit
+import app.gameport.core.model.InstallError
+import app.gameport.core.install.ExpansionStorageAccess
 
 @Composable
 fun DownloadsScreen(
@@ -142,6 +144,7 @@ private fun EntryRow(
     onResume: () -> Unit,
     onPlay: () -> Unit,
 ) {
+    val entryContext = LocalContext.current
     BoxWithConstraints(Modifier.fillMaxWidth().glass(RoundedCornerShape(18.dp)).padding(12.dp)) {
         val compact = maxWidth < COMPACT_WIDTH
         val cover: @Composable () -> Unit = {
@@ -183,6 +186,11 @@ private fun EntryRow(
                     DangerButton(onClick = onCancel) { Text(stringResource(R.string.downloads_cancel)) }
                 }
                 InstallState.Interrupted, is InstallState.Failed -> {
+                    if ((entry.state as? InstallState.Failed)?.error.let { it == InstallError.ExpansionStoragePermission || it == InstallError.ExpansionFiles }) {
+                        OutlinedButton(onClick = { ExpansionStorageAccess.openSettings(entryContext) }) {
+                            Text(stringResource(app.gameport.core.designsystem.R.string.game_error_expansion_storage_open))
+                        }
+                    }
                     if (entry.game != null) Button(onClick = onResume) { Text(stringResource(R.string.downloads_resume)) }
                     DangerButton(onClick = onDiscard) { Text(stringResource(R.string.downloads_discard)) }
                 }

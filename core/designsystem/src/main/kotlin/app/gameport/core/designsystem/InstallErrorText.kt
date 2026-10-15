@@ -22,6 +22,8 @@ fun installErrorText(error: InstallError): String {
         InstallError.NoApk -> stringResource(R.string.game_error_no_apk)
         InstallError.UnreadableApk -> stringResource(R.string.game_error_unreadable)
         InstallError.VersionConflict -> stringResource(R.string.game_error_conflict)
+        InstallError.ExpansionStoragePermission -> stringResource(R.string.game_error_expansion_storage_permission)
+        InstallError.ExpansionFiles -> stringResource(R.string.game_error_expansion_files)
         is InstallError.Other -> stringResource(R.string.game_install_failed, error.message.orEmpty())
     }
 }

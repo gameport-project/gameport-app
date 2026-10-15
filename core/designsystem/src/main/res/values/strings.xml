@@ -11,6 +11,9 @@
     <string name="game_error_no_apk">Steam\'s Android build of this game contains no APK.</string>
     <string name="game_error_unreadable">The downloaded APK could not be read.</string>
     <string name="game_error_conflict">A different version of this game is already installed (for example the Meta Store one). Uninstall it first.</string>
+    <string name="game_error_expansion_storage_permission">GamePort needs access to all files to place this game’s data on this device. Once it is allowed, the install can go on.</string>
+    <string name="game_error_expansion_storage_open">Allow storage access</string>
+    <string name="game_error_expansion_files">This game’s data could not be placed on this device. The game stays incomplete, and the downloaded data is kept to try again.</string>
     <string name="game_install_failed">Install failed: %1$s</string>
     <string name="status_offline">Not connected to Steam</string>
     <string name="status_connecting">Connecting to Steam…</string>

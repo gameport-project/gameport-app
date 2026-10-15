@@ -60,6 +60,12 @@ sealed interface InstallError {
     /** Another version of the game, signed differently, is already installed. */
     data object VersionConflict : InstallError
 
+    /** The player has to give GamePort access to all files before it can place a game's expansion files. */
+    data object ExpansionStoragePermission : InstallError
+
+    /** Android accepted the APK, but GamePort could not place the expansion files: the game is incomplete, and its download is kept. */
+    data object ExpansionFiles : InstallError
+
     data class Other(val message: String?) : InstallError
 }
 
@@ -71,7 +77,8 @@ data class VersionOption(val id: String, val versionName: String?, val versionCo
  * space (the message says how much), no Steam sign-in, no connection, or GamePort updating itself.
  */
 val InstallError.reportable: Boolean
-    get() = this !is InstallError.NotEnoughSpace && this !is InstallError.NotSignedIn && this !is InstallError.Offline && this !is InstallError.AppUpdating
+    get() = this !is InstallError.NotEnoughSpace && this !is InstallError.NotSignedIn && this !is InstallError.Offline &&
+        this !is InstallError.AppUpdating && this !is InstallError.ExpansionStoragePermission
 
 /**
  * True while a game is on its way to being installed: waiting its turn, downloading, patching, installing, or waiting for the player's
