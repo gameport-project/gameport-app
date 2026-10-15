@@ -62,6 +62,7 @@ class GameInstallRepository @Inject constructor(
     private val packages: PackageGateway,
     private val installed: InstalledGames,
     private val incomplete: IncompleteInstalls,
+    private val handoff: ExpansionHandoff,
     private val builds: InstalledBuilds,
     private val updates: GameUpdatesRepository,
     private val library: app.gameport.core.steam.SteamLibraryRepository,
@@ -539,6 +540,7 @@ class GameInstallRepository @Inject constructor(
                 if (packages.uninstall(leftOnDevice) != PackageGateway.Outcome.Success) return@launch
                 _uninstalled.tryEmit(leftOnDevice)
             }
+            leftOnDevice?.let(handoff::clear)
             incomplete.remove(appId)
             downloadDirectory(appId).deleteRecursively()
             clearState(appId)
@@ -553,6 +555,7 @@ class GameInstallRepository @Inject constructor(
             }
             installed.remove(appId)
             events.forget(appId)
+            packageName?.let(handoff::clear)
             packageName?.let { _uninstalled.tryEmit(it) }
             playHistory.forget(appId)
             builds.remove(appId)
@@ -801,28 +804,52 @@ class GameInstallRepository @Inject constructor(
             .toList()
 
     /**
-     * Places expansion files under Android/obb/<package>. Scoped storage can deny GamePort access
-     * to that protected directory; in that case the APK install must not be reported as ready.
+     * Places the game's expansion files. Files left by an earlier try go to the game itself (see [ExpansionHandoff]). Otherwise they are placed under Android/obb/<package>;
+     * where Android does not let GamePort write that folder, whatever access it has, they are kept and the game places them in its own folder. False when they are not in place.
      */
     private suspend fun placeExpansionFiles(appId: Int, directory: File, packageName: String): Boolean = withContext(Dispatchers.IO) {
-        val placedSuccessfully = runCatching {
+        if (handoff.hasStaged(packageName)) return@withContext deliverByGame(appId, packageName)
+        val problems = mutableListOf<String>()
+        val placedDirectly = runCatching {
             val target = File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName")
-            val problems = mutableListOf<String>()
             val placed = ExpansionFiles.place(directory, target, packageName, skipped = PATCHED_DIR, problems = problems)
             if (placed.isNotEmpty()) {
                 events.note(appId, "placed in Android/obb/$packageName: ${placed.take(MAX_PLACED_LISTED).joinToString()}${if (placed.size > MAX_PLACED_LISTED) " and ${placed.size - MAX_PLACED_LISTED} more" else ""}")
             } else if (problems.isEmpty()) {
                 events.note(appId, "no expansion file to place in Android/obb/$packageName")
             }
-            // A file that could not be placed is lost with the download folder: the report says which one and why.
-            if (problems.isNotEmpty()) {
-                events.note(appId, "${problems.size} expansion file(s) could NOT be placed in Android/obb/$packageName: " + problems.take(MAX_PLACED_LISTED).joinToString("; "))
-            }
             problems.isEmpty()
         }.onFailure { events.failure(appId, "placing the expansion files", it) }.getOrDefault(false)
-        if (placedSuccessfully) alignObbVersion(packageName)
-        placedSuccessfully
+        if (placedDirectly) {
+            alignObbVersion(packageName)
+            return@withContext true
+        }
+        if (problems.isNotEmpty()) events.note(appId, "${problems.size} expansion file(s) could NOT be placed in Android/obb/$packageName: " + problems.take(MAX_PLACED_LISTED).joinToString("; "))
+        // What is left of the download is kept for the game to place in its own folder.
+        val staging = mutableListOf<String>()
+        val kept = runCatching { handoff.stage(directory, packageName, PATCHED_DIR, alignedVersionCode(packageName), staging) }.getOrDefault(emptyList())
+        if (kept.isEmpty()) return@withContext false
+        deliverByGame(appId, packageName)
     }
+
+    private suspend fun deliverByGame(appId: Int, packageName: String): Boolean {
+        events.note(appId, "Android does not let GamePort write the expansion files: the game places them in its own folder")
+        setState(appId, InstallState.Finishing)
+        val ok = handoff.deliver(packageName)
+        if (ok) {
+            events.note(appId, "the game placed its expansion files")
+            handoff.clear(packageName)
+        } else {
+            events.note(appId, "the game could not place its expansion files: ${handoff.failureOf(packageName)}")
+        }
+        return ok
+    }
+
+    /** The version code the game's expansion files are named after now (see [alignObbVersion]), or null. */
+    private fun alignedVersionCode(packageName: String): Long? = runCatching {
+        val installedCode = packages.versionCodeOf(packageName) ?: return null
+        app.gameport.core.model.ObbNames.versionFor(installedCode, packages.originalVersionCodeOf(packageName), packages.isUnreal(packageName))
+    }.getOrNull()
 
     /**
      * An expansion file is named after the version code of the APK it belongs to (main.<code>.<package>.obb), and

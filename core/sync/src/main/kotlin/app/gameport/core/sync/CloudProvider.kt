@@ -48,6 +48,8 @@ internal interface CloudEntryPoint {
     fun lifeWatch(): LifeWatch
 
     fun steamAchievements(): SteamAchievementSync
+
+    fun expansionHandoff(): app.gameport.core.install.ExpansionHandoff
 }
 
 /**
@@ -68,6 +70,8 @@ internal interface CloudEntryPoint {
  * - `log` (its last log lines, how its last runs ended) -> kept for a problem report
  * - `achievement` (the names) -> the game unlocked achievements: they are announced
  * - `closed` -> the game's process is ending
+ * - `obb_list` -> the expansion files that wait for the game, with their sizes; `obb_progress` (done, total) and `obb_done` (ok, reason) -> the game is placing them
+ *   in its own folder, which GamePort cannot write on some devices (see [app.gameport.core.install.ExpansionHandoff]). Only while GamePort asked for it.
  *
  * Files travel through `openFile`: `fetch` reads a cloud file, `push` writes a file to upload.
  */
@@ -86,7 +90,7 @@ class CloudProvider : ContentProvider() {
             return null
         }
         // The game is there: GamePort stays connected for it (see [ConnectionKeeper]), except when it says it is leaving.
-        if (method != "closed" && method != "end") entryPoint.playtime().gameCalled()
+        if (method != "closed" && method != "end" && !method.startsWith("obb_")) entryPoint.playtime().gameCalled()
         return try {
             handle(method, packageName, extras ?: Bundle.EMPTY)
         } catch (e: Exception) {
@@ -188,9 +192,17 @@ class CloudProvider : ContentProvider() {
         // Did GamePort start this game's process only to send its saves? Then it is not played: nothing else is set up (no ticket, no time counted).
         "catchup" -> Bundle().apply {
             putString(STATUS, OK)
-            putBoolean("catchup", coordinator.isCatchUp(packageName))
+            // GamePort started this process for something else than a play: the saves to send, or the expansion files to place.
+            putBoolean("catchup", coordinator.isCatchUp(packageName) || entryPoint.expansionHandoff().isRequested(packageName))
         }
         "catchup_done" -> okAfter { coordinator.finishCatchUp(packageName) }
+        "obb_list" -> Bundle().apply {
+            val files = if (entryPoint.expansionHandoff().isRequested(packageName)) entryPoint.expansionHandoff().staged(packageName) else emptyList()
+            putStringArray("names", files.map { it.name }.toTypedArray())
+            putLongArray("sizes", files.map { it.length() }.toLongArray())
+        }
+        "obb_progress" -> okAfter { entryPoint.expansionHandoff().reportProgress(packageName, extras.getLong("done"), extras.getLong("total")) }
+        "obb_done" -> okAfter { entryPoint.expansionHandoff().reportDone(packageName, extras.getBoolean("ok"), extras.getString("reason")) }
         "begin" -> when (val result = runBlocking { if (!coordinator.isCatchUp(packageName)) noteLaunch(packageName); coordinator.begin(packageName) }) {
             is BeginResult.Ready -> Bundle().apply {
                 putString(STATUS, READY)
@@ -267,6 +279,12 @@ class CloudProvider : ContentProvider() {
                     file,
                     ParcelFileDescriptor.MODE_WRITE_ONLY or ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_TRUNCATE,
                 )
+            }
+            // The expansion files of this game, served to the game only while GamePort asked it to place them.
+            "obb" -> {
+                val file = entryPoint.expansionHandoff().fileForGame(packageName, uri.getQueryParameter("name").orEmpty())
+                    ?: throw FileNotFoundException("expansion file unavailable")
+                ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
             }
             else -> throw FileNotFoundException("unknown path")
         }

@@ -154,6 +154,7 @@ public final class GamePortHookProvider extends ContentProvider {
      */
     @Override
     public Bundle call(String method, String arg, Bundle extras) {
+        if ("obb_pull".equals(method)) return pullExpansionFiles();
         if (!"catchup".equals(method)) return super.call(method, arg, extras);
         Context context = getContext();
         if (context == null || sync == null || !calledByGamePort(context)) return null;
@@ -169,6 +170,45 @@ public final class GamePortHookProvider extends ContentProvider {
             tellGamePort(context, "catchup_done");
             exitIfNobodyPlays();
         }
+        return out;
+    }
+
+    private final java.util.concurrent.atomic.AtomicBoolean pullingExpansionFiles = new java.util.concurrent.atomic.AtomicBoolean();
+
+    /**
+     * GamePort asks the game to place its expansion files in its own folder (it cannot write that folder itself on some devices). Answers at once and does the copying
+     * in the background, telling GamePort how far it is and when it is done. Nobody else may ask.
+     */
+    private Bundle pullExpansionFiles() {
+        final Context context = getContext();
+        if (context == null || !calledByGamePort(context)) return null;
+        Bundle out = new Bundle();
+        out.putString("status", "STARTED");
+        if (!pullingExpansionFiles.compareAndSet(false, true)) return out;
+        Thread worker = new Thread(new Runnable() {
+            @Override public void run() {
+                ObbPuller.Result result;
+                try {
+                    result = ObbPuller.run(context, new ObbPuller.Log() {
+                        @Override public void info(String message) { Log.i(TAG, message); }
+                    });
+                } finally {
+                    pullingExpansionFiles.set(false);
+                }
+                try {
+                    Bundle done = new Bundle();
+                    done.putBoolean("ok", result.ok);
+                    if (result.reason != null) done.putString("reason", result.reason);
+                    Calls.call(context, Owner.cloud(context), "obb_done", context.getPackageName(), done);
+                } catch (Throwable t) {
+                    Log.w(TAG, "could not tell GamePort the files are placed", t);
+                }
+                // Started for this and nothing else: the process goes away, unless a screen of the game has opened since.
+                if (catchUpMode) exitIfNobodyPlays();
+            }
+        }, "gameport-obb");
+        worker.setDaemon(true);
+        worker.start();
         return out;
     }
 
