@@ -58,6 +58,7 @@ public final class GamePortHookProvider extends ContentProvider {
         } catch (Throwable t) {
             Log.w(TAG, "could not tell the shim where the APK is", t);
         }
+        presentAsQuestIfPatched(context);
         try {
             File root = Environment.getExternalStorageDirectory();
             File files = context.getExternalFilesDir(null);
@@ -78,6 +79,36 @@ public final class GamePortHookProvider extends ContentProvider {
             Log.w(TAG, "save sync unavailable; the game runs without it", t);
         }
         return true;
+    }
+
+    /**
+     * A game that got the platform libraries asks the device who made it before it takes its Oculus path (the same thing OVRPort's
+     * Unreal patch does in the game's code). On a headset that is not already a Quest, it is told "Oculus Quest 2". Only for this process.
+     */
+    private static void presentAsQuestIfPatched(Context context) {
+        try {
+            String maker = android.os.Build.MANUFACTURER;
+            if (maker != null && (maker.equalsIgnoreCase("Oculus") || maker.equalsIgnoreCase("Meta"))) return;
+            java.util.zip.ZipFile apk = new java.util.zip.ZipFile(context.getApplicationInfo().sourceDir);
+            boolean hasPlatformLibs;
+            try {
+                hasPlatformLibs = apk.getEntry("lib/arm64-v8a/liboverport.config.so") != null;
+            } finally {
+                apk.close();
+            }
+            if (!hasPlatformLibs) return;
+            setBuildField("MANUFACTURER", "Oculus");
+            setBuildField("MODEL", "Quest 2");
+            Log.i(TAG, "platform libraries: this device (" + maker + ") is presented to the game as Oculus Quest 2");
+        } catch (Throwable t) {
+            Log.w(TAG, "could not present the device as a Quest", t);
+        }
+    }
+
+    private static void setBuildField(String name, String value) throws Exception {
+        java.lang.reflect.Field field = android.os.Build.class.getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(null, value);
     }
 
     /** Everything that is done when a game starts: sync the saves before it reads them, then the Steam ticket, the achievements and the watchers. */
