@@ -18,7 +18,7 @@ fun interface PlatformLibsSource {
  */
 class PlatformLibsPatch(private val source: PlatformLibsSource = PlatformLibsSource { null }) : ApkPatch {
     override val id = "platform_libs"
-    override val recommended = false
+    override val recommended = true
     override val locked = false
 
     override fun apply(session: PatchSession, context: PatchContext, assets: PatchAssets) {
