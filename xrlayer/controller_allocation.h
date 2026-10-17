@@ -203,4 +203,39 @@ Gaps<A> FindGaps(const std::set<A>& frame, const std::vector<std::set<A>>& nativ
     return gaps;
 }
 
+// How much a control matters on the controllers of a Quest 3 or a Pico 4 / Ultra, to say what the runtime refused (it changes nothing of what is given to it).
+//  Essential: what those controllers have (trigger, squeeze, thumbstick, a, b, x, y, menu, the thumbrest's touch, the poses, the haptics).
+//  EssentialPlus: what a Quest 3 adds through its Touch Plus profile (the curl, the slide and the proximity of the fingers).
+//  Dispensable: the rest (the thumbrest's force of a Touch Pro, the stylus, controls of other controllers).
+enum class ControlTier { Essential, EssentialPlus, Dispensable };
+
+inline ControlTier ClassifyControl(const std::string& path) {
+    const std::string left = "/user/hand/left/", right = "/user/hand/right/";
+    std::string rest;
+    if (path.compare(0, left.size(), left) == 0) rest = path.substr(left.size());
+    else if (path.compare(0, right.size(), right) == 0) rest = path.substr(right.size());
+    else return ControlTier::Dispensable;
+    if (rest == "output/haptic") return ControlTier::Essential;
+    if (rest.compare(0, 6, "input/") != 0) return ControlTier::Dispensable;
+    rest = rest.substr(6);
+    if (rest.find("curl") != std::string::npos || rest.find("slide") != std::string::npos || rest.find("proximity") != std::string::npos) return ControlTier::EssentialPlus;
+    const size_t slash = rest.find('/');
+    const std::string group = rest.substr(0, slash);
+    const std::string sub = slash == std::string::npos ? "" : rest.substr(slash + 1);
+    if (group == "grip" || group == "aim") return sub == "pose" ? ControlTier::Essential : ControlTier::Dispensable;
+    if (group == "trigger") return (sub.empty() || sub == "value" || sub == "touch" || sub == "click") ? ControlTier::Essential : ControlTier::Dispensable;
+    if (group == "squeeze") return (sub.empty() || sub == "value" || sub == "click") ? ControlTier::Essential : ControlTier::Dispensable;
+    if (group == "thumbstick") return (sub.empty() || sub == "x" || sub == "y" || sub == "click" || sub == "touch") ? ControlTier::Essential : ControlTier::Dispensable;
+    if (group == "thumbrest") return sub == "touch" ? ControlTier::Essential : ControlTier::Dispensable;
+    if (group == "a" || group == "b" || group == "x" || group == "y") return (sub.empty() || sub == "click" || sub == "touch") ? ControlTier::Essential : ControlTier::Dispensable;
+    if (group == "menu") return (sub.empty() || sub == "click") ? ControlTier::Essential : ControlTier::Dispensable;
+    return ControlTier::Dispensable;
+}
+
+// A path as it is written in the log: without "/user/hand/".
+inline std::string ShortControlName(const std::string& path) {
+    const std::string prefix = "/user/hand/";
+    return path.compare(0, prefix.size(), prefix) == 0 ? path.substr(prefix.size()) : path;
+}
+
 }  // namespace gp

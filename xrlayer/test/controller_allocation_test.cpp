@@ -149,6 +149,24 @@ int main() {
     CHECK(!gp::IsFrameControlPath("/user/hand/left/input/thumbstick/x"));
     CHECK(!gp::IsFrameControlPath("/user/hand/right/input/a/click"));
     CHECK(!gp::IsFrameControlPath("/user/hand/left/input/squeeze/value"));
+    // What matters on a Quest 3 or a Pico 4: the controls they have are essential, the Touch Plus extras are "plus", the rest can be left out.
+    CHECK(gp::ClassifyControl("/user/hand/left/input/trigger/value") == gp::ControlTier::Essential);
+    CHECK(gp::ClassifyControl("/user/hand/right/input/squeeze/click") == gp::ControlTier::Essential);
+    CHECK(gp::ClassifyControl("/user/hand/left/input/thumbstick/x") == gp::ControlTier::Essential);
+    CHECK(gp::ClassifyControl("/user/hand/right/input/a/touch") == gp::ControlTier::Essential);
+    CHECK(gp::ClassifyControl("/user/hand/left/input/menu/click") == gp::ControlTier::Essential);
+    CHECK(gp::ClassifyControl("/user/hand/left/input/thumbrest/touch") == gp::ControlTier::Essential);
+    CHECK(gp::ClassifyControl("/user/hand/right/input/grip/pose") == gp::ControlTier::Essential);
+    CHECK(gp::ClassifyControl("/user/hand/right/output/haptic") == gp::ControlTier::Essential);
+    CHECK(gp::ClassifyControl("/user/hand/left/input/trigger/curl_meta") == gp::ControlTier::EssentialPlus);
+    CHECK(gp::ClassifyControl("/user/hand/right/input/trigger/slide_fb") == gp::ControlTier::EssentialPlus);
+    CHECK(gp::ClassifyControl("/user/hand/left/input/thumb_meta/proximity_meta") == gp::ControlTier::EssentialPlus);
+    CHECK(gp::ClassifyControl("/user/hand/left/input/thumbrest/force") == gp::ControlTier::Dispensable);
+    CHECK(gp::ClassifyControl("/user/hand/right/input/stylus_fb/force") == gp::ControlTier::Dispensable);
+    CHECK(gp::ClassifyControl("/user/hand/left/input/dpad_up/click") == gp::ControlTier::Dispensable);
+    CHECK(gp::ClassifyControl("/user/head/input/system/click") == gp::ControlTier::Dispensable);
+    CHECK(gp::ClassifyControl("/user/hand/left/input/trigger/bogus") == gp::ControlTier::Dispensable);
+    CHECK(gp::ShortControlName("/user/hand/left/input/thumbrest/force") == "left/input/thumbrest/force");
     CHECK(gp::ParseOverrides(nullptr).empty());
     CHECK(gp::ParseOverrides("").empty());
     if (failures == 0) std::printf("all checks passed\n");

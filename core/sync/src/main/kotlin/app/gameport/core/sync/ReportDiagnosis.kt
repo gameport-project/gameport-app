@@ -29,6 +29,10 @@ object ReportDiagnosis {
 
     fun of(libraries: String, startLog: String, previousExit: String, dataAgeSeconds: Long?, expansion: Expansion? = null, launch: Launch? = null, vendorChecks: List<String> = emptyList()): String = buildString {
         fun yes(value: Boolean) = if (value) "yes" else "no"
+        // First of all: a game whose essential controls the runtime refused cannot be played with the controllers.
+        leftOutControls(startLog).filter { it.essential.isNotBlank() }.forEach {
+            appendLine("WARNING: the runtime refused ESSENTIAL controls of the game for ${it.profile}:${it.essential}. The controllers may not work as they should.")
+        }
         val known = libraries.isNotBlank() && !libraries.startsWith("(")
         appendLine("hook of GamePort ran in the game: " + if (startLog.isBlank() || startLog.startsWith("(")) "unknown (no log handed over)" else yes(startLog.contains("GPHook")))
         if (known) {
@@ -79,6 +83,14 @@ object ReportDiagnosis {
         }
     }
 
+    /** The controls the layer left out of one table of the game because the runtime refused them, by how much they matter (see the layer's ClassifyControl). */
+    data class LeftOut(val profile: String, val essential: String, val plus: String, val dispensable: String)
+
+    private val LEFT_OUT = Regex("""GPXR\s*: controls left out of (\S+): essential \[(.*?) ?\] \| essential plus \[(.*?) ?\] \| dispensable \[(.*?) ?\]""")
+
+    internal fun leftOutControls(startLog: String): List<LeftOut> =
+        LEFT_OUT.findAll(startLog).map { LeftOut(it.groupValues[1], it.groupValues[2], it.groupValues[3], it.groupValues[4]) }.distinct().toList()
+
     private val SUGGESTION = Regex("""xrSuggestInteractionProfileBindings\(([^,]*), (\d+) bindings(?:, (\d+) actions)?\) -> (-?\d+)""")
     private val ACTIVE_PROFILE = Regex("""IP changed: /user/hand/(left|right)(/interaction_profiles/[^,]+), (-?\d+)""")
     private val DECISION = Regex("""GPXR\s*: (.*(?:nothing to translate|controls translated|taken for).*)""")
@@ -90,6 +102,10 @@ object ReportDiagnosis {
      */
     private fun StringBuilder.appendControllers(startLog: String) {
         if (startLog.isBlank() || startLog.startsWith("(")) return
+        leftOutControls(startLog).forEach {
+            fun say(text: String) = text.trim().ifEmpty { "none" }
+            appendLine("controls the runtime refused for ${it.profile} (left out, the others are given): essential: ${say(it.essential)}; essential plus: ${say(it.plus)}; dispensable: ${say(it.dispensable)}")
+        }
         val suggested = SUGGESTION.findAll(startLog).map { it.groupValues }.distinctBy { it[1] + it[2] + it[3] }.toList()
         if (suggested.isEmpty()) {
             appendLine("controllers: no line from GamePort's OpenXR layer in the start of the log (the game may not use OpenXR, or the layer is not in it)")

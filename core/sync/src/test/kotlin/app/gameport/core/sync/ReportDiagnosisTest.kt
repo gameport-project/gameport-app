@@ -137,4 +137,17 @@ class ReportDiagnosisTest {
         val given = ReportDiagnosis.of("", "", "", null, ReportDiagnosis.Expansion(declared = true, folder = ReportDiagnosis.Expansion.Folder.READABLE, files = 3, allFilesAccess = true, obbFolderWritable = true))
         assertTrue(given, given.contains("access to all files given to GamePort: yes"))
     }
+
+    @Test
+    fun `the controls left out are said by how much they matter, and an essential one is a warning in front`() {
+        val dispensableOnly = "10-15 19:48:25.603 24833 24937 I GPXR    : controls left out of /interaction_profiles/oculus/touch_controller: essential [ ] | essential plus [ ] | dispensable [ left/input/thumbrest/force ]\n" +
+            "10-15 19:48:25.603 24833 24937 I GPXR    : xrSuggestInteractionProfileBindings(/interaction_profiles/oculus/touch_controller, 43 bindings, 43 actions) -> 0"
+        val text = ReportDiagnosis.of("", dispensableOnly, "", null)
+        assertTrue(text, text.contains("essential: none; essential plus: none; dispensable: left/input/thumbrest/force"))
+        assertTrue(text, !text.contains("WARNING"))
+        val worse = "10-15 19:48:25.603 24833 24937 I GPXR    : controls left out of /interaction_profiles/oculus/touch_controller: essential [ right/input/a/click ] | essential plus [ left/input/trigger/curl_meta ] | dispensable [ ]"
+        val bad = ReportDiagnosis.of("", worse, "", null)
+        assertTrue(bad, bad.startsWith("WARNING: the runtime refused ESSENTIAL controls of the game for /interaction_profiles/oculus/touch_controller: right/input/a/click"))
+        assertTrue(bad, bad.contains("essential plus: left/input/trigger/curl_meta"))
+    }
 }

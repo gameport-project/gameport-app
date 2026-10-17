@@ -17,6 +17,7 @@
 
 #include <android/log.h>
 #include <jni.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -422,9 +423,19 @@ XrResult XRAPI_CALL Layer_xrEnumerateViewConfigurationViews(XrInstance instance,
     XrResult result = g_enumerateViews(instance, systemId, type, capacity, countOut, views);
     if (XR_SUCCEEDED(result) && views && countOut) {
         for (uint32_t i = 0; i < *countOut && i < capacity; i++) {
-            LOGI("view configuration %d view %u: recommended %ux%u, max %ux%u, samples %u/%u", (int)type, i, views[i].recommendedImageRectWidth,
-                 views[i].recommendedImageRectHeight, views[i].maxImageRectWidth, views[i].maxImageRectHeight,
-                 views[i].recommendedSwapchainSampleCount, views[i].maxSwapchainSampleCount);
+            // Some games ask at every frame: a line is written the first time a size is seen, not each time (it filled most of the start of the log).
+            char line[200];
+            snprintf(line, sizeof(line), "view configuration %d view %u: recommended %ux%u, max %ux%u, samples %u/%u", (int)type, i, views[i].recommendedImageRectWidth,
+                     views[i].recommendedImageRectHeight, views[i].maxImageRectWidth, views[i].maxImageRectHeight,
+                     views[i].recommendedSwapchainSampleCount, views[i].maxSwapchainSampleCount);
+            static std::mutex seenMutex;
+            static std::set<std::string> seen;
+            bool first;
+            {
+                std::lock_guard<std::mutex> lock(seenMutex);
+                first = seen.insert(line).second;
+            }
+            if (first) LOGI("%s", line);
             if (views[i].recommendedImageRectWidth == 0) views[i].recommendedImageRectWidth = views[i].maxImageRectWidth;
             if (views[i].recommendedImageRectHeight == 0) views[i].recommendedImageRectHeight = views[i].maxImageRectHeight;
         }
@@ -711,7 +722,10 @@ bool EmulateFrom(XrInstance instance, const std::string& sourceProfile, const ch
 // with no control at all. The bindings are tried one at a time, to find which it refuses, and the others are given together. Only runs after a refusal.
 XrResult SuggestTolerant(XrInstance instance, const XrInteractionProfileSuggestedBinding* suggested, const char* profile) {
     XrResult whole = g_suggestBindings(instance, suggested);
-    if (XR_SUCCEEDED(whole) || whole == XR_ERROR_PATH_UNSUPPORTED || !suggested || suggested->countSuggestedBindings < 2) return whole;
+    // "Path unsupported" for the whole table of a profile the device does not have is left as it is (the table is translated later, see below). For the device's own
+    // profile it means one path of the table is not one the profile has (Pavlov binds a thumbrest force the Touch controllers do not report): the others are given.
+    const bool ownProfile = profile != nullptr && IsNativeProfile(profile);
+    if (XR_SUCCEEDED(whole) || (whole == XR_ERROR_PATH_UNSUPPORTED && !ownProfile) || !suggested || suggested->countSuggestedBindings < 2) return whole;
     std::vector<XrActionSuggestedBinding> accepted;
     std::vector<std::string> refused;
     size_t mended = 0;
@@ -744,10 +758,16 @@ XrResult SuggestTolerant(XrInstance instance, const XrInteractionProfileSuggeste
     rest.countSuggestedBindings = (uint32_t)accepted.size();
     rest.suggestedBindings = accepted.data();
     const XrResult result = g_suggestBindings(instance, &rest);
-    std::string names;
-    for (const std::string& name : refused) names += " " + name;
+    std::string names, essential, plus, dispensable;
+    for (const std::string& name : refused) {
+        names += " " + name;
+        std::string& tier = gp::ClassifyControl(name) == gp::ControlTier::Essential ? essential : gp::ClassifyControl(name) == gp::ControlTier::EssentialPlus ? plus : dispensable;
+        tier += " " + gp::ShortControlName(name);
+    }
     LOGI("the runtime refused the %u bindings of %s (%d); %zu of them are refused one by one:%s, %zu mended; the %zu left are given: %d", suggested->countSuggestedBindings,
          profile, (int)whole, refused.size(), names.c_str(), mended, accepted.size(), (int)result);
+    // Which of the controls left out matter: the essential ones are those of a Quest 3 or a Pico 4, "plus" those of the Quest 3's Touch Plus profile.
+    LOGI("controls left out of %s: essential [%s ] | essential plus [%s ] | dispensable [%s ]", profile, essential.c_str(), plus.c_str(), dispensable.c_str());
     return result;
 }
 
