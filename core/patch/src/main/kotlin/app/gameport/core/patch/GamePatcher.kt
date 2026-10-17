@@ -3,6 +3,7 @@ package app.gameport.core.patch
 import android.content.Context
 import app.gameport.core.patch.patches.AppLabelPatch
 import app.gameport.core.patch.patches.CloudHookPatch
+import app.gameport.core.patch.patches.OvrportLibsSource
 import app.gameport.core.patch.patches.PatchVersionPatch
 import app.gameport.core.patch.patches.PlatformLibsPatch
 import app.gameport.core.patch.patches.VersionCodePatch
@@ -13,6 +14,7 @@ import app.gameport.core.patch.patches.XrLoaderPatch
 import app.gameport.core.patch.patches.VrLauncherPatch
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +36,7 @@ class GamePatcher @Inject constructor(
         engine.patch(
             input = input,
             output = output,
-            patches = patches,
+            patches = withPlatformLibs(patches),
             context = patchContext.copy(patchVersion = PatchVersioning.current(context)),
             assets = PatchAssets(
                 shim = BinarySource { context.assets.open(SHIM_ASSET) },
@@ -43,6 +45,19 @@ class GamePatcher @Inject constructor(
                 xrLoader = BinarySource { context.assets.open(XR_LOADER_ASSET) },
             ),
         )
+    }
+
+    /**
+     * The platform-libs patch needs OVRPort's pinned archive. It is fetched and checked here (this
+     * runs off the main thread) and the patch is rebuilt around it. When the user asked for the
+     * patch and the archive cannot be had, patching stops: injecting nothing while reporting
+     * success would be worse than an error.
+     */
+    private fun withPlatformLibs(patches: List<ApkPatch>): List<ApkPatch> {
+        if (patches.none { it is PlatformLibsPatch }) return patches
+        val source = OvrportLibsSource(File(context.filesDir, "patching/ovrport-libs"))
+        if (!source.prepare()) throw IOException("The platform libraries could not be downloaded or verified")
+        return patches.map { if (it is PlatformLibsPatch) PlatformLibsPatch(source) else it }
     }
 
     private companion object {
