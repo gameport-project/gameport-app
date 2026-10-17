@@ -249,13 +249,6 @@ class GameInstallRepository @Inject constructor(
                     return@launch clearState(game.appId)
                 }
 
-                // Access to all files is checked for every game that has expansion files, and asked once: when it is given it stays. A device that has no page
-                // for it is not stopped (the files are tried anyway).
-                if (ExpansionAccessRule.mustAsk(downloadHasExpansion(directory), android.os.Build.VERSION.SDK_INT, hasAllFilesAccess(), ExpansionStorageAccess.settingsPageExists(context))) {
-                    events.note(game.appId, "waiting for GamePort to be given access to all files before installing a game with expansion files")
-                    return@launch fail(game.appId, InstallError.ExpansionStoragePermission)
-                }
-
                 // A game that was left incomplete is already on the device: only its data is placed again.
                 val alreadyOnDevice = incomplete.all()[game.appId] == packageName && packages.isInstalled(packageName)
                 if (alreadyOnDevice) events.note(game.appId, "$packageName is already on the device, incomplete: only its expansion files are placed again")
@@ -271,8 +264,11 @@ class GameInstallRepository @Inject constructor(
                             // An update that fails leaves the entry of the version it replaced: the game is no longer offered to play, nor followed for updates.
                             installed.remove(game.appId)
                             builds.remove(game.appId)
-                            events.note(game.appId, "the game is incomplete: its expansion files could not be placed, the download is kept")
-                            return@launch fail(game.appId, InstallError.ExpansionFiles)
+                            // Neither GamePort nor the game's own folder could take the files. The access to all files is a last resort: offered only now, when
+                            // both tries have failed, and only on a device that has a page for it.
+                            val offerAccess = !hasAllFilesAccess() && ExpansionStorageAccess.settingsPageExists(context)
+                            events.note(game.appId, "the game is incomplete: its expansion files could not be placed, the download is kept" + if (offerAccess) " (access to all files may help)" else "")
+                            return@launch fail(game.appId, if (offerAccess) InstallError.ExpansionStoragePermission else InstallError.ExpansionFiles)
                         }
                         incomplete.remove(game.appId)
                         installed.put(game.appId, packageName)

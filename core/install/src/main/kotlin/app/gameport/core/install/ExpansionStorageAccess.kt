@@ -5,18 +5,6 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 
-/** When the player is asked for access to all files before a game with expansion files is installed. Pure, so it can be tried without a device. */
-object ExpansionAccessRule {
-    /**
-     * True when the download holds expansion files, the system has the special access (Android 11 and later), GamePort does not have it yet, and the system has a
-     * page where it can be given: a device without that page is not stopped, the files are tried anyway. Once given, the access stays: nothing is asked again.
-     */
-    fun mustAsk(hasExpansion: Boolean, sdk: Int, hasAccess: Boolean, settingsPageExists: Boolean): Boolean =
-        hasExpansion && sdk >= ANDROID_11 && !hasAccess && settingsPageExists
-
-    private const val ANDROID_11 = 30
-}
-
 /** Opens Android's special-access page for GamePort, so it can place the expansion files of a game. */
 object ExpansionStorageAccess {
     private fun appIntent(context: Context): Intent =
