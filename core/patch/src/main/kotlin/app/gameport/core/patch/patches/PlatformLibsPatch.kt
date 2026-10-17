@@ -24,8 +24,17 @@ class PlatformLibsPatch(private val source: PlatformLibsSource = PlatformLibsSou
     override fun apply(session: PatchSession, context: PatchContext, assets: PatchAssets) {
         if (session.readFile(LIB_DIR + LOADER) == null) return
 
+        var injected = false
         LIBRARIES.forEach { name ->
-            source.getLibrary(name)?.let { session.addFile(LIB_DIR + name, it) }
+            source.getLibrary(name)?.let { 
+                session.addFile(LIB_DIR + name, it)
+                injected = true
+            }
+        }
+        
+        // Add the config file only if at least one library was injected
+        if (injected) {
+            session.addFile(LIB_DIR + "liboverport.config.so", CONFIG_JSON.toByteArray())
         }
     }
 
@@ -38,5 +47,6 @@ class PlatformLibsPatch(private val source: PlatformLibsSource = PlatformLibsSou
             "libovrplatformloader_meta_q1.so",
             "libpxrplatformloader.so",
         )
+        const val CONFIG_JSON = "{\"version\":1,\"disable_controller_offset\":0,\"force_passthrough\":0,\"disable_space_warp\":0,\"verbose_logging\":0,\"suggested_texture_width\":0,\"suggested_texture_height\":0,\"suggested_cpu_level\":0,\"suggested_gpu_level\":0,\"vibration_multiplier\":1.0,\"vibration_frequency_multiplier\":1.0,\"database\":[],\"patched\":{\"by\":\"GamePort\",\"with\":\"3.3.0\",\"patches\":[\"platform_libs\"]}}"
     }
 }

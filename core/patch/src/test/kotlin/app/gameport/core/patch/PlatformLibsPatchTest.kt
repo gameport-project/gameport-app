@@ -87,6 +87,37 @@ class PlatformLibsPatchTest {
         }
     }
 
+    @Test
+    fun addsConfigFileWhenUsingFakeSourceAndGameHasLoader() {
+        val input = createApk(withLoader = true)
+        val output = patch(input, PlatformLibsPatch(fakeSource))
+
+        ZipFile(output).use { zip ->
+            // Check that the config file exists and has the correct content
+            val configEntry = zip.getEntry(libDir + "liboverport.config.so")
+            assertNotNull("liboverport.config.so should exist", configEntry)
+            assertEquals("Entry should be stored (not compressed)", ZipEntry.STORED, configEntry.method)
+            
+            val configContent = zip.bytes(libDir + "liboverport.config.so")
+            assertNotNull("Config content should not be null", configContent)
+            
+            val expectedJson = "{\"version\":1,\"disable_controller_offset\":0,\"force_passthrough\":0,\"disable_space_warp\":0,\"verbose_logging\":0,\"suggested_texture_width\":0,\"suggested_texture_height\":0,\"suggested_cpu_level\":0,\"suggested_gpu_level\":0,\"vibration_multiplier\":1.0,\"vibration_frequency_multiplier\":1.0,\"database\":[],\"patched\":{\"by\":\"GamePort\",\"with\":\"3.3.0\",\"patches\":[\"platform_libs\"]}}"
+            assertEquals("Config content should match expected JSON", expectedJson, String(configContent!!))
+        }
+    }
+
+    @Test
+    fun doesNotAddConfigFileWhenUsingDefaultSource() {
+        val input = createApk(withLoader = true)
+        val output = patch(input, PlatformLibsPatch())
+
+        ZipFile(output).use { zip ->
+            // Check that the config file does not exist
+            val configEntry = zip.getEntry(libDir + "liboverport.config.so")
+            assertNull("liboverport.config.so should not exist with default source", configEntry)
+        }
+    }
+
     private fun patch(input: File, patch: PlatformLibsPatch): File {
         val output = temp.newFile()
         ApkPatchEngine(SigningKeyStore(temp.newFolder().resolve("key.p12"))).patch(
