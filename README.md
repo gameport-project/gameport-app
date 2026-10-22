@@ -134,6 +134,7 @@ A friendly place to ask for help, share which games run well on your device, fol
 
 GamePort is built in the open, with the help of other free projects: a Steam emulation layer based on the [Goldberg Steam Emulator](https://gitlab.com/Mr_Goldberg/goldberg_emulator), ideas and code from [ovrport](https://github.com/ovrport/app), and [JavaSteam](https://github.com/Longi94/JavaSteam) to talk to Steam. Everything we reuse, with its licence, is listed in [docs/THIRD_PARTY_NOTICES.md](docs/THIRD_PARTY_NOTICES.md).
 
+- GamePort itself is released under the [GNU General Public License, version 3](LICENSE).
 - The past prices of the games come from [IsThereAnyDeal](https://isthereanydeal.com), read once for each game and then kept in [gameport-catalog](https://github.com/gameport-project/gameport-catalog), which also holds the catalog and the community VR ports.
 - The part that fakes Steam inside the games lives in its own repository: **gameport-steamworks-shim**.
 - Want to build it yourself or lend a hand? See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).

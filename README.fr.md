@@ -134,6 +134,7 @@ Un endroit sympa pour demander de l'aide, dire quels jeux tournent bien sur ton 
 
 GamePort se construit au grand jour, avec l'aide d'autres projets libres : une couche d'émulation de Steam basée sur le [Goldberg Steam Emulator](https://gitlab.com/Mr_Goldberg/goldberg_emulator), des idées et du code d'[ovrport](https://github.com/ovrport/app), et [JavaSteam](https://github.com/Longi94/JavaSteam) pour parler à Steam. Tout ce que nous réutilisons, avec sa licence, est listé dans [docs/THIRD_PARTY_NOTICES.md](docs/THIRD_PARTY_NOTICES.md).
 
+- GamePort lui-même est publié sous la [licence GNU GPL, version 3](LICENSE).
 - Les prix passés des jeux viennent d'[IsThereAnyDeal](https://isthereanydeal.com), lus une fois pour chaque jeu puis gardés dans [gameport-catalog](https://github.com/gameport-project/gameport-catalog), qui contient aussi le catalogue et les ports VR de la communauté.
 - La partie qui simule Steam dans les jeux vit dans son propre dépôt : **gameport-steamworks-shim**.
 - Envie de le compiler toi-même ou de donner un coup de main ? Voir [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
