@@ -47,6 +47,12 @@ object AppVersion {
 /** Picks, in a release notes file, the short list of what is new, in the player's language. */
 object ReleaseNotes {
     /**
+     * What ends the list of what is new: a rule, or a heading of the file's own level (`##`, `###`). A heading of a deeper level (`####`, such as "New features"
+     * and "Fixes" inside the list) only groups the bullets and does not end it.
+     */
+    private fun endsTheList(line: String) = line.startsWith("---") || (line.startsWith("#") && !line.startsWith("####"))
+
+    /**
      * The notes file has an English half and a French half, each with a "what's new" list under its first `###`
      * heading. Returns that list as bullet lines, or null when the file has none.
      */
@@ -57,7 +63,7 @@ object ReleaseNotes {
         val start = lines.indexOfFirst { it.startsWith("### ") }
         if (start < 0) return null
         return lines.drop(start + 1)
-            .takeWhile { !it.startsWith("#") && !it.startsWith("---") }
+            .takeWhile { !endsTheList(it) }
             .filter { it.trimStart().startsWith("- ") }
             .joinToString("\n") { "• " + it.trimStart().removePrefix("- ").replace("**", "") }
             .ifBlank { null }
@@ -74,7 +80,7 @@ object ReleaseNotes {
         val start = lines.indexOfFirst { it.startsWith("### ") }
         if (start < 0) return emptyList()
         return lines.drop(start + 1)
-            .takeWhile { !it.startsWith("#") && !it.startsWith("---") }
+            .takeWhile { !endsTheList(it) }
             .mapNotNull { line ->
                 val trimmed = line.trim()
                 val image = IMAGE.matchEntire(trimmed)?.let { it.groupValues[1] to it.groupValues[2] } ?: htmlImage(trimmed)

@@ -31,6 +31,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenu
@@ -133,8 +135,10 @@ fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewMode
                 val compact = maxWidth < COMPACT_WIDTH
                 val entries = Category.entries.filter { it != Category.GAMES || viewModel.isHeadset }
                 val page: @Composable (Modifier) -> Unit = { modifier ->
+                    val pageScroll = rememberScrollState()
+                    val pageScope = rememberCoroutineScope()
                     Column(
-                        modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
+                        modifier.fillMaxHeight().verticalScroll(pageScroll).padding(bottom = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
                         when (category) {
@@ -151,6 +155,7 @@ fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewMode
                                 UpdatesSection(
                                     viewModel.installedVersion, updateState, updateBlocker, viewModel.canUpdateInPlace,
                                     checkHours, viewModel::onUpdateCheckHoursChanged, viewModel::onCheckForUpdate, viewModel::onUpdate,
+                                    onNotesFocused = { pageScope.launch { pageScroll.animateScrollTo(0) } },
                                 )
                                 val patchAll = viewModel.patchAll.collectAsStateWithLifecycle().value
                                 PatchAllRow(patchAll) {

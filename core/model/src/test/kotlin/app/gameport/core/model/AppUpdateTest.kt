@@ -1,7 +1,9 @@
 package app.gameport.core.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AppUpdateTest {
@@ -50,6 +52,65 @@ class AppUpdateTest {
     fun `the whats new list comes in the player's language`() {
         assertEquals("• Demos and betas. Listed now.\n• Filters. A panel on the left.", ReleaseNotes.whatsNew(notes, french = false))
         assertEquals("• Démos et bêtas. Listées.", ReleaseNotes.whatsNew(notes, french = true))
+    }
+
+    private val groupedNotes = """
+        ## GamePort 0.8.2
+
+        ### What's new in this version
+
+        #### New features
+        - **A free game.** Added in one tap.
+        - **More filters.** Free or paid.
+
+        #### Fixes
+        - A game with expansion files keeps its version.
+
+        ---
+
+        ### Install
+        - Not this one.
+
+        ---
+
+        ## GamePort 0.8.2
+
+        ### Les nouveautés de cette version
+
+        #### Nouvelles fonctionnalités
+        - **Un jeu gratuit.** Ajouté en un geste.
+
+        #### Corrections
+        - Un jeu avec des fichiers d'extension garde sa version.
+
+        ---
+    """.trimIndent()
+
+    @Test
+    fun `bullets grouped under deeper headings are part of the list, and what follows the rule is not`() {
+        assertEquals(
+            "• A free game. Added in one tap.\n• More filters. Free or paid.\n• A game with expansion files keeps its version.",
+            ReleaseNotes.whatsNew(groupedNotes, french = false),
+        )
+        assertEquals(
+            "• Un jeu gratuit. Ajouté en un geste.\n• Un jeu avec des fichiers d'extension garde sa version.",
+            ReleaseNotes.whatsNew(groupedNotes, french = true),
+        )
+        val blocks = ReleaseNotes.whatsNewBlocks(groupedNotes, french = false)
+        assertEquals(3, blocks.size)
+        assertEquals("• A free game. Added in one tap.", (blocks.first() as NoteBlock.Line).text)
+    }
+
+    @Test
+    fun `every release notes file of the project shows its list`() {
+        val folder = java.io.File("../../docs/releases")
+        val files = folder.listFiles { file -> file.name.matches(Regex("v\\d+\\.\\d+\\.\\d+\\.md")) }.orEmpty()
+        assertTrue("the notes files were not found at ${folder.absolutePath}", files.isNotEmpty())
+        for (file in files.sortedBy { it.name }) {
+            val text = file.readText()
+            assertNotNull("${file.name}: no list in English", ReleaseNotes.whatsNew(text, french = false))
+            assertNotNull("${file.name}: no list in French", ReleaseNotes.whatsNew(text, french = true))
+        }
     }
 
     @Test

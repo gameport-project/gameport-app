@@ -1,6 +1,23 @@
 package app.gameport.feature.settings
 
 import android.text.format.DateUtils
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
@@ -47,6 +64,7 @@ internal fun UpdatesSection(
     onCheckHoursChanged: (Int) -> Unit,
     onCheck: () -> Unit,
     onUpdate: () -> Unit,
+    onNotesFocused: () -> Unit,
 ) {
     val french = LocalConfiguration.current.locales[0].language == "fr"
     val busy = state is AppUpdateState.Checking || state is AppUpdateState.Downloading || state is AppUpdateState.Installing
@@ -86,15 +104,7 @@ internal fun UpdatesSection(
         else -> null
     }
     release?.notes?.let { ReleaseNotes.whatsNewBlocks(it, french, "https://raw.githubusercontent.com/gameport-project/gameport-app/${release.tag}") }?.takeIf { it.isNotEmpty() }?.let { blocks ->
-        Column(Modifier.widthIn(max = 720.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.settings_updates_whats_new), style = MaterialTheme.typography.titleMedium)
-            blocks.forEach { block ->
-                when (block) {
-                    is NoteBlock.Line -> Text(block.text, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    is NoteBlock.Image -> NoteImage(block.url, block.description)
-                }
-            }
-        }
+        WhatsNew(blocks, onNotesFocused)
     }
 
     val offered = state is AppUpdateState.Available || (state is AppUpdateState.Failed && state.release != null)
@@ -145,3 +155,50 @@ private fun intervalLabel(hours: Int): String =
 @Composable
 private fun ago(millis: Long): String =
     DateUtils.getRelativeTimeSpanString(millis, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()
+
+/** The notes of the offered version in a tinted box of fixed height that fades out at its foot, opened in full by a tap or a press. A focus on it brings the top of the page back, since nothing above it can take the focus. */
+@Composable
+private fun WhatsNew(blocks: List<NoteBlock>, onFocused: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(12.dp)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .widthIn(max = 720.dp)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+            .onFocusChanged { if (it.isFocused) onFocused() }
+            .clickable { open = !open }
+            .padding(16.dp)
+            .animateContentSize(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.settings_updates_whats_new), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Icon(if (open) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown, contentDescription = null)
+        }
+        Column(
+            Modifier
+                .then(if (open) Modifier else Modifier.heightIn(max = COLLAPSED_NOTES_HEIGHT).clipToBounds().fadeOutAtBottom())
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            blocks.forEach { block ->
+                when (block) {
+                    is NoteBlock.Line -> Text(block.text, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    is NoteBlock.Image -> NoteImage(block.url, block.description)
+                }
+            }
+        }
+    }
+}
+
+private val COLLAPSED_NOTES_HEIGHT = 120.dp
+
+private fun Modifier.fadeOutAtBottom(): Modifier = graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.drawWithContent {
+    drawContent()
+    drawRect(
+        brush = Brush.verticalGradient(0.55f to Color.Black, 1f to Color.Transparent),
+        blendMode = BlendMode.DstIn,
+    )
+}
