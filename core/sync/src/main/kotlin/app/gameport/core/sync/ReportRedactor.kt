@@ -4,7 +4,11 @@ package app.gameport.core.sync
 object ReportRedactor {
     private val steamId = Regex("""\b7656119\d{10}\b""")
     private val email = Regex("""[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}""")
-    private val ipv4 = Regex("""\b(?:\d{1,3}\.){3}\d{1,3}\b""")
+    // Only the ranges a device's own network address falls in (its Wi-Fi or local address): a build number or a firmware version can look just like an
+    // address (a Pico's own display string is four dot-separated numbers), and redacting every such number loses real diagnostic data for nothing.
+    // One number, 0 to 255: a build or a version number often exceeds that in one place, which a plain \d{1,3} would still accept.
+    private const val OCTET = """(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)"""
+    private val ipv4 = Regex("""\b(?:10\.$OCTET\.$OCTET\.$OCTET|172\.(?:1[6-9]|2\d|3[01])\.$OCTET\.$OCTET|192\.168\.$OCTET\.$OCTET|169\.254\.$OCTET\.$OCTET)\b""")
     private val mac = Regex("""\b(?:[0-9A-Fa-f]{2}[:\-]){5}[0-9A-Fa-f]{2}\b""")
 
     /** What the system and the games put in their own words: a name that is one of them would hide the words, not the person. */
