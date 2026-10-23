@@ -102,6 +102,7 @@ private fun GamePortContent(viewModel: AppViewModel) {
             onOpenDownloads = { navController.navigate(DownloadsRoute) },
             onOpenSettings = { navController.navigate(SettingsRoute()) },
             onOpenSteamSettings = { navController.navigate(SettingsRoute(account = true)) },
+            onOpenUpdates = { navController.navigate(SettingsRoute(updates = true)) },
             onOpenGameSettings = navController::navigateToGameSettings,
             onOpenCompat = { navController.navigate(CompatRoute) },
             onOpenStore = { navController.navigate(StoreRoute) },
@@ -110,7 +111,7 @@ private fun GamePortContent(viewModel: AppViewModel) {
         compatScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame, onUnownedClick = { navController.navigate(StoreGameRoute(it)) })
         storeScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame, onStoreGame = { navController.navigate(StoreGameRoute(it)) })
         storeGameScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame)
-        settingsScreen(onBack = navController::goBack)
+        settingsScreen(onBack = navController::goBack, onOpenGame = navController::navigateToGame)
         downloadsScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame)
         gameScreen(onBack = navController::goBack, onOpenSettings = navController::navigateToGameSettings, onOpenSaves = navController::navigateToGameSaves, onOpenControllers = navController::navigateToGameControllers, onOpenCompat = navController::navigateToGameCompat, onOpenAchievements = navController::navigateToGameAchievements, onOpenSteamSettings = { navController.navigate(SettingsRoute(account = true)) })
         gameControllersScreen(onBack = navController::goBack)

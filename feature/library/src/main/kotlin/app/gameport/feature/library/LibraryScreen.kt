@@ -112,6 +112,7 @@ fun LibraryScreen(
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSteamSettings: () -> Unit,
+    onOpenUpdates: () -> Unit,
     onOpenGameSettings: (Int) -> Unit,
     onOpenCompat: () -> Unit,
     onOpenStore: () -> Unit,
@@ -132,6 +133,7 @@ fun LibraryScreen(
         onOpenDownloads = onOpenDownloads,
         onOpenSettings = onOpenSettings,
         onOpenSteamSettings = onOpenSteamSettings,
+        onOpenUpdates = onOpenUpdates,
         onOpenCompat = onOpenCompat,
         onOpenStore = onOpenStore,
         onOpenStoreGame = onOpenStoreGame,
@@ -162,6 +164,7 @@ internal fun LibraryContent(
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSteamSettings: () -> Unit,
+    onOpenUpdates: () -> Unit,
     onOpenCompat: () -> Unit = {},
     onOpenStore: () -> Unit = {},
     onOpenStoreGame: (Int) -> Unit = {},
@@ -173,7 +176,7 @@ internal fun LibraryContent(
     Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
         when (uiState) {
             LibraryUiState.Loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-            is LibraryUiState.Content -> Shelf(uiState, onQueryChanged, onTabSelected, onSortSelected, onFiltersChanged, onPlay, onGameClick, onOpenDownloads, onOpenSettings, onOpenSteamSettings, onOpenCompat, onOpenStore, onOpenStoreGame, menu, onPatchAll, onStopPatchAll, onClosePatchAll)
+            is LibraryUiState.Content -> Shelf(uiState, onQueryChanged, onTabSelected, onSortSelected, onFiltersChanged, onPlay, onGameClick, onOpenDownloads, onOpenSettings, onOpenSteamSettings, onOpenUpdates, onOpenCompat, onOpenStore, onOpenStoreGame, menu, onPatchAll, onStopPatchAll, onClosePatchAll)
         }
     }
 }
@@ -197,6 +200,7 @@ private fun Shelf(
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSteamSettings: () -> Unit,
+    onOpenUpdates: () -> Unit,
     onOpenCompat: () -> Unit,
     onOpenStore: () -> Unit,
     onOpenStoreGame: (Int) -> Unit,
@@ -241,7 +245,7 @@ private fun Shelf(
         if (display.backdrop) Backdrop(highlightedNew?.let { BackdropArt(it.banner ?: it.header ?: it.cover.orEmpty(), listOfNotNull(it.header)) } ?: highlighted?.let { BackdropArt(it.heroUrl, it.heroFallbacks) }, display.backdropStrength)
 
         Column(Modifier.fillMaxSize()) {
-            Header(state, onQueryChanged, onTabSelected, { filtersOpen = true }, onOpenDownloads, onOpenSettings, onOpenSteamSettings, onOpenCompat, onOpenStore) {
+            Header(state, onQueryChanged, onTabSelected, { filtersOpen = true }, onOpenDownloads, onOpenSettings, onOpenSteamSettings, onOpenUpdates, onOpenCompat, onOpenStore) {
                 if (!state.patchAll.running) onPatchAll()
                 patchWindow = true
             }
@@ -505,6 +509,7 @@ private fun Header(
     onOpenDownloads: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSteamSettings: () -> Unit,
+    onOpenUpdates: () -> Unit,
     onOpenCompat: () -> Unit,
     onOpenStore: () -> Unit,
     onPatchAll: () -> Unit,
@@ -583,7 +588,7 @@ private fun Header(
             }
             val offline: @Composable () -> Unit = { ConnectionNotice(state.connection, onClick = onOpenSteamSettings) }
             val update: @Composable () -> Unit = {
-                state.appUpdate?.let { StatusNotice(stringResource(R.string.library_app_update, it), icon = Icons.Rounded.Download, onClick = onOpenSettings, tone = NoticeTone.UPDATE) }
+                state.appUpdate?.let { StatusNotice(stringResource(R.string.library_app_update, it), icon = Icons.Rounded.Download, onClick = onOpenUpdates, tone = NoticeTone.UPDATE) }
             }
             // Installed games with a newer build, in green; a name too long for the notice is cut.
             val gameUpdates: @Composable () -> Unit = {
