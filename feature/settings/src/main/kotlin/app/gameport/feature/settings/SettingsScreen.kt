@@ -105,7 +105,7 @@ private enum class Category(val title: Int) {
 
 /** A full settings page: categories on the left, the selected one on the right. */
 @Composable
-fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
     val speedUnit by viewModel.speedUnit.collectAsStateWithLifecycle()
     val accountName by viewModel.accountName.collectAsStateWithLifecycle()
     val playerDefaults by viewModel.playerDefaults.collectAsStateWithLifecycle()
@@ -122,7 +122,8 @@ fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewMode
     val activity = LocalContext.current as? Activity
     // The window of "patch all", opened by its button; closing it stops nothing.
     var patchWindow by rememberSaveable { mutableStateOf(false) }
-    var category by rememberSaveable { mutableStateOf(if (!startOnAccount && viewModel.updateState.value is AppUpdateState.Available) Category.UPDATES else Category.ACCOUNT) }
+    // The settings always open on their first category.
+    var category by rememberSaveable { mutableStateOf(Category.ACCOUNT) }
     // The tour of the settings acts out two of the pages: it opens Appearance and tries a few colours, then puts back the ones the player had.
     val shownDisplay = display
     app.gameport.core.designsystem.TourDemo(TourIds.DEMO_SETTINGS_LOOK) {
