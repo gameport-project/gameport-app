@@ -212,4 +212,5 @@
     <string name="report_status_waiting">The report will be sent as soon as this device is online.</string>
     <string name="report_status_refused">The report could not be sent.</string>
     <string name="report_status_unavailable">No report could be made for this game.</string>
+    <string name="demo_notice">Preview: made-up values, nothing is installed</string>
 </resources>

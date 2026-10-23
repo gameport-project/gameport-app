@@ -1,5 +1,7 @@
 package app.gameport.feature.game
 
+import app.gameport.core.designsystem.TourIds
+import app.gameport.core.designsystem.tourTarget
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
@@ -63,6 +65,19 @@ import app.gameport.core.model.Hand
 fun ControllersScreen(onBack: () -> Unit, viewModel: ControllersViewModel = hiltViewModel()) {
     val mapping by viewModel.mapping.collectAsStateWithLifecycle()
     val gameName by viewModel.gameName.collectAsStateWithLifecycle()
+    ControllersContent(mapping, gameName, onBack, viewModel::onEnabledChanged, viewModel::onTargetsChosen, viewModel::onReset)
+}
+
+/** The page of the controllers, from what it shows: the screen feeds it from the game, the tour of the page feeds it made-up values. */
+@Composable
+internal fun ControllersContent(
+    mapping: ControllerMapping,
+    gameName: String,
+    onBack: () -> Unit,
+    onEnabledChanged: (Boolean) -> Unit,
+    onTargetsChosen: (ControlRef, List<ControlRef>) -> Unit,
+    onReset: () -> Unit,
+) {
     var confirmingReset by remember { mutableStateOf(false) }
     // The Steam Frame (or Meta) control being remapped, while the player picks where it goes.
     var capturing by remember { mutableStateOf<ControlRef?>(null) }
@@ -73,7 +88,7 @@ fun ControllersScreen(onBack: () -> Unit, viewModel: ControllersViewModel = hilt
             title = { Text(stringResource(R.string.controllers_reset_title)) },
             text = { Text(stringResource(R.string.controllers_reset_message)) },
             confirmButton = {
-                DangerButton(onClick = { confirmingReset = false; viewModel.onReset() }) { Text(stringResource(R.string.controllers_reset_confirm)) }
+                DangerButton(onClick = { confirmingReset = false; onReset() }) { Text(stringResource(R.string.controllers_reset_confirm)) }
             },
             dismissButton = { DangerTextButton(onClick = { confirmingReset = false }) { Text(stringResource(R.string.game_settings_cancel)) } },
         )
@@ -100,7 +115,7 @@ fun ControllersScreen(onBack: () -> Unit, viewModel: ControllersViewModel = hilt
                     }
                 }
             },
-            confirmButton = { GlassButton(onClick = { viewModel.onTargetsChosen(source, picked); capturing = null }) { Text(stringResource(R.string.controllers_apply)) } },
+            confirmButton = { GlassButton(onClick = { onTargetsChosen(source, picked); capturing = null }) { Text(stringResource(R.string.controllers_apply)) } },
             dismissButton = { DangerTextButton(onClick = { capturing = null }) { Text(stringResource(R.string.game_settings_cancel)) } },
         )
     }
@@ -112,10 +127,11 @@ fun ControllersScreen(onBack: () -> Unit, viewModel: ControllersViewModel = hilt
         ) {
             Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 BackButton(onClick = onBack)
-                Column {
+                Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.controllers_title), style = MaterialTheme.typography.headlineMedium)
                     Text(gameName, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                app.gameport.core.designsystem.TourHelpButton(app.gameport.core.model.TourKind.GAME_CONTROLLERS)
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 // Only what GamePort does by itself is told here; forcing the Steam Frame's controls adds no message above.
@@ -123,7 +139,7 @@ fun ControllersScreen(onBack: () -> Unit, viewModel: ControllersViewModel = hilt
                     Text(stringResource(R.string.controllers_status_automatic), style = MaterialTheme.typography.titleMedium, modifier = Modifier.widthIn(max = 720.dp))
                 }
                 Row(
-                    Modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
+                    Modifier.fillMaxWidth().widthIn(max = 720.dp).tourTarget(TourIds.CONTROLLERS_SWITCH).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
@@ -134,7 +150,7 @@ fun ControllersScreen(onBack: () -> Unit, viewModel: ControllersViewModel = hilt
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
-                    Switch(checked = mapping.enabled, onCheckedChange = viewModel::onEnabledChanged, enabled = mapping.translated)
+                    Switch(checked = mapping.enabled, onCheckedChange = onEnabledChanged, enabled = mapping.translated)
                 }
 
                 // Nothing to remap while GamePort puts nothing on the controllers.
@@ -156,7 +172,7 @@ fun ControllersScreen(onBack: () -> Unit, viewModel: ControllersViewModel = hilt
                         )
                     }
 
-                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    BoxWithConstraints(Modifier.fillMaxWidth().tourTarget(TourIds.CONTROLLERS_CARDS)) {
                         val wide = maxWidth >= 720.dp
                         val cards: @Composable (Modifier) -> Unit = { modifier ->
                             ControllerCard(Hand.LEFT, mapping, { capturing = it }, modifier)
@@ -166,7 +182,7 @@ fun ControllersScreen(onBack: () -> Unit, viewModel: ControllersViewModel = hilt
                         else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { cards(Modifier.fillMaxWidth()) }
                     }
 
-                    GlassButton(onClick = { confirmingReset = true }, enabled = mapping.overrides.isNotEmpty(), modifier = Modifier.padding(bottom = 24.dp)) {
+                    GlassButton(onClick = { confirmingReset = true }, enabled = mapping.overrides.isNotEmpty(), modifier = Modifier.padding(bottom = 24.dp).tourTarget(TourIds.CONTROLLERS_RESET)) {
                         Text(stringResource(R.string.controllers_reset))
                     }
                 }

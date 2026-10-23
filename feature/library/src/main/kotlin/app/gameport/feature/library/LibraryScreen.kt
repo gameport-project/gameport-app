@@ -95,6 +95,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.gameport.core.designsystem.GameImage
+import app.gameport.core.designsystem.TourIds
+import app.gameport.core.designsystem.tourTarget
 import app.gameport.core.designsystem.GamePortLogo
 import androidx.compose.foundation.layout.size
 import app.gameport.core.designsystem.GlassChip
@@ -251,13 +253,13 @@ private fun Shelf(
             ) {
                 if (state.newAndroid.isNotEmpty()) {
                     item(key = "android-new") {
-                        NewAndroidRail(
+                        Box(Modifier.tourTarget(TourIds.HOME_NEW)) { NewAndroidRail(
                             state.newAndroid,
                             state.newPrices,
                             display.coverSize.dp.dp,
                             display.newRailSize,
                             onHighlight = { app -> highlightedNew = app; if (app != null) highlightedId = null },
-                        ) { id -> if (state.anyKind.any { it.appId == id }) onGameClick(id) else onOpenStoreGame(id) }
+                        ) { id -> if (state.anyKind.any { it.appId == id }) onGameClick(id) else onOpenStoreGame(id) } }
                     }
                 }
                 if (state.continueGames.isNotEmpty()) {
@@ -277,7 +279,7 @@ private fun Shelf(
                     }
                 } else {
                     item(key = "all") {
-                        Rail(
+                        Box(Modifier.tourTarget(TourIds.HOME_ALL)) { Rail(
                             kind = RowKind.ALL,
                             games = state.allGames,
                             state = state,
@@ -286,7 +288,7 @@ private fun Shelf(
                             onMenu = { menuGame = it },
                             trailing = { SortPill(display.sort, onSortSelected) },
                             onHighlight = { highlightedId = it },
-                        )
+                        ) }
                     }
                 }
             }
@@ -518,10 +520,10 @@ private fun Header(
                 value = state.query,
                 onValueChange = onQueryChanged,
                 placeholder = stringResource(R.string.library_search_hint),
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).tourTarget(TourIds.HOME_SEARCH),
             )
             // The number of filters narrowing the list sits on the button, so a filter left on is never a mystery.
-            Box {
+            Box(Modifier.tourTarget(TourIds.HOME_FILTERS)) {
                 GlassIconButton(onClick = onOpenFilters) {
                     Icon(Icons.Filled.FilterList, contentDescription = stringResource(R.string.library_filters))
                 }
@@ -540,7 +542,7 @@ private fun Header(
                 }
             }
             // How many games are being installed sits on the button, as the filters do.
-            Box {
+            Box(Modifier.tourTarget(TourIds.HOME_DOWNLOADS)) {
                 GlassIconButton(onClick = onOpenDownloads) {
                     Icon(Icons.Filled.Download, contentDescription = stringResource(R.string.library_downloads))
                 }
@@ -558,14 +560,14 @@ private fun Header(
                 }
             }
             // The shop and the table of compatibility each have their own button.
-            GlassIconButton(onClick = onOpenStore) {
+            GlassIconButton(onClick = onOpenStore, modifier = Modifier.tourTarget(TourIds.HOME_STORE)) {
                 Icon(Icons.Filled.Storefront, contentDescription = stringResource(R.string.library_store), tint = Color(0xFF4FC3F7))
             }
             // The table of compatibility: a big wrench with a list, the same mark as the header of the table.
-            GlassIconButton(onClick = onOpenCompat) {
+            GlassIconButton(onClick = onOpenCompat, modifier = Modifier.tourTarget(TourIds.HOME_COMPAT)) {
                 app.gameport.core.designsystem.CompatToolsIcon(size = 32.dp, contentDescription = stringResource(R.string.library_compat))
             }
-            GlassIconButton(onClick = onOpenSettings) {
+            GlassIconButton(onClick = onOpenSettings, modifier = Modifier.tourTarget(TourIds.HOME_SETTINGS)) {
                 Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.library_settings))
             }
         }
@@ -576,7 +578,7 @@ private fun Header(
                     labels = listOf(stringResource(R.string.library_tab_vr), stringResource(R.string.library_tab_flat)),
                     selectedIndex = state.tab.ordinal,
                     onSelect = { onTabSelected(LibraryTab.entries[it]) },
-                    modifier = Modifier.width(StatusNoticeWidth),
+                    modifier = Modifier.width(StatusNoticeWidth).tourTarget(TourIds.HOME_TABS),
                 )
             }
             val offline: @Composable () -> Unit = { ConnectionNotice(state.connection, onClick = onOpenSteamSettings) }

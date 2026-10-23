@@ -1,5 +1,7 @@
 package app.gameport.feature.game
 
+import app.gameport.core.designsystem.TourIds
+import app.gameport.core.designsystem.tourTarget
 import android.text.format.DateUtils
 import android.text.format.Formatter
 import androidx.compose.foundation.layout.Arrangement
@@ -47,6 +49,7 @@ import app.gameport.core.designsystem.GlassIconButton
 import app.gameport.core.designsystem.glass
 import app.gameport.core.model.SaveDirection
 import app.gameport.core.model.SaveFileInfo
+import app.gameport.core.model.SaveOverview
 import app.gameport.core.model.SaveFileState
 import java.text.DateFormat
 import java.util.Date
@@ -60,6 +63,22 @@ fun SavesScreen(onBack: () -> Unit, viewModel: SavesViewModel = hiltViewModel())
     val gameName by viewModel.gameName.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val offline by viewModel.offline.collectAsStateWithLifecycle()
+    SavesContent(overview, gameName, refreshing, offline, onBack, viewModel::refresh, viewModel::onRestore, viewModel::onSend, viewModel::onCancelPending)
+}
+
+/** The page of the saves, from what it shows: the screen feeds it from the game, the tour of the page feeds it made-up values. */
+@Composable
+internal fun SavesContent(
+    overview: SaveOverview,
+    gameName: String,
+    refreshing: Boolean,
+    offline: Boolean,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
+    onRestore: () -> Unit,
+    onSend: () -> Unit,
+    onCancelPending: () -> Unit,
+) {
     var confirming by remember { mutableStateOf<Confirming?>(null) }
 
     confirming?.let { action ->
@@ -71,7 +90,7 @@ fun SavesScreen(onBack: () -> Unit, viewModel: SavesViewModel = hiltViewModel())
             confirmButton = {
                 DangerButton(onClick = {
                     confirming = null
-                    if (restore) viewModel.onRestore() else viewModel.onSend()
+                    if (restore) onRestore() else onSend()
                 }) { Text(stringResource(if (restore) R.string.saves_restore_confirm else R.string.saves_send_confirm)) }
             },
             dismissButton = { DangerTextButton(onClick = { confirming = null }) { Text(stringResource(R.string.game_settings_cancel)) } },
@@ -90,20 +109,21 @@ fun SavesScreen(onBack: () -> Unit, viewModel: SavesViewModel = hiltViewModel())
                     Text(gameName, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (refreshing) CircularProgressIndicator(Modifier.padding(end = 8.dp))
-                GlassIconButton(onClick = viewModel::refresh, enabled = !refreshing) {
+                GlassIconButton(onClick = onRefresh, enabled = !refreshing, modifier = Modifier.tourTarget(TourIds.SAVES_REFRESH)) {
                     Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.saves_refresh))
                 }
+                app.gameport.core.designsystem.TourHelpButton(app.gameport.core.model.TourKind.GAME_SAVES)
             }
 
             Summary(overview.inSync, overview.files.isEmpty(), overview.localSeenMillis, overview.cloudSeenMillis, offline)
 
-            overview.pending?.let { PendingCard(it, onCancel = viewModel::onCancelPending) }
+            overview.pending?.let { PendingCard(it, onCancel = onCancelPending) }
 
-            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            LazyColumn(Modifier.weight(1f).tourTarget(TourIds.SAVES_FILES), contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(overview.files, key = SaveFileState::path) { FileCard(it) }
             }
 
-            Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth().padding(bottom = 16.dp).tourTarget(TourIds.SAVES_ACTIONS), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 GlassButton(onClick = { confirming = Confirming.RESTORE }, enabled = overview.hasCloud && overview.pending == null) {
                     Text(stringResource(R.string.saves_restore))
                 }
@@ -120,7 +140,7 @@ private fun Summary(inSync: Boolean, empty: Boolean, localSeen: Long, cloudSeen:
     val context = LocalContext.current
     val now = System.currentTimeMillis()
     fun ago(millis: Long) = DateUtils.getRelativeTimeSpanString(millis, now, DateUtils.MINUTE_IN_MILLIS).toString()
-    Column(Modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(Modifier.fillMaxWidth().widthIn(max = 720.dp).tourTarget(TourIds.SAVES_SUMMARY).glass(RoundedCornerShape(16.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
             stringResource(
                 when {

@@ -136,4 +136,8 @@
     <string name="storegame_price_sale_fine_past">%1$s · on %2$s</string>
     <string name="storegame_price_instead_of">instead of %1$s</string>
     <string name="store_all_games">All games</string>
+    <string name="demo_notice">Preview: made-up values, nothing is installed</string>
+    <string name="demo_game_summary">The short description of the game appears here, as the catalog gives it.</string>
+    <string name="demo_tag_adventure">Adventure</string>
+    <string name="demo_tag_vr">VR</string>
 </resources>

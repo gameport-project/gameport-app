@@ -2,6 +2,8 @@
 
 package app.gameport.feature.downloads
 
+import app.gameport.core.designsystem.TourIds
+import app.gameport.core.designsystem.tourTarget
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.lazy.rememberLazyListState
 import app.gameport.core.designsystem.installErrorText
@@ -69,15 +71,48 @@ fun DownloadsScreen(
     val speedUnit by viewModel.speedUnit.collectAsStateWithLifecycle()
     val updatable by viewModel.updatable.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    DownloadsContent(
+        entries = entries,
+        speedUnit = speedUnit,
+        updatable = updatable,
+        onBack = onBack,
+        onGameClick = onGameClick,
+        onUpdate = viewModel::onUpdate,
+        onCancel = viewModel::onCancel,
+        onPause = viewModel::onPause,
+        onDiscard = viewModel::onDiscard,
+        onUninstall = viewModel::onUninstall,
+        onResume = viewModel::onResume,
+        onPlay = { entry -> viewModel.launchIntent(entry)?.let(context::startActivity) },
+    )
+}
+
+/** The page of the downloads, from what it shows: the screen feeds it from the installs, the tour of the page feeds it made-up entries. */
+@Composable
+internal fun DownloadsContent(
+    entries: List<DownloadEntry>,
+    speedUnit: SpeedUnit,
+    updatable: Set<Int>,
+    onBack: () -> Unit,
+    onGameClick: (Int) -> Unit,
+    onUpdate: (DownloadEntry) -> Unit,
+    onCancel: (Int) -> Unit,
+    onPause: (Int) -> Unit,
+    onDiscard: (Int) -> Unit,
+    onUninstall: (Int) -> Unit,
+    onResume: (DownloadEntry) -> Unit,
+    onPlay: (DownloadEntry) -> Unit,
+) {
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp)) {
             Row(
-                Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                Modifier.fillMaxWidth().padding(vertical = 16.dp).tourTarget(TourIds.DOWNLOADS_HEADER),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 BackButton(onClick = onBack)
-                Text(stringResource(R.string.downloads_title), style = MaterialTheme.typography.headlineMedium)
+                Text(stringResource(R.string.downloads_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+                app.gameport.core.designsystem.TourHelpButton(app.gameport.core.model.TourKind.DOWNLOADS)
             }
             if (entries.isEmpty()) {
                 Text(stringResource(R.string.downloads_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -95,7 +130,7 @@ fun DownloadsScreen(
                 if (waiting.size > 1) {
                     item(key = "updates") {
                         Row(
-                            Modifier.fillMaxWidth().glass(RoundedCornerShape(18.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
+                            Modifier.fillMaxWidth().tourTarget(TourIds.DOWNLOADS_UPDATES).glass(RoundedCornerShape(18.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -104,7 +139,7 @@ fun DownloadsScreen(
                                 modifier = Modifier.weight(1f),
                                 style = MaterialTheme.typography.titleMedium,
                             )
-                            Button(onClick = { waiting.forEach(viewModel::onUpdate) }) {
+                            Button(onClick = { waiting.forEach(onUpdate) }) {
                                 Text(stringResource(R.string.downloads_update_all))
                             }
                         }
@@ -112,17 +147,18 @@ fun DownloadsScreen(
                 }
                 items(entries, key = DownloadEntry::appId) { entry ->
                     EntryRow(
+                        modifier = if (entry.appId == entries.first().appId) Modifier.tourTarget(TourIds.DOWNLOADS_ENTRY) else Modifier,
                         entry = entry,
                         speedUnit = speedUnit,
                         updateAvailable = entry.appId in updatable,
-                        onUpdate = { viewModel.onUpdate(entry) },
+                        onUpdate = { onUpdate(entry) },
                         onOpen = { onGameClick(entry.appId) },
-                        onCancel = { viewModel.onCancel(entry.appId) },
-                        onPause = { viewModel.onPause(entry.appId) },
-                        onDiscard = { viewModel.onDiscard(entry.appId) },
-                        onUninstall = { viewModel.onUninstall(entry.appId) },
-                        onResume = { viewModel.onResume(entry) },
-                        onPlay = { viewModel.launchIntent(entry)?.let(context::startActivity) },
+                        onCancel = { onCancel(entry.appId) },
+                        onPause = { onPause(entry.appId) },
+                        onDiscard = { onDiscard(entry.appId) },
+                        onUninstall = { onUninstall(entry.appId) },
+                        onResume = { onResume(entry) },
+                        onPlay = { onPlay(entry) },
                     )
                 }
             }
@@ -132,6 +168,7 @@ fun DownloadsScreen(
 
 @Composable
 private fun EntryRow(
+    modifier: Modifier = Modifier,
     entry: DownloadEntry,
     speedUnit: SpeedUnit,
     updateAvailable: Boolean,
@@ -145,7 +182,7 @@ private fun EntryRow(
     onPlay: () -> Unit,
 ) {
     val entryContext = LocalContext.current
-    BoxWithConstraints(Modifier.fillMaxWidth().glass(RoundedCornerShape(18.dp)).padding(12.dp)) {
+    BoxWithConstraints(modifier.fillMaxWidth().glass(RoundedCornerShape(18.dp)).padding(12.dp)) {
         val compact = maxWidth < COMPACT_WIDTH
         val cover: @Composable () -> Unit = {
             Box(Modifier.width(54.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(10.dp))) {

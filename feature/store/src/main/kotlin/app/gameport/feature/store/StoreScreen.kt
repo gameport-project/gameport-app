@@ -1,5 +1,7 @@
 package app.gameport.feature.store
 
+import app.gameport.core.designsystem.TourIds
+import app.gameport.core.designsystem.tourTarget
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -143,6 +145,7 @@ fun StoreScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, onStoreGame: (In
                         content?.let { c ->
                             countText(c).let { count -> if (c.vrDevice && count.isNotEmpty()) tabNames[tab] + " \u00b7 " + count else count }
                         }.orEmpty(),
+                        tour = app.gameport.core.model.TourKind.STORE,
                     ) {
                         Icon(Icons.Filled.Storefront, contentDescription = null, tint = KindBlue, modifier = Modifier.size(52.dp))
                     }
@@ -151,7 +154,7 @@ fun StoreScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, onStoreGame: (In
                             labels = tabNames,
                             selectedIndex = tab,
                             onSelect = { viewModel.onGroupChosen(setOf(StoreFilter.VR, StoreFilter.FLAT), listOf(null, StoreFilter.VR, StoreFilter.FLAT)[it]) },
-                            modifier = Modifier.align(Alignment.CenterEnd).width(240.dp),
+                            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 72.dp).width(240.dp).tourTarget(TourIds.STORE_TABS),
                             height = 40.dp,
                         )
                     }
@@ -165,10 +168,10 @@ fun StoreScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, onStoreGame: (In
                                 value = current.query,
                                 onValueChange = viewModel::onQueryChanged,
                                 placeholder = stringResource(R.string.store_search_hint),
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1f).tourTarget(TourIds.STORE_SEARCH),
                             )
                             // The number of things narrowing the list sits on the button, as on the home, so a filter left on is never a mystery.
-                            Box {
+                            Box(Modifier.tourTarget(TourIds.STORE_FILTERS)) {
                                 GlassIconButton(onClick = { panelOpen = true }, modifier = Modifier.size(48.dp)) {
                                     Icon(Icons.Filled.FilterList, contentDescription = stringResource(R.string.store_filters))
                                 }
@@ -186,8 +189,37 @@ fun StoreScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, onStoreGame: (In
                                     )
                                 }
                             }
-                            SortButton(current.sort, viewModel::onSortChosen)
-                            ViewModeButtons(current.viewMode, current.listColumns, viewModel::onViewModeChosen, viewModel::onListColumnsToggled)
+                            Box(Modifier.tourTarget(TourIds.STORE_SORT)) { SortButton(current.sort, viewModel::onSortChosen) }
+                            Box(Modifier.tourTarget(TourIds.STORE_VIEW)) {
+                                ViewModeButtons(current.viewMode, current.listColumns, viewModel::onViewModeChosen, viewModel::onListColumnsToggled)
+                            }
+                            // The tour of the page acts out the ways to see the games, one at each step, and puts back the one the player had.
+                            val shown = current.viewMode to current.listColumns
+                            val kept = remember { arrayOfNulls<Pair<StoreViewMode, Int>>(1) }
+                            val putBack = {
+                                kept[0]?.let { (mode, columns) ->
+                                    viewModel.onViewModeChosen(mode)
+                                    viewModel.onListColumnsChosen(columns)
+                                }
+                                kept[0] = null
+                            }
+                            app.gameport.core.designsystem.TourDemo(TourIds.DEMO_STORE_LIST, putBack) {
+                                if (kept[0] == null) kept[0] = shown
+                                tap(TourIds.STORE_VIEW_LIST)
+                                viewModel.onViewModeChosen(StoreViewMode.LIST)
+                            }
+                            app.gameport.core.designsystem.TourDemo(TourIds.DEMO_STORE_COLUMNS, putBack) {
+                                tap(TourIds.STORE_VIEW_LIST)
+                                viewModel.onListColumnsToggled()
+                            }
+                            app.gameport.core.designsystem.TourDemo(TourIds.DEMO_STORE_COLUMNS_AGAIN, putBack) {
+                                tap(TourIds.STORE_VIEW_LIST)
+                                viewModel.onListColumnsToggled()
+                            }
+                            app.gameport.core.designsystem.TourDemo(TourIds.DEMO_STORE_COVERS, putBack) {
+                                tap(TourIds.STORE_VIEW_COVERS)
+                                viewModel.onViewModeChosen(StoreViewMode.COVERS)
+                            }
                         }
                         StateFilters(current, viewModel)
                         if (current.apps.isEmpty()) {
@@ -204,6 +236,7 @@ fun StoreScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, onStoreGame: (In
                             }
                             // The bottom margin matches the top one.
                             LazyVerticalGrid(
+                                modifier = Modifier.tourTarget(TourIds.STORE_LIST),
                                 state = gridState,
                                 columns = if (covers) GridCells.Adaptive(minSize = current.coverWidth.dp) else GridCells.Fixed(current.listColumns),
                                 contentPadding = PaddingValues(bottom = 24.dp),
@@ -291,7 +324,7 @@ private fun StateFilters(state: StoreUiState.Content, viewModel: StoreViewModel)
     val availability = setOf(StoreFilter.INSTALLABLE, StoreFilter.FUTURE)
     val library = setOf(StoreFilter.OWNED, StoreFilter.NOT_OWNED)
     val compat = setOf(StoreFilter.COMPATIBLE, StoreFilter.INCOMPATIBLE)
-    Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(bottom = 12.dp).tourTarget(TourIds.STORE_STATE), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         PillTabs(
             labels = listOf(stringResource(R.string.store_all), stringResource(R.string.store_avail_installable), stringResource(R.string.store_avail_future)),
             selectedIndex = when {
@@ -418,7 +451,7 @@ private fun ViewModeButtons(mode: StoreViewMode, columns: Int, onChosen: (StoreV
             Triple(StoreViewMode.COVERS, Icons.Filled.GridView, R.string.store_view_covers),
         ).forEach { (value, icon, label) ->
             // The list button says how many games a row holds; pressed again while the list is shown, it goes to the other number.
-            Box {
+            Box(Modifier.tourTarget(if (value == StoreViewMode.LIST) TourIds.STORE_VIEW_LIST else TourIds.STORE_VIEW_COVERS)) {
                 GlassIconButton(onClick = { if (value == StoreViewMode.LIST && mode == StoreViewMode.LIST) onColumns() else onChosen(value) }, modifier = Modifier.size(48.dp)) {
                     Icon(icon, contentDescription = stringResource(label), tint = if (value == mode) KindBlue else LocalContentColor.current)
                 }

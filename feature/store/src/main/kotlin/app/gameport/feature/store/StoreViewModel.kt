@@ -193,6 +193,11 @@ class StoreViewModel @Inject constructor(
         listColumns.value = next
     }
 
+    fun onListColumnsChosen(columns: Int) {
+        keptFilters.setListColumns(columns)
+        listColumns.value = columns
+    }
+
     fun onViewModeChosen(mode: StoreViewMode) {
         keptFilters.setViewMode(mode)
         viewMode.value = mode

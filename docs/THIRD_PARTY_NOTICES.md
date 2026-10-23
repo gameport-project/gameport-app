@@ -24,6 +24,10 @@ GamePort is open source. Everything below is used under its own licence; keep th
 | utf8_range | MIT | Linked statically into the shim (protobuf dependency). |
 | ARSCLib | to be confirmed | Binary manifest/resource editing in the patcher (through ovrport). |
 
+## Logos
+
+- The Steam and Discord logos (`core/designsystem/src/main/res/drawable/ic_steam.xml`, `ic_discord.xml`) come from [Simple Icons](https://simpleicons.org), CC0. The marks belong to Valve and Discord and only say "this opens Steam" or "this opens Discord".
+
 ## Not redistributed
 
 - **Valve Steamworks SDK headers.** `gameport-steamworks-shim/sdk_includes/isteamclient023.h` is generated locally from an SDK supplied by the developer (`tools/generate_isteamclient023.py`) and is git-ignored. Valve's SDK terms may not allow republishing its headers; decide how the open-source build obtains them before publishing.

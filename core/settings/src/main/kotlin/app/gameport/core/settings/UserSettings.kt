@@ -71,6 +71,21 @@ class UserSettings @Inject constructor(
         _whatsNewSeen.value = versionCode
     }
 
+    private val _homeTourSeen = MutableStateFlow(prefs.getBoolean(KEY_HOME_TOUR_SEEN, false))
+
+    /** Whether the complete guided tour was started once, so it opens by itself only the first time. */
+    val homeTourSeen: StateFlow<Boolean> = _homeTourSeen.asStateFlow()
+
+    fun markHomeTourSeen() {
+        prefs.edit().putBoolean(KEY_HOME_TOUR_SEEN, true).apply()
+        _homeTourSeen.value = true
+    }
+
+    /** Whether the first run after the tours appeared has been told apart from a first install; see [TourController.decideFirstRun]. */
+    var tourDecided: Boolean
+        get() = prefs.getBoolean(KEY_TOUR_DECIDED, false)
+        set(value) = prefs.edit().putBoolean(KEY_TOUR_DECIDED, value).apply()
+
     // Before this setting, a switch ("return_to_gameport") said whether a game started by GamePort opens it again: that is kept.
     private val _returnMode = MutableStateFlow(
         ReturnMode.ofId(prefs.getString(KEY_RETURN_MODE, null)) ?: if (prefs.getBoolean(KEY_RETURN, true)) ReturnMode.APP else ReturnMode.NEVER,
@@ -194,5 +209,7 @@ class UserSettings @Inject constructor(
         const val KEY_FAVORITES = "home_favorites"
         const val KEY_HIDE_UNINSTALLED = "hide_uninstalled"
         const val KEY_SORT = "library_sort"
+        const val KEY_TOUR_DECIDED = "tour_decided"
+        const val KEY_HOME_TOUR_SEEN = "home_tour_seen"
     }
 }

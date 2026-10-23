@@ -4,10 +4,31 @@ import androidx.navigation.NavController
 import android.app.Activity
 import android.view.WindowManager
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.navigation.compose.currentBackStackEntryAsState
+import app.gameport.core.designsystem.LocalTourTargets
+import app.gameport.core.designsystem.TourOverlay
+import app.gameport.core.designsystem.TourTransition
+import app.gameport.core.designsystem.TourTargets
+import app.gameport.core.model.TourKind
+import app.gameport.feature.game.gameDemoScreens
+import app.gameport.feature.game.navigateToGame
+import app.gameport.feature.game.isTourDemo
+import app.gameport.feature.game.navigateToTourDemo
+import app.gameport.feature.downloads.downloadsDemoScreen
+import app.gameport.feature.downloads.isDownloadsDemo
+import app.gameport.feature.downloads.navigateToDownloadsDemo
+import app.gameport.feature.store.isStoreGameDemo
+import app.gameport.feature.store.navigateToStoreGameDemo
+import app.gameport.feature.store.storeGameDemoScreen
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -35,7 +56,6 @@ import app.gameport.feature.game.gameSettingsScreen
 import app.gameport.feature.game.navigateToGameControllers
 import app.gameport.feature.game.navigateToGameSaves
 import app.gameport.feature.game.navigateToGameSettings
-import app.gameport.feature.game.navigateToGame
 import app.gameport.feature.library.LibraryRoute
 import app.gameport.feature.settings.SettingsRoute
 import app.gameport.feature.settings.settingsScreen
@@ -73,6 +93,8 @@ private fun GamePortContent(viewModel: AppViewModel) {
         }
     }
 
+    val targets = remember { TourTargets() }
+    CompositionLocalProvider(LocalTourTargets provides targets, app.gameport.core.designsystem.LocalTourStarter provides { kind -> viewModel.tour.start(kind) }) {
     NavHost(navController = navController, startDestination = AuthRoute) {
         authScreen()
         libraryScreen(
@@ -96,9 +118,15 @@ private fun GamePortContent(viewModel: AppViewModel) {
         gameAchievementsScreen(onBack = navController::goBack)
         gameSavesScreen(onBack = navController::goBack)
         gameSettingsScreen(onBack = navController::goBack)
+        // Pages of made-up values, for the guided tours.
+        gameDemoScreens(onBack = navController::goBack)
+        downloadsDemoScreen(onBack = navController::goBack)
+        storeGameDemoScreen(onBack = navController::goBack)
     }
     // What a new version changes, and the games to patch again when it needs it.
     if (signedIn) app.gameport.whatsnew.WhatsNewHost()
+    if (signedIn) TourHost(navController, viewModel)
+    }
 }
 
 /**
@@ -107,4 +135,71 @@ private fun GamePortContent(viewModel: AppViewModel) {
  */
 private fun NavController.goBack() {
     if (previousBackStackEntry != null) popBackStack()
+}
+
+/**
+ * The guided tours. The complete one opens by itself the first time and goes through every page; each page's own can be started from Settings > Help or
+ * from the help button of the page. The page of a tour is opened first when it is not on screen, and the pages of a game (which a first launch has none
+ * of) are pages of made-up values, so the tours show every button and notice. When a tour on such a page ends, the page is left.
+ */
+@Composable
+private fun TourHost(navController: NavController, viewModel: AppViewModel) {
+    val tour = viewModel.tour
+    val active by tour.active.collectAsStateWithLifecycle()
+    val entry by navController.currentBackStackEntryAsState()
+    val destination = entry?.destination
+    val onHome = destination?.hasRoute<LibraryRoute>() == true
+
+    // The first time, the home shows itself a moment, then the complete tour starts.
+    LaunchedEffect(onHome) {
+        if (onHome && tour.firstLaunchDue()) {
+            delay(1_200)
+            if (tour.firstLaunchDue()) tour.startComplete()
+        }
+    }
+    val kind = active
+    val onPage = kind != null && destination?.let { isPageOf(kind, it) } == true
+    // A tour brings its page first. In the complete tour each page replaces the last, so the pages do not pile up.
+    LaunchedEffect(kind, onPage) {
+        if (kind == null || onPage) return@LaunchedEffect
+        if (tour.chaining && kind != TourKind.HOME) navController.popBackStack<LibraryRoute>(inclusive = false)
+        when (kind) {
+            TourKind.HOME -> navController.popBackStack<LibraryRoute>(inclusive = false)
+            TourKind.STORE -> navController.navigate(StoreRoute)
+            TourKind.STORE_GAME -> navController.navigateToStoreGameDemo()
+            TourKind.COMPAT_TABLE -> navController.navigate(CompatRoute)
+            TourKind.DOWNLOADS -> navController.navigateToDownloadsDemo()
+            TourKind.SETTINGS -> navController.navigate(SettingsRoute())
+            TourKind.GAME, TourKind.GAME_COMPAT, TourKind.GAME_CONTROLLERS, TourKind.GAME_SAVES -> navController.navigateToTourDemo(kind)
+        }
+    }
+    // In the complete tour, each page is entered with its mark growing in the middle of the screen, while the page opens behind it.
+    var introduced by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<TourKind?>(null) }
+    LaunchedEffect(kind) { if (kind == null) introduced = null }
+    if (kind != null && tour.chaining && introduced != kind) {
+        TourTransition(
+            caption = stringResource(if (kind == TourKind.HOME) R.string.tour_caption_start else R.string.tour_caption_next),
+            title = stringResource(tourPageName(kind)),
+            icon = { TourPageIcon(kind) },
+        ) { introduced = kind }
+    } else if (kind != null && onPage) {
+        val next = tour.upcoming
+        TourOverlay(tourSteps(kind), lastStepLabel = next?.let { stringResource(R.string.tour_next_page, stringResource(tourPageName(it))) }) { completed ->
+            val wasComplete = tour.chaining
+            tour.finish(completed)
+            // The tour is over: a page of made-up values is left, back to where the tour was started from, and the complete tour ends on the home.
+            if (tour.active.value == null && (kind.onDemoPage || wasComplete)) navController.goBack()
+        }
+    }
+}
+
+/** Whether [destination] is the page a tour of [kind] runs on: the real page, or the page of made-up values for a game's pages. */
+private fun isPageOf(kind: TourKind, destination: androidx.navigation.NavDestination): Boolean = when (kind) {
+    TourKind.HOME -> destination.hasRoute<LibraryRoute>()
+    TourKind.STORE -> destination.hasRoute<StoreRoute>()
+    TourKind.COMPAT_TABLE -> destination.hasRoute<CompatRoute>()
+    TourKind.SETTINGS -> destination.hasRoute<SettingsRoute>()
+    TourKind.STORE_GAME -> destination.isStoreGameDemo()
+    TourKind.DOWNLOADS -> destination.isDownloadsDemo()
+    TourKind.GAME, TourKind.GAME_COMPAT, TourKind.GAME_CONTROLLERS, TourKind.GAME_SAVES -> destination.isTourDemo(kind)
 }

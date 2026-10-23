@@ -40,6 +40,7 @@ class SettingsViewModel @Inject constructor(
     private val history: PlayHistoryStore,
     private val incompatible: app.gameport.core.settings.IncompatibleGames,
     private val verdicts: app.gameport.core.settings.GameVerdicts,
+    private val tours: app.gameport.core.settings.TourController,
     private val downloadRegion: app.gameport.core.steam.DownloadRegion,
     device: DeviceProfile,
 ) : ViewModel() {
@@ -47,6 +48,12 @@ class SettingsViewModel @Inject constructor(
     val hiddenGames: StateFlow<List<Game>> = combine(library.observeLibrary(), history.hidden) { loaded, hidden ->
         loaded.games.filter { it.appId in hidden }.sortedBy { it.name.lowercase() }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
+    /** Starts a guided tour; the page it belongs to opens by itself. */
+    fun onStartTour(kind: app.gameport.core.model.TourKind) = tours.start(kind)
+
+    /** Starts the complete tour, which goes through every page. */
+    fun onStartCompleteTour() = tours.startComplete()
 
     fun onShowAgain(appId: Int) = history.setHidden(appId, false)
 

@@ -39,4 +39,14 @@
     <string name="install_installing">Installation… une confirmation peut être demandée à l\'écran</string>
     <string name="install_finishing">Mise en place des fichiers du jeu… il pourra être lancé juste après</string>
     <string name="price_free">Gratuit</string>
+    <string name="tour_progress">Étape %1$d sur %2$d</string>
+    <string name="tour_skip">Quitter</string>
+    <string name="tour_back">Précédent</string>
+    <string name="tour_next">Suivant</string>
+    <string name="tour_done">Terminer</string>
+    <string name="tour_leave_title">Quitter la visite ?</string>
+    <string name="tour_leave_text">La visite peut être relancée à tout moment depuis Réglages > Aide.</string>
+    <string name="tour_leave">Quitter la visite</string>
+    <string name="tour_continue">Continuer</string>
+    <string name="tour_help">Visite guidée de cette page</string>
 </resources>

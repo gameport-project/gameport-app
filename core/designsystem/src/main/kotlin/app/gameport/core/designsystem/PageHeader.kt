@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.dp
 
 /** The header of a page, as the page of the trophies has it: the back arrow, a mark, the title and a line under it. */
 @Composable
-fun PageHeader(onBack: () -> Unit, title: String, subtitle: String, trailing: (@Composable () -> Unit)? = null, mark: @Composable () -> Unit) {
+fun PageHeader(onBack: () -> Unit, title: String, subtitle: String, trailing: (@Composable () -> Unit)? = null, tour: app.gameport.core.model.TourKind? = null, mark: @Composable () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
         BackButton(onClick = onBack)
         mark()
@@ -24,6 +24,11 @@ fun PageHeader(onBack: () -> Unit, title: String, subtitle: String, trailing: (@
                 trailing?.invoke()
             }
             Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        // The help button stands at the far end of the header.
+        if (tour != null) {
+            androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+            TourHelpButton(tour)
         }
     }
 }

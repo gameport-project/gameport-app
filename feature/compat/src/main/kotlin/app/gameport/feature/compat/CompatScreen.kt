@@ -1,5 +1,7 @@
 package app.gameport.feature.compat
 
+import app.gameport.core.designsystem.TourIds
+import app.gameport.core.designsystem.tourTarget
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -73,9 +75,9 @@ fun CompatScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, onUnownedClick:
                         value = current.query,
                         onValueChange = viewModel::onQueryChanged,
                         placeholder = stringResource(R.string.compat_search_hint),
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).tourTarget(TourIds.TABLE_SEARCH),
                     )
-                    Row(Modifier.padding(bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.padding(bottom = 16.dp).tourTarget(TourIds.TABLE_FILTERS), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(CompatFilter.WORKS, current.filter, R.string.compat_filter_works, Glyph.CHECK, CompatGreen, viewModel::onFilterChosen)
                         FilterChip(CompatFilter.FAILS, current.filter, R.string.compat_filter_fails, Glyph.CROSS, CompatRed, viewModel::onFilterChosen)
                     }
@@ -88,9 +90,10 @@ fun CompatScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, onUnownedClick:
                             val columns = maxOf(1, ((maxWidth + CARD_GAP) / (CARD_MIN_WIDTH + CARD_GAP)).toInt())
                             LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(CARD_GAP)) {
                                 items(current.entries.chunked(columns), key = { row -> row.first().counts.appId }) { row ->
+                                    val firstRow = row.first().counts.appId == current.entries.first().counts.appId
                                     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(CARD_GAP)) {
                                         row.forEach { entry ->
-                                            CompatCard(entry, current.deviceKind, Modifier.weight(1f).fillMaxHeight()) { if (entry.inLibrary) onGameClick(entry.counts.appId) else onUnownedClick(entry.counts.appId) }
+                                            CompatCard(entry, current.deviceKind, Modifier.weight(1f).fillMaxHeight(), first = firstRow && entry === row.first()) { if (entry.inLibrary) onGameClick(entry.counts.appId) else onUnownedClick(entry.counts.appId) }
                                         }
                                         // The last row keeps the width of its cards.
                                         repeat(columns - row.size) { Box(Modifier.weight(1f)) }
@@ -107,7 +110,7 @@ fun CompatScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, onUnownedClick:
 
 /** A game of the table: the numbers for the device in hand, and on request for the others. */
 @Composable
-private fun CompatCard(entry: CompatEntry, deviceKind: String, modifier: Modifier, onClick: () -> Unit) {
+private fun CompatCard(entry: CompatEntry, deviceKind: String, modifier: Modifier, first: Boolean = false, onClick: () -> Unit) {
     val shape = RoundedCornerShape(18.dp)
     val appId = entry.counts.appId
     var showAll by rememberSaveable(appId) { mutableStateOf(false) }
@@ -118,6 +121,7 @@ private fun CompatCard(entry: CompatEntry, deviceKind: String, modifier: Modifie
     val others = devices.filter { it.first != deviceKind }
     Row(
         modifier
+            .then(if (first) Modifier.tourTarget(TourIds.TABLE_CARD) else Modifier)
             .glass(shape)
             .then(if (outline != null) Modifier.border(1.5.dp, outline.copy(alpha = 0.85f), shape) else Modifier)
             .clickable(onClick = onClick)
@@ -146,7 +150,7 @@ private fun CompatCard(entry: CompatEntry, deviceKind: String, modifier: Modifie
                 DeviceLine(
                     entry.counts, kind, own, mine = kind == deviceKind,
                     trailing = if (kind == deviceKind) {
-                        { UnfoldButton(open = showAll, enabled = others.isNotEmpty(), onClick = { showAll = !showAll }) }
+                        { UnfoldButton(open = showAll, enabled = others.isNotEmpty(), onClick = { showAll = !showAll }, modifier = if (first) Modifier.tourTarget(TourIds.TABLE_UNFOLD) else Modifier) }
                     } else null,
                 )
             }
@@ -165,8 +169,8 @@ private fun CompatCard(entry: CompatEntry, deviceKind: String, modifier: Modifie
 
 /** A small arrow, beside the device in hand, that unfolds the numbers for the other devices; it points up while they are shown. */
 @Composable
-private fun UnfoldButton(open: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(28.dp)) {
+private fun UnfoldButton(open: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    IconButton(onClick = onClick, enabled = enabled, modifier = modifier.size(28.dp)) {
         Icon(
             if (open) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
             contentDescription = stringResource(if (open) R.string.compat_hide_others else R.string.compat_show_others),

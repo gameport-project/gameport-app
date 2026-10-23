@@ -1,5 +1,8 @@
 package app.gameport.feature.settings
 
+import app.gameport.core.designsystem.TourIds
+import app.gameport.core.designsystem.tourTarget
+import app.gameport.core.model.BackdropPresets
 import app.gameport.core.designsystem.DangerTextButton
 import app.gameport.core.designsystem.GameImage
 import app.gameport.core.designsystem.GlassButton
@@ -97,6 +100,7 @@ private enum class Category(val title: Int) {
     GAMES(R.string.settings_category_games),
     HIDDEN(R.string.settings_category_hidden),
     INCOMPATIBLE(R.string.settings_category_incompatible),
+    HELP(R.string.settings_category_help),
 }
 
 /** A full settings page: categories on the left, the selected one on the right. */
@@ -119,6 +123,32 @@ fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewMode
     // The window of "patch all", opened by its button; closing it stops nothing.
     var patchWindow by rememberSaveable { mutableStateOf(false) }
     var category by rememberSaveable { mutableStateOf(if (!startOnAccount && viewModel.updateState.value is AppUpdateState.Available) Category.UPDATES else Category.ACCOUNT) }
+    // The tour of the settings acts out two of the pages: it opens Appearance and tries a few colours, then puts back the ones the player had.
+    val shownDisplay = display
+    app.gameport.core.designsystem.TourDemo(TourIds.DEMO_SETTINGS_LOOK) {
+        try {
+            tap(TourIds.SETTINGS_APPEARANCE_ITEM)
+            category = Category.APPEARANCE
+            kotlinx.coroutines.delay(1_800)
+            BackdropPresets.pairs.drop(1).take(2).forEach { (start, end) ->
+                viewModel.onDisplayChanged { it.copy(gradientStart = start, gradientEnd = end) }
+                kotlinx.coroutines.delay(1_500)
+            }
+            AccentPresets.colors.drop(1).take(2).forEach { colour ->
+                viewModel.onDisplayChanged { it.copy(accent = colour) }
+                kotlinx.coroutines.delay(1_300)
+            }
+        } finally {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                viewModel.onDisplayChanged { it.copy(gradientStart = shownDisplay.gradientStart, gradientEnd = shownDisplay.gradientEnd, accent = shownDisplay.accent) }
+            }
+        }
+    }
+    app.gameport.core.designsystem.TourDemo(TourIds.DEMO_SETTINGS_HELP) {
+        tap(TourIds.SETTINGS_HELP_ITEM)
+        category = Category.HELP
+        kotlinx.coroutines.delay(2_000)
+    }
 
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp)) {
@@ -128,7 +158,8 @@ fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewMode
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 BackButton(onClick = onBack)
-                Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineMedium)
+                Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+                app.gameport.core.designsystem.TourHelpButton(app.gameport.core.model.TourKind.SETTINGS)
             }
             // A wide screen has the categories on the left; a narrow one has them in a row above the page.
             BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -138,7 +169,7 @@ fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewMode
                     val pageScroll = rememberScrollState()
                     val pageScope = rememberCoroutineScope()
                     Column(
-                        modifier.fillMaxHeight().verticalScroll(pageScroll).padding(bottom = 24.dp),
+                        modifier.fillMaxHeight().tourTarget(TourIds.SETTINGS_PAGE).verticalScroll(pageScroll).padding(bottom = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
                         when (category) {
@@ -178,6 +209,7 @@ fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewMode
                             }
                             Category.GAMES -> GamesSection(playerDefaults.heightCm, viewModel::onDefaultHeightChanged)
                             Category.HIDDEN -> HiddenSection(viewModel.hiddenGames.collectAsStateWithLifecycle().value, viewModel::onShowAgain)
+                            Category.HELP -> HelpSection(viewModel::onStartCompleteTour, viewModel::onStartTour)
                             Category.INCOMPATIBLE -> IncompatibleSection(
                                 viewModel.incompatibleGames.collectAsStateWithLifecycle().value,
                                 viewModel.showIncompatible.collectAsStateWithLifecycle().value,
@@ -188,16 +220,16 @@ fun SettingsScreen(onBack: () -> Unit, startOnAccount: Boolean = false, viewMode
                 }
                 if (compact) {
                     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            entries.forEach { entry -> CategoryItem(entry, entry == category, compact = true) { category = entry } }
+                        Row(Modifier.tourTarget(TourIds.SETTINGS_CATEGORIES).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            entries.forEach { entry -> CategoryItem(entry, entry == category, compact = true, Modifier.tourTarget(tourIdOf(entry))) { category = entry } }
                         }
                         page(Modifier.weight(1f).fillMaxWidth())
                     }
                 } else {
                     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
                         // Scrolls: with every category the list is taller than a headset screen, and the last ones were cut off.
-                        Column(Modifier.width(260.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            entries.forEach { entry -> CategoryItem(entry, entry == category, compact = false) { category = entry } }
+                        Column(Modifier.width(260.dp).fillMaxHeight().tourTarget(TourIds.SETTINGS_CATEGORIES).verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            entries.forEach { entry -> CategoryItem(entry, entry == category, compact = false, Modifier.tourTarget(tourIdOf(entry))) { category = entry } }
                         }
                         page(Modifier.weight(1f))
                     }
@@ -451,12 +483,18 @@ private fun returnModeLabel(mode: ReturnMode): Int = when (mode) {
 /** Below this width the categories move from the left to a row above the page. */
 private val COMPACT_WIDTH = 600.dp
 
+private fun tourIdOf(entry: Category): String = when (entry) {
+    Category.APPEARANCE -> TourIds.SETTINGS_APPEARANCE_ITEM
+    Category.HELP -> TourIds.SETTINGS_HELP_ITEM
+    else -> "settings_item_" + entry.name
+}
+
 @Composable
-private fun CategoryItem(entry: Category, selected: Boolean, compact: Boolean, onClick: () -> Unit) {
+private fun CategoryItem(entry: Category, selected: Boolean, compact: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = if (selected) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.06f),
-        modifier = (if (compact) Modifier else Modifier.fillMaxWidth()).clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick),
+        modifier = modifier.then(if (compact) Modifier else Modifier.fillMaxWidth()).clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick),
     ) {
         Text(
             stringResource(entry.title),

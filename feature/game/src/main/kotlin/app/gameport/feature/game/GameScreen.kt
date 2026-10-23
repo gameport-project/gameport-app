@@ -2,6 +2,8 @@
 
 package app.gameport.feature.game
 
+import app.gameport.core.designsystem.TourIds
+import app.gameport.core.designsystem.tourTarget
 import app.gameport.core.designsystem.KindBlue
 import app.gameport.core.model.reportable
 import android.content.Intent
@@ -489,7 +491,7 @@ private fun GameDetails(
             }
             val details: @Composable ColumnScope.() -> Unit = {
                 Text(text = game.name, style = MaterialTheme.typography.headlineLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.tourTarget(TourIds.GAME_LABELS), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     // The VR / flat label only means something where VR exists.
                     game.androidBuild?.isVr?.takeIf { vrDevice }?.let { vr ->
                         GlassChip(stringResource(if (vr) R.string.game_kind_vr else R.string.game_kind_flat))
@@ -510,7 +512,7 @@ private fun GameDetails(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    InstallActions(
+                    Box(Modifier.tourTarget(TourIds.GAME_ACTIONS)) { InstallActions(
                         install = install,
                         speedUnit = speedUnit,
                         onInstall = { if (compat?.level == app.gameport.core.model.CompatLevel.FAILS) warning = true else startInstall() },
@@ -526,9 +528,9 @@ private fun GameDetails(
                         patchOutdated = GameIssue.PatchOutdated in issues,
                         busy = repatch is Repatch.Running,
                         onReport = { reporting = true },
-                    )
+                    ) }
                     if (install is InstallState.Installed) {
-                        Box {
+                        Box(Modifier.tourTarget(TourIds.GAME_SAVES)) {
                             GlassIconButton(onClick = onOpenSaves, enabled = repatch !is Repatch.Running) {
                                 Icon(Icons.Filled.CloudSync, contentDescription = stringResource(R.string.saves_title))
                             }
@@ -539,13 +541,13 @@ private fun GameDetails(
                         }
                     }
                     if (install is InstallState.Installed) {
-                        GlassIconButton(onClick = { reporting = true }) {
+                        GlassIconButton(onClick = { reporting = true }, modifier = Modifier.tourTarget(TourIds.GAME_REPORT)) {
                             Icon(Icons.Filled.BugReport, contentDescription = stringResource(R.string.report_open))
                         }
                     }
                     if (install is InstallState.Installed && vrDevice && game.androidBuild?.isVr != false) {
                         // The options that make a game work: orange as the compatibility labels, with a small mark when GamePort adapted the game by itself.
-                        Box {
+                        Box(Modifier.tourTarget(TourIds.GAME_COMPAT)) {
                             GlassIconButton(onClick = onOpenCompat, enabled = repatch !is Repatch.Running) {
                                 Icon(Icons.Filled.Build, contentDescription = stringResource(R.string.gamecompat_button), tint = CompatOrange)
                             }
@@ -555,7 +557,7 @@ private fun GameDetails(
                         }
                     }
                     if (install is InstallState.Installed && controllerProfile) {
-                        GlassIconButton(onClick = onOpenControllers, enabled = repatch !is Repatch.Running) {
+                        GlassIconButton(onClick = onOpenControllers, enabled = repatch !is Repatch.Running, modifier = Modifier.tourTarget(TourIds.GAME_CONTROLLERS)) {
                             Icon(
                                 Icons.Filled.SportsEsports,
                                 contentDescription = stringResource(R.string.controllers_title),
@@ -582,12 +584,13 @@ private fun GameDetails(
                             tint = if (hidden) LocalContentColor.current else HideRed,
                         )
                     }
-                    GlassIconButton(onClick = onOpenSettings, enabled = repatch !is Repatch.Running) {
+                    GlassIconButton(onClick = onOpenSettings, enabled = repatch !is Repatch.Running, modifier = Modifier.tourTarget(TourIds.GAME_SETTINGS)) {
                         Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.game_settings_title))
                     }
+                    app.gameport.core.designsystem.TourHelpButton(app.gameport.core.model.TourKind.GAME)
                 }
                 if (install is InstallState.Installed && (issues.isNotEmpty() || repatch != Repatch.None)) {
-                    IssuesPanel(
+                    Box(Modifier.tourTarget(TourIds.GAME_ISSUES)) { IssuesPanel(
                         issues = issues,
                         repatch = repatch,
                         speedUnit = speedUnit,
@@ -600,7 +603,7 @@ private fun GameDetails(
                         onActivateFrame = onActivateFrame,
                         onReport = { reporting = true },
                         onDismissProblem = report.onDismissProblem,
-                    )
+                    ) }
                 }
                 // A game without achievements, or one Steam has not answered for yet, shows nothing here.
                 achievements?.takeIf { it.items.isNotEmpty() }?.let { AchievementsCard(it, onOpenAchievements) }
@@ -619,7 +622,7 @@ private fun GameDetails(
                     })
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp), content = details)
                     // Size and play time are not what the player came for: after everything else.
-                    InfoCard(game, installed, playtime, Modifier.fillMaxWidth())
+                    InfoCard(game, installed, playtime, Modifier.fillMaxWidth().tourTarget(TourIds.GAME_INFO))
                 }
             } else {
                 Row(
@@ -633,7 +636,7 @@ private fun GameDetails(
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         cover(Modifier)
-                        InfoCard(game, installed, playtime, Modifier.fillMaxWidth())
+                        InfoCard(game, installed, playtime, Modifier.fillMaxWidth().tourTarget(TourIds.GAME_INFO))
                     }
                     Column(Modifier.weight(1f).padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp), content = details)
                 }

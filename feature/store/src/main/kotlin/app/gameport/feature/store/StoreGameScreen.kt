@@ -1,5 +1,7 @@
 package app.gameport.feature.store
 
+import app.gameport.core.designsystem.TourIds
+import app.gameport.core.designsystem.tourTarget
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -104,11 +106,17 @@ private val COVER_OVER_PICTURE: Dp get() = COVER_WIDTH * 1.5f - (BUTTON_BLOCK_HE
 @Composable
 fun StoreGameScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, viewModel: StoreGameViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    StoreGameContent(state, onBack, onGameClick, viewModel::onAddToLibrary)
+}
+
+/** The page from what it shows: the screen feeds it from the catalog, the tour of the page feeds it a made-up game. */
+@Composable
+internal fun StoreGameContent(state: StoreGameUiState, onBack: () -> Unit, onGameClick: (Int) -> Unit, onAddToLibrary: () -> Unit) {
     val context = LocalContext.current
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp)) {
             val content = state as? StoreGameUiState.Content
-            PageHeader(onBack, content?.app?.name ?: stringResource(R.string.store_title), content?.app?.let { (it.developer + it.publisher).distinct().joinToString(" · ") }.orEmpty(), trailing = content?.app?.let { app -> { Rating(app) } }) {
+            PageHeader(onBack, content?.app?.name ?: stringResource(R.string.store_title), content?.app?.let { (it.developer + it.publisher).distinct().joinToString(" · ") }.orEmpty(), trailing = content?.app?.let { app -> { Rating(app) } }, tour = app.gameport.core.model.TourKind.STORE_GAME) {
                 Icon(Icons.Filled.Storefront, contentDescription = null, tint = KindBlue, modifier = Modifier.size(52.dp))
             }
             when {
@@ -117,7 +125,7 @@ fun StoreGameScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, viewModel: S
                     Text(stringResource(R.string.storegame_not_listed), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     SteamButton(null) { openOnSteam(context, content.appId) }
                 }
-                else -> Details(content, content.app, onGameClick, viewModel::onAddToLibrary, context)
+                else -> Details(content, content.app, onGameClick, onAddToLibrary, context)
             }
         }
     }
@@ -139,7 +147,7 @@ private fun Details(content: StoreGameUiState.Content, app: AndroidApp, onGameCl
                 Hero(app)
                 // The labels lie over the picture, at the right of the cover.
                 FlowRow(
-                    Modifier.align(Alignment.BottomEnd).padding(start = COVER_WIDTH + 34.dp, end = 12.dp, bottom = 10.dp),
+                    Modifier.align(Alignment.BottomEnd).padding(start = COVER_WIDTH + 34.dp, end = 12.dp, bottom = 10.dp).tourTarget(TourIds.STOREGAME_LABELS),
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                     itemVerticalAlignment = Alignment.CenterVertically,
@@ -158,7 +166,7 @@ private fun Details(content: StoreGameUiState.Content, app: AndroidApp, onGameCl
                     modifier = Modifier.width(COVER_WIDTH).aspectRatio(2f / 3f).glass(cover).clip(cover),
                 )
                 Column(Modifier.weight(1f).height(COVER_WIDTH * 1.5f), verticalArrangement = Arrangement.Bottom) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+                    FlowRow(Modifier.tourTarget(TourIds.STOREGAME_BUTTONS), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
                         Buttons(content, app, onGameClick, onAdd, context)
                     }
                 }
@@ -182,7 +190,7 @@ private fun Details(content: StoreGameUiState.Content, app: AndroidApp, onGameCl
                 }
             }
         }
-        Section(stringResource(R.string.storegame_details)) {
+        Box(Modifier.tourTarget(TourIds.STOREGAME_DETAILS)) { Section(stringResource(R.string.storegame_details)) {
             // Two halves side by side where there is room: the facts, and the languages as a table. One under the other on a narrow screen.
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 if (maxWidth >= 640.dp) {
@@ -197,7 +205,7 @@ private fun Details(content: StoreGameUiState.Content, app: AndroidApp, onGameCl
                     }
                 }
             }
-        }
+        } }
     }
 }
 

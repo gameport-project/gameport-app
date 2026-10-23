@@ -39,4 +39,14 @@
     <string name="install_installing">Installing… a confirmation may be asked on screen</string>
     <string name="install_finishing">Putting the files of the game in place… it can be played right after</string>
     <string name="price_free">Free</string>
+    <string name="tour_progress">Step %1$d of %2$d</string>
+    <string name="tour_skip">Leave</string>
+    <string name="tour_back">Back</string>
+    <string name="tour_next">Next</string>
+    <string name="tour_done">Done</string>
+    <string name="tour_leave_title">Leave the tour?</string>
+    <string name="tour_leave_text">The tour can be started again at any time from Settings > Help.</string>
+    <string name="tour_leave">Leave the tour</string>
+    <string name="tour_continue">Keep going</string>
+    <string name="tour_help">Guided tour of this page</string>
 </resources>

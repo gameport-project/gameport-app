@@ -42,7 +42,7 @@ private val HeaderOrange = Color(0xFFFFB74D)
 /** The header of the page of the table: the wrench of the compatibility options in the colour of the labels. */
 @Composable
 internal fun CompatHeader(onBack: () -> Unit, subtitle: String) {
-    PageHeader(onBack, stringResource(R.string.compat_title), subtitle) {
+    PageHeader(onBack, stringResource(R.string.compat_title), subtitle, tour = app.gameport.core.model.TourKind.COMPAT_TABLE) {
         app.gameport.core.designsystem.CompatToolsIcon(size = 52.dp)
     }
 }

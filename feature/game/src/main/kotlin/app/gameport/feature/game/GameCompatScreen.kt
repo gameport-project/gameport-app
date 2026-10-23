@@ -1,5 +1,7 @@
 package app.gameport.feature.game
 
+import app.gameport.core.designsystem.TourIds
+import app.gameport.core.designsystem.tourTarget
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,26 +46,42 @@ fun GameCompatScreen(onBack: () -> Unit, viewModel: GameCompatViewModel = hiltVi
     val settings by viewModel.gameSettings.collectAsStateWithLifecycle()
     val stageFallback by viewModel.stageFallback.collectAsStateWithLifecycle()
     val gameName by viewModel.gameName.collectAsStateWithLifecycle()
+    GameCompatContent(mapping, settings, stageFallback, gameName, onBack, viewModel::onUseFrameChanged, viewModel::onRecenterChosen)
+}
+
+/** The page of the options, from what it shows: the screen feeds it from the game, the tour of the page feeds it made-up values. */
+@Composable
+internal fun GameCompatContent(
+    mapping: app.gameport.core.model.ControllerMapping,
+    settings: app.gameport.core.model.GameSettings,
+    stageFallback: Boolean,
+    gameName: String,
+    onBack: () -> Unit,
+    onUseFrameChanged: (Boolean) -> Unit,
+    onRecenterChosen: (RecenterMode) -> Unit,
+) {
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp)) {
-            PageHeader(onBack, stringResource(R.string.gamecompat_title), gameName) {
+            PageHeader(onBack, stringResource(R.string.gamecompat_title), gameName, tour = app.gameport.core.model.TourKind.GAME_COMPAT) {
                 Icon(Icons.Filled.Build, contentDescription = null, tint = CompatOrange, modifier = Modifier.size(52.dp))
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 OptionBox(
+                    modifier = Modifier.tourTarget(TourIds.GAMECOMPAT_FRAME),
                     title = stringResource(R.string.controllers_use_frame),
                     legend = stringResource(R.string.controllers_use_frame_legend),
                     checked = mapping.useFrame,
-                    onChecked = viewModel::onUseFrameChanged,
+                    onChecked = onUseFrameChanged,
                     // Only when the game ran and the layer saw no control for the Steam Frame's controllers.
                     warning = stringResource(R.string.controllers_use_frame_warning).takeIf { mapping.useFrame && mapping.noFrameControls },
                 )
                 ChoiceBox(
+                    modifier = Modifier.tourTarget(TourIds.GAMECOMPAT_RECENTER),
                     title = stringResource(R.string.gamecompat_recenter),
                     legend = stringResource(R.string.gamecompat_recenter_legend),
                     labels = listOf(R.string.gamecompat_mode_auto, R.string.gamecompat_mode_on, R.string.gamecompat_mode_off).map { stringResource(it) },
                     selected = settings.recenter.ordinal,
-                    onSelect = { viewModel.onRecenterChosen(RecenterMode.entries[it]) },
+                    onSelect = { onRecenterChosen(RecenterMode.entries[it]) },
                     // What GamePort did by itself, said only when it did.
                     note = stringResource(R.string.gamecompat_recenter_auto).takeIf { stageFallback && settings.recenter == RecenterMode.AUTO },
                 )
@@ -74,9 +92,9 @@ fun GameCompatScreen(onBack: () -> Unit, viewModel: GameCompatViewModel = hiltVi
 
 /** A choice among a few, always showing which is taken, with its legend. The first is the automatic one, where GamePort decides. */
 @Composable
-private fun ChoiceBox(title: String, legend: String, labels: List<String>, selected: Int, onSelect: (Int) -> Unit, note: String? = null) {
+private fun ChoiceBox(modifier: Modifier = Modifier, title: String, legend: String, labels: List<String>, selected: Int, onSelect: (Int) -> Unit, note: String? = null) {
     Column(
-        Modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text(title, style = MaterialTheme.typography.titleMedium)
@@ -94,6 +112,7 @@ private fun ChoiceBox(title: String, legend: String, labels: List<String>, selec
 /** A switch with its legend. A [warning], in orange with a mark, says a doubt about the switch. */
 @Composable
 private fun OptionBox(
+    modifier: Modifier = Modifier,
     title: String,
     legend: String,
     checked: Boolean,
@@ -101,7 +120,7 @@ private fun OptionBox(
     warning: String? = null,
 ) {
     Column(
-        Modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
