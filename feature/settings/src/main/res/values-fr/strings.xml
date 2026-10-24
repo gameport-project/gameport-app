@@ -254,4 +254,5 @@
     <string name="manage_discard">Abandonner</string>
     <string name="manage_discard_title">Abandonner ce téléchargement ?</string>
     <string name="manage_discard_text">Les fichiers laissés par le téléchargement de %1$s sont supprimés. Il peut être relancé depuis la page du jeu.</string>
+    <string name="manage_parts_recorded">Application %1$s · Extension %2$s (notée à l\'installation)</string>
 </resources>

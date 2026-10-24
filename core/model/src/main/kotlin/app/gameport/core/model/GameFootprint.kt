@@ -10,6 +10,8 @@ data class GameFootprint(
     /** The expansion files, or null when GamePort has no access to the folder they live in, so their size is unknown rather than zero. */
     val expansionBytes: Long?,
     val keptBytes: Long,
+    /** [expansionBytes] was written down when the files were put in place, not measured now: it says what the game was installed with. */
+    val expansionRecorded: Boolean = false,
 ) {
     /** The sum of what is known: an unknown expansion adds nothing, and [expansionUnknown] says so. */
     val knownBytes: Long get() = appBytes + (expansionBytes ?: 0L) + keptBytes

@@ -25,6 +25,7 @@ class GameFootprints @Inject constructor(
     private val packages: PackageGateway,
     private val handoff: ExpansionHandoff,
     private val installer: GameInstallRepository,
+    private val builds: InstalledBuilds,
 ) {
     /** The footprint of every installed game, by Steam app id. A game whose package is gone from the device is left out. */
     suspend fun ofInstalled(): Map<Int, GameFootprint> = withContext(Dispatchers.IO) {
@@ -51,7 +52,10 @@ class GameFootprints @Inject constructor(
         val folder = apks.firstOrNull()?.parentFile
         val app = maxOf(folder?.let(::treeBytes) ?: 0L, apks.sumOf { it.length() })
         val kept = handoff.staged(packageName).sumOf { it.length() } + treeBytes(installer.downloadDirectory(appId))
-        return GameFootprint(appBytes = app, expansionBytes = expansionBytes(packageName), keptBytes = kept)
+        // Measured when the folder can be read; otherwise what was written down at the install, which is exact unless the files were removed since.
+        val measured = expansionBytes(packageName)
+        val recorded = if (measured == null) builds.get(appId)?.expansionBytes else null
+        return GameFootprint(appBytes = app, expansionBytes = measured ?: recorded, keptBytes = kept, expansionRecorded = recorded != null)
     }
 
     private fun expansionBytes(packageName: String): Long? = ExpansionSize.of(Environment.getExternalStorageDirectory(), packageName, hasAllFilesAccess())

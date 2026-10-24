@@ -12,7 +12,15 @@ import kotlinx.serialization.json.Json
 
 /** The build of a game that was installed: Steam's build id of each depot, and the DLC that was chosen. */
 @Serializable
-data class InstalledBuild(val manifests: Map<Int, Long>, val dlc: Set<Int> = emptySet())
+data class InstalledBuild(
+    val manifests: Map<Int, Long>,
+    val dlc: Set<Int> = emptySet(),
+    /**
+     * What the game's expansion files weighed when they were put in place, in bytes: zero for a game that has none, null for a game installed before this was
+     * written down. Android hides other apps' `Android/obb` folders, so this is the one reliable figure.
+     */
+    val expansionBytes: Long? = null,
+)
 
 /** Remembers what each installed game was installed from, to tell when Steam publishes a newer build. */
 @Singleton

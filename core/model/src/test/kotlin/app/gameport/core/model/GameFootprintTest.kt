@@ -38,4 +38,12 @@ class GameFootprintTest {
     fun `no game weighs nothing`() {
         assertEquals(FootprintTotal(0, 0), emptyList<GameFootprint>().total())
     }
+
+    @Test
+    fun `a size noted at the install counts like a measured one and is told apart`() {
+        val noted = GameFootprint(appBytes = 100, expansionBytes = 2_000, keptBytes = 0, expansionRecorded = true)
+        assertEquals(2_100L, noted.knownBytes)
+        assertFalse(noted.expansionUnknown)
+        assertTrue(noted.expansionRecorded)
+    }
 }

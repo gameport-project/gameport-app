@@ -240,7 +240,7 @@ private fun ManagedRow(
                 text = buildString {
                     append(
                         if (footprint.expansionBytes == null) stringResource(R.string.manage_parts_unknown, size(footprint.appBytes))
-                        else stringResource(R.string.manage_parts, size(footprint.appBytes), size(footprint.expansionBytes!!)),
+                        else stringResource(if (footprint.expansionRecorded) R.string.manage_parts_recorded else R.string.manage_parts, size(footprint.appBytes), size(footprint.expansionBytes!!)),
                     )
                     if (footprint.keptBytes > 0) append(" · ").append(stringResource(R.string.manage_kept, size(footprint.keptBytes)))
                 },

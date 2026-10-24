@@ -258,6 +258,8 @@ class GameInstallRepository @Inject constructor(
                         if (!alreadyOnDevice) events.note(game.appId, "installed $packageName")
                         // Not playable yet: the expansion files have to be in place, under the name the game looks for.
                         setState(game.appId, InstallState.Finishing)
+                        // Measured before the files move: once placed, the download no longer holds them. A retry after a failed try finds them still there.
+                        val expansionBytes = ExpansionFiles.bytesToPlace(directory, packageName, PATCHED_DIR).takeIf { it > 0 } ?: handoff.staged(packageName).sumOf { it.length() }
                         if (!placeExpansionFiles(game.appId, directory, packageName)) {
                             // Not installed, not removed: the game is incomplete, its download is kept to place the files again, and the player chooses to try again or to remove it.
                             incomplete.put(game.appId, packageName)
@@ -273,7 +275,7 @@ class GameInstallRepository @Inject constructor(
                         incomplete.remove(game.appId)
                         installed.put(game.appId, packageName)
                         // What this install came from, to recognise a newer build later.
-                        builds.put(game.appId, InstalledBuild(depots.associate { it.id to it.manifestId }, chosen))
+                        builds.put(game.appId, InstalledBuild(depots.associate { it.id to it.manifestId }, chosen, expansionBytes))
                         updates.markCurrent(game.appId)
                         // The game is ready: Play shows now. Clearing the work folder (possibly gigabytes) is not waited for.
                         clearState(game.appId)

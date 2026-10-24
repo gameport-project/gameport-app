@@ -18,16 +18,7 @@ internal object ExpansionFiles {
      * error), so a report can say why nothing was placed instead of saying there was nothing to place.
      */
     fun place(downloaded: File, target: File, packageName: String, skipped: String, problems: MutableList<String> = mutableListOf()): List<String> {
-        val files = downloaded.walkTopDown()
-            .onEnter { it.name != skipped }
-            .filter { it.isFile }
-            .mapNotNull { file -> ObbNames.placement(file.relativeTo(downloaded).path, packageName)?.let { file to it } }
-            .toList()
-            .let { all ->
-                // A depot with an obb folder says what goes to the device: that folder, and the expansion files wherever they are.
-                val inFolder = all.filter { (file, _) -> ObbNames.inObbFolder(file.relativeTo(downloaded).path, packageName) }
-                if (inFolder.isEmpty()) all else all.filter { (file, _) -> file in inFolder.map { it.first } || file.name.endsWith(".obb", ignoreCase = true) }
-            }
+        val files = select(downloaded, packageName, skipped)
         if (files.isEmpty()) return emptyList()
         if (!target.mkdirs() && !target.isDirectory) problems += "the folder ${target.path} cannot be created (exists=${target.exists()}, parent writable=${target.parentFile?.canWrite()})"
         // A new version of the game replaces the expansion files of the old one, whatever code they were renamed to.
@@ -48,6 +39,21 @@ internal object ExpansionFiles {
         }
         return placed
     }
+
+    /** The files of [downloaded] that go to the device, each with the path it takes under the game's folder. */
+    fun select(downloaded: File, packageName: String, skipped: String): List<Pair<File, String>> = downloaded.walkTopDown()
+        .onEnter { it.name != skipped }
+        .filter { it.isFile }
+        .mapNotNull { file -> ObbNames.placement(file.relativeTo(downloaded).path, packageName)?.let { file to it } }
+        .toList()
+        .let { all ->
+            // A depot with an obb folder says what goes to the device: that folder, and the expansion files wherever they are.
+            val inFolder = all.filter { (file, _) -> ObbNames.inObbFolder(file.relativeTo(downloaded).path, packageName) }
+            if (inFolder.isEmpty()) all else all.filter { (file, _) -> file in inFolder.map { it.first } || file.name.endsWith(".obb", ignoreCase = true) }
+        }
+
+    /** What [place] is about to put on the device, in bytes: measured before the files move, since afterwards the download no longer holds them. */
+    fun bytesToPlace(downloaded: File, packageName: String, skipped: String): Long = select(downloaded, packageName, skipped).sumOf { it.first.length() }
 
     /**
      * Renames the expansion files of [directory] to follow [code], the version code of the APK installed now (see [ObbNames.aligned]).

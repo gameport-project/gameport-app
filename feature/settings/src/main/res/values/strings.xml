@@ -254,4 +254,5 @@
     <string name="manage_discard">Discard</string>
     <string name="manage_discard_title">Discard this download?</string>
     <string name="manage_discard_text">The files left by the download of %1$s are deleted. It can be started again from the page of the game.</string>
+    <string name="manage_parts_recorded">App %1$s · Expansion %2$s (noted at the install)</string>
 </resources>

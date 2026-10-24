@@ -193,4 +193,25 @@ class ExpansionFilesTest {
         ExpansionFiles.align(target, pkg, 140)
         assertTrue(java.nio.file.attribute.PosixFilePermission.OTHERS_READ in java.nio.file.Files.getPosixFilePermissions(file.toPath()))
     }
+
+    @Test
+    fun `the size to place is what the expansion files weigh, the APK and the patched folder left out`() {
+        val root = download("app.apk", "patched/app.apk", "obb/main.5.$pkg.obb", "obb/patch.5.$pkg.obb")
+        val expected = File(root, "obb/main.5.$pkg.obb").length() + File(root, "obb/patch.5.$pkg.obb").length()
+        assertEquals(expected, ExpansionFiles.bytesToPlace(root, pkg, skipped = "patched"))
+    }
+
+    @Test
+    fun `a download with only the APK has no expansion to count`() {
+        assertEquals(0L, ExpansionFiles.bytesToPlace(download("app.apk"), pkg, skipped = "patched"))
+    }
+
+    @Test
+    fun `the size is the same before and after the files are placed only if it is read before`() {
+        val root = download("obb/main.5.$pkg.obb")
+        val before = ExpansionFiles.bytesToPlace(root, pkg, skipped = "patched")
+        place(root)
+        assertTrue(before > 0)
+        assertEquals("after the files moved, the download holds nothing to count", 0L, ExpansionFiles.bytesToPlace(root, pkg, skipped = "patched"))
+    }
 }
