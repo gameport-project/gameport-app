@@ -916,6 +916,7 @@ private fun IssuesPanel(
                         onSecondAction = onDismissProblem,
                     )
                 GameIssue.ReinstallMayHelp -> IssueRow(stringResource(R.string.issue_reinstall_may_help), info = true)
+                is GameIssue.ExpansionMissing -> IssueRow(pluralStringResource(R.plurals.issue_expansion_missing, issue.missing, issue.missing), stringResource(R.string.issue_expansion_unchecked_action), { confirmingRepair = true }, enabled = !busy)
                 GameIssue.ExpansionMayBeMissing -> IssueRow(stringResource(R.string.issue_expansion_unchecked), stringResource(R.string.issue_expansion_unchecked_action), { confirmingRepair = true }, enabled = !busy, info = true)
                 GameIssue.StoragePermissionMissing ->
                     IssueRow(stringResource(R.string.issue_storage_permission), stringResource(R.string.game_storage_open), onPermissions, enabled = !busy)

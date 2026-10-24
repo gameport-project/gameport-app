@@ -35,6 +35,9 @@ sealed interface GameIssue {
      */
     data object ExpansionMayBeMissing : GameIssue
 
+    /** The game itself said that [missing] of the files Steam lists for it are not in its folder: it cannot load its data. */
+    data class ExpansionMissing(val missing: Int) : GameIssue
+
     /** The last save sync could not reach Steam ([offline]) or could not send the saves. */
     data class SaveSyncFailed(val offline: Boolean) : GameIssue
 }

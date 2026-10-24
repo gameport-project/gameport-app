@@ -56,6 +56,25 @@ object SteamInspector {
         }
     }
 
+    /**
+     * The files of [manifestId] of [depotId] as (path, size), or null when the manifest could not be read. Public to anyone who owns the game: it is the list the
+     * downloader itself reads, so the sizes of what the game should hold are known without downloading any of it.
+     */
+    suspend fun manifestFiles(session: SteamSession, appId: Int, depotId: Int, manifestId: Long, branch: String = "public"): List<Pair<String, Long>>? = coroutineScope {
+        runCatching {
+            val content = session.client.getHandler(SteamContent::class.java) ?: return@coroutineScope null
+            val key = session.apps.getDepotDecryptionKey(depotId, appId).await().depotKey
+            val servers = content.getServersForSteamPipe(null, 8, this).await()
+            val code = content.getManifestRequestCode(depotId, appId, manifestId, branch, null, this).await()
+            val cdn = Client(session.client)
+            for (server in servers) {
+                val manifest = runCatching { cdn.downloadManifestFuture(depotId, manifestId, code, server, key).await() }.getOrNull() ?: continue
+                return@coroutineScope manifest.files.filter { it.totalSize > 0 }.map { it.fileName to it.totalSize }
+            }
+            null
+        }.getOrNull()
+    }
+
     private fun KeyValue.dump(out: StringBuilder, depth: Int) {
         for (child in children) {
             out.append("  ".repeat(depth)).append(child.name)

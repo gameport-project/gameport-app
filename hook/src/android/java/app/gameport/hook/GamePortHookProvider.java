@@ -155,6 +155,7 @@ public final class GamePortHookProvider extends ContentProvider {
     @Override
     public Bundle call(String method, String arg, Bundle extras) {
         if ("obb_pull".equals(method)) return pullExpansionFiles();
+        if ("obb_report".equals(method)) return reportExpansionFiles();
         if (!"catchup".equals(method)) return super.call(method, arg, extras);
         Context context = getContext();
         if (context == null || sync == null || !calledByGamePort(context)) return null;
@@ -170,6 +171,37 @@ public final class GamePortHookProvider extends ContentProvider {
             tellGamePort(context, "catchup_done");
             exitIfNobodyPlays();
         }
+        return out;
+    }
+
+    /**
+     * GamePort asks which expansion files the game holds, by size: the game can list its own folder, which no other app can read. Only sizes leave the game, never a
+     * name or a content. Nobody else may ask. A process started only for this goes away again, as it does after sending saves.
+     */
+    private Bundle reportExpansionFiles() {
+        Context context = getContext();
+        if (context == null || !calledByGamePort(context)) return null;
+        Bundle out = new Bundle();
+        java.util.ArrayList<Long> sizes = new java.util.ArrayList<>();
+        boolean listed = false;
+        try {
+            java.io.File folder = context.getObbDir();
+            java.io.File[] files = folder == null ? null : folder.listFiles();
+            if (files != null) {
+                listed = true;
+                for (java.io.File file : files) {
+                    // A file still being copied is not a file the game can load.
+                    if (file.isFile() && !file.getName().endsWith(".part")) sizes.add(file.length());
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "could not list the expansion files", t);
+        }
+        long[] list = new long[sizes.size()];
+        for (int i = 0; i < list.length; i++) list[i] = sizes.get(i);
+        out.putString("status", listed ? "OK" : "UNREADABLE");
+        out.putLongArray("sizes", list);
+        if (catchUpMode) exitIfNobodyPlays();
         return out;
     }
 

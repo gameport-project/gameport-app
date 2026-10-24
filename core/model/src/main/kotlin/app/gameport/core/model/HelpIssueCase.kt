@@ -18,6 +18,7 @@ enum class HelpIssueCase(val tone: IssueTone) {
     CONTROLLER_MAPPING(IssueTone.INFO),
     REINSTALL(IssueTone.INFO),
     EXPANSION_UNCHECKED(IssueTone.INFO),
+    EXPANSION_MISSING(IssueTone.ATTENTION),
     ;
 
     companion object {
@@ -31,6 +32,7 @@ enum class HelpIssueCase(val tone: IssueTone) {
             is GameIssue.ProblemSuspected -> PROBLEM
             GameIssue.ReinstallMayHelp -> REINSTALL
             GameIssue.ExpansionMayBeMissing -> EXPANSION_UNCHECKED
+            is GameIssue.ExpansionMissing -> EXPANSION_MISSING
             is GameIssue.SaveSyncFailed -> SAVE_SYNC_FAILED
         }
     }

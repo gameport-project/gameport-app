@@ -67,6 +67,7 @@ class GameInstallRepository @Inject constructor(
     private val incomplete: IncompleteInstalls,
     private val handoff: ExpansionHandoff,
     private val builds: InstalledBuilds,
+    private val verdicts: ExpansionVerdicts,
     private val updates: GameUpdatesRepository,
     private val library: app.gameport.core.steam.SteamLibraryRepository,
     private val achievements: app.gameport.core.steam.AchievementsRepository,
@@ -276,6 +277,7 @@ class GameInstallRepository @Inject constructor(
                             return@launch fail(game.appId, if (offerAccess) InstallError.ExpansionStoragePermission else InstallError.ExpansionFiles)
                         }
                         incomplete.remove(game.appId)
+                        verdicts.forget(game.appId)
                         installed.put(game.appId, packageName)
                         // What this install came from, to recognise a newer build later.
                         builds.put(game.appId, InstalledBuild(depots.associate { it.id to it.manifestId }, chosen, expansionBytes))
@@ -647,14 +649,23 @@ class GameInstallRepository @Inject constructor(
      * The installed games that may be missing their expansion files (see [ExpansionCheck]): GamePort cannot look in Android/obb, so it compares what Steam says the game
      * weighs with its APKs and with what was written down at the install. Looked at again whenever the library or the installed games change.
      */
-    val expansionMayBeMissing: Flow<Set<Int>> = combine(library.observeLibrary(), observeAll()) { loaded, _ ->
+    val expansionMayBeMissing: Flow<Set<Int>> = combine(library.observeLibrary(), observeAll(), verdicts.all) { loaded, _, said ->
         val installedIds = installed.all()
         loaded.games.filter { it.appId in installedIds }.mapNotNull { game ->
             val packageName = installedIds[game.appId] ?: return@mapNotNull null
             if (!packages.isInstalled(packageName)) return@mapNotNull null
+            // A game that said its files are all there, for this build, is no longer a doubt; one that said some are missing is told apart (see [expansionMissing]).
+            val verdict = said[game.appId]?.takeIf { it.manifests == builds.get(game.appId)?.manifests }
+            if (verdict != null && verdict.state != ExpansionVerdict.State.UNKNOWN) return@mapNotNull null
             val apkBytes = packages.apkFilesOf(packageName).sumOf { it.length() }
             game.appId.takeIf { ExpansionCheck.mayBeMissing(game.androidBuild?.installBytes, apkBytes, builds.get(game.appId)?.expansionBytes) }
         }.toSet()
+    }.distinctUntilChanged().flowOn(Dispatchers.IO)
+
+    /** The installed games that said some of the files Steam lists for them are not there, by the number missing. Only for the build the game was asked about. */
+    val expansionMissing: Flow<Map<Int, Int>> = combine(verdicts.all, observeAll()) { said, _ ->
+        said.filter { (appId, verdict) -> verdict.state == ExpansionVerdict.State.MISSING && verdict.manifests == builds.get(appId)?.manifests && appId in installed.all() }
+            .mapValues { it.value.missing }
     }.distinctUntilChanged().flowOn(Dispatchers.IO)
 
     /**

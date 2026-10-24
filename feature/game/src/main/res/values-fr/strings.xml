@@ -218,4 +218,8 @@
     <string name="repair_text">Les gros fichiers du jeu sont téléchargés à nouveau et remis en place, ce qui peut prendre du temps et consommer des données mobiles. Le jeu reste installé et ses sauvegardes ne sont pas touchées. Il ne peut pas être lancé tant que ce n\'est pas fini.</string>
     <string name="repair_confirm">Réparer</string>
     <string name="repair_cancel">Annuler</string>
+    <plurals name="issue_expansion_missing">
+        <item quantity="one">Le jeu dit qu\'%1$d de ses gros fichiers manque, il ne peut donc pas charger ses données. La réparation le télécharge à nouveau.</item>
+        <item quantity="other">Le jeu dit que %1$d de ses gros fichiers manquent, il ne peut donc pas charger ses données. La réparation les télécharge à nouveau.</item>
+    </plurals>
 </resources>

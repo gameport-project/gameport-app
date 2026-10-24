@@ -58,6 +58,16 @@ object ObbNames {
             segments[0].equals("obb", ignoreCase = true)
     }
 
+    /**
+     * Of the [paths] of a depot or of a download, the ones that go to the device and what each is called there. A depot with an obb folder says what goes to the device:
+     * that folder, and the expansion files wherever they are; without one, everything [placement] keeps.
+     */
+    fun selectPlaced(paths: List<String>, packageName: String): List<Pair<String, String>> {
+        val all = paths.mapNotNull { path -> placement(path, packageName)?.let { path to it } }
+        val inFolder = all.filter { (path, _) -> inObbFolder(path, packageName) }.map { it.first }.toSet()
+        return if (inFolder.isEmpty()) all else all.filter { (path, _) -> path in inFolder || path.endsWith(".obb", ignoreCase = true) }
+    }
+
     fun placement(relativePath: String, packageName: String): String? {
         val segments = relativePath.replace('\\', '/').split('/').filter { it.isNotEmpty() }
         if (segments.isEmpty() || segments.any { it.startsWith(".") }) return null

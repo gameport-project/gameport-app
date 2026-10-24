@@ -256,4 +256,5 @@
     <string name="manage_discard_text">Les fichiers laissés par le téléchargement de %1$s sont supprimés. Il peut être relancé depuis la page du jeu.</string>
     <string name="manage_parts_recorded">Application %1$s · Extension %2$s (notée à l\'installation)</string>
     <string name="help_notice_expansion">Le jeu a de gros fichiers à côté de son application et GamePort ne peut pas vérifier qu\'ils sont tous là. Un bouton le répare en les téléchargeant à nouveau.</string>
+    <string name="help_notice_expansion_missing">Le jeu a dit lui-même que certains de ses gros fichiers ne sont pas là, il ne peut donc pas charger ses données. Un bouton le répare en les téléchargeant à nouveau.</string>
 </resources>

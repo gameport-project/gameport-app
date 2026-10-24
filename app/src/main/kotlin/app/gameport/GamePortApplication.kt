@@ -14,6 +14,7 @@ class GamePortApplication : Application() {
     @Inject lateinit var reportSender: app.gameport.core.sync.ReportSender
     @Inject lateinit var compat: app.gameport.core.sync.CompatRepository
     @Inject lateinit var verdictAsker: app.gameport.core.sync.VerdictAsker
+    @Inject lateinit var expansionVerifier: app.gameport.core.sync.ExpansionVerifier
 
     override fun onCreate() {
         super.onCreate()
@@ -34,6 +35,8 @@ class GamePortApplication : Application() {
         verdictAsker.start()
         // A game killed while GamePort was not looking (a minute or a day ago) is found out now.
         verdictAsker.checkRuns()
+        // The games that may be missing their large files are asked whether they are, once Steam can be reached.
+        expansionVerifier.start()
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: android.app.Activity) {
                 connectionKeeper.screenShown()

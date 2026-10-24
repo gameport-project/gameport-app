@@ -14,6 +14,7 @@ class HelpIssueCaseTest {
         GameIssue.ProblemSuspected(crash = true),
         GameIssue.ReinstallMayHelp,
         GameIssue.ExpansionMayBeMissing,
+        GameIssue.ExpansionMissing(missing = 2),
         GameIssue.SaveSyncFailed(offline = true),
     )
 
