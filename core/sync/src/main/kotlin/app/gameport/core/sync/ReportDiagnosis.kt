@@ -73,7 +73,7 @@ object ReportDiagnosis {
             val newest = exits.firstOrNull()?.let { field(it, "time").toLongOrNull() }
             val now = launch?.nowMillis
             if (newest != null && now != null && now >= newest) {
-                appendLine("  The newest of these ended ${ago(now - newest)} before this report.")
+                appendLine("  The newest of these ended on ${stamp(newest)}, ${ago(now - newest)} before this report (made ${stamp(now)}, the time of the device).")
                 if (launch.launchedAtMillis != null && launch.launchedAtMillis > newest) appendLine("  The game was started again since: that end does not explain the run of this report.")
             }
         }
@@ -158,6 +158,9 @@ object ReportDiagnosis {
             appendLine("  and what the download held besides the APK. Installing the game again downloads them again.")
         }
     }
+
+    /** A moment as the device wrote it, with the date: a report is read days after it was made, so "28 h ago" alone would not say when. */
+    internal fun stamp(millis: Long): String = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.ROOT).format(java.util.Date(millis))
 
     /** A stretch of time in the unit a reader weighs it in: seconds, minutes, hours or days. */
     internal fun ago(millis: Long): String = when {

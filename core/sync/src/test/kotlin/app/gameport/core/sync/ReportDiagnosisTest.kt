@@ -177,7 +177,7 @@ class ReportDiagnosisTest {
             previousExit = "time=$crashAt reason=CRASH_NATIVE status=0 importance=1000\n",
             launch = ReportDiagnosis.Launch(launchedAtMillis = now - 30_000, dataAtMillis = now - 4_000, nowMillis = now),
         )
-        assertTrue(text, text.contains("ended 28 h before this report"))
+        assertTrue(text, text.contains("ended on ${ReportDiagnosis.stamp(crashAt)}, 28 h before this report (made ${ReportDiagnosis.stamp(now)}"))
         assertTrue(text, text.contains("started again since"))
     }
 
@@ -189,7 +189,7 @@ class ReportDiagnosisTest {
             previousExit = "time=$crashAt reason=CRASH_NATIVE status=0 importance=1000\n",
             launch = ReportDiagnosis.Launch(launchedAtMillis = crashAt - 60_000, dataAtMillis = crashAt - 50_000, nowMillis = crashAt + 10_000),
         )
-        assertTrue(text, text.contains("ended 10 s before this report"))
+        assertTrue(text, text.contains("ended on ${ReportDiagnosis.stamp(crashAt)}, 10 s before this report"))
         assertTrue(text, !text.contains("started again since"))
     }
 
