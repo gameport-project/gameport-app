@@ -206,4 +206,52 @@
     <string name="help_tour_saves">Tour of the saves page</string>
     <string name="help_tours_page_hint">Every page also has a question mark button at its top that starts its own tour.</string>
     <string name="help_tour_settings">Tour of the settings</string>
+    <string name="settings_category_manage">Manage games</string>
+    <string name="manage_loading">Measuring the games…</string>
+    <plurals name="manage_summary_games">
+        <item quantity="one">%1$d game installed, %2$s taken on this device</item>
+        <item quantity="other">%1$d games installed, %2$s taken on this device</item>
+    </plurals>
+    <string name="manage_free">%1$s free on this device</string>
+    <string name="manage_summary_unfinished">Not counted above: %1$s left by unfinished downloads.</string>
+    <plurals name="manage_unknown_expansion">
+        <item quantity="one">The expansion files of %1$d game cannot be read here, so their size is missing from the figures.</item>
+        <item quantity="other">The expansion files of %1$d games cannot be read here, so their size is missing from the figures.</item>
+    </plurals>
+    <string name="manage_counted">Counted: the files of the installed app, its expansion files, and what GamePort keeps for it. What a game keeps for itself, such as its data and caches, is hidden by Android and is not counted.</string>
+    <string name="manage_empty">No game is installed.</string>
+    <string name="manage_sort">Order</string>
+    <string name="manage_sort_size">Size</string>
+    <string name="manage_sort_played">Last played</string>
+    <string name="manage_sort_name">Name</string>
+    <string name="manage_parts">App %1$s · Expansion %2$s</string>
+    <string name="manage_parts_unknown">App %1$s · Expansion not readable</string>
+    <string name="manage_kept">kept by GamePort %1$s</string>
+    <string name="manage_played">Played %1$s</string>
+    <string name="manage_never_played">Never played</string>
+    <string name="manage_update_available">Update available</string>
+    <string name="manage_patch_behind">Patch to redo</string>
+    <string name="manage_update">Update</string>
+    <string name="manage_patch">Patch again</string>
+    <string name="manage_uninstall">Uninstall</string>
+    <plurals name="manage_selected">
+        <item quantity="one">%1$d game selected, %2$s</item>
+        <item quantity="other">%1$d games selected, %2$s</item>
+    </plurals>
+    <string name="manage_action_update">Update (%1$d)</string>
+    <string name="manage_action_patch">Patch again (%1$d)</string>
+    <string name="manage_action_uninstall">Uninstall (%1$d)</string>
+    <string name="manage_clear">Deselect</string>
+    <plurals name="manage_uninstall_title">
+        <item quantity="one">Uninstall %1$d game?</item>
+        <item quantity="other">Uninstall %1$d games?</item>
+    </plurals>
+    <string name="manage_uninstall_text">Removed from this device, with their data: %1$s. Saves already synced with Steam Cloud stay there. Android asks to confirm each one.</string>
+    <string name="manage_uninstall_confirm">Uninstall</string>
+    <string name="manage_cancel">Cancel</string>
+    <string name="manage_unfinished_title">Unfinished downloads</string>
+    <string name="manage_unfinished_text">Files left behind by a download that stopped. Discarding one frees the space it takes.</string>
+    <string name="manage_discard">Discard</string>
+    <string name="manage_discard_title">Discard this download?</string>
+    <string name="manage_discard_text">The files left by the download of %1$s are deleted. It can be started again from the page of the game.</string>
 </resources>

@@ -120,7 +120,7 @@ class GameInstallRepository @Inject constructor(
             ?: installed.all()[appId]?.takeIf(packages::isInstalled)?.let { InstallState.Installed(it, otherGamePortOf(it)) }
             ?: if (hasLeftovers(appId)) InstallState.Interrupted else InstallState.NotInstalled
 
-    private fun leftoverIds(): List<Int> =
+    internal fun leftoverIds(): List<Int> =
         downloadsRoot().listFiles { file -> file.isDirectory && file.list()?.isNotEmpty() == true }
             ?.mapNotNull { it.name.toIntOrNull() }.orEmpty()
 
@@ -675,7 +675,7 @@ class GameInstallRepository @Inject constructor(
 
     private fun downloadsRoot(): File = context.getExternalFilesDir("downloads") ?: File(context.filesDir, "downloads")
 
-    private fun downloadDirectory(appId: Int): File = File(downloadsRoot(), appId.toString())
+    internal fun downloadDirectory(appId: Int): File = File(downloadsRoot(), appId.toString())
 
     /** What is in the game's download folder and what its APKs say about themselves, for a problem report. */
     fun downloadReport(appId: Int): String = buildString {

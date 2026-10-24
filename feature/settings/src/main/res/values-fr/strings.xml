@@ -206,4 +206,52 @@
     <string name="help_tour_saves">Visite de la page des sauvegardes</string>
     <string name="help_tours_page_hint">Chaque page a aussi un bouton point d\'interrogation en haut qui lance sa propre visite.</string>
     <string name="help_tour_settings">Visite des réglages</string>
+    <string name="settings_category_manage">Gérer les jeux</string>
+    <string name="manage_loading">Mesure des jeux…</string>
+    <plurals name="manage_summary_games">
+        <item quantity="one">%1$d jeu installé, %2$s pris sur cet appareil</item>
+        <item quantity="other">%1$d jeux installés, %2$s pris sur cet appareil</item>
+    </plurals>
+    <string name="manage_free">%1$s libres sur cet appareil</string>
+    <string name="manage_summary_unfinished">Non compté ci-dessus : %1$s laissés par des téléchargements inachevés.</string>
+    <plurals name="manage_unknown_expansion">
+        <item quantity="one">Les fichiers d\'extension de %1$d jeu ne peuvent pas être lus ici, leur taille manque donc dans les chiffres.</item>
+        <item quantity="other">Les fichiers d\'extension de %1$d jeux ne peuvent pas être lus ici, leur taille manque donc dans les chiffres.</item>
+    </plurals>
+    <string name="manage_counted">Compté : les fichiers de l\'application installée, ses fichiers d\'extension, et ce que GamePort garde pour elle. Ce qu\'un jeu garde pour lui, comme ses données et ses caches, est caché par Android et n\'est pas compté.</string>
+    <string name="manage_empty">Aucun jeu n\'est installé.</string>
+    <string name="manage_sort">Tri</string>
+    <string name="manage_sort_size">Taille</string>
+    <string name="manage_sort_played">Dernière partie</string>
+    <string name="manage_sort_name">Nom</string>
+    <string name="manage_parts">Application %1$s · Extension %2$s</string>
+    <string name="manage_parts_unknown">Application %1$s · Extension illisible</string>
+    <string name="manage_kept">gardés par GamePort %1$s</string>
+    <string name="manage_played">Joué %1$s</string>
+    <string name="manage_never_played">Jamais joué</string>
+    <string name="manage_update_available">Mise à jour disponible</string>
+    <string name="manage_patch_behind">Patch à refaire</string>
+    <string name="manage_update">Mettre à jour</string>
+    <string name="manage_patch">Patcher à nouveau</string>
+    <string name="manage_uninstall">Désinstaller</string>
+    <plurals name="manage_selected">
+        <item quantity="one">%1$d jeu sélectionné, %2$s</item>
+        <item quantity="other">%1$d jeux sélectionnés, %2$s</item>
+    </plurals>
+    <string name="manage_action_update">Mettre à jour (%1$d)</string>
+    <string name="manage_action_patch">Patcher à nouveau (%1$d)</string>
+    <string name="manage_action_uninstall">Désinstaller (%1$d)</string>
+    <string name="manage_clear">Désélectionner</string>
+    <plurals name="manage_uninstall_title">
+        <item quantity="one">Désinstaller %1$d jeu ?</item>
+        <item quantity="other">Désinstaller %1$d jeux ?</item>
+    </plurals>
+    <string name="manage_uninstall_text">Retirés de cet appareil, avec leurs données : %1$s. Les sauvegardes déjà synchronisées avec le Steam Cloud y restent. Android demande de confirmer chacun.</string>
+    <string name="manage_uninstall_confirm">Désinstaller</string>
+    <string name="manage_cancel">Annuler</string>
+    <string name="manage_unfinished_title">Téléchargements inachevés</string>
+    <string name="manage_unfinished_text">Fichiers laissés par un téléchargement arrêté. En abandonner un libère la place qu\'il prend.</string>
+    <string name="manage_discard">Abandonner</string>
+    <string name="manage_discard_title">Abandonner ce téléchargement ?</string>
+    <string name="manage_discard_text">Les fichiers laissés par le téléchargement de %1$s sont supprimés. Il peut être relancé depuis la page du jeu.</string>
 </resources>

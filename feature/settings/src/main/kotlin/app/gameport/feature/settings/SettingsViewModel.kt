@@ -21,12 +21,23 @@ import app.gameport.core.steam.SteamAuthRepository
 import app.gameport.core.sync.CloudSyncCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import app.gameport.core.model.FootprintTotal
+import app.gameport.core.model.GameFootprint
+import app.gameport.core.model.UnfinishedDownload
+import app.gameport.core.model.total
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+@OptIn(FlowPreview::class)
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val settings: UserSettings,
@@ -36,11 +47,13 @@ class SettingsViewModel @Inject constructor(
     private val gameSettings: GameSettingsStore,
     private val updater: AppUpdater,
     private val patching: app.gameport.core.sync.PatchAllCoordinator,
-    library: SteamLibraryRepository,
+    private val library: SteamLibraryRepository,
     private val history: PlayHistoryStore,
     private val incompatible: app.gameport.core.settings.IncompatibleGames,
     private val verdicts: app.gameport.core.settings.GameVerdicts,
     private val tours: app.gameport.core.settings.TourController,
+    private val footprints: app.gameport.core.install.GameFootprints,
+    private val updatesRepository: app.gameport.core.install.GameUpdatesRepository,
     private val downloadRegion: app.gameport.core.steam.DownloadRegion,
     device: DeviceProfile,
 ) : ViewModel() {
@@ -171,7 +184,89 @@ class SettingsViewModel @Inject constructor(
 
     fun onUpdate() = updater.update()
 
+    /** One installed game on the page that manages the games. */
+    class ManagedGame(
+        val appId: Int,
+        val name: String,
+        val footprint: GameFootprint,
+        val lastPlayedMillis: Long?,
+        val updateAvailable: Boolean,
+        val patchBehind: Boolean,
+    )
+
+    /** The page that manages the games: the games with their sizes, the downloads left behind, and the free space. */
+    class ManageState(
+        val loading: Boolean = true,
+        val games: List<ManagedGame> = emptyList(),
+        val unfinished: List<Pair<String, UnfinishedDownload>> = emptyList(),
+        val freeBytes: Long = 0L,
+    ) {
+        val total: FootprintTotal get() = games.map { it.footprint }.total()
+        val unfinishedBytes: Long get() = unfinished.sumOf { it.second.bytes }
+    }
+
+    private class Measured(val sizes: Map<Int, GameFootprint>, val unfinished: List<UnfinishedDownload>, val freeBytes: Long)
+
+    private val measured = MutableStateFlow<Measured?>(null)
+
+    /** Measures the games again: the folders are read off the main thread, and the page shows what it had until the new figures come. */
+    fun refreshManage() {
+        viewModelScope.launch {
+            measured.value = Measured(footprints.ofInstalled(), footprints.unfinished(), footprints.freeBytes())
+        }
+    }
+
+    init {
+        refreshManage()
+        // A game installed, removed or stopped changes what is on the device: measure again once things settle, not at every step of a download.
+        viewModelScope.launch {
+            installer.observeAll()
+                .map { states -> states.entries.sortedBy { it.key }.joinToString { "${it.key}:${it.value::class.simpleName}" } }
+                .distinctUntilChanged()
+                .drop(1)
+                .debounce(MEASURE_SETTLE_MS)
+                .collect { refreshManage() }
+        }
+    }
+
+    val manage: StateFlow<ManageState> = combine(
+        measured,
+        library.observeLibrary(),
+        history.lastPlayed,
+        updatesRepository.updates,
+        installer.observeOutdatedPatches(),
+    ) { sizes, loaded, played, updates, behind ->
+        if (sizes == null) return@combine ManageState()
+        val names = loaded.games.associate { it.appId to it.name }
+        val withUpdate = updates.map { it.appId }.toSet()
+        ManageState(
+            loading = false,
+            games = sizes.sizes.map { (appId, footprint) ->
+                ManagedGame(appId, names[appId] ?: "#$appId", footprint, played[appId], appId in withUpdate, appId in behind)
+            },
+            unfinished = sizes.unfinished.map { (names[it.appId] ?: "#${it.appId}") to it },
+            freeBytes = sizes.freeBytes,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ManageState())
+
+    /** Installs the newer build of each game, as the page of the game does. */
+    fun onUpdateGames(appIds: Collection<Int>) {
+        viewModelScope.launch {
+            appIds.forEach { appId -> library.observeGame(appId).first()?.let(installer::update) }
+        }
+    }
+
+    /** Patches the games again, one after the other, the run the settings already show. */
+    fun onPatchGames(appIds: Collection<Int>) = installer.repatchAll(appIds.sorted())
+
+    /** Removes the games from the device; Android asks to confirm each one. */
+    fun onUninstallGames(appIds: Collection<Int>) = appIds.forEach(installer::uninstall)
+
+    /** Throws away what a stopped download left, which frees the space it took. */
+    fun onDiscardUnfinished(appId: Int) = installer.discard(appId)
+
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
+        const val MEASURE_SETTLE_MS = 1_500L
     }
 }

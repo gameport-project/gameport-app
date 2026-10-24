@@ -157,7 +157,7 @@
     <string name="tour_enter_saves">Les sauvegardes</string>
     <string name="tour_enter_settings">Les réglages</string>
     <string name="tour_settings_categories_title">Catégories</string>
-    <string name="tour_settings_categories_text">Les réglages sont rangés en catégories : le compte Steam, les téléchargements, l\'apparence, l\'accueil, la langue, les mises à jour, la configuration par défaut des jeux, les jeux masqués et incompatibles, et l\'Aide.</string>
+    <string name="tour_settings_categories_text">Les réglages sont rangés en catégories : le compte Steam, les téléchargements, l\'apparence, l\'accueil, la langue, les mises à jour, la gestion des jeux installés, la configuration par défaut des jeux, les jeux masqués et incompatibles, et l\'Aide.</string>
     <string name="tour_settings_look_title">Apparence et couleurs</string>
     <string name="tour_settings_look_text">La couleur d\'accent des boutons et des surlignages, et le dégradé derrière chaque page, tout prêts ou choisis couleur par couleur, avec la taille des jaquettes et plus encore. La visite en essaie quelques-uns, puis remet ceux choisis.</string>
     <string name="tour_settings_help_title">Aide</string>

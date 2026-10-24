@@ -97,6 +97,7 @@ private enum class Category(val title: Int) {
     HOME(R.string.settings_category_home),
     LANGUAGE(R.string.settings_category_language),
     UPDATES(R.string.settings_category_updates),
+    MANAGE(R.string.settings_category_manage),
     GAMES(R.string.settings_category_games),
     HIDDEN(R.string.settings_category_hidden),
     INCOMPATIBLE(R.string.settings_category_incompatible),
@@ -105,7 +106,7 @@ private enum class Category(val title: Int) {
 
 /** A full settings page: categories on the left, the selected one on the right. */
 @Composable
-fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(onBack: () -> Unit, onOpenGame: (Int) -> Unit = {}, startOnUpdates: Boolean = false, viewModel: SettingsViewModel = hiltViewModel()) {
     val speedUnit by viewModel.speedUnit.collectAsStateWithLifecycle()
     val accountName by viewModel.accountName.collectAsStateWithLifecycle()
     val playerDefaults by viewModel.playerDefaults.collectAsStateWithLifecycle()
@@ -122,8 +123,10 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
     val activity = LocalContext.current as? Activity
     // The window of "patch all", opened by its button; closing it stops nothing.
     var patchWindow by rememberSaveable { mutableStateOf(false) }
-    // The settings always open on their first category.
-    var category by rememberSaveable { mutableStateOf(Category.ACCOUNT) }
+    // The settings open on their first category; the notice of a new version asks for the Updates category.
+    var category by rememberSaveable { mutableStateOf(if (startOnUpdates) Category.UPDATES else Category.ACCOUNT) }
+    // The games are measured again each time their page opens.
+    androidx.compose.runtime.LaunchedEffect(category) { if (category == Category.MANAGE) viewModel.refreshManage() }
     // The tour of the settings acts out two of the pages: it opens Appearance and tries a few colours, then puts back the ones the player had.
     val shownDisplay = display
     app.gameport.core.designsystem.TourDemo(TourIds.DEMO_SETTINGS_LOOK) {
@@ -169,6 +172,7 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                 val page: @Composable (Modifier) -> Unit = { modifier ->
                     val pageScroll = rememberScrollState()
                     val pageScope = rememberCoroutineScope()
+                    val patchAll = viewModel.patchAll.collectAsStateWithLifecycle().value
                     Column(
                         modifier.fillMaxHeight().tourTarget(TourIds.SETTINGS_PAGE).verticalScroll(pageScroll).padding(bottom = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -189,25 +193,19 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                                     checkHours, viewModel::onUpdateCheckHoursChanged, viewModel::onCheckForUpdate, viewModel::onUpdate,
                                     onNotesFocused = { pageScope.launch { pageScroll.animateScrollTo(0) } },
                                 )
-                                val patchAll = viewModel.patchAll.collectAsStateWithLifecycle().value
                                 PatchAllRow(patchAll) {
                                     if (!patchAll.running) viewModel.onPatchAll()
                                     patchWindow = true
                                 }
-                                if (patchWindow) {
-                                    patchAll.progress?.let { progress ->
-                                        app.gameport.core.designsystem.PatchAllDialog(
-                                            state = progress,
-                                            names = viewModel.gameNames.collectAsStateWithLifecycle().value,
-                                            onClose = {
-                                                patchWindow = false
-                                                if (progress.finished) viewModel.onClosePatchAll()
-                                            },
-                                            onStop = viewModel::onStopPatchAll,
-                                        )
-                                    }
-                                }
                             }
+                            Category.MANAGE -> ManageGamesSection(
+                                state = viewModel.manage.collectAsStateWithLifecycle().value,
+                                onOpenGame = onOpenGame,
+                                onUpdate = viewModel::onUpdateGames,
+                                onPatch = { ids -> viewModel.onPatchGames(ids); patchWindow = true },
+                                onUninstall = viewModel::onUninstallGames,
+                                onDiscard = viewModel::onDiscardUnfinished,
+                            )
                             Category.GAMES -> GamesSection(playerDefaults.heightCm, viewModel::onDefaultHeightChanged)
                             Category.HIDDEN -> HiddenSection(viewModel.hiddenGames.collectAsStateWithLifecycle().value, viewModel::onShowAgain)
                             Category.HELP -> HelpSection(viewModel::onStartCompleteTour, viewModel::onStartTour)
@@ -216,7 +214,21 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = hiltViewMo
                                 viewModel.showIncompatible.collectAsStateWithLifecycle().value,
                                 viewModel::onShowIncompatibleChanged,
                             )
-                    }
+                        }
+                        // The window of a run that patches games, whichever page started it: Updates (all) or Manage games (the chosen ones).
+                        if (patchWindow) {
+                            patchAll.progress?.let { progress ->
+                                app.gameport.core.designsystem.PatchAllDialog(
+                                    state = progress,
+                                    names = viewModel.gameNames.collectAsStateWithLifecycle().value,
+                                    onClose = {
+                                        patchWindow = false
+                                        if (progress.finished) viewModel.onClosePatchAll()
+                                    },
+                                    onStop = viewModel::onStopPatchAll,
+                                )
+                            }
+                        }
                     }
                 }
                 if (compact) {

@@ -156,7 +156,7 @@
     <string name="tour_enter_saves">The saves</string>
     <string name="tour_enter_settings">The settings</string>
     <string name="tour_settings_categories_title">Categories</string>
-    <string name="tour_settings_categories_text">The settings are in categories: the Steam account, downloads, appearance, the home, language, updates, the default configuration of games, hidden and incompatible games, and Help.</string>
+    <string name="tour_settings_categories_text">The settings are in categories: the Steam account, downloads, appearance, the home, language, updates, the management of installed games, the default configuration of games, hidden and incompatible games, and Help.</string>
     <string name="tour_settings_look_title">Appearance and colours</string>
     <string name="tour_settings_look_text">The accent colour of buttons and highlights, and the gradient behind every page, ready-made or picked colour by colour, with the size of covers and more. The tour tries a few, then puts back the ones chosen.</string>
     <string name="tour_settings_help_title">Help</string>
