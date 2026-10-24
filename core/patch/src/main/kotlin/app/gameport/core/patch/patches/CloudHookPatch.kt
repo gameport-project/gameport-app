@@ -45,6 +45,18 @@ object CloudHookPatch : ApkPatch {
     private fun JSONObject?.isGamePortQueries(): Boolean =
         named("queries") && elem<JSONArray>("nodes").elemEach<JSONObject> { named("package") && nameAttribute().isGamePortPackage() }.isNotEmpty()
 
+    /** Writes who patched the game, replacing any mark already there: only that GamePort lists the game as its own and starts it. */
+    fun markOwner(session: PatchSession, owner: String) {
+        session.manifest.takeNodesEach({ named("manifest") }) {
+            takeNodesEach({ named("application") }) {
+                takeNodes {
+                    this.takeEach<JSONObject>({ named("meta-data") && nameAttribute() == META_OWNER }) { null }
+                    this?.put(element("meta-data", ManifestAttr("name", ATTR_NAME, "STRING", META_OWNER), ManifestAttr("value", ATTR_VALUE, "STRING", owner)))
+                }
+            }
+        }
+    }
+
     /** Takes the hook's manifest entries out again; the caller removes the dex. */
     fun removeFrom(session: PatchSession) {
         session.manifest.takeNodesEach({ named("manifest") }) {

@@ -2,6 +2,7 @@ package app.gameport.core.patch
 
 import app.gameport.core.patch.patches.AppLabelPatch
 import app.gameport.core.patch.patches.CloudHookPatch
+import app.gameport.core.patch.patches.GamePortRemovalPatch
 import app.gameport.core.patch.patches.VersionCodePatch
 import app.gameport.core.patch.patches.SteamShimPatch
 import app.gameport.core.patch.patches.XrLayerPatch
@@ -86,5 +87,21 @@ class ApkPatchEngineTest {
             assets = PatchAssets(BinarySource { ByteArray(1).inputStream() }, BinarySource { ByteArray(1).inputStream() }, BinarySource { ByteArray(1).inputStream() }),
         )
         assertEquals(code(after), code(ApkModule.loadApkFile(again).androidManifest.toJson().toString()))
+    }
+
+    @Test
+    fun aGameFromWhichThePatchWasTakenOffStaysThatGamePortsGame() {
+        val source = System.getenv("GAMEPORT_TEST_APK")?.let(::File)
+        assumeTrue("set GAMEPORT_TEST_APK to run", source?.isFile == true)
+        val assets = PatchAssets(BinarySource { ByteArray(8).inputStream() }, BinarySource { ByteArray(8).inputStream() }, BinarySource { ByteArray(8).inputStream() })
+        val engine = ApkPatchEngine(SigningKeyStore(temp.newFolder().resolve("key.p12")))
+        val context = PatchContext(steamAppId = 1, steamId = 2, personaName = "test", owner = "app.gameport.dev")
+        val patched = temp.newFile("patched.apk")
+        engine.patch(input = source!!, output = patched, patches = listOf(CloudHookPatch), context = context, assets = assets)
+        val removed = temp.newFile("removed.apk")
+        engine.patch(input = patched, output = removed, patches = listOf(GamePortRemovalPatch), context = context, assets = assets)
+        val manifest = ApkModule.loadApkFile(removed).androidManifest.toJson().toString()
+        assertTrue("the hook is gone", !manifest.contains("app.gameport.hook.GamePortHookProvider"))
+        assertTrue("the owner is kept", manifest.contains("app.gameport.owner") && manifest.contains("app.gameport.dev"))
     }
 }
