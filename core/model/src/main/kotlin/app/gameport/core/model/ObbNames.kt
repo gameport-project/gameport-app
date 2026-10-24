@@ -35,7 +35,12 @@ object ObbNames {
      * or already has that name. Patching raises the version code of the APK, so its expansion files follow it.
      */
     fun aligned(fileName: String, packageName: String, code: Long): String? {
-        val match = Regex("^(main|patch|overflow\\d+)\\.(\\d+)\\.${Regex.escape(packageName)}\\.obb$").matchEntire(fileName) ?: return null
+        val match = Regex("^(main|patch|overflow\\d+)\\.(\\d+)\\.${Regex.escape(packageName)}\\.obb$").matchEntire(fileName)
+        if (match == null) {
+            // A depot may publish the file under a name of its own (`<game>.main.obb`, for one), which the engine never looks for.
+            val role = Regex("^(?:.*[._-])?(main|patch)\\.obb$", RegexOption.IGNORE_CASE).matchEntire(fileName)?.groupValues?.get(1) ?: return null
+            return "${role.lowercase()}.$code.$packageName.obb"
+        }
         if (match.groupValues[2] == code.toString()) return null
         return "${match.groupValues[1]}.$code.$packageName.obb"
     }

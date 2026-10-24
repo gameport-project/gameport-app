@@ -8,6 +8,15 @@ class ObbNamesTest {
     private val pkg = "com.vankrupt.pavlov"
 
     @Test
+    fun `a file published under a name of the depot's own is renamed to the one the engine looks for`() {
+        assertEquals("main.1129.$pkg.obb", ObbNames.aligned("quantum_void_steamframe.main.obb", pkg, 1129))
+        assertEquals("patch.1129.$pkg.obb", ObbNames.aligned("game-patch.obb", pkg, 1129))
+        assertEquals("main.1129.$pkg.obb", ObbNames.aligned("main.obb", pkg, 1129))
+        assertEquals(null, ObbNames.aligned("textures.obb", pkg, 1129))
+        assertEquals(null, ObbNames.aligned("main.5.other.package.obb", pkg, 1129))
+    }
+
+    @Test
     fun `the main and the patch follow the version of the APK`() {
         assertEquals("main.2418.$pkg.obb", ObbNames.aligned("main.2398.$pkg.obb", pkg, 2418))
         assertEquals("patch.2418.$pkg.obb", ObbNames.aligned("patch.2398.$pkg.obb", pkg, 2418))

@@ -60,6 +60,18 @@ class ExpansionFilesTest {
     }
 
     @Test
+    fun `a file the depot publishes under a name of its own is placed, then named the way the engine looks for it`() {
+        val downloaded = download("app.apk", "game_steamframe.main.obb")
+        val target = File(folder.root, "obb/$pkg")
+        assertEquals(listOf("game_steamframe.main.obb"), place(downloaded, target))
+        assertEquals(listOf("main.1129.$pkg.obb"), ExpansionFiles.align(target, pkg, 1129))
+        assertEquals(listOf("main.1129.$pkg.obb"), target.list()!!.toList())
+        assertEquals("data of game_steamframe.main.obb", File(target, "main.1129.$pkg.obb").readText())
+        // Aligned again, nothing changes.
+        assertEquals(emptyList<String>(), ExpansionFiles.align(target, pkg, 1129))
+    }
+
+    @Test
     fun `the patched APKs and what the downloader keeps are left alone`() {
         val downloaded = download("app.apk", "patched/app.apk", ".DepotDownloader/state")
         assertEquals(emptyList<String>(), place(downloaded))
