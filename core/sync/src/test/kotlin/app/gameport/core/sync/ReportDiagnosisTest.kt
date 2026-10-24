@@ -150,4 +150,54 @@ class ReportDiagnosisTest {
         assertTrue(bad, bad.startsWith("WARNING: the runtime refused ESSENTIAL controls of the game for /interaction_profiles/oculus/touch_controller: right/input/a/click"))
         assertTrue(bad, bad.contains("essential plus: left/input/trigger/curl_meta"))
     }
+
+    @Test
+    fun `a layer that the log of the start shows is said loaded even when the list of libraries no longer holds it`() {
+        val text = ReportDiagnosis.of(
+            libraries = "/data/app/x/lib/arm64/libopenxr_loader.so\n",
+            startLog = "I GPHook : plan: NONE\nI OpenXR-Loader: ApiLayerInterface::LoadApiLayers succeeded loading layer XR_APILAYER_GAMEPORT_compat\nI GPXR : GamePort OpenXR layer active; seated mode off",
+            previousExit = "",
+            dataAgeSeconds = 4,
+        )
+        assertTrue(text, text.contains("OpenXR layer of GamePort loaded: yes, at the start of the run"))
+    }
+
+    @Test
+    fun `a layer in neither the list nor the log is said not loaded`() {
+        val text = ReportDiagnosis.of("/data/app/x/lib/arm64/libunity.so\n", "I GPHook : plan: NONE", "", 4)
+        assertTrue(text, text.contains("OpenXR layer of GamePort loaded: no"))
+    }
+
+    @Test
+    fun `a crash of long ago is dated, and said not to explain a run that started after it`() {
+        val crashAt = 1_000_000_000_000L
+        val now = crashAt + 28 * 3_600_000L
+        val text = ReportDiagnosis.of(
+            libraries = "", startLog = "", dataAgeSeconds = 4,
+            previousExit = "time=$crashAt reason=CRASH_NATIVE status=0 importance=1000\n",
+            launch = ReportDiagnosis.Launch(launchedAtMillis = now - 30_000, dataAtMillis = now - 4_000, nowMillis = now),
+        )
+        assertTrue(text, text.contains("ended 28 h before this report"))
+        assertTrue(text, text.contains("started again since"))
+    }
+
+    @Test
+    fun `a crash just before the launch of the report is not said to be old news`() {
+        val crashAt = 1_000_000_000_000L
+        val text = ReportDiagnosis.of(
+            libraries = "", startLog = "", dataAgeSeconds = 4,
+            previousExit = "time=$crashAt reason=CRASH_NATIVE status=0 importance=1000\n",
+            launch = ReportDiagnosis.Launch(launchedAtMillis = crashAt - 60_000, dataAtMillis = crashAt - 50_000, nowMillis = crashAt + 10_000),
+        )
+        assertTrue(text, text.contains("ended 10 s before this report"))
+        assertTrue(text, !text.contains("started again since"))
+    }
+
+    @Test
+    fun `stretches of time are given in the unit a reader weighs them in`() {
+        assertTrue(ReportDiagnosis.ago(45_000) == "45 s")
+        assertTrue(ReportDiagnosis.ago(10 * 60_000L) == "10 min")
+        assertTrue(ReportDiagnosis.ago(28 * 3_600_000L) == "28 h")
+        assertTrue(ReportDiagnosis.ago(5 * 86_400_000L) == "5 days")
+    }
 }

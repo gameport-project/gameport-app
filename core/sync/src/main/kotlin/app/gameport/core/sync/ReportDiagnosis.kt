@@ -38,7 +38,15 @@ object ReportDiagnosis {
         if (known) {
             val loader = libraries.contains("libopenxr_loader") || libraries.contains("libopenxr_forwardloader")
             appendLine("OpenXR loader loaded: " + if (loader) "yes" else "not in this list (the game may use a vendor SDK instead, which says nothing against it, or load it later)")
-            appendLine("OpenXR layer of GamePort loaded: " + yes(libraries.contains("XrApiLayer_gameport")))
+            // The list of libraries is read late: a game that makes an OpenXR instance only to look (Unity does) has let go of the layer by then. The log of its start says it was there.
+            val layerAtStart = startLog.contains("XR_APILAYER_GAMEPORT") || startLog.contains("GamePort OpenXR layer active")
+            appendLine(
+                "OpenXR layer of GamePort loaded: " + when {
+                    libraries.contains("XrApiLayer_gameport") -> "yes"
+                    layerAtStart -> "yes, at the start of the run (the game's log says so; it is no longer in the list of loaded libraries, which is read later)"
+                    else -> "no"
+                },
+            )
             appendLine("Steam library loaded: " + yes(libraries.contains("libsteam_api") || libraries.contains("libsteamclient")))
         } else {
             appendLine("loaded libraries: not handed over")
@@ -61,6 +69,13 @@ object ReportDiagnosis {
             val summary = exits.groupingBy { line -> field(line, "reason") + (field(line, "status").takeIf { line.contains("reason=SIGNALED") }?.let { "/$it" } ?: "") }.eachCount()
             appendLine("last exits (newest first, as Android recorded them): " + summary.entries.joinToString(", ") { "${it.key} x${it.value}" })
             appendLine("  A game closed from the system menu can also end as SIGNALED/9: this alone does not say it failed.")
+            // A crash of long ago says nothing of the run that is reported: when it was, and whether the game ran again since, is what a reader needs to weigh it.
+            val newest = exits.firstOrNull()?.let { field(it, "time").toLongOrNull() }
+            val now = launch?.nowMillis
+            if (newest != null && now != null && now >= newest) {
+                appendLine("  The newest of these ended ${ago(now - newest)} before this report.")
+                if (launch.launchedAtMillis != null && launch.launchedAtMillis > newest) appendLine("  The game was started again since: that end does not explain the run of this report.")
+            }
         }
     }
 
@@ -142,6 +157,14 @@ object ReportDiagnosis {
             appendLine("  A game installed by a GamePort older than 0.7.0 lost them at install. The first lines of events.txt say which version installed it,")
             appendLine("  and what the download held besides the APK. Installing the game again downloads them again.")
         }
+    }
+
+    /** A stretch of time in the unit a reader weighs it in: seconds, minutes, hours or days. */
+    internal fun ago(millis: Long): String = when {
+        millis < 120_000L -> "${millis / 1000} s"
+        millis < 2 * 3_600_000L -> "${millis / 60_000L} min"
+        millis < 2 * 86_400_000L -> "${millis / 3_600_000L} h"
+        else -> "${millis / 86_400_000L} days"
     }
 
     private fun field(line: String, key: String): String = Regex("$key=(\\S+)").find(line)?.groupValues?.get(1).orEmpty()
