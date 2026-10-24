@@ -47,6 +47,7 @@ class ExpansionVerifier @Inject constructor(
     private val verdicts: ExpansionVerdicts,
     private val sessions: SteamSessionHolder,
     private val packages: PackageGateway,
+    private val coordinator: CloudSyncCoordinator,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Mutex()
@@ -103,13 +104,21 @@ class ExpansionVerifier @Inject constructor(
     /** The sizes of the files the game holds in its folder, or null when it did not answer or could not list it. */
     private suspend fun askGame(packageName: String): List<Long>? = withContext(Dispatchers.IO) {
         val uri = Uri.parse("content://$packageName.gameporthook")
-        val client = context.contentResolver.acquireUnstableContentProviderClient(uri) ?: return@withContext null
+        // The hook asks GamePort, as its process starts, whether it was started for the game to be played: told it was not, it sets nothing up (no Steam ticket, no play
+        // time, no sync of the saves at launch). Without this, asking would start the game as if the player had launched it.
+        coordinator.requestCatchUp(packageName)
+        val client = context.contentResolver.acquireUnstableContentProviderClient(uri)
+        if (client == null) {
+            coordinator.finishCatchUp(packageName)
+            return@withContext null
+        }
         try {
             val answer = withTimeoutOrNull(ASK_TIMEOUT_MS) { runCatching { client.call("obb_report", null, null) }.getOrNull() } ?: return@withContext null
             if (answer.getString("status") != "OK") return@withContext null
             answer.getLongArray("sizes")?.toList()
         } finally {
             client.close()
+            coordinator.finishCatchUp(packageName)
         }
     }
 
