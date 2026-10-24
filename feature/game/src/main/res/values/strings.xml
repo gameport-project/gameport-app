@@ -213,4 +213,10 @@
     <string name="report_status_refused">The report could not be sent.</string>
     <string name="report_status_unavailable">No report could be made for this game.</string>
     <string name="demo_notice">Preview: made-up values, nothing is installed</string>
+    <string name="issue_expansion_unchecked">This game has large files beside its app, and GamePort cannot check that they are all there. If it lacks content or does not start, repairing downloads them again.</string>
+    <string name="issue_expansion_unchecked_action">Repair</string>
+    <string name="repair_title">Repair this game?</string>
+    <string name="repair_text">The game\'s large files are downloaded again and put back in place, which can take a while and use mobile data. The game stays installed and its saves are not touched. It cannot be played until this is done.</string>
+    <string name="repair_confirm">Repair</string>
+    <string name="repair_cancel">Cancel</string>
 </resources>

@@ -47,13 +47,14 @@ class GameIssuesRepository @Inject constructor(
                 if (device.isHeadset && mapping.both && mapping.silent) mapping.useFrame else null,
             )
         },
-        reports.suspected,
-    ) { patchOutdated, conflicts, statuses, (updateAvailable, mappingNoticeSource, silent), suspected ->
+        combine(reports.suspected, installer.expansionMayBeMissing) { suspected, unchecked -> suspected to unchecked },
+    ) { patchOutdated, conflicts, statuses, (updateAvailable, mappingNoticeSource, silent), (suspected, unchecked) ->
         // The controller notice is informative: it is listed on the game's page but never lights the cover badge.
         issuesFor(appId, patchOutdated, conflicts.keys, statuses, updateAvailable, suspected) +
             listOfNotNull(
                 mappingNoticeSource?.let { GameIssue.ControllerMappingAvailable(it) },
                 silent?.let { GameIssue.ControllerSilent(activated = it) },
+                GameIssue.ExpansionMayBeMissing.takeIf { appId in unchecked },
             )
     }
 

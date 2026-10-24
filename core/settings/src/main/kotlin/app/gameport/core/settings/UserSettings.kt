@@ -71,6 +71,16 @@ class UserSettings @Inject constructor(
         _whatsNewSeen.value = versionCode
     }
 
+    private val _expansionNoticeSeen = MutableStateFlow(prefs.getBoolean(KEY_EXPANSION_NOTICE_SEEN, false))
+
+    /** Whether the window about games that may be missing their large files was understood: it is shown once, then each game's page keeps the notice. */
+    val expansionNoticeSeen: StateFlow<Boolean> = _expansionNoticeSeen.asStateFlow()
+
+    fun markExpansionNoticeSeen() {
+        prefs.edit().putBoolean(KEY_EXPANSION_NOTICE_SEEN, true).apply()
+        _expansionNoticeSeen.value = true
+    }
+
     private val _homeTourSeen = MutableStateFlow(prefs.getBoolean(KEY_HOME_TOUR_SEEN, false))
 
     /** Whether the complete guided tour was started once, so it opens by itself only the first time. */
@@ -210,6 +220,7 @@ class UserSettings @Inject constructor(
         const val KEY_HIDE_UNINSTALLED = "hide_uninstalled"
         const val KEY_SORT = "library_sort"
         const val KEY_TOUR_DECIDED = "tour_decided"
+        const val KEY_EXPANSION_NOTICE_SEEN = "expansion_notice_seen"
         const val KEY_HOME_TOUR_SEEN = "home_tour_seen"
     }
 }

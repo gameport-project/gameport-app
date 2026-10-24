@@ -13,6 +13,7 @@ class HelpIssueCaseTest {
         GameIssue.SaveConflict,
         GameIssue.ProblemSuspected(crash = true),
         GameIssue.ReinstallMayHelp,
+        GameIssue.ExpansionMayBeMissing,
         GameIssue.SaveSyncFailed(offline = true),
     )
 

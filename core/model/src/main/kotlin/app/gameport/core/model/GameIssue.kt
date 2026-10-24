@@ -29,6 +29,12 @@ sealed interface GameIssue {
      */
     data object ReinstallMayHelp : GameIssue
 
+    /**
+     * Steam says the game weighs far more than its APK and nothing was written down about its expansion files, which GamePort cannot look for: the game may be missing
+     * its data. A notice, not a problem: the page offers to repair it, and it never lights the cover badge.
+     */
+    data object ExpansionMayBeMissing : GameIssue
+
     /** The last save sync could not reach Steam ([offline]) or could not send the saves. */
     data class SaveSyncFailed(val offline: Boolean) : GameIssue
 }

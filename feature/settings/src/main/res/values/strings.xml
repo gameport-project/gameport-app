@@ -255,4 +255,5 @@
     <string name="manage_discard_title">Discard this download?</string>
     <string name="manage_discard_text">The files left by the download of %1$s are deleted. It can be started again from the page of the game.</string>
     <string name="manage_parts_recorded">App %1$s · Expansion %2$s (noted at the install)</string>
+    <string name="help_notice_expansion">The game has large files beside its app and GamePort cannot check that they are all there. A button repairs it by downloading them again.</string>
 </resources>

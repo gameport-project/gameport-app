@@ -103,6 +103,7 @@ private fun GameDemoScreen(onBack: () -> Unit) {
                 GameIssue.ControllerSilent(activated = false),
                 GameIssue.ControllerMappingAvailable("valve"),
                 GameIssue.ReinstallMayHelp,
+                GameIssue.ExpansionMayBeMissing,
             ),
             controllerProfile = true,
             controllerFrame = true,

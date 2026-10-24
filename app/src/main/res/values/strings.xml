@@ -162,4 +162,7 @@
     <string name="tour_settings_help_title">Help</string>
     <string name="tour_settings_help_text">Where the complete tour and the tour of each page are started again, with every label, notice and button explained, and the link to the Discord.</string>
     <string name="tour_next_page">Next: %1$s</string>
+    <string name="expansion_notice_title">Games that may be missing files</string>
+    <string name="expansion_notice_text">These games have large files beside their app, and GamePort cannot check that they are all in place:\n\n%1$s\n\nIf one does not start or lacks content, open its page and press Repair: its large files are downloaded again, and the game stays installed.</string>
+    <string name="expansion_notice_ok">Understood</string>
 </resources>

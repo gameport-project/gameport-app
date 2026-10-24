@@ -126,6 +126,7 @@ private fun GamePortContent(viewModel: AppViewModel) {
     }
     // What a new version changes, and the games to patch again when it needs it.
     if (signedIn) app.gameport.whatsnew.WhatsNewHost()
+    if (signedIn) app.gameport.whatsnew.ExpansionNoticeHost()
     if (signedIn) TourHost(navController, viewModel)
     }
 }

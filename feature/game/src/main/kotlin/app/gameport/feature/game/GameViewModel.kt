@@ -175,6 +175,11 @@ class GameViewModel @Inject constructor(
 
     fun onRepatch() = installer.repatch(appId)
 
+    /** Downloads the game's expansion files again and places them, the APK on the device staying as it is. */
+    fun onRepair() {
+        (uiState.value as? GameUiState.Content)?.game?.let(installer::repair)
+    }
+
     /** Installs the newer build Steam published, over the installed game. */
     fun onUpdate() {
         (uiState.value as? GameUiState.Content)?.game?.let(installer::update)

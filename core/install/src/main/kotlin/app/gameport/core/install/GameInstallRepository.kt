@@ -7,6 +7,7 @@ import android.os.Environment
 import app.gameport.core.model.AndroidDepot
 import app.gameport.core.model.Game
 import app.gameport.core.model.InstallError
+import app.gameport.core.model.ExpansionCheck
 import app.gameport.core.model.InstallState
 import app.gameport.core.model.reportable
 import app.gameport.core.model.ObbNames
@@ -34,6 +35,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -639,6 +642,31 @@ class GameInstallRepository @Inject constructor(
 
     /** The DLC of [game] the account has, or null when the library does not tell what DLC the game has. */
     private fun ownedDlcOf(game: Game): List<Int>? = game.androidBuild?.dlc?.filter { it.owned }?.map { it.appId }
+
+    /**
+     * The installed games that may be missing their expansion files (see [ExpansionCheck]): GamePort cannot look in Android/obb, so it compares what Steam says the game
+     * weighs with its APKs and with what was written down at the install. Looked at again whenever the library or the installed games change.
+     */
+    val expansionMayBeMissing: Flow<Set<Int>> = combine(library.observeLibrary(), observeAll()) { loaded, _ ->
+        val installedIds = installed.all()
+        loaded.games.filter { it.appId in installedIds }.mapNotNull { game ->
+            val packageName = installedIds[game.appId] ?: return@mapNotNull null
+            if (!packages.isInstalled(packageName)) return@mapNotNull null
+            val apkBytes = packages.apkFilesOf(packageName).sumOf { it.length() }
+            game.appId.takeIf { ExpansionCheck.mayBeMissing(game.androidBuild?.installBytes, apkBytes, builds.get(game.appId)?.expansionBytes) }
+        }.toSet()
+    }.distinctUntilChanged().flowOn(Dispatchers.IO)
+
+    /**
+     * Puts the game's data right: the game is marked incomplete, which is what a game is whose files could not be placed, and installed again. The APK on the device stays;
+     * only the files that go beside it are downloaded and placed again, and the page shows the progress like any install.
+     */
+    fun repair(game: Game) {
+        val packageName = installed.all()[game.appId]?.takeIf(packages::isInstalled) ?: return
+        events.note(game.appId, "repair requested: the game is installed again to place its expansion files")
+        incomplete.put(game.appId, packageName)
+        install(game, builds.get(game.appId)?.dlc.orEmpty())
+    }
 
     /** The DLC of [game] the library lists and the account does not have. */
     private fun missingDlcOf(game: Game): List<Int> = game.androidBuild?.dlc?.filter { !it.owned }?.map { it.appId }.orEmpty()

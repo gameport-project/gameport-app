@@ -204,6 +204,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onOpenControllers = onOpenControllers,
         onOpenCompat = onOpenCompat,
         onActivateFrame = viewModel::onActivateFrame,
+        onRepair = viewModel::onRepair,
         achievements = achievements,
         onOpenAchievements = onOpenAchievements,
         artworkHeight = artworkHeight,
@@ -239,6 +240,7 @@ internal fun GameContent(
     onOpenControllers: () -> Unit,
     onOpenCompat: () -> Unit,
     onActivateFrame: () -> Unit,
+    onRepair: () -> Unit = {},
     onToggleFavorite: () -> Unit,
     onSetHidden: (Boolean) -> Unit,
     onBack: () -> Unit,
@@ -297,6 +299,7 @@ internal fun GameContent(
                     onOpenControllers = onOpenControllers,
                     onOpenCompat = onOpenCompat,
                     onActivateFrame = onActivateFrame,
+                    onRepair = onRepair,
                     onToggleFavorite = onToggleFavorite,
                     onSetHidden = onSetHidden,
                     hidden = uiState.hidden,
@@ -360,6 +363,7 @@ private fun GameDetails(
     onOpenControllers: () -> Unit,
     onOpenCompat: () -> Unit,
     onActivateFrame: () -> Unit,
+    onRepair: () -> Unit,
     onToggleFavorite: () -> Unit,
     onSetHidden: (Boolean) -> Unit,
     onOpenPermissions: () -> Unit,
@@ -478,7 +482,7 @@ private fun GameDetails(
                     )
                     if (install is InstallState.Installed) {
                         // Orange for what needs attention, green when the only news is an update.
-                        val attention = issues.any { it !is GameIssue.ControllerMappingAvailable && it !is GameIssue.ControllerSilent && it !is GameIssue.UpdateAvailable && it !is GameIssue.ReinstallMayHelp }
+                        val attention = issues.any { it !is GameIssue.ControllerMappingAvailable && it !is GameIssue.ControllerSilent && it !is GameIssue.UpdateAvailable && it !is GameIssue.ReinstallMayHelp && it !is GameIssue.ExpansionMayBeMissing }
                         val update = GameIssue.UpdateAvailable in issues
                         if (attention || update) {
                             Row(Modifier.align(Alignment.TopStart).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -601,6 +605,7 @@ private fun GameDetails(
                         onConflict = onResolveConflict,
                         onControllers = onOpenControllers,
                         onActivateFrame = onActivateFrame,
+                        onRepair = onRepair,
                         onReport = { reporting = true },
                         onDismissProblem = report.onDismissProblem,
                     ) }
@@ -854,9 +859,20 @@ private fun IssuesPanel(
     onConflict: () -> Unit,
     onControllers: () -> Unit,
     onActivateFrame: () -> Unit,
+    onRepair: () -> Unit,
     onReport: () -> Unit,
     onDismissProblem: () -> Unit,
 ) {
+    var confirmingRepair by remember { mutableStateOf(false) }
+    if (confirmingRepair) {
+        BackdropDialog(
+            onDismissRequest = { confirmingRepair = false },
+            title = { Text(stringResource(R.string.repair_title)) },
+            text = { Text(stringResource(R.string.repair_text)) },
+            confirmButton = { Button(onClick = { confirmingRepair = false; onRepair() }) { Text(stringResource(R.string.repair_confirm)) } },
+            dismissButton = { GlassButton(onClick = { confirmingRepair = false }) { Text(stringResource(R.string.repair_cancel)) } },
+        )
+    }
     val busy = repatch is Repatch.Running
     val updateAvailable = GameIssue.UpdateAvailable in issues
     // As wide as the achievements card beside it in the column.
@@ -900,6 +916,7 @@ private fun IssuesPanel(
                         onSecondAction = onDismissProblem,
                     )
                 GameIssue.ReinstallMayHelp -> IssueRow(stringResource(R.string.issue_reinstall_may_help), info = true)
+                GameIssue.ExpansionMayBeMissing -> IssueRow(stringResource(R.string.issue_expansion_unchecked), stringResource(R.string.issue_expansion_unchecked_action), { confirmingRepair = true }, enabled = !busy, info = true)
                 GameIssue.StoragePermissionMissing ->
                     IssueRow(stringResource(R.string.issue_storage_permission), stringResource(R.string.game_storage_open), onPermissions, enabled = !busy)
                 GameIssue.SaveConflict ->

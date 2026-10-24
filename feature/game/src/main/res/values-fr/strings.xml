@@ -212,4 +212,10 @@
     <string name="report_status_refused">Le rapport n\'a pas pu être envoyé.</string>
     <string name="report_status_unavailable">Aucun rapport n\'a pu être fait pour ce jeu.</string>
     <string name="demo_notice">Aperçu : valeurs inventées, rien n\'est installé</string>
+    <string name="issue_expansion_unchecked">Ce jeu a de gros fichiers à côté de son application, et GamePort ne peut pas vérifier qu\'ils sont tous là. S\'il manque du contenu ou ne démarre pas, la réparation les télécharge à nouveau.</string>
+    <string name="issue_expansion_unchecked_action">Réparer</string>
+    <string name="repair_title">Réparer ce jeu ?</string>
+    <string name="repair_text">Les gros fichiers du jeu sont téléchargés à nouveau et remis en place, ce qui peut prendre du temps et consommer des données mobiles. Le jeu reste installé et ses sauvegardes ne sont pas touchées. Il ne peut pas être lancé tant que ce n\'est pas fini.</string>
+    <string name="repair_confirm">Réparer</string>
+    <string name="repair_cancel">Annuler</string>
 </resources>

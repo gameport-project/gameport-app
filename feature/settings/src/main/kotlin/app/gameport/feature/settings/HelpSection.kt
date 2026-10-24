@@ -215,6 +215,7 @@ private fun noticeText(case: HelpIssueCase): Int = when (case) {
     HelpIssueCase.CONTROLLER_SILENT -> R.string.help_notice_silent
     HelpIssueCase.CONTROLLER_MAPPING -> R.string.help_notice_mapping
     HelpIssueCase.REINSTALL -> R.string.help_notice_reinstall
+    HelpIssueCase.EXPANSION_UNCHECKED -> R.string.help_notice_expansion
 }
 
 /**

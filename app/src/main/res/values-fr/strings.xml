@@ -163,4 +163,7 @@
     <string name="tour_settings_help_title">Aide</string>
     <string name="tour_settings_help_text">Là où la visite complète et la visite de chaque page se relancent, avec chaque étiquette, avis et bouton expliqués, et le lien vers le Discord.</string>
     <string name="tour_next_page">Suivant : %1$s</string>
+    <string name="expansion_notice_title">Jeux auxquels il peut manquer des fichiers</string>
+    <string name="expansion_notice_text">Ces jeux ont de gros fichiers à côté de leur application, et GamePort ne peut pas vérifier qu\'ils sont tous en place :\n\n%1$s\n\nSi l\'un d\'eux ne démarre pas ou manque de contenu, ouvrir sa page et appuyer sur Réparer : ses gros fichiers sont téléchargés à nouveau, et le jeu reste installé.</string>
+    <string name="expansion_notice_ok">Compris</string>
 </resources>
