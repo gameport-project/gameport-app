@@ -19,5 +19,9 @@
       "docs/screenshots/game-incompatible.png"
     ],
     "intro": "Free games and demos can now be added to the library from the store, the store has more filters, and the games that cannot run are marked online."
+  },
+  "0.9.0": {
+    "images": [],
+    "intro": "Online play works: a game that signs in through Steam can log in to its own online services, and lobbies work in the games tested. Plus a real download progress with a time left, passthrough and VR choices for each game, and a smoother picture for games that stuttered."
   }
 }
