@@ -94,8 +94,11 @@ class GameViewModel @Inject constructor(
     saves: app.gameport.core.sync.SaveStateRepository,
     private val compat: app.gameport.core.sync.CompatRepository,
     incompatibleGames: app.gameport.core.settings.IncompatibleGames,
+    private val launchOptions: app.gameport.core.steam.LaunchOptionsRepository,
 ) : ViewModel() {
     init {
+        // The arguments Steam lists for starting the game are kept now, so the game starts with them even without a connection.
+        viewModelScope.launch { launchOptions.refresh(savedStateHandle.toRoute<GameRoute>().appId) }
         // The totals of the players are asked again when they are old; what is kept shows meanwhile.
         viewModelScope.launch { compat.refreshIfStale() }
     }

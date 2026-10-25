@@ -9,6 +9,7 @@ import app.gameport.core.model.Game
 import app.gameport.core.model.InstallError
 import app.gameport.core.model.ExpansionCheck
 import app.gameport.core.model.InstallState
+import app.gameport.core.model.LaunchOptions
 import app.gameport.core.model.reportable
 import app.gameport.core.model.ObbNames
 import app.gameport.core.model.VersionOption
@@ -74,6 +75,8 @@ class GameInstallRepository @Inject constructor(
     private val playHistory: app.gameport.core.settings.PlayHistoryStore,
     private val gate: UpdateGate,
     private val events: GameEventLog,
+    private val launchOptions: app.gameport.core.steam.LaunchOptionsRepository,
+    private val gameSettings: app.gameport.core.settings.GameSettingsStore,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val operations = MutableStateFlow<Map<Int, InstallState>>(emptyMap())
@@ -279,6 +282,8 @@ class GameInstallRepository @Inject constructor(
                         incomplete.remove(game.appId)
                         verdicts.forget(game.appId)
                         installed.put(game.appId, packageName)
+                        // The arguments Steam lists for starting it, kept for when it is started without a connection.
+                        scope.launch { launchOptions.refresh(game.appId) }
                         // What this install came from, to recognise a newer build later.
                         builds.put(game.appId, InstalledBuild(depots.associate { it.id to it.manifestId }, chosen, expansionBytes))
                         updates.markCurrent(game.appId)
@@ -595,8 +600,16 @@ class GameInstallRepository @Inject constructor(
     fun launchIntent(appId: Int, isVr: Boolean? = null): Intent? {
         val packageName = installed.all()[appId]?.takeIf { !belongsToOtherGamePort(it) } ?: return null
         alignObbVersion(packageName)
+        // The arguments Steam lists for the game: a plain switch for VR is given on a headset unless the player left it out.
+        val options = launchOptions.cached(appId)
+        val own = gameSettings.get(appId)
+        val flat = isVr == false || !packages.isHeadset
+        val arguments = LaunchOptions.chosen(options, own.launchArguments, isVr = isVr == true && packages.isHeadset)
         // The patched game reads this mark to know GamePort started it, so it can open GamePort again when it closes.
-        return packages.launchIntent(packageName, immersive = isVr != false)
+        return packages.launchIntent(packageName, immersive = !flat)
+            ?.also { intent ->
+                LaunchOptions.unityExtra(arguments)?.let { intent.putExtra(LaunchOptions.UNITY_EXTRA, it); events.note(appId, "started with the arguments: $it") }
+            }
             ?.also { it.putExtra("app.gameport.launched", true); playHistory.markPlayed(appId); events.note(appId, "$LAUNCH_NOTE: ${it.component?.flattenToShortString() ?: it.`package`}") }
     }
 

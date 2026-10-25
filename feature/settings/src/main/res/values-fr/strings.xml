@@ -194,6 +194,8 @@
     <string name="help_option_recenter_text">Automatique, Oui ou Non. Utile quand le recentrage ne remet pas le jeu en face. Automatique l\'active pour un appareil sans zone de jeu.</string>
     <string name="help_option_mapping_title">Mapping des manettes</string>
     <string name="help_option_mapping_text">Pour un jeu sans contrôles pour les manettes de cet appareil, chaque bouton des manettes du Steam Frame peut être déplacé sur un autre bouton.</string>
+    <string name="help_option_launch_title">Arguments de lancement</string>
+    <string name="help_option_launch_text">Les arguments que Steam liste pour lancer un jeu. Un simple interrupteur VR est choisi au départ, et certains jeux restent sur un écran noir sans lui. Les autres sont seulement proposés. Chacun peut être choisi ou non, et un jeu qui ne connaît pas un argument l\'ignore.</string>
     <string name="help_ask_title">Questions et bugs</string>
     <string name="help_ask_text">Un problème avec un jeu s\'envoie de préférence avec le bouton de signalement de sa page. Pour tout le reste, le Discord du projet est ouvert à tous.</string>
     <string name="help_discord">Rejoindre le Discord</string>

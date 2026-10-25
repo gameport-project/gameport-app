@@ -194,6 +194,8 @@
     <string name="help_option_recenter_text">Automatic, On or Off. Useful when recentering does not bring the game back in front. Automatic turns it on for a device without a play area.</string>
     <string name="help_option_mapping_title">Controller mapping</string>
     <string name="help_option_mapping_text">For a game without controls for this device\'s controllers, each button of the Steam Frame\'s controllers can be moved onto another button.</string>
+    <string name="help_option_launch_title">Launch arguments</string>
+    <string name="help_option_launch_text">The arguments Steam lists for starting a game. A plain switch for VR is picked at first, and some games stay on a black screen without it. The others are only offered. Any of them can be picked or not, and a game that does not know an argument ignores it.</string>
     <string name="help_ask_title">Questions and bugs</string>
     <string name="help_ask_text">A problem with a game is best sent with the report button of its page. For everything else, the project\'s Discord is open to anyone.</string>
     <string name="help_discord">Join the Discord</string>

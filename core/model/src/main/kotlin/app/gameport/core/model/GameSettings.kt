@@ -21,6 +21,8 @@ data class GameSettings(
     val heightCm: Int? = null,
     /** The game follows the headset's recentering: it gets the play space that recentering moves, in place of a fixed one. */
     val recenter: RecenterMode = RecenterMode.AUTO,
+    /** The arguments the player picked to start the game with; null means none was picked and the ones meant for VR are used (see [LaunchOptions.chosen]). */
+    val launchArguments: Set<String>? = null,
 ) {
     val followsDefaults: Boolean get() = heightCm == null
 

@@ -36,6 +36,21 @@ import app.gameport.core.designsystem.BackButton
 import app.gameport.core.designsystem.DangerButton
 import app.gameport.core.designsystem.DangerRed
 import app.gameport.core.designsystem.DangerTextButton
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.Color
+import app.gameport.core.designsystem.BackdropMenu
+import app.gameport.core.designsystem.KindBlue
+import app.gameport.core.model.LaunchOption
+import app.gameport.core.model.LaunchOptions
 import app.gameport.core.model.InstallState
 import app.gameport.core.model.PlayerDefaults
 
@@ -49,6 +64,7 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
     val patchOutdated by viewModel.patchOutdated.collectAsStateWithLifecycle()
     val installState by viewModel.installState.collectAsStateWithLifecycle()
     val patchRemoved by viewModel.patchRemoved.collectAsStateWithLifecycle()
+    val launchOptions by viewModel.launchOptions.collectAsStateWithLifecycle()
     var confirmingRemoval by remember { mutableStateOf(false) }
     if (confirmingRemoval) {
         BackdropDialog(
@@ -123,6 +139,14 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
                         }
                     }
                 }
+                if (launchOptions.isNotEmpty()) {
+                    LaunchArgumentsSection(
+                        options = launchOptions,
+                        picked = settings.launchArguments,
+                        effective = LaunchOptions.chosen(launchOptions, settings.launchArguments, isVrGame).toSet(),
+                        onPicked = viewModel::onLaunchArgumentsChanged,
+                    )
+                }
                 if (viewModel.isHeadset && isVrGame) {
                     Text(stringResource(R.string.game_settings_vr), style = MaterialTheme.typography.headlineSmall)
                     Row(Modifier.widthIn(max = 720.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -160,6 +184,52 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
                     }
                 } else {
                     Text(stringResource(R.string.game_settings_nothing), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+/** The arguments Steam lists for starting the game, each one picked or not. What is picked at first is what Steam marks for VR. */
+@Composable
+private fun LaunchArgumentsSection(options: List<LaunchOption>, picked: Set<String>?, effective: Set<String>, onPicked: (Set<String>?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Text(stringResource(R.string.game_settings_launch), style = MaterialTheme.typography.headlineSmall)
+    Column(Modifier.widthIn(max = 720.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.game_settings_launch_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            stringResource(if (picked == null) R.string.game_settings_launch_suggested else R.string.game_settings_launch_own),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box {
+                GlassButton(onClick = { open = true }) {
+                    Icon(Icons.Filled.Tune, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (effective.isEmpty()) stringResource(R.string.game_settings_launch_nothing) else stringResource(R.string.game_settings_launch_picked, effective.size))
+                }
+                BackdropMenu(expanded = open, onDismissRequest = { open = false }) {
+                    options.forEach { option ->
+                        val on = option.arguments in effective
+                        Row(
+                            Modifier.fillMaxWidth().clickable { onPicked(if (on) effective - option.arguments else effective + option.arguments) }.padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Filled.Check, contentDescription = null, tint = if (on) KindBlue else Color.Transparent, modifier = Modifier.size(18.dp))
+                            Column {
+                                Text(option.arguments, color = if (on) KindBlue else MaterialTheme.colorScheme.onSurface)
+                                option.description?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            }
+                        }
+                    }
+                }
+            }
+            if (picked != null) {
+                GlassButton(onClick = { onPicked(null) }) {
+                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.game_settings_launch_reset))
                 }
             }
         }

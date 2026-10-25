@@ -256,6 +256,7 @@ internal fun GameContent(
     onOpenPermissions: () -> Unit,
     onResolveConflict: () -> Unit,
     onRepatch: () -> Unit,
+
     onUpdate: () -> Unit,
     achievements: AchievementList? = null,
     onOpenAchievements: () -> Unit = {},

@@ -148,6 +148,10 @@ internal fun HelpSection(onStartComplete: () -> Unit, onStartTour: (TourKind) ->
             Text(stringResource(R.string.help_option_mapping_title), style = MaterialTheme.typography.titleSmall)
             Text(stringResource(R.string.help_option_mapping_text))
         }
+        Column(Modifier.readable(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(stringResource(R.string.help_option_launch_title), style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.help_option_launch_text))
+        }
     }
 
     HelpBlock(R.string.help_ask_title) {

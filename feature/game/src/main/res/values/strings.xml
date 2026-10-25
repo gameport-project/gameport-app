@@ -38,6 +38,14 @@
     <string name="game_settings_seated_description">The game is raised so it matches the standing height, even while seated.</string>
     <string name="game_settings_height">Height: %1$d cm</string>
     <string name="game_settings_height_description">GamePort measures where the head really is and works out how far to raise the game from the chosen height.</string>
+    <string name="game_settings_launch">Launch arguments</string>
+    <string name="game_settings_launch_description">Steam lists the arguments this game can be started with. A plain switch for VR is picked at first, the others are only offered, and a game that does not know an argument ignores it.</string>
+    <string name="game_settings_launch_choose">Choose arguments</string>
+    <string name="game_settings_launch_picked">%1$d picked</string>
+    <string name="game_settings_launch_nothing">None picked</string>
+    <string name="game_settings_launch_suggested">Picked from what Steam lists for VR</string>
+    <string name="game_settings_launch_own">Chosen for this game</string>
+    <string name="game_settings_launch_reset">Use what Steam suggests</string>
     <string name="game_settings_nothing">This game has no settings on this device.</string>
     <string name="game_settings_height_global">Global configuration</string>
     <string name="game_settings_height_own">This game\'s own setting</string>

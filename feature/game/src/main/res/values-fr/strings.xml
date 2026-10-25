@@ -37,6 +37,14 @@
     <string name="game_settings_seated_description">Le jeu est remonté pour correspondre à la taille debout, même en position assise.</string>
     <string name="game_settings_height">Taille : %1$d cm</string>
     <string name="game_settings_height_description">GamePort mesure la position réelle de la tête et calcule de combien remonter le jeu à partir de la taille choisie.</string>
+    <string name="game_settings_launch">Arguments de lancement</string>
+    <string name="game_settings_launch_description">Steam liste les arguments avec lesquels ce jeu peut être lancé. Un simple interrupteur VR est choisi au départ, les autres sont seulement proposés, et un jeu qui ne connaît pas un argument l\'ignore.</string>
+    <string name="game_settings_launch_choose">Choisir les arguments</string>
+    <string name="game_settings_launch_picked">%1$d choisi(s)</string>
+    <string name="game_settings_launch_nothing">Aucun choisi</string>
+    <string name="game_settings_launch_suggested">Choisis d\'après ce que Steam liste pour la VR</string>
+    <string name="game_settings_launch_own">Choix propre à ce jeu</string>
+    <string name="game_settings_launch_reset">Utiliser ce que Steam suggère</string>
     <string name="game_settings_nothing">Ce jeu n\'a pas de réglages sur cet appareil.</string>
     <string name="game_settings_height_global">Configuration globale</string>
     <string name="game_settings_height_own">Réglage propre à ce jeu</string>

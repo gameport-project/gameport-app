@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 @HiltViewModel
 class GameSettingsViewModel @Inject constructor(
@@ -25,8 +26,17 @@ class GameSettingsViewModel @Inject constructor(
     library: SteamLibraryRepository,
     private val installer: GameInstallRepository,
     device: DeviceProfile,
+    private val launchOptionsRepository: app.gameport.core.steam.LaunchOptionsRepository,
 ) : ViewModel() {
     private val appId = savedStateHandle.toRoute<GameSettingsRoute>().appId
+
+    init {
+        viewModelScope.launch { launchOptionsRepository.refresh(appId) }
+    }
+
+    /** The arguments Steam lists for starting the game. */
+    val launchOptions: StateFlow<List<app.gameport.core.model.LaunchOption>> = launchOptionsRepository.observe(appId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), launchOptionsRepository.cached(appId))
 
     /** The height and seated options only mean something on a headset. */
     val isHeadset: Boolean = device.isHeadset
@@ -62,6 +72,9 @@ class GameSettingsViewModel @Inject constructor(
     fun onRepatch() = installer.repatch(appId)
 
     fun onRemovePatch() = installer.removePatch(appId)
+
+    /** The player picks the arguments to start the game with; null goes back to what Steam suggests. */
+    fun onLaunchArgumentsChanged(picked: Set<String>?) = store.set(appId, settings.value.copy(launchArguments = picked))
 
     fun onSeatedChanged(seated: Boolean) = store.set(appId, settings.value.copy(seated = seated))
 
