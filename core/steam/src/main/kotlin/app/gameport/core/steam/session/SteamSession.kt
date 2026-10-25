@@ -160,10 +160,21 @@ class SteamSession(private val cellId: Int = 0, private val onAccountRegion: (cu
         playingProcess = if (appId != 0) gameProcess else 0
     }
 
-    /** Tells Steam the account is in [appId] until [releasePlaying]: the time it runs is counted. */
+    /** Whether this connection told Steam it is online: a connection that never does is not seen by the account's other devices as a place where a game is played. */
+    @Volatile private var announcedOnline = false
+
+    /** Tells Steam the account is in [appId] until [releasePlaying]: the time it runs is counted. The account shows as online while GamePort holds the game, as Steam's own clients do. */
     suspend fun holdPlaying(appId: Int, processId: Int = 0) {
         sessionApp = appId
         playingJob?.cancel()
+        if (!announcedOnline) {
+            announcedOnline = client.getHandler(`in`.dragonbra.javasteam.steam.handlers.steamfriends.SteamFriends::class.java)?.let { friends ->
+                friends.setPersonaState(EPersonaState.Online)
+                Log.i("GPSteamTicket", "told Steam this connection is online")
+                true
+            } ?: false
+        }
+        // A ticket may have said the game first, with GamePort's process: Steam is told again when the game's own process is known.
         if (playingApp != appId || (processId > 0 && processId != playingProcess)) sendPlaying(appId, processId, waitForBuild = true)
     }
 
