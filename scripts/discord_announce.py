@@ -39,9 +39,13 @@ def release_file(version):
     return json.loads((ROOT / f"app/src/main/assets/releases/{version}.json").read_text(encoding="utf-8"))
 
 
+# The pictures the news window can show (WindowIcon in WhatsNew.kt), as the emoji closest to each on Discord, which cannot draw the app's own.
+EMOJI = {"trophy": "🏆", "cloud-sync": "☁️", "key": "🔑", "check": "✅", "download": "⬇️", "play": "▶️", "warning": "⚠️", "build": "🔧", "trash": "🗑️", "info": "ℹ️"}
+
+
 def bullets(release, lang):
-    """The short points of the news window of the version, one line each."""
-    return [f"• {item['text'][lang]}" for item in release["window"]["items"]]
+    """The short points of the news window of the version, each with its icon, and a blank line below it."""
+    return [f"{EMOJI.get(item.get('icon'), '•')} {item['text'][lang]}\n" for item in release["window"]["items"]]
 
 
 def payload(version, lang="en", chosen=None, release=None, exists=lambda path: (ROOT / path).is_file()):
@@ -56,7 +60,7 @@ def payload(version, lang="en", chosen=None, release=None, exists=lambda path: (
             raise ValueError(f"the picture {path} is not in the repository")
     intro = chosen.get("intro")
     lines = ([intro, ""] if intro else []) + bullets(release, lang)
-    description = "\n".join(lines)[:MAX_DESCRIPTION]
+    description = "\n".join(lines).rstrip()[:MAX_DESCRIPTION]
     title = f"GamePort {version} is out" if lang == "en" else f"GamePort {version} est sortie"
     footer = "Free and open source. Not made by or affiliated with Valve, Meta or Pico." if lang == "en" else "Gratuite et open source. Ni créée par Valve, Meta ou Pico, ni affiliée à eux."
     first = {"title": title, "url": page, "description": description, "color": BLURPLE, "footer": {"text": footer}}

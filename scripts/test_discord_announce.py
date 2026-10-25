@@ -2,7 +2,7 @@ import unittest
 
 import discord_announce as d
 
-RELEASE = {"window": {"items": [{"text": {"en": "A store.", "fr": "Un store."}}, {"text": {"en": "A price.", "fr": "Un prix."}}]}}
+RELEASE = {"window": {"items": [{"icon": "check", "text": {"en": "A store.", "fr": "Un store."}}, {"icon": "build", "text": {"en": "A price.", "fr": "Un prix."}}, {"text": {"en": "No icon.", "fr": "Sans icône."}}]}}
 ALWAYS = lambda path: True
 
 
@@ -11,17 +11,18 @@ class PayloadTest(unittest.TestCase):
         body = d.payload("0.8.0", release=RELEASE, chosen={"images": [], "intro": None}, exists=ALWAYS)
         embed = body["embeds"][0]
         self.assertEqual("GamePort 0.8.0 is out", embed["title"])
-        self.assertEqual("• A store.\n• A price.", embed["description"])
+        # Each point has the emoji of its icon, and a blank line below it; a point without an icon keeps a bullet.
+        self.assertEqual("✅ A store.\n\n🔧 A price.\n\n• No icon.", embed["description"])
         self.assertTrue(embed["url"].endswith("/releases/tag/v0.8.0"))
 
     def test_the_text_can_be_french(self):
         body = d.payload("0.8.0", lang="fr", release=RELEASE, chosen={"images": [], "intro": None}, exists=ALWAYS)
         self.assertEqual("GamePort 0.8.0 est sortie", body["embeds"][0]["title"])
-        self.assertIn("• Un store.", body["embeds"][0]["description"])
+        self.assertIn("✅ Un store.", body["embeds"][0]["description"])
 
     def test_the_intro_opens_the_text(self):
         body = d.payload("0.8.0", release=RELEASE, chosen={"images": [], "intro": "Big one."}, exists=ALWAYS)
-        self.assertTrue(body["embeds"][0]["description"].startswith("Big one.\n\n• A store."))
+        self.assertTrue(body["embeds"][0]["description"].startswith("Big one.\n\n✅ A store."))
 
     def test_the_chosen_pictures_are_read_from_main_and_shown_as_one_gallery(self):
         chosen = {"images": ["docs/screenshots/a.png", "docs/screenshots/b.png", "docs/screenshots/c.png"], "intro": None}
