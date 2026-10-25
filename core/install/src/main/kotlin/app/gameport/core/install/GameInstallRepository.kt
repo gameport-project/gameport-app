@@ -850,7 +850,7 @@ class GameInstallRepository @Inject constructor(
     private fun findApks(directory: File): List<File> =
         directory.walkTopDown()
             .onEnter { it.name != PATCHED_DIR }
-            .filter { it.isFile && it.extension.equals("apk", ignoreCase = true) }
+            .filter { it.isFile && it.extension.equals("apk", ignoreCase = true) && !DepotJunk.isJunk(it.relativeTo(directory).path) }
             .toList()
 
     /**

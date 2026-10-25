@@ -42,7 +42,7 @@ internal object ExpansionFiles {
 
     /** The files of [downloaded] that go to the device, each with the path it takes under the game's folder. */
     fun select(downloaded: File, packageName: String, skipped: String): List<Pair<File, String>> {
-        val files = downloaded.walkTopDown().onEnter { it.name != skipped }.filter { it.isFile }.associateBy { it.relativeTo(downloaded).path }
+        val files = downloaded.walkTopDown().onEnter { it.name != skipped }.filter { it.isFile }.associateBy { it.relativeTo(downloaded).path }.filterKeys { !DepotJunk.isJunk(it) }
         return ObbNames.selectPlaced(files.keys.toList(), packageName).map { (path, placed) -> files.getValue(path) to placed }
     }
 
