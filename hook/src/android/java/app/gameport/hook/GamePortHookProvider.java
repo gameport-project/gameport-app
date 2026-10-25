@@ -800,9 +800,11 @@ public final class GamePortHookProvider extends ContentProvider {
                 // The game was closed (not just turned): bring GamePort back, which Horizon does not do by itself.
                 boolean last = --liveActivities <= 0;
                 boolean byGamePort = launchedByGamePort;
-                boolean returning = last && a.isFinishing() && ("all".equals(returnMode) || ("app".equals(returnMode) && byGamePort) || ("library".equals(returnMode) && !byGamePort));
+                // A splash activity closes itself right after it started the activity that runs the game, which is not created yet: that is a hand-over, not the end.
+                boolean handOver = a.getClass().getSimpleName().endsWith("SplashActivity");
+                boolean returning = last && a.isFinishing() && !handOver && ("all".equals(returnMode) || ("app".equals(returnMode) && byGamePort) || ("library".equals(returnMode) && !byGamePort));
                 Log.i(TAG, "activity destroyed: last=" + last + " finishing=" + a.isFinishing() + " returnMode=" + returnMode
-                        + " byGamePort=" + byGamePort + " -> " + (returning ? "opening GamePort" : "staying away"));
+                        + " byGamePort=" + byGamePort + " handOver=" + handOver + " -> " + (returning ? "opening GamePort" : "staying away"));
                 if (returning) openGamePort(a);
             }
             @Override public void onActivityCreated(Activity a, Bundle b) {
