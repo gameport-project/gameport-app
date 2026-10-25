@@ -8,6 +8,12 @@ package app.gameport.core.model
 object ObbNames {
     private fun expansion(packageName: String) = Regex("^(main|patch|overflow\\d+)\\.(\\d+)\\.${Regex.escape(packageName)}\\.obb$")
 
+    /** True when one of [names] is an expansion file named after a version code (`main.<code>.<package>.obb` and its kind): the ones that the raised version of a patched game can leave unfound. */
+    fun hasVersioned(names: Collection<String>, packageName: String): Boolean {
+        val pattern = expansion(packageName)
+        return names.any { pattern.matches(it) }
+    }
+
     /**
      * The expansion files in [existing] that a new download replaces: those that play the same part (main, patch, or the same overflow
      * file) as one of the [placed] files under another version code. Left there, they would be mistaken for the new file when it is

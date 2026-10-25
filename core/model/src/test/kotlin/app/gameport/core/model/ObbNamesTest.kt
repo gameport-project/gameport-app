@@ -1,7 +1,9 @@
 package app.gameport.core.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ObbNamesTest {
@@ -103,5 +105,19 @@ class ObbNamesTest {
         assertEquals(false, ObbNames.inObbFolder("res/layout.xml", pkg))
         assertEquals(false, ObbNames.inObbFolder("main_assets_all.bundle", pkg))
         assertEquals(false, ObbNames.inObbFolder("obb", pkg))
+    }
+
+    @Test
+    fun `the small data files some games put beside the game are not expansion files named after a version`() {
+        // What Cubism ships: two tiny files, no .obb.
+        assertFalse(ObbNames.hasVersioned(listOf("vrpreferences.json", "RuntimeActionBindings.json"), "com.tvb.cubism"))
+        assertFalse(ObbNames.hasVersioned(emptyList(), "com.tvb.cubism"))
+    }
+
+    @Test
+    fun `a main or patch expansion file named after a version code is one`() {
+        assertTrue(ObbNames.hasVersioned(listOf("main.944116.com.vertigogames.ImpactDevelopment.obb", "chunk.1.com.vertigogames.ImpactDevelopment.obb"), "com.vertigogames.ImpactDevelopment"))
+        assertTrue(ObbNames.hasVersioned(listOf("patch.12.com.example.game.obb"), "com.example.game"))
+        assertFalse(ObbNames.hasVersioned(listOf("main.12.com.other.game.obb"), "com.example.game"))
     }
 }

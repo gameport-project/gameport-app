@@ -704,7 +704,8 @@ class GameInstallRepository @Inject constructor(
     fun reinstallMayHelp(packageName: String): Boolean {
         val original = packages.originalVersionCodeOf(packageName) ?: return false
         val installedCode = packages.versionCodeOf(packageName) ?: return false
-        return original != installedCode && deviceHasExpansion(packageName)
+        // Only the expansion files named after a version code can be left unfound by a raised version; the small data files some games put beside it are not.
+        return original != installedCode && ObbNames.hasVersioned(File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName").list().orEmpty().toList(), packageName)
     }
 
     /** True when the game already has files under `Android/obb`, for a game patched again. */
