@@ -34,6 +34,9 @@
     <string name="install_step_install">Installer</string>
     <string name="install_step_finish">Finaliser</string>
     <string name="install_queued">En attente des autres téléchargements…</string>
+    <string name="install_eta_under_minute">moins d\'1 min restante</string>
+    <string name="install_eta_minutes">%1$d min restantes</string>
+    <string name="install_eta_hours">%1$d h %2$02d min restantes</string>
     <string name="install_verifying">Vérification des fichiers déjà téléchargés… %1$d %%</string>
     <string name="install_patching">Préparation du jeu pour Steam… cela peut prendre quelques minutes</string>
     <string name="install_installing">Installation… une confirmation peut être demandée à l\'écran</string>

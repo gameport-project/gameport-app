@@ -8,9 +8,10 @@ sealed interface InstallState {
 
     /**
      * [progress] is 0..1 of the download. [verifying] is true while it moves on by checking files already on disk
-     * (a resumed download) rather than by fetching anything.
+     * (a resumed download) rather than by fetching anything. [etaSeconds] is the time left worked out from how the download is moving, or null
+     * when it cannot be told yet (the first moments, a check of files, a download that does not move).
      */
-    data class Downloading(val progress: Float, val bytesPerSecond: Long = 0L, val verifying: Boolean = false) : InstallState
+    data class Downloading(val progress: Float, val bytesPerSecond: Long = 0L, val verifying: Boolean = false, val etaSeconds: Long? = null) : InstallState
 
     /** A download was started earlier and left files behind; it can be resumed or discarded. */
     data object Interrupted : InstallState

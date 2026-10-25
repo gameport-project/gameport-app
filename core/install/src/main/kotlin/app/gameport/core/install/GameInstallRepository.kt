@@ -183,12 +183,20 @@ class GameInstallRepository @Inject constructor(
                         var wasVerifying = resuming
                         var shownProgress = 0f
                         var reported = false
+                        // What the files really take on the device, looked at every few seconds: the downloader's figure is held against it, and the time left follows the figure shown.
+                        val totalBytes = depots.sumOf { it.installBytes }
+                        val eta = DownloadEta()
+                        var allocatedAt = 0L
+                        var allocated = 0L
+                        var correctedNoted = false
+                        var followingDisk = false
                         downloader.download(game.appId, depots.map { it.id }, directory, depots.associate { it.id to it.downloadBytes }) { progress, received ->
                             val verifying = check.update(received)
                             if (verifying) {
                                 // Checking what is on the device: the figure is how far the check has read, not the download.
                                 wasVerifying = true
                                 setState(game.appId, InstallState.Downloading(verification.fraction(), speed.update(received), true))
+                                eta.reset()
                                 return@download
                             }
                             if (wasVerifying) {
@@ -196,11 +204,30 @@ class GameInstallRepository @Inject constructor(
                                 wasVerifying = false
                                 reported = false
                                 shownProgress = 0f
+                                followingDisk = false
+                                eta.reset()
                             }
                             if (progress >= 0f) {
                                 // 100 % means done: the install moves on when the downloader returns, not before.
-                                val real = minOf(progress, MAX_WHILE_DOWNLOADING)
-                                if (!reported) {
+                                val claimed = minOf(progress, MAX_WHILE_DOWNLOADING)
+                                val seenAt = System.currentTimeMillis()
+                                if (seenAt - allocatedAt > ALLOCATED_EVERY_MS) {
+                                    allocated = DownloadFigure.allocatedBytes(directory, setOf(PATCHED_DIR, ".DepotDownloader"))
+                                    allocatedAt = seenAt
+                                }
+                                val corrected = DownloadFigure.contradicts(claimed, allocated, totalBytes)
+                                val real = if (corrected) minOf(DownloadFigure.fractionOf(allocated, totalBytes), MAX_WHILE_DOWNLOADING) else claimed
+                                if (corrected) {
+                                    // The downloader claims more than the device holds: what the device holds is shown, even if it is less than what was shown before. From then on
+                                    // the figure only moves forward, as the one of the disk does.
+                                    if (!correctedNoted) {
+                                        correctedNoted = true
+                                        events.note(game.appId, "the downloader says ${(claimed * 1000).toInt() / 10.0}% but the files hold ${(real * 1000).toInt() / 10.0}% of ${totalBytes / 1_000_000} MB: shown from the files")
+                                    }
+                                    reported = true
+                                    shownProgress = if (followingDisk) maxOf(shownProgress, real) else real
+                                    followingDisk = true
+                                } else if (!reported) {
                                     reported = true
                                     shownProgress = real
                                 } else {
@@ -213,7 +240,7 @@ class GameInstallRepository @Inject constructor(
                                     shownProgress = maxOf(shownProgress, real)
                                 }
                             }
-                            setState(game.appId, InstallState.Downloading(shownProgress, speed.update(received), false))
+                            setState(game.appId, InstallState.Downloading(shownProgress, speed.update(received), false, etaSeconds = eta.update(shownProgress)))
                         }
                     }
 
@@ -997,6 +1024,9 @@ private const val BACKWARDS_TOLERANCE = 0.002f
 
 /** The figure shown while a game downloads never reaches 100 %: that is for when it is done. */
 private const val MAX_WHILE_DOWNLOADING = 0.99f
+
+/** How often the space the files take on the device is looked at to hold the downloader's figure against it. */
+private const val ALLOCATED_EVERY_MS = 3_000L
 
 /** Written in a download's folder when the player pauses it, or when it failed for a reason of its own: GamePort does not resume it by itself. */
 private const val PAUSED_FILE = ".gameport-paused"

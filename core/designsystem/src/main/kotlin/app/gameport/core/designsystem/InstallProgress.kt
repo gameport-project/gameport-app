@@ -49,7 +49,7 @@ fun installStatusText(state: InstallState, speedUnit: SpeedUnit): String? = when
         val percent = (state.progress * 100).toInt()
         when {
             state.verifying -> stringResource(R.string.install_verifying, percent)
-            state.bytesPerSecond > 0 -> "$percent% · ${speedText(state.bytesPerSecond, speedUnit)}"
+            state.bytesPerSecond > 0 -> "$percent% · ${speedText(state.bytesPerSecond, speedUnit)}" + (state.etaSeconds?.let { " · ${etaText(it)}" } ?: "")
             else -> "$percent%"
         }
     }
@@ -57,4 +57,15 @@ fun installStatusText(state: InstallState, speedUnit: SpeedUnit): String? = when
     InstallState.Installing -> stringResource(R.string.install_installing)
     InstallState.Finishing -> stringResource(R.string.install_finishing)
     else -> null
+}
+
+/** The time left of a download in words: under a minute, minutes, then hours and minutes (rounded up to the minute, so it never says 0). */
+@Composable
+fun etaText(seconds: Long): String {
+    val minutes = (seconds + 59) / 60
+    return when {
+        minutes <= 1 -> stringResource(R.string.install_eta_under_minute)
+        minutes < 60 -> stringResource(R.string.install_eta_minutes, minutes.toInt())
+        else -> stringResource(R.string.install_eta_hours, (minutes / 60).toInt(), (minutes % 60).toInt())
+    }
 }
