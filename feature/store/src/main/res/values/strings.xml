@@ -35,8 +35,8 @@
     <string name="storegame_metacritic">Metacritic %1$d</string>
     <string name="storegame_open_steam">See on Steam</string>
     <string name="storegame_open_library">Open its page in my library</string>
-    <string name="storegame_multi_warning">Has a multiplayer part: it does not work for now, and the game may not start.</string>
-    <string name="storegame_multi_warning_detail">GamePort focuses on single player and saves. The online part of a game, its servers and its matchmaking, often does not work on these devices yet.</string>
+    <string name="storegame_multi_warning">Has a multiplayer part: it works in some games and not in others.</string>
+    <string name="storegame_multi_warning_detail">GamePort focuses on single player and saves. The online part of a game, its servers and its matchmaking, works for some games now and not yet for others, and the game may not start.</string>
     <string name="storegame_add">Add to the library</string>
     <string name="storegame_adding">Adding…</string>
     <string name="storegame_add_title">Add to the library</string>
