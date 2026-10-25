@@ -41,6 +41,11 @@ class PackageGateway @Inject constructor(
         (listOf(info.sourceDir) + info.splitSourceDirs.orEmpty()).map(::File)
     }.getOrDefault(emptyList())
 
+    /** Whether the package's manifest metadata holds [key]. */
+    fun hasMetaData(packageName: String, key: String): Boolean = runCatching {
+        packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA).metaData?.containsKey(key) == true
+    }.getOrDefault(false)
+
     /** An integer from the package's manifest metadata, or null when it has none. */
     fun metaDataInt(packageName: String, key: String): Int? = runCatching {
         packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)

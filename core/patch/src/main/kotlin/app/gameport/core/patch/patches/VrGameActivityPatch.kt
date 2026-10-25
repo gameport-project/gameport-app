@@ -14,6 +14,7 @@ import app.gameport.core.patch.json.elemEach
 import app.gameport.core.patch.json.named
 import app.gameport.core.patch.json.nameAttribute
 import app.gameport.core.patch.json.namedElement
+import app.gameport.core.patch.json.takeEach
 import app.gameport.core.patch.json.takeNodes
 import app.gameport.core.patch.json.takeNodesEach
 import com.reandroid.json.JSONArray
@@ -41,28 +42,51 @@ object VrGameActivityPatch : ApkPatch {
 
     override fun apply(session: PatchSession, context: PatchContext, assets: PatchAssets) {
         if (context.isVr == false) return
-        patchManifest(session.manifest)
+        patchManifest(session.manifest, enabled = context.vrGameActivity)
     }
 
-    internal fun patchManifest(manifest: JSONObject) {
+    /**
+     * Gives the Unreal game activity its VR entry, or, when the player turned that off, takes away the one this patch gave it (a game patched
+     * again starts from the APK already patched). An entry the game came with is never touched.
+     */
+    internal fun patchManifest(manifest: JSONObject, enabled: Boolean = true) {
         manifest.takeNodesEach({ named("manifest") }) {
             takeNodesEach({ named("application") }) {
-                var added = false
-                takeNodesEach({ named("activity") }) {
+                var ours = false
+                val patched = takeNodesEach({ named("activity") }) {
+                    val isGameActivity = nameAttribute() == UNREAL_GAME_ACTIVITY
                     val hasEntry = elem<JSONArray>("nodes").elemEach<JSONObject> { named("intent-filter") }.any { filter ->
                         filter.elem<JSONArray>("nodes").elemEach<JSONObject> { named("category") }.any { it.nameAttribute() in ENTRY_CATEGORIES }
                     }
-                    if (nameAttribute() != UNREAL_GAME_ACTIVITY || hasEntry) this else {
-                        added = true
-                        takeNodes { (this ?: JSONArray()).apply { put(immersiveEntry()) } }
+                    when {
+                        !isGameActivity -> this
+                        enabled && !hasEntry -> {
+                            ours = true
+                            takeNodes { (this ?: JSONArray()).apply { put(immersiveEntry()) } }
+                        }
+                        // An entry this patch gave on an earlier pass is still ours, and gets its mark if it has none (a game patched before the mark existed).
+                        enabled -> this.also { if (elem<JSONArray>("nodes").elemEach<JSONObject> { named("intent-filter") }.any { it.isOurEntry() }) ours = true }
+                        else -> takeNodesEach({ named("intent-filter") }) { if (isOurEntry()) null else this }
                     }
                 }
                 // A mark the hook writes into the game's log, so a problem report tells whether the game was given this entry.
-                if (added) takeNodes {
-                    this?.put(element("meta-data", ManifestAttr("name", ATTR_NAME, "STRING", META_KEY), ManifestAttr("value", ATTR_VALUE, "STRING", "true")))
-                } else this
+                when {
+                    // One mark, whatever the number of passes.
+                    ours -> patched.takeNodes {
+                        this.also { it.takeEach<JSONObject>({ named("meta-data") && nameAttribute() == META_KEY }) { null } }
+                            ?.put(element("meta-data", ManifestAttr("name", ATTR_NAME, "STRING", META_KEY), ManifestAttr("value", ATTR_VALUE, "STRING", "true")))
+                    }
+                    !enabled -> patched.takeNodes { this.also { it.takeEach<JSONObject>({ named("meta-data") && nameAttribute() == META_KEY }) { null } } }
+                    else -> patched
+                }
             }
         }
+    }
+
+    /** The filter this patch adds: the main action and the immersive categories, and no launcher category. */
+    private fun JSONObject?.isOurEntry(): Boolean {
+        val categories = elem<JSONArray>("nodes").elemEach<JSONObject> { named("category") }.mapNotNull { it.nameAttribute() }
+        return categories.isNotEmpty() && "android.intent.category.LAUNCHER" !in categories && categories.all { it in VrPlatforms.allImmersiveLauncherCategories }
     }
 
     /** An intent filter that only marks an activity as a VR one: the main action and the immersive categories, no launcher. */

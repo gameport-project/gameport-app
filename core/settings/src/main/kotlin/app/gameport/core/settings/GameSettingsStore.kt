@@ -38,6 +38,7 @@ class GameSettingsStore @Inject constructor(
         seated = prefs.getBoolean("seated_$appId", false),
         heightCm = if (prefs.contains("height_$appId")) prefs.getInt("height_$appId", 0) else null,
         recenter = recenterOf(appId),
+        openInVr = prefs.getBoolean("open_in_vr_$appId", true),
         launchArguments = if (prefs.contains("launchargs_$appId")) prefs.getStringSet("launchargs_$appId", emptySet()).orEmpty().toSet() else null,
     )
 
@@ -66,6 +67,8 @@ class GameSettingsStore @Inject constructor(
         }
         // No pick is the absence of a choice, an empty pick is a choice of none.
         settings.launchArguments?.let { editor.putStringSet("launchargs_$appId", it) } ?: editor.remove("launchargs_$appId")
+        // Automatic is the absence of a choice: only a no is written.
+        if (settings.openInVr) editor.remove("open_in_vr_$appId") else editor.putBoolean("open_in_vr_$appId", false)
         if (height == null) editor.remove("height_$appId") else editor.putInt("height_$appId", height.coerceIn(PlayerDefaults.HEIGHT_RANGE_CM))
         editor.apply()
         changes.value += 1

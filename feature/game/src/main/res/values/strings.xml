@@ -217,6 +217,8 @@
     <string name="gamecompat_recenter">Follow the headset\'s recentering</string>
     <string name="gamecompat_recenter_legend">Useful when recentering does not bring the game back in front. The game then uses the play space that recentering moves, with the floor at the right height. Where the content stands may change.</string>
     <string name="gamecompat_recenter_auto">Done automatically for this game: the headset has no play area.</string>
+    <string name="gamecompat_open_in_vr">Open the game itself in VR</string>
+    <string name="gamecompat_open_in_vr_legend">Some games start with a first screen that then opens the game itself. By default the game itself opens in VR too, instead of in a flat window. Turning it off is for a game that does not work that way. A change patches the game again.</string>
     <string name="gamecompat_mode_auto">Automatic</string>
     <string name="gamecompat_mode_on">On</string>
     <string name="gamecompat_mode_off">Off</string>

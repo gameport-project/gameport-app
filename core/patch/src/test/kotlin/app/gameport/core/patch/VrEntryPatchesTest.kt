@@ -90,4 +90,45 @@ class VrEntryPatchesTest {
         val notGiven = manifest(activity(game, filter(launcher))).also { VrLauncherPatch.patchManifest(it); VrGameActivityPatch.patchManifest(it) }
         assertFalse(notGiven.toString().contains("app.gameport.vr_game_activity"))
     }
+
+    @Test
+    fun `turned off, the entry this patch gave is taken away with its mark, and the launcher is left`() {
+        val root = splashThenGame().also { VrLauncherPatch.patchManifest(it); VrGameActivityPatch.patchManifest(it) }
+        assertTrue(root.toString().contains("app.gameport.vr_game_activity"))
+        VrGameActivityPatch.patchManifest(root, enabled = false)
+        assertEquals(emptyList<List<String>>(), filtersOf(root, game))
+        assertFalse(root.toString().contains("app.gameport.vr_game_activity"))
+        assertEquals(listOf(listOf(launcher) + vr), filtersOf(root, "com.epicgames.unreal.SplashActivity"))
+    }
+
+    @Test
+    fun `turned off, a game that was never given the entry stays as it is, and an entry it came with is kept`() {
+        val plain = splashThenGame().also { VrGameActivityPatch.patchManifest(it, enabled = false) }
+        assertEquals(emptyList<List<String>>(), filtersOf(plain, game))
+        val own = manifest(activity(game, filter(launcher))).also { VrGameActivityPatch.patchManifest(it, enabled = false) }
+        assertEquals(listOf(listOf(launcher)), filtersOf(own, game))
+    }
+
+    @Test
+    fun `turned off then on again, the entry comes back once`() {
+        val root = splashThenGame().also { VrLauncherPatch.patchManifest(it); VrGameActivityPatch.patchManifest(it); VrGameActivityPatch.patchManifest(it, enabled = false); VrGameActivityPatch.patchManifest(it) }
+        assertEquals(1, filtersOf(root, game).size)
+    }
+
+    @Test
+    fun `a game that already holds the entry without a mark gets the mark once, whatever the number of passes`() {
+        // As an earlier version left it: the VR-only entry on the game activity, and no mark.
+        val root = manifest(activity("com.epicgames.unreal.SplashActivity", filter(launcher)), activity(game, filter(*vr.toTypedArray())))
+        assertFalse(root.toString().contains("app.gameport.vr_game_activity"))
+        repeat(3) { VrGameActivityPatch.patchManifest(root) }
+        assertEquals(1, Regex("app.gameport.vr_game_activity").findAll(root.toString()).count())
+        assertEquals(1, filtersOf(root, game).size)
+    }
+
+    @Test
+    fun `an entry the game came with that looks the same is never marked as ours when it has a launcher category`() {
+        val root = manifest(activity(game, filter(launcher)))
+        VrGameActivityPatch.patchManifest(root)
+        assertFalse(root.toString().contains("app.gameport.vr_game_activity"))
+    }
 }

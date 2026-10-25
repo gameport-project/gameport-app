@@ -23,6 +23,11 @@ data class GameSettings(
     val recenter: RecenterMode = RecenterMode.AUTO,
     /** The arguments the player picked to start the game with; null means none was picked and the ones meant for VR are used (see [LaunchOptions.chosen]). */
     val launchArguments: Set<String>? = null,
+    /**
+     * Some games start with a first screen that then opens the game itself, in a flat window. On (automatic), the patch makes the game itself open in VR too;
+     * off keeps it from doing so, for a game that does not get along with it. A change needs the game to be patched again.
+     */
+    val openInVr: Boolean = true,
 ) {
     val followsDefaults: Boolean get() = heightCm == null
 

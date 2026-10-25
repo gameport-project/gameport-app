@@ -191,6 +191,8 @@
     <string name="help_options_text">The options that make a game work, one per game.</string>
     <string name="help_option_frame_title">Force the detection of the Steam Frame\'s controllers</string>
     <string name="help_option_frame_text">Useful when the game starts but does not react to the controllers. It changes nothing if the game has no controls for the Steam Frame\'s controllers, and a warning says so when that was seen.</string>
+    <string name="help_option_open_in_vr_title">Open the game itself in VR</string>
+    <string name="help_option_open_in_vr_text">Shown only for a game patched for it. Automatic or Off. Useful when a game starts with a first screen and then shows in a flat window. Off patches the game again without it.</string>
     <string name="help_option_recenter_title">Follow the recentering of the device</string>
     <string name="help_option_recenter_text">Automatic, On or Off. Useful when recentering does not bring the game back in front. Automatic turns it on for a device without a play area.</string>
     <string name="help_option_mapping_title">Controller mapping</string>

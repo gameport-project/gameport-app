@@ -20,6 +20,8 @@ data class PatchContext(
      * its version code is left as it is, never raised ([app.gameport.core.patch.patches.VersionCodePatch]).
      */
     val keepVersionCode: Boolean = false,
+    /** The player did not turn off the VR entry of the game's own activity ([app.gameport.core.patch.patches.VrGameActivityPatch]). */
+    val vrGameActivity: Boolean = true,
     /** The patch version to record in the game ([PatchVersioning.current]). */
     val patchVersion: Int = PatchVersioning.GENERATION * 1_000,
     /** The game's achievements (JSON, see [app.gameport.core.model.ShimAchievements]) for the Steamworks shim; null to bake none. */

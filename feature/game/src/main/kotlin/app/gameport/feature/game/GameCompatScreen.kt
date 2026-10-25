@@ -46,7 +46,8 @@ fun GameCompatScreen(onBack: () -> Unit, viewModel: GameCompatViewModel = hiltVi
     val settings by viewModel.gameSettings.collectAsStateWithLifecycle()
     val stageFallback by viewModel.stageFallback.collectAsStateWithLifecycle()
     val gameName by viewModel.gameName.collectAsStateWithLifecycle()
-    GameCompatContent(mapping, settings, stageFallback, gameName, onBack, viewModel::onUseFrameChanged, viewModel::onRecenterChosen)
+    val showOpenInVr by viewModel.showOpenInVr.collectAsStateWithLifecycle()
+    GameCompatContent(mapping, settings, stageFallback, gameName, onBack, viewModel::onUseFrameChanged, viewModel::onRecenterChosen, showOpenInVr, viewModel::onOpenInVrChosen)
 }
 
 /** The page of the options, from what it shows: the screen feeds it from the game, the tour of the page feeds it made-up values. */
@@ -59,6 +60,8 @@ internal fun GameCompatContent(
     onBack: () -> Unit,
     onUseFrameChanged: (Boolean) -> Unit,
     onRecenterChosen: (RecenterMode) -> Unit,
+    showOpenInVr: Boolean = false,
+    onOpenInVrChosen: (Boolean) -> Unit = {},
 ) {
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp)) {
@@ -84,6 +87,13 @@ internal fun GameCompatContent(
                     onSelect = { onRecenterChosen(RecenterMode.entries[it]) },
                     // What GamePort did by itself, said only when it did.
                     note = stringResource(R.string.gamecompat_recenter_auto).takeIf { stageFallback && settings.recenter == RecenterMode.AUTO },
+                )
+                if (showOpenInVr) ChoiceBox(
+                    title = stringResource(R.string.gamecompat_open_in_vr),
+                    legend = stringResource(R.string.gamecompat_open_in_vr_legend),
+                    labels = listOf(R.string.gamecompat_mode_auto, R.string.gamecompat_mode_off).map { stringResource(it) },
+                    selected = if (settings.openInVr) 0 else 1,
+                    onSelect = { onOpenInVrChosen(it == 0) },
                 )
             }
         }
