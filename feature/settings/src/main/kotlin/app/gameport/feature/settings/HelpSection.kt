@@ -160,6 +160,10 @@ internal fun HelpSection(onStartComplete: () -> Unit, onStartTour: (TourKind) ->
             Text(stringResource(R.string.help_option_ovrplugin_text))
         }
         Column(Modifier.readable(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(stringResource(R.string.help_option_passthrough_title), style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.help_option_passthrough_text))
+        }
+        Column(Modifier.readable(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(stringResource(R.string.help_option_mapping_title), style = MaterialTheme.typography.titleSmall)
             Text(stringResource(R.string.help_option_mapping_text))
         }

@@ -7,6 +7,8 @@ import androidx.navigation.toRoute
 import app.gameport.core.model.ControllerMapping
 import app.gameport.core.model.GameSettings
 import app.gameport.core.install.GameInstallRepository
+import app.gameport.core.model.PassthroughGames
+import app.gameport.core.model.PassthroughMode
 import app.gameport.core.model.RecenterMode
 import app.gameport.core.settings.ControllerMappingStore
 import app.gameport.core.settings.GameSettingsStore
@@ -66,6 +68,16 @@ class GameCompatViewModel @Inject constructor(
         settings.set(appId, gameSettings.value.copy(openInVr = automatic))
         installer.repatch(appId)
     }
+
+    /** Whether the game declares the headset's passthrough feature: automatic follows the list of games known to need it. A change patches the game again, which applies it. */
+    fun onPassthroughChosen(mode: PassthroughMode) {
+        val before = PassthroughGames.declared(gameSettings.value.passthrough, appId)
+        settings.set(appId, gameSettings.value.copy(passthrough = mode))
+        if (PassthroughGames.declared(mode, appId) != before) installer.repatch(appId)
+    }
+
+    /** True when the list, and not the player, gives this game the declaration. */
+    val passthroughListed: Boolean = PassthroughGames.wanted(appId)
 
     /** Automatic gives the game the stand-in when it needs one, off takes away the one GamePort gave. Either way the game is patched again, which applies the choice. */
     fun onOvrPluginStandInChosen(automatic: Boolean) {

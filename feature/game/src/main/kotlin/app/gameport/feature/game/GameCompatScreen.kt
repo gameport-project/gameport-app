@@ -33,6 +33,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.gameport.core.designsystem.PillTabs
 import app.gameport.core.designsystem.PageHeader
+import app.gameport.core.model.PassthroughMode
 import app.gameport.core.model.RecenterMode
 import app.gameport.core.designsystem.glass
 
@@ -48,7 +49,7 @@ fun GameCompatScreen(onBack: () -> Unit, viewModel: GameCompatViewModel = hiltVi
     val gameName by viewModel.gameName.collectAsStateWithLifecycle()
     val showOpenInVr by viewModel.showOpenInVr.collectAsStateWithLifecycle()
     val showOvrPluginStandIn by viewModel.showOvrPluginStandIn.collectAsStateWithLifecycle()
-    GameCompatContent(mapping, settings, stageFallback, gameName, onBack, viewModel::onUseFrameChanged, viewModel::onRecenterChosen, showOpenInVr, viewModel::onOpenInVrChosen, showOvrPluginStandIn, viewModel::onOvrPluginStandInChosen)
+    GameCompatContent(mapping, settings, stageFallback, gameName, onBack, viewModel::onUseFrameChanged, viewModel::onRecenterChosen, showOpenInVr, viewModel::onOpenInVrChosen, showOvrPluginStandIn, viewModel::onOvrPluginStandInChosen, viewModel::onPassthroughChosen, viewModel.passthroughListed)
 }
 
 /** The page of the options, from what it shows: the screen feeds it from the game, the tour of the page feeds it made-up values. */
@@ -65,6 +66,8 @@ internal fun GameCompatContent(
     onOpenInVrChosen: (Boolean) -> Unit = {},
     showOvrPluginStandIn: Boolean = false,
     onOvrPluginStandInChosen: (Boolean) -> Unit = {},
+    onPassthroughChosen: (PassthroughMode) -> Unit = {},
+    passthroughListed: Boolean = false,
 ) {
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp)) {
@@ -90,6 +93,14 @@ internal fun GameCompatContent(
                     onSelect = { onRecenterChosen(RecenterMode.entries[it]) },
                     // What GamePort did by itself, said only when it did.
                     note = stringResource(R.string.gamecompat_recenter_auto).takeIf { stageFallback && settings.recenter == RecenterMode.AUTO },
+                )
+                ChoiceBox(
+                    title = stringResource(R.string.gamecompat_passthrough),
+                    legend = stringResource(R.string.gamecompat_passthrough_legend),
+                    labels = listOf(R.string.gamecompat_mode_auto, R.string.gamecompat_mode_on, R.string.gamecompat_mode_off).map { stringResource(it) },
+                    selected = settings.passthrough.ordinal,
+                    onSelect = { onPassthroughChosen(PassthroughMode.entries[it]) },
+                    note = stringResource(R.string.gamecompat_passthrough_auto).takeIf { passthroughListed && settings.passthrough == PassthroughMode.AUTO },
                 )
                 if (showOpenInVr) ChoiceBox(
                     title = stringResource(R.string.gamecompat_open_in_vr),

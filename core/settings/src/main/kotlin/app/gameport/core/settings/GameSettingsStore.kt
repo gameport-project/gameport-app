@@ -3,6 +3,7 @@ package app.gameport.core.settings
 import android.content.Context
 import app.gameport.core.model.GameSettings
 import app.gameport.core.model.PlayerDefaults
+import app.gameport.core.model.PassthroughMode
 import app.gameport.core.model.RecenterMode
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -40,6 +41,7 @@ class GameSettingsStore @Inject constructor(
         recenter = recenterOf(appId),
         openInVr = prefs.getBoolean("open_in_vr_$appId", true),
         ovrPluginStandIn = prefs.getBoolean("ovrplugin_stand_in_$appId", true),
+        passthrough = passthroughOf(appId),
         launchArguments = if (prefs.contains("launchargs_$appId")) prefs.getStringSet("launchargs_$appId", emptySet()).orEmpty().toSet() else null,
     )
 
@@ -71,6 +73,12 @@ class GameSettingsStore @Inject constructor(
         // Automatic is the absence of a choice: only a no is written.
         if (settings.openInVr) editor.remove("open_in_vr_$appId") else editor.putBoolean("open_in_vr_$appId", false)
         if (settings.ovrPluginStandIn) editor.remove("ovrplugin_stand_in_$appId") else editor.putBoolean("ovrplugin_stand_in_$appId", false)
+        // Automatic is the absence of a choice.
+        when (settings.passthrough) {
+            PassthroughMode.AUTO -> editor.remove("passthrough_$appId")
+            PassthroughMode.ON -> editor.putString("passthrough_$appId", "on")
+            PassthroughMode.OFF -> editor.putString("passthrough_$appId", "off")
+        }
         if (height == null) editor.remove("height_$appId") else editor.putInt("height_$appId", height.coerceIn(PlayerDefaults.HEIGHT_RANGE_CM))
         editor.apply()
         changes.value += 1
@@ -81,6 +89,13 @@ class GameSettingsStore @Inject constructor(
         "on", true -> RecenterMode.ON
         "off" -> RecenterMode.OFF
         else -> RecenterMode.AUTO
+    }
+
+    /** A choice written when it was only a switch: an old "true" is a yes. */
+    private fun passthroughOf(appId: Int): PassthroughMode = when (prefs.all["passthrough_$appId"]) {
+        "on", true -> PassthroughMode.ON
+        "off" -> PassthroughMode.OFF
+        else -> PassthroughMode.AUTO
     }
 
     private fun readDefaults() = PlayerDefaults(prefs.getInt(KEY_DEFAULT_HEIGHT, PlayerDefaults.DEFAULT_HEIGHT_CM))

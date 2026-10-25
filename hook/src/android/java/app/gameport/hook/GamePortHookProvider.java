@@ -747,7 +747,7 @@ public final class GamePortHookProvider extends ContentProvider {
             // The play space that the headset's recentering moves, in place of the fixed one a game asks for (auto, on or off).
             android.system.Os.setenv("GAMEPORT_XR_LOCAL_FLOOR", localFloor, true);
             Log.i(TAG, "seated mode " + seated + ", eye height " + eyeCm + " cm, controller overrides " + (controls.isEmpty() ? "none" : controls));
-            Log.i(TAG, "patches: vr_game_activity=" + hasPatchMark(context, "app.gameport.vr_game_activity") + " ovrplugin_stand_in=" + hasPatchMark(context, "app.gameport.ovrplugin_stand_in"));
+            Log.i(TAG, "patches: vr_game_activity=" + hasPatchMark(context, "app.gameport.vr_game_activity") + " ovrplugin_stand_in=" + hasPatchMark(context, "app.gameport.ovrplugin_stand_in") + " passthrough_feature=" + hasPatchMark(context, "app.gameport.passthrough_feature"));
         } catch (Throwable t) {
             Log.w(TAG, "could not pass the seated settings on", t);
         }

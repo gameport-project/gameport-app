@@ -24,6 +24,8 @@ data class PatchContext(
     val vrGameActivity: Boolean = true,
     /** The player did not turn off the stand-in for Meta's OVRPlugin ([app.gameport.core.patch.patches.OvrPluginStandInPatch]). */
     val ovrPluginStandIn: Boolean = true,
+    /** The player turned on the declaration of the passthrough feature for this game ([app.gameport.core.patch.patches.PassthroughFeaturePatch]). */
+    val allowPassthrough: Boolean = false,
     /** The patch version to record in the game ([PatchVersioning.current]). */
     val patchVersion: Int = PatchVersioning.GENERATION * 1_000,
     /** The game's achievements (JSON, see [app.gameport.core.model.ShimAchievements]) for the Steamworks shim; null to bake none. */

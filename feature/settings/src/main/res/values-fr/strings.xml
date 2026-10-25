@@ -193,6 +193,8 @@
     <string name="help_option_frame_text">Utile quand le jeu démarre mais ne réagit pas aux manettes. Cela ne change rien si le jeu n\'a pas de contrôles pour les manettes du Steam Frame, et un avertissement le dit quand cela a été vu.</string>
     <string name="help_option_open_in_vr_title">Ouvrir le jeu lui-même en VR</string>
     <string name="help_option_open_in_vr_text">Affiché seulement pour un jeu patché pour cela. Automatique ou Désactivé. Utile quand un jeu démarre par un premier écran puis s\'affiche dans une fenêtre plate. Désactivé patche de nouveau le jeu sans cela.</string>
+    <string name="help_option_passthrough_title">Laisser le jeu montrer le monde réel</string>
+    <string name="help_option_passthrough_text">Automatique, Oui ou Non. Pour un jeu dont le réglage de transparence ne fonctionne pas sur cet appareil. Automatique le fait pour les jeux connus pour en avoir besoin. Un changement patche de nouveau le jeu pour qu\'il déclare utiliser la transparence.</string>
     <string name="help_option_ovrplugin_title">Adoucir un jeu qui saccade</string>
     <string name="help_option_ovrplugin_text">Affiché seulement pour un jeu patché pour cela. Automatique ou Désactivé. Utile quand un jeu saccade sans perdre d\'images. Désactivé patche de nouveau le jeu sans cela.</string>
     <string name="help_option_recenter_title">Suivre le recentrage de l\'appareil</string>

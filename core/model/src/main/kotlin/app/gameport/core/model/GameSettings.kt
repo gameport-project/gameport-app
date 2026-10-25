@@ -13,6 +13,27 @@ data class PlayerDefaults(
 /** Whether a game gets the play space that the headset's recentering moves: by itself where the headset has no play area, always, or never. */
 enum class RecenterMode { AUTO, ON, OFF }
 
+/** Whether a game declares that it uses the headset's passthrough: by itself for the games known to need it, always, or never. */
+enum class PassthroughMode { AUTO, ON, OFF }
+
+/**
+ * The games whose VR build leaves out the declaration that lets the headset show the real world behind them, though they have a setting for it (Cubism, since an
+ * update of the game). Steam does not say which games use the passthrough, and nothing the game does at run time tells it apart, so this is a list kept by hand:
+ * it grows as players report a game whose passthrough does not work.
+ */
+object PassthroughGames {
+    private val APP_IDS = setOf(804530)
+
+    fun wanted(appId: Int): Boolean = appId in APP_IDS
+
+    /** Whether the declaration is given to [appId]: the player's choice, or the list when they left it automatic. */
+    fun declared(mode: PassthroughMode, appId: Int): Boolean = when (mode) {
+        PassthroughMode.ON -> true
+        PassthroughMode.OFF -> false
+        PassthroughMode.AUTO -> wanted(appId)
+    }
+}
+
 /** What the player chose for one game. */
 data class GameSettings(
     /** Play seated while the game believes the player stands. */
@@ -33,6 +54,8 @@ data class GameSettings(
      * gives it a stand-in that answers "not initialized"; off keeps it from doing so. A change needs the game to be patched again.
      */
     val ovrPluginStandIn: Boolean = true,
+    /** The game declares that it uses the headset's passthrough, so the headset lets it show the real world behind it. A change needs the game to be patched again. */
+    val passthrough: PassthroughMode = PassthroughMode.AUTO,
 ) {
     val followsDefaults: Boolean get() = heightCm == null
 
