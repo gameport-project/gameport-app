@@ -14,6 +14,9 @@ fun interface AttentionSource {
 
     /** Among them, the games with a patch to apply: they get a wrench, the others an exclamation mark. */
     fun observePatches(): Flow<Set<Int>> = kotlinx.coroutines.flow.flowOf(emptySet())
+
+    /** The games that have a question for the player: they get a blue question mark until it is answered. */
+    fun observeQuestions(): Flow<Set<Int>> = kotlinx.coroutines.flow.flowOf(emptySet())
 }
 
 internal class InstallAttentionSource @Inject constructor(
@@ -22,6 +25,8 @@ internal class InstallAttentionSource @Inject constructor(
     override fun observe(): Flow<Set<Int>> = issues.observeAttention()
 
     override fun observePatches(): Flow<Set<Int>> = issues.observePatchesToApply()
+
+    override fun observeQuestions(): Flow<Set<Int>> = issues.observeQuestions()
 }
 
 @Module

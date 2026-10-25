@@ -25,7 +25,8 @@ sealed interface GameIssue {
 
     /**
      * The game has expansion files and its version was raised by an earlier patch, so its files and its code may disagree: if it does not start, installing it
-     * again from scratch puts them right. A notice, not a problem: it never lights the cover badge.
+     * again from scratch puts them right. A question, not a problem: the player is asked whether the game works (the cover carries a blue mark until they answer),
+     * and the mark and the notice go once they say it does. It never lights the orange badge.
      */
     data object ReinstallMayHelp : GameIssue
 
@@ -41,3 +42,11 @@ sealed interface GameIssue {
     /** The last save sync could not reach Steam ([offline]) or could not send the saves. */
     data class SaveSyncFailed(val offline: Boolean) : GameIssue
 }
+
+/**
+ * True for an issue that is a problem of the game: the orange mark on its cover. The notices, a new version, and the questions put to the player never
+ * are (a question has its own blue mark, and goes away once answered).
+ */
+val GameIssue.needsAttention: Boolean
+    get() = this !is GameIssue.ControllerMappingAvailable && this !is GameIssue.ControllerSilent && this !is GameIssue.UpdateAvailable &&
+        this !is GameIssue.ReinstallMayHelp && this !is GameIssue.ExpansionMayBeMissing

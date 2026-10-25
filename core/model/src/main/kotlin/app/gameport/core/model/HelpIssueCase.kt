@@ -1,7 +1,7 @@
 package app.gameport.core.model
 
-/** How a notice weighs: what needs attention, what only informs, and a new version. */
-enum class IssueTone { ATTENTION, INFO, UPDATE }
+/** How a notice weighs: what needs attention, what only informs, a new version, and a question put to the player. */
+enum class IssueTone { ATTENTION, INFO, UPDATE, QUESTION }
 
 /**
  * Every kind of notice a game's page can show, for the legend in Settings > Help. [of] has no fallback branch: a new [GameIssue] does not build until
@@ -16,7 +16,7 @@ enum class HelpIssueCase(val tone: IssueTone) {
     SAVE_SYNC_FAILED(IssueTone.ATTENTION),
     CONTROLLER_SILENT(IssueTone.INFO),
     CONTROLLER_MAPPING(IssueTone.INFO),
-    REINSTALL(IssueTone.INFO),
+    REINSTALL(IssueTone.QUESTION),
     EXPANSION_UNCHECKED(IssueTone.INFO),
     EXPANSION_MISSING(IssueTone.ATTENTION),
     ;

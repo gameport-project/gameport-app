@@ -183,6 +183,14 @@ class GameViewModel @Inject constructor(
         (uiState.value as? GameUiState.Content)?.game?.let(installer::repair)
     }
 
+    /** The player says the game works: the question about its expansion files, and its blue mark, go. */
+    fun onReinstallWorks() = issuesRepository.answerReinstallWorks(appId)
+
+    /** The player says the game does not work and agreed to start again: it is uninstalled, then installed from scratch. */
+    fun onReinstallFromScratch() {
+        (uiState.value as? GameUiState.Content)?.game?.let(installer::reinstallFromScratch)
+    }
+
     /** Installs the newer build Steam published, over the installed game. */
     fun onUpdate() {
         (uiState.value as? GameUiState.Content)?.game?.let(installer::update)

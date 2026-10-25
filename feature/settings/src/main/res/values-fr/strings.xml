@@ -177,7 +177,7 @@
     <string name="help_notice_sync">La dernière synchronisation des sauvegardes n\'a pas atteint Steam ou a échoué, les dernières sauvegardes ne sont donc peut-être pas sur Steam.</string>
     <string name="help_notice_silent">Le jeu démarre mais ne semble pas réagir aux manettes. Activer la prise en charge des contrôles du Steam Frame peut aider.</string>
     <string name="help_notice_mapping">Le jeu n\'a pas de contrôles pour les manettes de cet appareil, ceux du Steam Frame sont donc émulés et peuvent être remappés.</string>
-    <string name="help_notice_reinstall">Le jeu a des fichiers d\'extension qu\'un ancien patch a nommés d\'après une version augmentée. S\'il ne démarre pas, le désinstaller puis le réinstaller règle cela.</string>
+    <string name="help_notice_reinstall">Un point d\'interrogation bleu : le jeu a des fichiers d\'extension qu\'un ancien patch a nommés d\'après une version augmentée, ce qui peut l\'empêcher de démarrer. La page demande si le jeu fonctionne. S\'il fonctionne, la question disparaît. Sinon, la page propose de le désinstaller puis de le réinstaller.</string>
     <string name="help_buttons_title">Boutons de la page d\'un jeu</string>
     <string name="help_buttons_text">Ils apparaissent à côté du bouton d\'installation une fois le jeu installé.</string>
     <string name="help_button_saves">Sauvegardes. Un point orange indique que celles d\'ici et celles de Steam ne concordent pas.</string>

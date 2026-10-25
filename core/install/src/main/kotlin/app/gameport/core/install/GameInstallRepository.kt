@@ -77,6 +77,7 @@ class GameInstallRepository @Inject constructor(
     private val events: GameEventLog,
     private val launchOptions: app.gameport.core.steam.LaunchOptionsRepository,
     private val gameSettings: app.gameport.core.settings.GameSettingsStore,
+    private val reinstallNotice: app.gameport.core.settings.ReinstallNoticeStore,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val operations = MutableStateFlow<Map<Int, InstallState>>(emptyMap())
@@ -583,19 +584,35 @@ class GameInstallRepository @Inject constructor(
     }
 
     fun uninstall(appId: Int) {
+        scope.launch { uninstallNow(appId) }
+    }
+
+    /** Removes the game and what GamePort keeps for it. False when Android did not remove it (the player declined), and nothing is touched then. */
+    private suspend fun uninstallNow(appId: Int): Boolean {
+        val packageName = installed.all()[appId]
+        if (packageName != null && packages.isInstalled(packageName)) {
+            if (packages.uninstall(packageName) != PackageGateway.Outcome.Success) return false
+        }
+        installed.remove(appId)
+        events.forget(appId)
+        packageName?.let(handoff::clear)
+        packageName?.let { _uninstalled.tryEmit(it) }
+        playHistory.forget(appId)
+        builds.remove(appId)
+        reinstallNotice.forget(appId)
+        downloadDirectory(appId).deleteRecursively()
+        clearState(appId)
+        return true
+    }
+
+    /**
+     * The player said the game does not work and agreed to start again: the game is uninstalled, then installed from scratch with the same extra content as before.
+     * Nothing is installed when the uninstall did not go through.
+     */
+    fun reinstallFromScratch(game: Game) {
         scope.launch {
-            val packageName = installed.all()[appId]
-            if (packageName != null && packages.isInstalled(packageName)) {
-                if (packages.uninstall(packageName) != PackageGateway.Outcome.Success) return@launch
-            }
-            installed.remove(appId)
-            events.forget(appId)
-            packageName?.let(handoff::clear)
-            packageName?.let { _uninstalled.tryEmit(it) }
-            playHistory.forget(appId)
-            builds.remove(appId)
-            downloadDirectory(appId).deleteRecursively()
-            clearState(appId)
+            val dlc = builds.get(game.appId)?.dlc
+            if (uninstallNow(game.appId)) install(game, dlc)
         }
     }
 

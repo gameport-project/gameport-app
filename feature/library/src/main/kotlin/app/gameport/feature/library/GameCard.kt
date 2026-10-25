@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.gameport.core.designsystem.AttentionBadge
 import app.gameport.core.designsystem.PatchBadge
+import app.gameport.core.designsystem.QuestionBadge
 import app.gameport.core.designsystem.UpdateBadge
 import app.gameport.core.designsystem.CompatGlyph
 import app.gameport.core.designsystem.GameImage
@@ -94,6 +95,7 @@ internal fun GameCard(
     onLongClick: (() -> Unit)? = null,
     needsAttention: Boolean = false,
     needsPatch: Boolean = false,
+    hasQuestion: Boolean = false,
     hasUpdate: Boolean = false,
     /** What the players who use this kind of device say of the game, once enough of them did. */
     compat: app.gameport.core.model.CompatLevel? = null,
@@ -186,10 +188,11 @@ internal fun GameCard(
                 }
             }
             Badges(game, Modifier.align(Alignment.TopEnd).padding(8.dp))
-            // Small, so they do not hide the artwork: a wrench for a patch to apply, orange "!" for the rest that needs attention, green for an update.
-            if (needsAttention || hasUpdate) {
+            // Small, so they do not hide the artwork: a wrench for a patch to apply, orange "!" for the rest that needs attention, blue "?" for a question, green for an update.
+            if (needsAttention || hasQuestion || hasUpdate) {
                 Row(Modifier.align(Alignment.TopStart).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (needsPatch) PatchBadge(size = 18.dp) else if (needsAttention) AttentionBadge(size = 18.dp)
+                    if (hasQuestion) QuestionBadge(size = 18.dp)
                     if (hasUpdate) UpdateBadge(size = 18.dp)
                 }
             }

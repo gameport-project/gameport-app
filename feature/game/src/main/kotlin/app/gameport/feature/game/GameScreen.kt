@@ -126,6 +126,7 @@ import app.gameport.core.designsystem.DangerButton
 import app.gameport.core.designsystem.DangerTextButton
 import app.gameport.core.designsystem.DangerTrashButton
 import app.gameport.core.designsystem.AttentionBadge
+import app.gameport.core.designsystem.QuestionBadge
 import app.gameport.core.designsystem.InstallStepper
 import app.gameport.core.designsystem.installStatusText
 import app.gameport.core.model.stage
@@ -138,6 +139,7 @@ import app.gameport.core.designsystem.speedText
 import app.gameport.core.model.DlcContent
 import app.gameport.core.model.Game
 import app.gameport.core.model.GameIssue
+import app.gameport.core.model.needsAttention
 import app.gameport.core.model.DisplaySettings
 import app.gameport.core.model.InstallError
 import app.gameport.core.model.AchievementList
@@ -205,6 +207,8 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onOpenCompat = onOpenCompat,
         onActivateFrame = viewModel::onActivateFrame,
         onRepair = viewModel::onRepair,
+        onReinstallWorks = viewModel::onReinstallWorks,
+        onReinstallFromScratch = viewModel::onReinstallFromScratch,
         achievements = achievements,
         onOpenAchievements = onOpenAchievements,
         artworkHeight = artworkHeight,
@@ -241,6 +245,8 @@ internal fun GameContent(
     onOpenCompat: () -> Unit,
     onActivateFrame: () -> Unit,
     onRepair: () -> Unit = {},
+    onReinstallWorks: () -> Unit = {},
+    onReinstallFromScratch: () -> Unit = {},
     onToggleFavorite: () -> Unit,
     onSetHidden: (Boolean) -> Unit,
     onBack: () -> Unit,
@@ -301,6 +307,8 @@ internal fun GameContent(
                     onOpenCompat = onOpenCompat,
                     onActivateFrame = onActivateFrame,
                     onRepair = onRepair,
+                    onReinstallWorks = onReinstallWorks,
+                    onReinstallFromScratch = onReinstallFromScratch,
                     onToggleFavorite = onToggleFavorite,
                     onSetHidden = onSetHidden,
                     hidden = uiState.hidden,
@@ -365,6 +373,8 @@ private fun GameDetails(
     onOpenCompat: () -> Unit,
     onActivateFrame: () -> Unit,
     onRepair: () -> Unit,
+    onReinstallWorks: () -> Unit = {},
+    onReinstallFromScratch: () -> Unit = {},
     onToggleFavorite: () -> Unit,
     onSetHidden: (Boolean) -> Unit,
     onOpenPermissions: () -> Unit,
@@ -478,12 +488,14 @@ private fun GameDetails(
                             .background(Brush.linearGradient(0f to Color.White.copy(alpha = 0.16f), 0.45f to Color.Transparent)),
                     )
                     if (install is InstallState.Installed) {
-                        // Orange for what needs attention, green when the only news is an update.
-                        val attention = issues.any { it !is GameIssue.ControllerMappingAvailable && it !is GameIssue.ControllerSilent && it !is GameIssue.UpdateAvailable && it !is GameIssue.ReinstallMayHelp && it !is GameIssue.ExpansionMayBeMissing }
+                        // Orange for what needs attention, blue for a question, green when the only news is an update.
+                        val attention = issues.any { it.needsAttention }
+                        val question = GameIssue.ReinstallMayHelp in issues
                         val update = GameIssue.UpdateAvailable in issues
-                        if (attention || update) {
+                        if (attention || question || update) {
                             Row(Modifier.align(Alignment.TopStart).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 if (attention) AttentionBadge(size = 22.dp)
+                                if (question) QuestionBadge(size = 22.dp)
                                 if (update) UpdateBadge(size = 22.dp)
                             }
                         }
@@ -603,6 +615,8 @@ private fun GameDetails(
                         onControllers = onOpenControllers,
                         onActivateFrame = onActivateFrame,
                         onRepair = onRepair,
+                        onReinstallWorks = onReinstallWorks,
+                        onReinstallFromScratch = onReinstallFromScratch,
                         onReport = { reporting = true },
                         onDismissProblem = report.onDismissProblem,
                     ) }
@@ -857,9 +871,21 @@ private fun IssuesPanel(
     onControllers: () -> Unit,
     onActivateFrame: () -> Unit,
     onRepair: () -> Unit,
+    onReinstallWorks: () -> Unit = {},
+    onReinstallFromScratch: () -> Unit = {},
     onReport: () -> Unit,
     onDismissProblem: () -> Unit,
 ) {
+    var confirmingReinstall by remember { mutableStateOf(false) }
+    if (confirmingReinstall) {
+        BackdropDialog(
+            onDismissRequest = { confirmingReinstall = false },
+            title = { Text(stringResource(R.string.reinstall_title)) },
+            text = { Text(stringResource(R.string.reinstall_text)) },
+            confirmButton = { Button(onClick = { confirmingReinstall = false; onReinstallFromScratch() }) { Text(stringResource(R.string.reinstall_confirm)) } },
+            dismissButton = { GlassButton(onClick = { confirmingReinstall = false }) { Text(stringResource(R.string.repair_cancel)) } },
+        )
+    }
     var confirmingRepair by remember { mutableStateOf(false) }
     if (confirmingRepair) {
         BackdropDialog(
@@ -912,7 +938,15 @@ private fun IssuesPanel(
                         secondAction = stringResource(R.string.issue_dismiss),
                         onSecondAction = onDismissProblem,
                     )
-                GameIssue.ReinstallMayHelp -> IssueRow(stringResource(R.string.issue_reinstall_may_help), info = true)
+                GameIssue.ReinstallMayHelp -> IssueRow(
+                    stringResource(R.string.issue_reinstall_may_help),
+                    stringResource(R.string.issue_reinstall_not_working),
+                    { confirmingReinstall = true },
+                    enabled = !busy,
+                    question = true,
+                    secondAction = stringResource(R.string.issue_reinstall_working),
+                    onSecondAction = onReinstallWorks,
+                )
                 is GameIssue.ExpansionMissing -> IssueRow(pluralStringResource(R.plurals.issue_expansion_missing, issue.missing, issue.missing), stringResource(R.string.issue_expansion_unchecked_action), { confirmingRepair = true }, enabled = !busy)
                 GameIssue.ExpansionMayBeMissing -> IssueRow(stringResource(R.string.issue_expansion_unchecked), stringResource(R.string.issue_expansion_unchecked_action), { confirmingRepair = true }, enabled = !busy, info = true)
                 GameIssue.StoragePermissionMissing ->
@@ -943,6 +977,8 @@ private fun IssueRow(
     info: Boolean = false,
     /** A new version: a green arrow instead of the orange warning. */
     update: Boolean = false,
+    /** A question for the player: a blue question mark instead of the orange warning. */
+    question: Boolean = false,
     secondAction: String? = null,
     onSecondAction: () -> Unit = {},
 ) {
@@ -950,6 +986,7 @@ private fun IssueRow(
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             when {
                 info -> Icon(Icons.Filled.SportsEsports, contentDescription = null, tint = Color(0xFF90CAF9))
+                question -> QuestionBadge()
                 update -> UpdateBadge()
                 else -> AttentionBadge()
             }

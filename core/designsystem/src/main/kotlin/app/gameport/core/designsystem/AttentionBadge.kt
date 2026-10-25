@@ -2,6 +2,7 @@ package app.gameport.core.designsystem
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.QuestionMark
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -69,6 +70,22 @@ fun UpdateBadge(modifier: Modifier = Modifier, size: Dp = 28.dp) {
             contentDescription = null,
             tint = Color.White,
             modifier = Modifier.size(size * 0.72f),
+        )
+    }
+}
+
+/** A small blue question mark: the game has a question for the player, who answers it on the game's page. Same size as the other badges. */
+@Composable
+fun QuestionBadge(modifier: Modifier = Modifier, size: Dp = 28.dp) {
+    Box(
+        modifier = modifier.size(size).clip(CircleShape).background(KindBlue),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.material3.Icon(
+            Icons.Filled.QuestionMark,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(size * 0.7f),
         )
     }
 }

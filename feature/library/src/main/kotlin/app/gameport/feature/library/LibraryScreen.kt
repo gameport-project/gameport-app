@@ -416,6 +416,7 @@ private fun Rail(
                         onLongClick = { onMenu(game) },
                         needsAttention = game.appId in state.attention,
                         needsPatch = game.appId in state.patchToApply,
+                        hasQuestion = game.appId in state.questions,
                         hasUpdate = game.appId in state.updatable,
                         compat = state.compat[game.appId],
                         showTitle = display.coverTitles,

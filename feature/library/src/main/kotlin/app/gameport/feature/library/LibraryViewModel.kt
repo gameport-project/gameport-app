@@ -40,6 +40,8 @@ sealed interface LibraryUiState {
         val attention: Set<Int> = emptySet(),
         /** Among them, the games with a patch to apply. */
         val patchToApply: Set<Int> = emptySet(),
+        /** The games that have a question for the player (blue mark), which are not problems. */
+        val questions: Set<Int> = emptySet(),
         /** What the players who use this kind of device say of the games they said enough about. */
         val compat: Map<Int, app.gameport.core.model.CompatLevel> = emptyMap(),
         /** What is shown besides the covers: the artwork behind them, the names, their size. */
@@ -92,8 +94,8 @@ class LibraryViewModel @Inject constructor(
     private val showTabs = headsetDetector.isHeadset()
 
     private val shelf: Flow<LibraryUiState.Content> = combine(
-        combine(repository.observeLibrary(), query, tab, combine(attention.observe(), attention.observePatches()) { all, patches -> all to patches }, combine(appearance.observe(), history.observe(), filters) { shown, played, narrowed -> Triple(shown, played, narrowed) }) { library, query, tab, (outdated, patches), (shown, played, narrowed) ->
-            library.toUiState(query, tab, showTabs).copy(attention = outdated, patchToApply = patches, compat = played.compat).arranged(shown, played, narrowed)
+        combine(repository.observeLibrary(), query, tab, combine(attention.observe(), attention.observePatches(), attention.observeQuestions()) { all, patches, questions -> Triple(all, patches, questions) }, combine(appearance.observe(), history.observe(), filters) { shown, played, narrowed -> Triple(shown, played, narrowed) }) { library, query, tab, (outdated, patches, questions), (shown, played, narrowed) ->
+            library.toUiState(query, tab, showTabs).copy(attention = outdated, patchToApply = patches, questions = questions, compat = played.compat).arranged(shown, played, narrowed)
         },
         combine(
             combine(updates.observe(), updates.observeApp(), updates.observeConnection(), updates.observeIds(), updates.observePatchAll()) { games, app, connection, ids, patchAll -> HeaderInfo(games, app, connection, ids, patchAll) },

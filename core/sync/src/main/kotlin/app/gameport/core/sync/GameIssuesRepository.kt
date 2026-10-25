@@ -6,6 +6,7 @@ import app.gameport.core.install.GameInstallRepository
 import app.gameport.core.install.GameUpdatesRepository
 import app.gameport.core.install.InstalledGames
 import app.gameport.core.model.GameIssue
+import app.gameport.core.model.needsAttention
 import app.gameport.core.settings.ControllerMappingStore
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -30,6 +31,7 @@ class GameIssuesRepository @Inject constructor(
     private val controllers: ControllerMappingStore,
     private val device: DeviceProfile,
     private val reports: ReportStore,
+    private val reinstallNotice: app.gameport.core.settings.ReinstallNoticeStore,
 ) {
     // Permissions are granted outside GamePort, so the screens ask for a re-check when they come back.
     private val recheck = MutableStateFlow(0)
@@ -47,15 +49,17 @@ class GameIssuesRepository @Inject constructor(
                 if (device.isHeadset && mapping.both && mapping.silent) mapping.useFrame else null,
             )
         },
-        combine(reports.suspected, installer.expansionMayBeMissing, installer.expansionMissing) { suspected, unchecked, missing -> Triple(suspected, unchecked, missing) },
-    ) { patchOutdated, conflicts, statuses, (updateAvailable, mappingNoticeSource, silent), (suspected, unchecked, missing) ->
+        combine(reports.suspected, installer.expansionMayBeMissing, installer.expansionMissing, reinstallNotice.answered) { suspected, unchecked, missing, answered ->
+            Others(suspected, unchecked, missing, answered)
+        },
+    ) { patchOutdated, conflicts, statuses, (updateAvailable, mappingNoticeSource, silent), others ->
         // The controller notice is informative: it is listed on the game's page but never lights the cover badge.
-        issuesFor(appId, patchOutdated, conflicts.keys, statuses, updateAvailable, suspected) +
+        issuesFor(appId, patchOutdated, conflicts.keys, statuses, updateAvailable, others.suspected, others.answered) +
             listOfNotNull(
                 mappingNoticeSource?.let { GameIssue.ControllerMappingAvailable(it) },
                 silent?.let { GameIssue.ControllerSilent(activated = it) },
-                GameIssue.ExpansionMayBeMissing.takeIf { appId in unchecked },
-                missing[appId]?.let { GameIssue.ExpansionMissing(it) },
+                GameIssue.ExpansionMayBeMissing.takeIf { appId in others.unchecked },
+                others.missing[appId]?.let { GameIssue.ExpansionMissing(it) },
             )
     }
 
@@ -68,9 +72,17 @@ class GameIssuesRepository @Inject constructor(
         reports.suspected,
     ) { outdated, conflicts, statuses, updatable, suspected ->
         installed.all().keys.filter { appId ->
-            issuesFor(appId, appId in outdated, conflicts.keys, statuses, updateAvailable = false, suspected = suspected).isNotEmpty()
+            issuesFor(appId, appId in outdated, conflicts.keys, statuses, updateAvailable = false, suspected = suspected).any { it.needsAttention }
         }.toSet()
     }
+
+    /** Ids of the installed games that have a question for the player (the blue mark): the game may need installing again, and it was not said that it works. */
+    fun observeQuestions(): Flow<Set<Int>> = combine(reinstallNotice.answered, installer.observeAll()) { answered, _ ->
+        installed.all().filter { (appId, packageName) -> appId !in answered && installer.reinstallMayHelp(packageName) }.keys
+    }
+
+    /** The player says the game works: its question and its blue mark go. */
+    fun answerReinstallWorks(appId: Int) = reinstallNotice.answerWorks(appId)
 
     /** Ids of the games whose patch is older than the current one: the ones the patch button is for. */
     fun observePatchesToApply(): Flow<Set<Int>> = installer.observeOutdatedPatches()
@@ -89,13 +101,14 @@ class GameIssuesRepository @Inject constructor(
         statuses: Map<Int, SyncStatus>,
         updateAvailable: Boolean,
         suspected: Map<String, Suspicion>,
+        reinstallAnswered: Set<Int> = emptySet(),
     ): List<GameIssue> {
         val packageName = installed.all()[appId] ?: return emptyList()
         return buildList {
             if (updateAvailable) add(GameIssue.UpdateAvailable)
             if (patchOutdated) add(GameIssue.PatchOutdated)
             if (installer.shouldExplainStoragePermission(appId)) add(GameIssue.StoragePermissionMissing)
-            if (installer.reinstallMayHelp(packageName)) add(GameIssue.ReinstallMayHelp)
+            if (appId !in reinstallAnswered && installer.reinstallMayHelp(packageName)) add(GameIssue.ReinstallMayHelp)
             if (packageName in conflictPackages) add(GameIssue.SaveConflict)
             suspected[packageName]?.let { add(GameIssue.ProblemSuspected(crash = it == Suspicion.CRASH)) }
             when (statuses[appId]) {
@@ -106,3 +119,11 @@ class GameIssuesRepository @Inject constructor(
         }
     }
 }
+
+/** What the issues of one game are made of besides the patch, the conflicts, the sync and the controllers: kept together for the combine. */
+private class Others(
+    val suspected: Map<String, Suspicion>,
+    val unchecked: Set<Int>,
+    val missing: Map<Int, Int>,
+    val answered: Set<Int>,
+)

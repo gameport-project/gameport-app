@@ -193,7 +193,12 @@
     <string name="issue_problem_short">This game closed almost right away. A report can help find out why.</string>
     <string name="issue_problem_crash">This game seems to have crashed. A report can help find out why.</string>
     <string name="issue_problem_action">Report it</string>
-    <string name="issue_reinstall_may_help">This game has expansion files that an earlier patch named after a raised version. If it does not start, uninstalling it and installing it again fixes that.</string>
+    <string name="issue_reinstall_may_help">This game has expansion files that an earlier patch named after a raised version, which can stop it from starting. Does the game work?</string>
+    <string name="issue_reinstall_working">It works</string>
+    <string name="issue_reinstall_not_working">It does not work</string>
+    <string name="reinstall_title">Uninstall the game and install it again?</string>
+    <string name="reinstall_text">The game is removed from this device, then downloaded and installed again from scratch, which can take a while and use mobile data. Saves that were sent to Steam Cloud come back with it. Other data the game kept on this device is removed.</string>
+    <string name="reinstall_confirm">Uninstall and install again</string>
     <string name="game_hide">Hide the game</string>
     <string name="game_show_again">Show the game again</string>
     <string name="game_hide_title">Hide this game</string>

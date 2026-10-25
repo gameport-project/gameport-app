@@ -177,7 +177,7 @@
     <string name="help_notice_sync">The last save sync did not reach Steam or failed, so the latest saves may not be on Steam.</string>
     <string name="help_notice_silent">The game starts but does not seem to react to the controllers. Turning on support for the Steam Frame\'s controls may help.</string>
     <string name="help_notice_mapping">The game has no controls for the controllers of this device, so the Steam Frame\'s are emulated and can be remapped.</string>
-    <string name="help_notice_reinstall">The game has expansion files that an earlier patch named after a raised version. If it does not start, uninstalling it and installing it again fixes that.</string>
+    <string name="help_notice_reinstall">A blue question mark: the game has expansion files that an earlier patch named after a raised version, which can stop it from starting. The page asks whether the game works. If it does, the question goes away. If it does not, the page offers to uninstall it and install it again.</string>
     <string name="help_buttons_title">Buttons of a game\'s page</string>
     <string name="help_buttons_text">They appear next to the install button once the game is installed.</string>
     <string name="help_button_saves">Saves. An orange dot says the saves here and on Steam do not agree.</string>

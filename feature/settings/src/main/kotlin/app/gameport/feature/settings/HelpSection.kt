@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.gameport.core.designsystem.AttentionBadge
 import app.gameport.core.designsystem.PatchBadge
+import app.gameport.core.designsystem.QuestionBadge
 import app.gameport.core.designsystem.CompatGlyph
 import app.gameport.core.designsystem.CompatOrange
 import app.gameport.core.designsystem.GlassChip
@@ -116,6 +117,7 @@ internal fun HelpSection(onStartComplete: () -> Unit, onStartTour: (TourKind) ->
                     when (case.tone) {
                         IssueTone.ATTENTION -> AttentionBadge(size = 20.dp)
                         IssueTone.UPDATE -> UpdateBadge(size = 20.dp)
+                        IssueTone.QUESTION -> QuestionBadge(size = 20.dp)
                         IssueTone.INFO -> Box(Modifier.size(12.dp).background(KindBlue, CircleShape))
                     }
                 }
