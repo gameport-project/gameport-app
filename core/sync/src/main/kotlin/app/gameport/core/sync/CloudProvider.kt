@@ -174,7 +174,7 @@ class CloudProvider : ContentProvider() {
             // A test: the question is put as if another device played.
             entryPoint.playDecisions().ask(packageName, gameLabel(packageName))
             Bundle().apply { putString(STATUS, "BLOCKED"); putInt("otherApp", 0) }
-        } else when (val outcome = runBlocking { coordinator.authTicket(packageName, extras.getBoolean("takeOver", false)) }) {
+        } else when (val outcome = runBlocking { coordinator.authTicket(packageName, extras.getBoolean("takeOver", false), extras.getString("identity")?.takeIf { it.isNotEmpty() }) }) {
             is CloudSyncCoordinator.TicketOutcome.Given -> Bundle().apply { putByteArray("ticket", outcome.ticket) }
             // Another device plays with the account: at the start of the game the question is put to the player, in front of it.
             is CloudSyncCoordinator.TicketOutcome.Blocked -> if (extras.getBoolean("quiet", false)) {

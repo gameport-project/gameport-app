@@ -447,12 +447,16 @@ public final class GamePortHookProvider extends ContentProvider {
                             Calls.call(context, Owner.cloud(context), "warm", context.getPackageName(), null);
                         }
                         if (request.exists()) {
-                            String id = readLine(request);
+                            // The first line is the id of the request, the second (when there is one) the service a web ticket is for.
+                            String[] lines = readLines(request, 2);
+                            String id = lines[0];
+                            String identity = lines[1];
                             request.delete();
                             long begun = SystemClock.elapsedRealtime();
                             // A ticket asked for while the game runs never opens the question: it was put when the game started.
                             Bundle quiet = new Bundle();
                             quiet.putBoolean("quiet", true);
+                            if (identity != null && !identity.isEmpty()) quiet.putString("identity", identity);
                             Bundle result = Calls.call(context, Owner.cloud(context), "ticket", context.getPackageName(), quiet);
                             byte[] ticket = result == null ? null : result.getByteArray("ticket");
                             if (ticket != null && ticket.length > 0) {
@@ -647,6 +651,18 @@ public final class GamePortHookProvider extends ContentProvider {
         } catch (Throwable t) {
             return null;
         }
+    }
+
+    /** The first [count] lines of the file, null for the ones it does not have. */
+    private static String[] readLines(File file, int count) {
+        String[] lines = new String[count];
+        try {
+            java.io.BufferedReader in = new java.io.BufferedReader(new java.io.FileReader(file));
+            try { for (int i = 0; i < count; i++) lines[i] = in.readLine(); } finally { in.close(); }
+        } catch (Throwable t) {
+            // what could not be read stays null
+        }
+        return lines;
     }
 
     private static void writeAll(File file, byte[] bytes) throws java.io.IOException {

@@ -162,12 +162,12 @@ class SteamSession(private val cellId: Int = 0, private val onAccountRegion: (cu
         }
     }
 
-    /** A session ticket for [appId] that its servers can verify against Steam; see [AuthTicket]. Each one is good for a single use. */
-    suspend fun authSessionTicket(appId: Int): ByteArray {
+    /** A session ticket for [appId] that its servers can verify against Steam; see [AuthTicket]. Each one is good for a single use. With an [identity], the ticket is the one for a web service of that name. */
+    suspend fun authSessionTicket(appId: Int, identity: String? = null): ByteArray {
         markPlaying(appId)
         // Steam refuses a second playing session: the ticket would not be honoured, and it is for the player to say what to do.
         playingElsewhere.value?.takeIf { !it.kicked }?.let { throw PlayingBlockedException(it) }
-        return AuthTicket.build(this, appId)
+        return AuthTicket.build(this, appId, identity)
     }
 
     /**

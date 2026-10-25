@@ -30,4 +30,17 @@ class AuthTicketTest {
         val readOwnership = ByteArray(100).also { buffer.get(it) }
         assertArrayEquals(ownership, readOwnership)
     }
+
+    @Test
+    fun `a ticket for a web service carries its type in the header`() {
+        val ticket = AuthTicket.assemble(ByteArray(20), ByteArray(10), headerNonce = 1, millisSinceLogOn = 0, connectionCount = 0, type = 5)
+        val buffer = ByteBuffer.wrap(ticket).order(ByteOrder.LITTLE_ENDIAN)
+        buffer.position(4 + 20 + 4 + 4)
+        assertEquals(5, buffer.int)
+    }
+
+    @Test
+    fun `Steam is told the service with its own prefix and a terminating zero`() {
+        assertArrayEquals("str:epiconlineservices".toByteArray() + byteArrayOf(0), AuthTicket.serverSecret("epiconlineservices"))
+    }
 }

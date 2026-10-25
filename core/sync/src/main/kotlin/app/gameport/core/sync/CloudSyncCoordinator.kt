@@ -125,9 +125,9 @@ class CloudSyncCoordinator @Inject constructor(
 
     /**
      * A Steam session ticket for the game, made with the signed-in account. The game's own servers verify it (login to their online services).
-     * With [takeOver] the playing session is first taken from the other device, as Steam's client does when the player chooses to play here.
+     * With [takeOver] the playing session is first taken from the other device, as Steam's client does when the player chooses to play here. With an [identity] the ticket is the one for a web service of that name.
      */
-    suspend fun authTicket(packageName: String, takeOver: Boolean = false): TicketOutcome {
+    suspend fun authTicket(packageName: String, takeOver: Boolean = false, identity: String? = null): TicketOutcome {
         val appId = installed.all().entries.firstOrNull { it.value == packageName }?.key ?: return TicketOutcome.None
         // Taking the playing session is the player's wish: the connection is opened even when the account was just taken by another device.
         runCatching { if (takeOver) auth.resume() else auth.restoreSession() }
@@ -138,7 +138,7 @@ class CloudSyncCoordinator @Inject constructor(
             events.note(appId, "the playing session was taken from the other device: ${if (taken) "done" else "Steam still says another one plays"}")
         }
         return try {
-            TicketOutcome.Given(session.authSessionTicket(appId)).also { events.note(appId, "Steam ticket given to the game") }
+            TicketOutcome.Given(session.authSessionTicket(appId, identity)).also { events.note(appId, "Steam ticket given to the game") }
         } catch (blocked: app.gameport.core.steam.session.PlayingBlockedException) {
             events.note(appId, "no Steam ticket: Steam says another device plays (app ${blocked.other.appId})")
             TicketOutcome.Blocked(blocked.other.appId)

@@ -93,6 +93,7 @@ internal class GameConnectTokens : ClientMsgHandler() {
             EMsg.ClientAuthListAck -> {
                 val ack = ClientMsgProtobuf<CMsgClientAuthListAck.Builder>(CMsgClientAuthListAck::class.java, packetMsg)
                 authSequenceFromServer = ack.body.messageSequence
+                ack.body.ticketCrcList.forEach { acks.remove(it)?.countDown() }
                 Log.i(TAG, "Steam acknowledged the ticket list (sequence ${ack.body.messageSequence}, ${ack.body.ticketCrcCount} ticket(s))")
             }
             EMsg.ClientTicketAuthComplete -> {
@@ -104,6 +105,15 @@ internal class GameConnectTokens : ClientMsgHandler() {
     }
 
     val available: Int get() = tokens.size
+
+    private val acks = java.util.concurrent.ConcurrentHashMap<Int, java.util.concurrent.CountDownLatch>()
+
+    /** Called before a ticket list is sent: the latch opens when Steam's acknowledgement names the ticket with this CRC. */
+    fun expectAck(crc: Int): java.util.concurrent.CountDownLatch = java.util.concurrent.CountDownLatch(1).also { acks[crc] = it }
+
+    fun forgetAck(crc: Int) {
+        acks.remove(crc)
+    }
 
     /** The oldest token, waiting up to [timeoutMs] for Steam to send one. */
     fun take(timeoutMs: Long): ByteArray? = tokens.pollFirst(timeoutMs, TimeUnit.MILLISECONDS)
@@ -117,10 +127,17 @@ internal class GameConnectTokens : ClientMsgHandler() {
  */
 internal object AuthTicket {
     private const val TOKEN_WAIT_MS = 10_000L
+    private const val ACK_WAIT_MS = 5_000L
     private const val SESSION_HEADER_SIZE = 24
+    private const val SESSION_TYPE = 2
+    private const val WEB_API_TYPE = 5
     private val nonce = java.security.SecureRandom()
 
-    suspend fun build(session: SteamSession, appId: Int): ByteArray = withContext(Dispatchers.IO) {
+    /**
+     * The ticket for [appId]. With an [identity] it is the one `GetAuthTicketForWebApi` gives: the same pieces with another type in the
+     * header (the Steam client gives the same length: the 2560 bytes of the callback are only its buffer), and Steam is told which service it is meant for, so that service can ask Steam to check it.
+     */
+    suspend fun build(session: SteamSession, appId: Int, identity: String? = null): ByteArray = withContext(Dispatchers.IO) {
         val ownership = session.apps.getAppOwnershipTicket(appId).await()
         check(ownership.result == EResult.OK && ownership.ticket.isNotEmpty()) { "Steam gave no ownership ticket for $appId (${ownership.result})" }
         val token = checkNotNull(session.connectTokens.take(TOKEN_WAIT_MS)) { "Steam sent no game connect token" }
@@ -130,18 +147,30 @@ internal object AuthTicket {
             headerNonce = session.connectTokens.clientInstanceId.takeIf { it != 0L } ?: nonce.nextLong(),
             millisSinceLogOn = (System.currentTimeMillis() - session.loggedOnAtMillis).coerceAtLeast(0),
             connectionCount = session.nextConnectionCount(),
+            type = if (identity == null) SESSION_TYPE else WEB_API_TYPE,
         )
-        activate(session, appId, ticket)
-        ticket
+        // Steam is told of the token and the header only, as JavaSteam and SteamKit do for both kinds of ticket: it looks a ticket up by the CRC of those
+        // bytes, so a game's server asking Steam to check the ticket finds it.
+        val declared = ticket.copyOf(4 + token.size + 4 + SESSION_HEADER_SIZE)
+        if (identity == null) {
+            activate(session, appId, ticket, declared, serverSecret = null)
+            ticket
+        } else {
+            activate(session, appId, ticket, declared, serverSecret(identity))
+            ticket
+        }
     }
+
+    /** What Steam keeps next to a web ticket to know its service: the identity with Steam's own prefix and a terminating zero. */
+    internal fun serverSecret(identity: String): ByteArray = "str:$identity\u0000".toByteArray(Charsets.UTF_8)
 
     /**
      * Tells Steam the ticket exists, as the Steam client does when it hands one to a game: a game's
      * server asks Steam to check the ticket, and Steam only knows the ones that were declared.
      */
-    private fun activate(session: SteamSession, appId: Int, ticket: ByteArray) {
+    private fun activate(session: SteamSession, appId: Int, ticket: ByteArray, declared: ByteArray, serverSecret: ByteArray?) {
         val steamId = session.client.steamID?.convertToUInt64() ?: return
-        val crc = CRC32().apply { update(ticket) }.value.toInt()
+        val crc = CRC32().apply { update(declared) }.value.toInt()
         val message = ClientMsgProtobuf<CMsgClientAuthList.Builder>(CMsgClientAuthList::class.java, EMsg.ClientAuthList)
         message.body.setTokensLeft(session.connectTokens.available)
         message.body.setLastRequestSeq(session.authSequence)
@@ -153,20 +182,27 @@ internal object AuthTicket {
                 .setGameid(appId.toLong())
                 .setHSteamPipe(session.pipeHandle)
                 .setTicketCrc(crc)
-                .setTicket(ByteString.copyFrom(ticket)),
+                .setTicket(ByteString.copyFrom(declared))
+                .also { if (serverSecret != null) it.setServerSecret(ByteString.copyFrom(serverSecret)) },
         )
         message.body.addAppIds(appId)
         message.body.setMessageSequence(session.nextAuthSequence())
+        // A game hands the ticket to its server at once, and the server asks Steam: the ticket is given back only when Steam has taken the list,
+        // as JavaSteam and SteamKit do. Without the acknowledgement it goes on after a while, as the ticket may still be honoured.
+        val acknowledged = session.connectTokens.expectAck(crc)
         session.client.send(message)
-        Log.i(TAG, "declared a session ticket for $appId to Steam (crc $crc, ${ticket.size} bytes)")
+        val answered = acknowledged.await(ACK_WAIT_MS, TimeUnit.MILLISECONDS)
+        if (!answered) session.connectTokens.forgetAck(crc)
+        Log.i(TAG, "Steam ${if (answered) "took" else "did not acknowledge"} the ticket list for $appId")
+        Log.i(TAG, "declared a session ticket for $appId to Steam (crc $crc, ${declared.size} bytes${if (serverSecret != null) ", for a web service" else ""})")
     }
 
-    internal fun assemble(token: ByteArray, ownershipTicket: ByteArray, headerNonce: Long, millisSinceLogOn: Long, connectionCount: Int): ByteArray {
+    internal fun assemble(token: ByteArray, ownershipTicket: ByteArray, headerNonce: Long, millisSinceLogOn: Long, connectionCount: Int, type: Int = SESSION_TYPE): ByteArray {
         val buffer = ByteBuffer.allocate(4 + token.size + 4 + SESSION_HEADER_SIZE + 4 + ownershipTicket.size).order(ByteOrder.LITTLE_ENDIAN)
         buffer.putInt(token.size).put(token)
         buffer.putInt(SESSION_HEADER_SIZE)
         buffer.putInt(1) // constants the Steam client writes here
-        buffer.putInt(2)
+        buffer.putInt(type)
         // 8 bytes the Steam client fills with the connection's client instance id (the real tickets we compared vary per session).
         buffer.putLong(headerNonce)
         buffer.putInt(millisSinceLogOn.toInt())
