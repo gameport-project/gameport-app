@@ -3,6 +3,8 @@ package app.gameport.core.steam.session
 import app.gameport.core.model.Artwork
 import kotlinx.coroutines.flow.flow
 import android.util.Log
+import app.gameport.core.model.AgePolicy
+import app.gameport.core.model.AndroidApp
 import app.gameport.core.model.AndroidBuild
 import app.gameport.core.model.AppKind
 import app.gameport.core.model.AndroidDepot
@@ -160,6 +162,7 @@ internal fun libraryOf(shown: Collection<CachedGame>, owned: Set<Int>, visible: 
             },
             artwork = Artwork(game.capsule, game.hero, game.header),
             parentAppId = game.parent,
+            isAdult = game.adult,
             androidBuild = AndroidBuild(
                 packageName = null,
                 isVr = game.isVr,
@@ -207,6 +210,7 @@ private fun KeyValue.toAndroidGame(appId: Int): CachedGame? {
         appId = appId,
         name = common["name"].value ?: return null,
         isVr = isVr(),
+        adult = isAdult(),
         depots = depots,
         saveRules = SaveRulesParser.parse(this["ufs"]),
         kind = kind,
@@ -223,6 +227,14 @@ private fun KeyValue.isVr(): Boolean {
     val categories = common["category"].children.mapNotNull { it.name }
     val tags = common["store_tags"].children.map { it.asInteger(-1) }
     return "category_53" in categories || "category_54" in categories || VR_TAG in tags
+}
+
+// Adult content: the store tags for nudity and sexual content, an age of 18 or more, or a content descriptor for sexual content (3, 4).
+private fun KeyValue.isAdult(): Boolean {
+    val common = this["common"]
+    val tags = common["store_tags"].children.map { it.asInteger(-1) }
+    val descriptors = common["content_descriptors"].children.map { it.asInteger(-1) }
+    return tags.any { it in AndroidApp.ADULT_TAGS } || common["required_age"].asInteger(0) >= AgePolicy.ADULT_AGE || descriptors.any { it == 3 || it == 4 }
 }
 
 /** The Steam app types listed in the library. */

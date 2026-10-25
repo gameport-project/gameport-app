@@ -93,6 +93,7 @@ private fun GamePortContent(viewModel: AppViewModel) {
         }
     }
 
+    if (signedIn) app.gameport.feature.settings.AgeAsk()
     val targets = remember { TourTargets() }
     CompositionLocalProvider(LocalTourTargets provides targets, app.gameport.core.designsystem.LocalTourStarter provides { kind -> viewModel.tour.start(kind) }) {
     NavHost(navController = navController, startDestination = AuthRoute) {

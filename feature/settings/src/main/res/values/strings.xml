@@ -197,6 +197,14 @@
     <string name="help_option_mapping_text">For a game without controls for this device\'s controllers, each button of the Steam Frame\'s controllers can be moved onto another button.</string>
     <string name="help_option_launch_title">Launch arguments</string>
     <string name="help_option_launch_text">The arguments Steam lists for starting a game. A plain switch for VR is picked at first, and some games stay on a black screen without it. The others are only offered. Any of them can be picked or not, and a game that does not know an argument ignores it.</string>
+    <string name="age_title">Adult games</string>
+    <string name="age_text">Some games are for adults only. This answer decides whether they are shown. It stays on this device and is sent nowhere. Without a yes, they stay hidden everywhere in the app.</string>
+    <string name="age_yes">I am %1$d or older</string>
+    <string name="age_no">No</string>
+    <string name="settings_age">Show adult games (%1$d or older)</string>
+    <string name="settings_age_description">Off: adult games are hidden everywhere in the app. The answer stays on this device.</string>
+    <string name="help_age_text">Games Steam files as adult content (nudity, sexual content, an age of %1$d or more) are shown only after a yes to the question asked once. Otherwise they are hidden from the library, the store (and its adult filter), the new Android versions, the downloads and the compatibility page. The answer stays on this device and can be changed in Settings > Account.</string>
+    <string name="help_age_title">Adult games</string>
     <string name="help_ask_title">Questions and bugs</string>
     <string name="help_ask_text">A problem with a game is best sent with the report button of its page. For everything else, the project\'s Discord is open to anyone.</string>
     <string name="help_discord">Join the Discord</string>

@@ -48,6 +48,7 @@ class SettingsViewModel @Inject constructor(
     private val updater: AppUpdater,
     private val patching: app.gameport.core.sync.PatchAllCoordinator,
     private val library: SteamLibraryRepository,
+    private val adultApps: app.gameport.core.settings.AdultApps,
     private val history: PlayHistoryStore,
     private val incompatible: app.gameport.core.settings.IncompatibleGames,
     private val verdicts: app.gameport.core.settings.GameVerdicts,

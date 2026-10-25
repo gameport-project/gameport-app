@@ -197,6 +197,14 @@
     <string name="help_option_mapping_text">Pour un jeu sans contrôles pour les manettes de cet appareil, chaque bouton des manettes du Steam Frame peut être déplacé sur un autre bouton.</string>
     <string name="help_option_launch_title">Arguments de lancement</string>
     <string name="help_option_launch_text">Les arguments que Steam liste pour lancer un jeu. Un simple interrupteur VR est choisi au départ, et certains jeux restent sur un écran noir sans lui. Les autres sont seulement proposés. Chacun peut être choisi ou non, et un jeu qui ne connaît pas un argument l\'ignore.</string>
+    <string name="age_title">Jeux pour adultes</string>
+    <string name="age_text">Certains jeux sont réservés aux adultes. Cette réponse décide s\'ils sont affichés. Elle reste sur cet appareil et n\'est envoyée nulle part. Sans un oui, ils restent masqués partout dans l\'application.</string>
+    <string name="age_yes">J\'ai %1$d ans ou plus</string>
+    <string name="age_no">Non</string>
+    <string name="settings_age">Afficher les jeux pour adultes (%1$d ans ou plus)</string>
+    <string name="settings_age_description">Désactivé : les jeux pour adultes sont masqués partout dans l\'application. La réponse reste sur cet appareil.</string>
+    <string name="help_age_text">Les jeux que Steam classe en contenu adulte (nudité, contenu sexuel, âge de %1$d ans ou plus) ne sont affichés qu\'après un oui à la question posée une fois. Sinon, ils sont masqués de la bibliothèque, du magasin (et de son filtre adulte), des nouvelles versions Android, des téléchargements et de la page de compatibilité. La réponse reste sur cet appareil et se change dans Réglages > Compte.</string>
+    <string name="help_age_title">Jeux pour adultes</string>
     <string name="help_ask_title">Questions et bugs</string>
     <string name="help_ask_text">Un problème avec un jeu s\'envoie de préférence avec le bouton de signalement de sa page. Pour tout le reste, le Discord du projet est ouvert à tous.</string>
     <string name="help_discord">Rejoindre le Discord</string>

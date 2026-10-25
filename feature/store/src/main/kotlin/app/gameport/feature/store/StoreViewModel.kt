@@ -55,6 +55,8 @@ sealed interface StoreUiState {
         val kept: Boolean,
         /** False on a device without VR, which lists flat games only. */
         val vrDevice: Boolean,
+        /** False when the player did not say they are an adult: the adult filter is not offered, since no adult game is listed. */
+        val adultFilter: Boolean = true,
         /** The width of a cover, the one the player set for the home. */
         val coverWidth: Int = CoverSize.SMALL.dp,
         /** What the players of this kind of device say of the games they were enough to try. */
@@ -91,6 +93,7 @@ class StoreViewModel @Inject constructor(
     private val priceRepository: PriceRepository,
     library: SteamLibraryRepository,
     device: DeviceProfile,
+    private val age: app.gameport.core.settings.AgeStore,
 ) : ViewModel() {
     private val language = CatalogLanguages.of(Locale.getDefault())
     private val query = MutableStateFlow("")
@@ -122,7 +125,9 @@ class StoreViewModel @Inject constructor(
     ) { listed, owned, nameOf, levelsAndPrices, shown ->
         val (levels, prices) = levelsAndPrices
         val text = shown[0] as String
-        val chosen = shown[1] as StoreFilters
+        // A filter on adult content kept from before is ignored while the player may not see adult games: there are none to filter.
+        val canSeeAdult = age.canSeeAdult.value
+        val chosen = (shown[1] as StoreFilters).let { picked -> if (canSeeAdult) picked else picked.copy(quick = picked.quick - StoreFilter.ADULT - StoreFilter.NOT_ADULT) }
         val keptNow = shown[2] as StoreFilters?
         val mode = shown[3] as StoreViewMode
         @Suppress("UNCHECKED_CAST")
@@ -140,6 +145,7 @@ class StoreViewModel @Inject constructor(
             filters = chosen,
             kept = keptNow != null && keptNow == chosen,
             vrDevice = device.isHeadset,
+            adultFilter = canSeeAdult,
             viewMode = mode,
             listColumns = columns,
             sort = order,

@@ -78,6 +78,8 @@ data class Game(
     val artwork: Artwork = Artwork(),
     /** For a demo or a playtest, the full game: its artwork stands in when the app has none of its own. */
     val parentAppId: Int? = null,
+    /** Steam files the game as adult content: nudity, sexual content or an age of 18 or more. Hidden from anyone who is not an adult (see [AgePolicy]). */
+    val isAdult: Boolean = false,
 ) {
     /** Portrait capsule, used in grids. */
     val capsuleUrl: String get() = artwork.capsule?.let { SteamImages.asset(appId, it) } ?: SteamImages.asset(appId, "library_600x900.jpg")

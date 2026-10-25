@@ -30,6 +30,8 @@ data class CachedGame(
     val appId: Int,
     val name: String,
     val isVr: Boolean,
+    /** Steam files the game as adult content. */
+    val adult: Boolean = false,
     val depots: List<CachedDepot>,
     val saveRules: List<CachedSaveRule> = emptyList(),
     /** `game`, `demo` or `beta`: the app type Steam gives it. */
@@ -66,7 +68,7 @@ interface LibraryCacheStore {
 }
 
 /** Version 4 adds the save rules used for the cloud sync, version 6 the build id of each depot, version 8 the artwork names and the parent app. */
-const val CACHE_VERSION = 8
+const val CACHE_VERSION = 9
 
 @Singleton
 class FileLibraryCacheStore @Inject constructor(

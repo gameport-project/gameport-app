@@ -9,4 +9,5 @@ android {
 dependencies {
     implementation(project(":core:device"))
     implementation(project(":core:sync"))
+    implementation(project(":core:settings"))
 }

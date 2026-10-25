@@ -288,6 +288,7 @@ private fun AccountSection(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     accountName?.let { Text(stringResource(R.string.settings_signed_in_as, it), style = MaterialTheme.typography.titleMedium) }
+    AgeBlock()
     Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(stringResource(R.string.settings_offline), style = MaterialTheme.typography.titleMedium)
@@ -514,5 +515,18 @@ private fun CategoryItem(entry: Category, selected: Boolean, compact: Boolean, m
             modifier = Modifier.padding(if (compact) PaddingValues(horizontal = 16.dp, vertical = 10.dp) else PaddingValues(16.dp)),
             style = MaterialTheme.typography.titleMedium,
         )
+    }
+}
+
+/** Whether adult games are shown: the answer to the question asked once, which can be changed here at any time. */
+@Composable
+private fun AgeBlock(viewModel: AgeViewModel = androidx.hilt.navigation.compose.hiltViewModel()) {
+    val canSee by viewModel.canSeeAdult.collectAsStateWithLifecycle()
+    Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.settings_age, app.gameport.core.model.AgePolicy.ADULT_AGE), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_age_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = canSee, onCheckedChange = viewModel::onAnswer)
     }
 }

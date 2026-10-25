@@ -2,6 +2,7 @@ package app.gameport.core.sync
 
 import android.content.Context
 import app.gameport.core.model.AndroidCatalog
+import app.gameport.core.model.visibleTo
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.net.HttpURLConnection
@@ -119,28 +120,41 @@ class AndroidCatalogRepository internal constructor(
     folder: File,
     private val snapshot: () -> String?,
     transport: CatalogTransport,
+    /** Whether adult apps may be shown (see AgePolicy): when it is false they are left out of what this repository gives, whoever asks. */
+    private val canSeeAdult: kotlinx.coroutines.flow.StateFlow<Boolean> = MutableStateFlow(true),
+    private val adult: app.gameport.core.settings.AdultApps? = null,
     now: () -> Long = System::currentTimeMillis,
 ) {
     @Inject
-    constructor(@ApplicationContext context: Context) : this(
+    constructor(@ApplicationContext context: Context, age: app.gameport.core.settings.AgeStore, adult: app.gameport.core.settings.AdultApps) : this(
         folder = context.filesDir,
         snapshot = { runCatching { context.assets.open(SNAPSHOT).bufferedReader().use { it.readText() } }.getOrNull() },
         transport = HttpCatalogTransport(),
+        canSeeAdult = age.canSeeAdult,
+        adult = adult,
     )
 
     private val kept = KeptFile(folder, "android-catalog.json", "v1/catalog.json", transport, now, REFRESH_MS)
     private val lock = Mutex()
     private val catalog = MutableStateFlow(AndroidCatalog.parse(kept.read()) ?: AndroidCatalog.parse(snapshot()))
 
-    /** The catalog, or null if neither a kept copy nor the shipped one can be read. */
-    fun observe(): Flow<AndroidCatalog?> = catalog.asStateFlow()
+    init {
+        learnAdult(catalog.value)
+    }
 
-    val current: AndroidCatalog? get() = catalog.value
+    private fun learnAdult(read: AndroidCatalog?) {
+        read?.let { adult?.learn(it.apps.filter { app -> app.isAdult }.map { app -> app.appid }) }
+    }
+
+    /** The catalog, or null if neither a kept copy nor the shipped one can be read. */
+    fun observe(): Flow<AndroidCatalog?> = kotlinx.coroutines.flow.combine(catalog, canSeeAdult) { kept, ok -> kept?.visibleTo(ok) }
+
+    val current: AndroidCatalog? get() = catalog.value?.visibleTo(canSeeAdult.value)
 
     /** Asks for a newer file when the one kept is old. Safe to call whenever a screen that needs the catalog opens. */
     suspend fun refreshIfStale() {
         lock.withLock {
-            kept.refreshIfStale { AndroidCatalog.parse(it) != null }?.let { catalog.value = AndroidCatalog.parse(it) }
+            kept.refreshIfStale { AndroidCatalog.parse(it) != null }?.let { catalog.value = AndroidCatalog.parse(it); learnAdult(catalog.value) }
         }
     }
 

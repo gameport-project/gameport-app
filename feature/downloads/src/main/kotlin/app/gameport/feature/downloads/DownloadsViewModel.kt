@@ -37,6 +37,7 @@ class DownloadsViewModel @Inject constructor(
     private val installer: GameInstallRepository,
     private val updatesRepository: GameUpdatesRepository,
     settings: UserSettings,
+    private val adult: app.gameport.core.settings.AdultApps,
 ) : ViewModel() {
     val speedUnit: StateFlow<SpeedUnit> = settings.speedUnit
 
@@ -45,9 +46,10 @@ class DownloadsViewModel @Inject constructor(
         .map { list -> list.map { it.appId }.toSet() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptySet())
 
-    val entries: StateFlow<List<DownloadEntry>> = combine(library.observeLibrary(), installer.observeAll(), updatable) { lib, states, withUpdate ->
+    val entries: StateFlow<List<DownloadEntry>> = combine(library.observeLibrary(), installer.observeAll(), updatable, adult.hidden) { lib, states, withUpdate, leftOut ->
         val games = lib.games.associateBy { it.appId }
-        states.map { (appId, state) -> DownloadEntry(appId, games[appId], state, installer.installedAt(appId)) }.sortedWith(downloadsOrder(withUpdate))
+        // An adult game the player may not see is not listed, not even by its number while its name is looked for.
+        states.filterKeys { it !in leftOut }.map { (appId, state) -> DownloadEntry(appId, games[appId], state, installer.installedAt(appId)) }.sortedWith(downloadsOrder(withUpdate))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     init {

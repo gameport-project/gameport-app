@@ -109,4 +109,15 @@ class AndroidCatalogRepositoryTest {
         repository.refreshIfStale()
         assertEquals(2, place.asked.size)
     }
+
+    @Test
+    fun `adult apps are left out unless the player may see them`() {
+        val text = """{"v":1,"count":2,"apps":[{"appid":1,"name":"Adult","tags":[6650]},{"appid":2,"name":"Other"}]}"""
+        val canSee = kotlinx.coroutines.flow.MutableStateFlow(false)
+        val repo = AndroidCatalogRepository(File(temp.root, "adult").also { it.mkdirs() }, { text }, Place(CatalogAnswer.Unavailable), canSee) { clock }
+        assertEquals(listOf("Other"), runBlocking { repo.observe().first()?.apps?.map { it.name } })
+        assertEquals(listOf("Other"), repo.current?.apps?.map { it.name })
+        canSee.value = true
+        assertEquals(listOf("Adult", "Other"), runBlocking { repo.observe().first()?.apps?.map { it.name } })
+    }
 }

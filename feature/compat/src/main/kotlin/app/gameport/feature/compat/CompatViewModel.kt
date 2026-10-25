@@ -58,15 +58,22 @@ class CompatViewModel @Inject constructor(
     library: SteamLibraryRepository,
     private val appNames: AppNameRepository,
     device: DeviceProfile,
+    adult: app.gameport.core.settings.AdultApps,
+    // Asked for so that the catalog is read, and the adult apps in it known, before the page lists anything.
+    @Suppress("UNUSED_PARAMETER") catalog: app.gameport.core.sync.AndroidCatalogRepository,
 ) : ViewModel() {
+    private val hidden = adult.hidden
     private val query = MutableStateFlow("")
     private val filter = MutableStateFlow(CompatFilter.ALL)
     private val libraryNames = library.observeLibrary()
 
-    val uiState: StateFlow<CompatUiState> = combine(compat.observeSummary(), libraryNames, appNames.names, query, filter) { summary, lib, steamNames, text, chosen ->
+    /** The library, with the app ids that are left out of every list. */
+    private val libraryAndHidden = combine(libraryNames, hidden) { lib, leftOut -> lib to leftOut }
+
+    val uiState: StateFlow<CompatUiState> = combine(compat.observeSummary(), libraryAndHidden, appNames.names, query, filter) { summary, (lib, leftOut), steamNames, text, chosen ->
         if (summary == null) return@combine CompatUiState.Unavailable
         val needle = text.trim()
-        val shown = entries(summary.games, lib.games.associate { it.appId to it.name }, steamNames)
+        val shown = entries(summary.games.filter { it.appId !in leftOut }, lib.games.associate { it.appId to it.name }, steamNames)
             .filter { needle.isEmpty() || it.name?.contains(needle, ignoreCase = true) == true || it.counts.appId.toString().contains(needle) }
             .filter { matches(it, chosen, device.kind) }
             // The most reported games first, then by name; a game whose name is not known goes after the ones that have one.
@@ -78,9 +85,9 @@ class CompatViewModel @Inject constructor(
         // Opening the page asks the relay again when what is kept is old, then Steam for the names of the games the account does not have.
         viewModelScope.launch { compat.refreshIfStale() }
         viewModelScope.launch {
-            combine(compat.observeSummary().filterNotNull(), libraryNames.filter { !it.isScanning }) { summary, lib ->
+            combine(compat.observeSummary().filterNotNull(), libraryNames.filter { !it.isScanning }, hidden) { summary, lib, leftOut ->
                 val owned = lib.games.map { it.appId }.toSet()
-                summary.games.map { it.appId }.filter { it !in owned }
+                summary.games.map { it.appId }.filter { it !in owned && it !in leftOut }
             }.collect { appNames.resolve(it) }
         }
     }

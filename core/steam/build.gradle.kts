@@ -10,6 +10,7 @@ android {
 
 dependencies {
     api(project(":core:model"))
+    implementation(project(":core:settings"))
     api(libs.kotlinx.coroutines.core)
     implementation(libs.javasteam)
     // JavaSteam only brings OkHttp at run time; the cloud transfers use it directly.

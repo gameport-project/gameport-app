@@ -677,7 +677,7 @@ private fun FilterPanel(open: Boolean, state: StoreUiState.Content, viewModel: S
                 textStyle = MaterialTheme.typography.labelMedium,
             )
         }
-        PanelGroup(stringResource(R.string.store_group_adult)) {
+        if (state.adultFilter) PanelGroup(stringResource(R.string.store_group_adult)) {
             val adult = setOf(StoreFilter.ADULT, StoreFilter.NOT_ADULT)
             PillTabs(
                 labels = listOf(stringResource(R.string.store_all), stringResource(R.string.store_adult_only), stringResource(R.string.store_adult_hidden)),
