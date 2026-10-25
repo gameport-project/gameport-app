@@ -47,7 +47,8 @@ fun GameCompatScreen(onBack: () -> Unit, viewModel: GameCompatViewModel = hiltVi
     val stageFallback by viewModel.stageFallback.collectAsStateWithLifecycle()
     val gameName by viewModel.gameName.collectAsStateWithLifecycle()
     val showOpenInVr by viewModel.showOpenInVr.collectAsStateWithLifecycle()
-    GameCompatContent(mapping, settings, stageFallback, gameName, onBack, viewModel::onUseFrameChanged, viewModel::onRecenterChosen, showOpenInVr, viewModel::onOpenInVrChosen)
+    val showOvrPluginStandIn by viewModel.showOvrPluginStandIn.collectAsStateWithLifecycle()
+    GameCompatContent(mapping, settings, stageFallback, gameName, onBack, viewModel::onUseFrameChanged, viewModel::onRecenterChosen, showOpenInVr, viewModel::onOpenInVrChosen, showOvrPluginStandIn, viewModel::onOvrPluginStandInChosen)
 }
 
 /** The page of the options, from what it shows: the screen feeds it from the game, the tour of the page feeds it made-up values. */
@@ -62,6 +63,8 @@ internal fun GameCompatContent(
     onRecenterChosen: (RecenterMode) -> Unit,
     showOpenInVr: Boolean = false,
     onOpenInVrChosen: (Boolean) -> Unit = {},
+    showOvrPluginStandIn: Boolean = false,
+    onOvrPluginStandInChosen: (Boolean) -> Unit = {},
 ) {
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp)) {
@@ -94,6 +97,13 @@ internal fun GameCompatContent(
                     labels = listOf(R.string.gamecompat_mode_auto, R.string.gamecompat_mode_off).map { stringResource(it) },
                     selected = if (settings.openInVr) 0 else 1,
                     onSelect = { onOpenInVrChosen(it == 0) },
+                )
+                if (showOvrPluginStandIn) ChoiceBox(
+                    title = stringResource(R.string.gamecompat_ovrplugin),
+                    legend = stringResource(R.string.gamecompat_ovrplugin_legend),
+                    labels = listOf(R.string.gamecompat_mode_auto, R.string.gamecompat_mode_off).map { stringResource(it) },
+                    selected = if (settings.ovrPluginStandIn) 0 else 1,
+                    onSelect = { onOvrPluginStandInChosen(it == 0) },
                 )
             }
         }

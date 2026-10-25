@@ -22,6 +22,8 @@ data class PatchContext(
     val keepVersionCode: Boolean = false,
     /** The player did not turn off the VR entry of the game's own activity ([app.gameport.core.patch.patches.VrGameActivityPatch]). */
     val vrGameActivity: Boolean = true,
+    /** The player did not turn off the stand-in for Meta's OVRPlugin ([app.gameport.core.patch.patches.OvrPluginStandInPatch]). */
+    val ovrPluginStandIn: Boolean = true,
     /** The patch version to record in the game ([PatchVersioning.current]). */
     val patchVersion: Int = PatchVersioning.GENERATION * 1_000,
     /** The game's achievements (JSON, see [app.gameport.core.model.ShimAchievements]) for the Steamworks shim; null to bake none. */
@@ -66,6 +68,9 @@ class PatchSession(private val apk: ApkModule, val existingHookDex: String? = nu
             refresh()
         }.bytes
     }
+
+    /** Whether the APK holds a file at [path]. */
+    fun hasFile(path: String): Boolean = apk.zipEntryMap.getInputSource(path) != null
 
     /** A file of the game as it is in the APK, or null when there is none. */
     fun readFile(path: String): ByteArray? =
@@ -123,4 +128,11 @@ fun interface BinarySource {
 }
 
 /** The binaries a patch may inject. */
-class PatchAssets(val shim: BinarySource, val hookDex: BinarySource, val xrLayer: BinarySource? = null, val xrLoader: BinarySource? = null)
+class PatchAssets(
+    val shim: BinarySource,
+    val hookDex: BinarySource,
+    val xrLayer: BinarySource? = null,
+    val xrLoader: BinarySource? = null,
+    /** The stand-in for Meta's OVRPlugin ([app.gameport.core.patch.patches.OvrPluginStandInPatch]). */
+    val ovrPlugin: BinarySource? = null,
+)

@@ -216,6 +216,8 @@
     <string name="gamecompat_recenter">Suivre le recentrage du casque</string>
     <string name="gamecompat_recenter_legend">Utile quand le recentrage ne ramène pas le jeu devant. Le jeu utilise alors l\'espace de jeu que le recentrage déplace, avec le sol à la bonne hauteur. La position du contenu peut changer.</string>
     <string name="gamecompat_recenter_auto">Fait automatiquement pour ce jeu : le casque n\'a pas de zone de jeu.</string>
+    <string name="gamecompat_ovrplugin">Adoucir un jeu qui saccade</string>
+    <string name="gamecompat_ovrplugin_legend">Certains jeux embarquent des scripts de réalité mixte de Meta sans la bibliothèque qu\'ils appellent, et saccadent parce qu\'ils échouent à chaque mise à jour. Par défaut le jeu reçoit un petit remplaçant qui répond à la place de la bibliothèque absente. Désactiver sert pour un jeu qui ne fonctionne pas ainsi. Un changement patche de nouveau le jeu.</string>
     <string name="gamecompat_open_in_vr">Ouvrir le jeu lui-même en VR</string>
     <string name="gamecompat_open_in_vr_legend">Certains jeux démarrent par un premier écran qui ouvre ensuite le jeu lui-même. Par défaut le jeu lui-même s\'ouvre aussi en VR, au lieu d\'une fenêtre plate. Désactiver sert pour un jeu qui ne fonctionne pas ainsi. Un changement patche de nouveau le jeu.</string>
     <string name="gamecompat_mode_auto">Automatique</string>

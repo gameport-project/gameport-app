@@ -28,6 +28,11 @@ data class GameSettings(
      * off keeps it from doing so, for a game that does not get along with it. A change needs the game to be patched again.
      */
     val openInVr: Boolean = true,
+    /**
+     * A game that carries Meta's mixed reality scripts without the native library they call stutters, as it raises an exception at every update: on (automatic), the patch
+     * gives it a stand-in that answers "not initialized"; off keeps it from doing so. A change needs the game to be patched again.
+     */
+    val ovrPluginStandIn: Boolean = true,
 ) {
     val followsDefaults: Boolean get() = heightCm == null
 

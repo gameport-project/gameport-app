@@ -51,6 +51,10 @@ class GameCompatViewModel @Inject constructor(
     val showOpenInVr: StateFlow<Boolean> = combine(installer.observeVrGameActivityEntry(appId), gameSettings) { entry, chosen -> entry || !chosen.openInVr }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
 
+    /** Whether to offer the choice of the stand-in for Meta's OVRPlugin: when the game holds it, or when the player turned it off (to turn it on again). */
+    val showOvrPluginStandIn: StateFlow<Boolean> = combine(installer.observeOvrPluginStandIn(appId), gameSettings) { held, chosen -> held || !chosen.ovrPluginStandIn }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
+
     fun onUseFrameChanged(useFrame: Boolean) = controllers.setUseFrame(appId, useFrame)
 
     /** Automatic leaves it to GamePort; on and off are the player's choice, kept even where GamePort would have decided otherwise. */
@@ -60,6 +64,13 @@ class GameCompatViewModel @Inject constructor(
     fun onOpenInVrChosen(automatic: Boolean) {
         if (gameSettings.value.openInVr == automatic) return
         settings.set(appId, gameSettings.value.copy(openInVr = automatic))
+        installer.repatch(appId)
+    }
+
+    /** Automatic gives the game the stand-in when it needs one, off takes away the one GamePort gave. Either way the game is patched again, which applies the choice. */
+    fun onOvrPluginStandInChosen(automatic: Boolean) {
+        if (gameSettings.value.ovrPluginStandIn == automatic) return
+        settings.set(appId, gameSettings.value.copy(ovrPluginStandIn = automatic))
         installer.repatch(appId)
     }
 

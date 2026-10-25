@@ -9,6 +9,7 @@ import app.gameport.core.patch.patches.SteamShimPatch
 import app.gameport.core.patch.patches.XrLayerPatch
 import app.gameport.core.patch.patches.StorageTargetPatch
 import app.gameport.core.patch.patches.XrLoaderPatch
+import app.gameport.core.patch.patches.OvrPluginStandInPatch
 import app.gameport.core.patch.patches.VrGameActivityPatch
 import app.gameport.core.patch.patches.VrLauncherPatch
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -41,6 +42,7 @@ class GamePatcher @Inject constructor(
                 hookDex = BinarySource { context.assets.open(HOOK_ASSET) },
                 xrLayer = BinarySource { context.assets.open(XR_LAYER_ASSET) },
                 xrLoader = BinarySource { context.assets.open(XR_LOADER_ASSET) },
+                ovrPlugin = BinarySource { context.assets.open(OVRPLUGIN_ASSET) },
             ),
         )
     }
@@ -50,12 +52,13 @@ class GamePatcher @Inject constructor(
         const val HOOK_ASSET = "hook/classes.dex"
         const val XR_LAYER_ASSET = "xrlayer/arm64-v8a/libXrApiLayer_gameport.so"
         const val XR_LOADER_ASSET = "xrloader/arm64-v8a/libopenxr_loader.so"
+        const val OVRPLUGIN_ASSET = "ovrplugin/arm64-v8a/libOVRPlugin.so"
     }
 }
 
 /** Every patch GamePort knows, in the order they are applied. */
 object PatchCatalog {
-    val all: List<ApkPatch> = listOf(VrLauncherPatch, VrGameActivityPatch, SteamShimPatch, CloudHookPatch, XrLayerPatch, XrLoaderPatch, StorageTargetPatch, AppLabelPatch, VersionCodePatch, PatchVersionPatch)
+    val all: List<ApkPatch> = listOf(VrLauncherPatch, VrGameActivityPatch, OvrPluginStandInPatch, SteamShimPatch, CloudHookPatch, XrLayerPatch, XrLoaderPatch, StorageTargetPatch, AppLabelPatch, VersionCodePatch, PatchVersionPatch)
 
     val recommended: List<ApkPatch> get() = all.filter { it.recommended }
 }
