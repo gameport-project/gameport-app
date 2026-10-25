@@ -10,6 +10,7 @@ class CompatFilterTest {
         CompatCounts(1, works, fails, offlineOnly = offlineOnly, devices = mapOf("quest" to DeviceCounts(works, fails, offlineOnly = offlineOnly))),
         name = "Game",
         inLibrary = false,
+        art = app.gameport.core.model.Covers.capsule(1),
     )
 
     @Test

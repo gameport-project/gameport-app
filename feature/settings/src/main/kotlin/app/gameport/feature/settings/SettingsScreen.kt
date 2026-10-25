@@ -427,9 +427,7 @@ private fun HiddenSection(games: List<Game>, onShowAgain: (Int) -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             GameImage(
-                url = game.capsuleUrl,
-                fallbackUrl = game.capsuleFallbacks.firstOrNull(),
-                moreFallbacks = game.capsuleFallbacks.drop(1),
+                art = game.capsuleArt,
                 contentDescription = null,
                 modifier = Modifier.width(48.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(6.dp)),
             )
@@ -462,9 +460,7 @@ private fun IncompatibleSection(entries: List<SettingsViewModel.IncompatibleEntr
     entries.forEach { entry ->
         Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
             GameImage(
-                url = entry.game.capsuleUrl,
-                fallbackUrl = entry.game.capsuleFallbacks.firstOrNull(),
-                moreFallbacks = entry.game.capsuleFallbacks.drop(1),
+                art = entry.game.capsuleArt,
                 contentDescription = null,
                 modifier = Modifier.width(62.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(6.dp)),
             )

@@ -193,6 +193,8 @@ class SettingsViewModel @Inject constructor(
         val lastPlayedMillis: Long?,
         val updateAvailable: Boolean,
         val patchBehind: Boolean,
+        /** The cover, built by the model (see Art) from the library when the game is in it. */
+        val art: app.gameport.core.model.Art,
     )
 
     /** The page that manages the games: the games with their sizes, the downloads left behind, and the free space. */
@@ -238,12 +240,14 @@ class SettingsViewModel @Inject constructor(
         installer.observeOutdatedPatches(),
     ) { sizes, loaded, played, updates, behind ->
         if (sizes == null) return@combine ManageState()
-        val names = loaded.games.associate { it.appId to it.name }
+        val byId = loaded.games.associateBy { it.appId }
+        val names = byId.mapValues { it.value.name }
         val withUpdate = updates.map { it.appId }.toSet()
         ManageState(
             loading = false,
-            games = sizes.sizes.map { (appId, footprint) ->
-                ManagedGame(appId, names[appId] ?: "#$appId", footprint, played[appId], appId in withUpdate, appId in behind)
+            // An adult game the player may not see is not listed here either.
+            games = sizes.sizes.filterKeys { !adultApps.isHidden(it) }.map { (appId, footprint) ->
+                ManagedGame(appId, names[appId] ?: "#$appId", footprint, played[appId], appId in withUpdate, appId in behind, byId[appId]?.capsuleArt ?: app.gameport.core.model.Covers.capsule(appId))
             },
             unfinished = sizes.unfinished.map { (names[it.appId] ?: "#${it.appId}") to it },
             freeBytes = sizes.freeBytes,

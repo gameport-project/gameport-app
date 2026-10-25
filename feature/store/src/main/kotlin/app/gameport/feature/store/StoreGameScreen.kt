@@ -78,6 +78,7 @@ import app.gameport.core.designsystem.KindBlue
 import app.gameport.core.designsystem.PageHeader
 import app.gameport.core.designsystem.glass
 import app.gameport.core.model.AndroidApp
+import app.gameport.core.model.ArtSlot
 import app.gameport.feature.compat.VerdictChip
 import app.gameport.core.model.PriceStory
 import app.gameport.core.model.PriceVerdict
@@ -159,9 +160,7 @@ private fun Details(content: StoreGameUiState.Content, app: AndroidApp, onGameCl
             Row(Modifier.fillMaxWidth().pullUp(COVER_OVER_PICTURE).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 val cover = RoundedCornerShape(14.dp)
                 GameImage(
-                    url = app.cover ?: app.header ?: app.banner ?: "",
-                    fallbackUrl = app.header,
-                    moreFallbacks = listOfNotNull(app.capsule),
+                    art = app.art(ArtSlot.COVER, ArtSlot.HEADER, ArtSlot.BANNER, ArtSlot.CAPSULE),
                     contentDescription = null,
                     modifier = Modifier.width(COVER_WIDTH).aspectRatio(2f / 3f).glass(cover).clip(cover),
                 )
@@ -270,8 +269,7 @@ private fun Hero(app: AndroidApp) {
     val shape = RoundedCornerShape(18.dp)
     Box(Modifier.fillMaxWidth().height(HERO_HEIGHT).clip(shape)) {
         GameImage(
-            url = app.banner ?: app.header ?: app.cover ?: "",
-            fallbackUrl = app.header,
+            art = app.art(ArtSlot.BANNER, ArtSlot.HEADER, ArtSlot.COVER),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
         )

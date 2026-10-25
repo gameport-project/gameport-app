@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** One game of the page: what the players said, its name when it is known, and whether the account has it. */
-data class CompatEntry(val counts: CompatCounts, val name: String?, val inLibrary: Boolean) {
+data class CompatEntry(val counts: CompatCounts, val name: String?, val inLibrary: Boolean, val art: app.gameport.core.model.Art) {
     val players: Int get() = counts.works + counts.offlineOnly + counts.fails
 }
 
@@ -49,8 +49,14 @@ internal fun matches(entry: CompatEntry, filter: CompatFilter, deviceKind: Strin
 }
 
 /** The games players reported, with names from the account's library and, for the other games, from Steam. */
-private fun entries(summaryGames: List<CompatCounts>, libraryNames: Map<Int, String>, steamNames: Map<Int, String>) =
-    summaryGames.map { CompatEntry(it, libraryNames[it.appId] ?: steamNames[it.appId], inLibrary = it.appId in libraryNames) }
+private fun entries(summaryGames: List<CompatCounts>, library: Map<Int, app.gameport.core.model.Game>, steamNames: Map<Int, String>, catalog: app.gameport.core.model.AndroidCatalog?) =
+    summaryGames.map {
+        // The cover comes from the library, else from the catalog, else from Steam's standard names: never written here.
+        val art = library[it.appId]?.capsuleArt
+            ?: catalog?.of(it.appId)?.art(app.gameport.core.model.ArtSlot.COVER, app.gameport.core.model.ArtSlot.HEADER, app.gameport.core.model.ArtSlot.BANNER, app.gameport.core.model.ArtSlot.CAPSULE)
+            ?: app.gameport.core.model.Covers.capsule(it.appId)
+        CompatEntry(it, library[it.appId]?.name ?: steamNames[it.appId], inLibrary = it.appId in library, art = art)
+    }
 
 @HiltViewModel
 class CompatViewModel @Inject constructor(
@@ -59,8 +65,8 @@ class CompatViewModel @Inject constructor(
     private val appNames: AppNameRepository,
     device: DeviceProfile,
     adult: app.gameport.core.settings.AdultApps,
-    // Asked for so that the catalog is read, and the adult apps in it known, before the page lists anything.
-    @Suppress("UNUSED_PARAMETER") catalog: app.gameport.core.sync.AndroidCatalogRepository,
+    // Also read so that the adult apps in it are known before the page lists anything.
+    catalog: app.gameport.core.sync.AndroidCatalogRepository,
 ) : ViewModel() {
     private val hidden = adult.hidden
     private val query = MutableStateFlow("")
@@ -68,12 +74,12 @@ class CompatViewModel @Inject constructor(
     private val libraryNames = library.observeLibrary()
 
     /** The library, with the app ids that are left out of every list. */
-    private val libraryAndHidden = combine(libraryNames, hidden) { lib, leftOut -> lib to leftOut }
+    private val libraryAndHidden = combine(libraryNames, hidden, catalog.observe()) { lib, leftOut, cat -> Triple(lib, leftOut, cat) }
 
-    val uiState: StateFlow<CompatUiState> = combine(compat.observeSummary(), libraryAndHidden, appNames.names, query, filter) { summary, (lib, leftOut), steamNames, text, chosen ->
+    val uiState: StateFlow<CompatUiState> = combine(compat.observeSummary(), libraryAndHidden, appNames.names, query, filter) { summary, (lib, leftOut, cat), steamNames, text, chosen ->
         if (summary == null) return@combine CompatUiState.Unavailable
         val needle = text.trim()
-        val shown = entries(summary.games.filter { it.appId !in leftOut }, lib.games.associate { it.appId to it.name }, steamNames)
+        val shown = entries(summary.games.filter { it.appId !in leftOut }, lib.games.associateBy { it.appId }, steamNames, cat)
             .filter { needle.isEmpty() || it.name?.contains(needle, ignoreCase = true) == true || it.counts.appId.toString().contains(needle) }
             .filter { matches(it, chosen, device.kind) }
             // The most reported games first, then by name; a game whose name is not known goes after the ones that have one.

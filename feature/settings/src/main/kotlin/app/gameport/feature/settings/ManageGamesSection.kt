@@ -229,7 +229,7 @@ private fun ManagedRow(
     ) {
         Checkbox(checked = checked, onCheckedChange = onChecked)
         GameImage(
-            url = SteamImages.asset(game.appId, "library_600x900.jpg"),
+            art = game.art,
             contentDescription = null,
             modifier = Modifier.size(width = 40.dp, height = 60.dp).clip(RoundedCornerShape(8.dp)),
         )

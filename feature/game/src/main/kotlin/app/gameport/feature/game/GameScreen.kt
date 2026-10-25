@@ -444,9 +444,7 @@ private fun GameDetails(
                         },
                 ) {
                     GameImage(
-                        url = game.heroUrl,
-                        fallbackUrl = game.heroFallbacks.firstOrNull(),
-                        moreFallbacks = game.heroFallbacks.drop(1),
+                        art = game.heroArt,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -468,9 +466,7 @@ private fun GameDetails(
                 // does not always render): a tight dark one where it would nearly touch, a wide soft one under it, and a very wide faint one.
                 Box(coverModifier.width(COVER_WIDTH).height(COVER_HEIGHT).liftedShadow(14.dp)) {
                     GameImage(
-                        url = game.capsuleUrl,
-                        fallbackUrl = game.capsuleFallbacks.firstOrNull(),
-                        moreFallbacks = game.capsuleFallbacks.drop(1),
+                        art = game.capsuleArt,
                         contentDescription = game.name,
                         modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp)),
                     )

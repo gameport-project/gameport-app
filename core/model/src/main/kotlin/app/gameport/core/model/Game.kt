@@ -90,6 +90,12 @@ data class Game(
     /** Landscape header, a fallback when the other artwork is missing. */
     val headerUrl: String get() = artwork.header?.let { SteamImages.asset(appId, it) } ?: SteamImages.asset(appId, "header.jpg")
 
+    /** The cover, with everything to try after it. The one way a cover is shown (see [Art]). */
+    val capsuleArt: Art get() = Art(capsuleUrl, capsuleFallbacks)
+
+    /** The wide hero picture, with everything to try after it. */
+    val heroArt: Art get() = Art(heroUrl, heroFallbacks)
+
     /** What to try after [capsuleUrl], in order: the old file name, the header, then the full game's artwork. */
     val capsuleFallbacks: List<String>
         get() = listOf(SteamImages.asset(appId, "library_600x900.jpg"), headerUrl, SteamImages.asset(appId, "header.jpg")) + parentArtwork("library_600x900.jpg")

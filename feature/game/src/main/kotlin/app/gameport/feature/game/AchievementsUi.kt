@@ -231,8 +231,7 @@ private fun AchievementIcon(appId: Int, achievement: Achievement, size: Dp) {
         }
     } else {
         GameImage(
-            url = urls.first(),
-            fallbackUrl = urls.getOrNull(1),
+            art = app.gameport.core.model.Art.of(urls),
             contentDescription = null,
             modifier = Modifier.size(size).clip(shape).alpha(if (achievement.unlocked) 1f else 0.75f),
         )

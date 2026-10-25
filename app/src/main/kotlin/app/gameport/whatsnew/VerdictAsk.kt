@@ -68,7 +68,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** The game the player is asked about, and whether the answer will be sent to the project. */
-data class VerdictQuestion(val appId: Int, val name: String, val shared: Boolean, val cover: String, val coverFallbacks: List<String>)
+data class VerdictQuestion(val appId: Int, val name: String, val shared: Boolean, val cover: app.gameport.core.model.Art)
 
 /**
  * The window that follows the answer "it did not work": what became of the technical report, and the two ways to take it. [status] is null while the
@@ -94,7 +94,7 @@ class VerdictAskViewModel @Inject constructor(
 
     val question: StateFlow<VerdictQuestion?> = combine(auth.authState, library.observeLibrary(), verdicts.book, verdicts.share) { authState, loaded, book, share ->
         if (authState !is AuthState.SignedIn) null
-        else loaded.games.filter { it.appId in book.pending }.minByOrNull { it.name.lowercase() }?.let { VerdictQuestion(it.appId, it.name, share, it.capsuleUrl, it.capsuleFallbacks) }
+        else loaded.games.filter { it.appId in book.pending }.minByOrNull { it.name.lowercase() }?.let { VerdictQuestion(it.appId, it.name, share, it.capsuleArt) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     private val _followUp = MutableStateFlow<ReportFollowUp?>(null)
@@ -168,9 +168,7 @@ fun VerdictAskHost(viewModel: VerdictAskViewModel = hiltViewModel()) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
                     GameImage(
-                        url = question.cover,
-                        fallbackUrl = question.coverFallbacks.firstOrNull(),
-                        moreFallbacks = question.coverFallbacks.drop(1),
+                        art = question.cover,
                         contentDescription = null,
                         modifier = Modifier.width(64.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(8.dp)),
                     )

@@ -242,7 +242,7 @@ private fun Shelf(
                 }
             },
     ) {
-        if (display.backdrop) Backdrop(highlightedNew?.let { BackdropArt(it.banner ?: it.header ?: it.cover.orEmpty(), listOfNotNull(it.header)) } ?: highlighted?.let { BackdropArt(it.heroUrl, it.heroFallbacks) }, display.backdropStrength)
+        if (display.backdrop) Backdrop(highlightedNew?.art(app.gameport.core.model.ArtSlot.BANNER, app.gameport.core.model.ArtSlot.HEADER, app.gameport.core.model.ArtSlot.COVER) ?: highlighted?.heroArt, display.backdropStrength)
 
         Column(Modifier.fillMaxSize()) {
             Header(state, onQueryChanged, onTabSelected, { filtersOpen = true }, onOpenDownloads, onOpenSettings, onOpenSteamSettings, onOpenUpdates, onOpenCompat, onOpenStore) {
@@ -333,17 +333,16 @@ private fun Shelf(
 }
 
 /** A picture to show behind the library, and what to try when it is missing. */
-private data class BackdropArt(val url: String, val fallbacks: List<String>)
 
 /** The artwork of [game] behind the library: the weaker [strength] is, the darker and blurrier it gets. */
 @Composable
-private fun Backdrop(art: BackdropArt?, strength: Int) {
+private fun Backdrop(art: app.gameport.core.model.Art?, strength: Int) {
     // 50 is the look the library always had; below it the art is dimmed more and blurred, above it clearer.
     val dim = ((100 - strength) / 50f).coerceAtLeast(0.1f)
     val blur = (((50 - strength).coerceAtLeast(0)) * 0.4f).dp
     Crossfade(targetState = art, label = "backdrop", modifier = Modifier.fillMaxSize()) { shown ->
         if (shown != null) {
-            GameImage(url = shown.url, fallbackUrl = shown.fallbacks.firstOrNull(), moreFallbacks = shown.fallbacks.drop(1), contentDescription = null, modifier = Modifier.fillMaxSize().blur(blur))
+            GameImage(art = shown, contentDescription = null, modifier = Modifier.fillMaxSize().blur(blur))
         }
     }
     fun shade(alpha: Float) = Color(0xFF101418).copy(alpha = (alpha * dim).coerceIn(0f, 1f))

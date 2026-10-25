@@ -47,6 +47,16 @@ data class AndroidApp(
     val installBytes: Long = 0,
     val downloadBytes: Long = 0,
 ) {
+    /**
+     * The picture to show for this entry: the slots in [order] first, then the ones left, then Steam's standard names for the number, so that an
+     * entry with no picture of its own still has something to try (see [Art]).
+     */
+    fun art(vararg order: ArtSlot): Art {
+        val slots = mapOf(ArtSlot.COVER to cover, ArtSlot.BANNER to banner, ArtSlot.HEADER to header, ArtSlot.CAPSULE to capsule)
+        val chosen = (order.toList() + ArtSlot.entries).distinct().mapNotNull { slots[it] }
+        return Art.of(chosen + Covers.capsule(appid).candidates)
+    }
+
     /** The day [androidSince] names, when it is a date. */
     val arrival: LocalDate? get() = androidSince?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
 

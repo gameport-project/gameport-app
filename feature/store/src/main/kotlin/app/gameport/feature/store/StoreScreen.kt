@@ -106,6 +106,7 @@ import app.gameport.core.designsystem.PricePill
 import app.gameport.core.designsystem.SidePanel
 import app.gameport.core.designsystem.glass
 import app.gameport.core.model.AndroidApp
+import app.gameport.core.model.ArtSlot
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -383,8 +384,7 @@ private fun ArtBackdrop(app: AndroidApp?, strength: Int) {
     Crossfade(targetState = app, label = "store-backdrop", modifier = Modifier.fillMaxSize()) { shown ->
         if (shown != null) {
             GameImage(
-                url = shown.banner ?: shown.header ?: shown.cover ?: "",
-                fallbackUrl = shown.header,
+                art = shown.art(ArtSlot.BANNER, ArtSlot.HEADER, ArtSlot.COVER),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize().blur(blur),
             )
@@ -479,9 +479,7 @@ private fun Cover(app: AndroidApp, owned: Boolean, isNew: Boolean, level: Compat
     val shape = RoundedCornerShape(14.dp)
     Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).glass(shape).clip(shape).clickable(onClick = onClick)) {
         GameImage(
-            url = app.cover ?: app.header ?: app.banner ?: "",
-            fallbackUrl = app.header,
-            moreFallbacks = listOfNotNull(app.capsule),
+            art = app.art(ArtSlot.COVER, ArtSlot.HEADER, ArtSlot.BANNER, ArtSlot.CAPSULE),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
         )
@@ -526,9 +524,7 @@ private fun GameRow(app: AndroidApp, owned: Boolean, isNew: Boolean, level: Comp
     val picture: @Composable (Modifier) -> Unit = { modifier ->
         Box(modifier) {
             GameImage(
-                url = app.header ?: app.capsule ?: app.cover ?: "",
-                fallbackUrl = app.capsule,
-                moreFallbacks = listOfNotNull(app.cover),
+                art = app.art(ArtSlot.HEADER, ArtSlot.CAPSULE, ArtSlot.COVER),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -592,9 +588,7 @@ private fun PromoRail(apps: List<AndroidApp>, prices: Map<Int, StorePrice>, leve
                         Column(Modifier.width(PROMO_WIDTH).frosted(shape).clickable { onOpen(app.appid) }) {
                             Box(Modifier.fillMaxWidth().aspectRatio(460f / 215f)) {
                                 GameImage(
-                                    url = app.header ?: app.capsule ?: app.cover ?: "",
-                                    fallbackUrl = app.capsule,
-                                    moreFallbacks = listOfNotNull(app.cover),
+                                    art = app.art(ArtSlot.HEADER, ArtSlot.CAPSULE, ArtSlot.COVER),
                                     contentDescription = null,
                                     modifier = Modifier.fillMaxSize(),
                                 )

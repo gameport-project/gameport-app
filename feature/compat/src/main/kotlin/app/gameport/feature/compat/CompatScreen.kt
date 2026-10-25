@@ -129,7 +129,7 @@ private fun CompatCard(entry: CompatEntry, deviceKind: String, modifier: Modifie
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         GameImage(
-            url = SteamImages.asset(appId, "library_600x900.jpg"),
+            art = entry.art,
             contentDescription = null,
             modifier = Modifier.size(width = 72.dp, height = 108.dp).clip(RoundedCornerShape(10.dp)),
         )

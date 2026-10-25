@@ -46,6 +46,7 @@ import app.gameport.core.designsystem.PricePill
 import app.gameport.core.model.StorePrice
 import app.gameport.core.designsystem.glass
 import app.gameport.core.model.AndroidApp
+import app.gameport.core.model.ArtSlot
 
 /** The proportions of the picture of a banner by size: the header Steam publishes for every app, then wider and wider hero pictures. */
 private fun ratioOf(size: NewRailSize) = when (size) {
@@ -110,10 +111,8 @@ private fun Banner(app: AndroidApp, price: StorePrice?, width: Dp, height: Dp, s
     ) {
         val wide = size != NewRailSize.COMPACT
         // A wide banner shows the hero picture; the compact one the header, which has the proportions of the box.
-        val image = if (wide) app.banner ?: app.header ?: app.cover else app.header ?: app.banner ?: app.cover
-        if (image != null) {
-            GameImage(url = image, fallbackUrl = if (wide) app.header else app.banner, contentDescription = null, modifier = Modifier.fillMaxWidth().height(height))
-        }
+        val art = if (wide) app.art(ArtSlot.BANNER, ArtSlot.HEADER, ArtSlot.COVER) else app.art(ArtSlot.HEADER, ArtSlot.BANNER, ArtSlot.COVER)
+        GameImage(art = art, contentDescription = null, modifier = Modifier.fillMaxWidth().height(height))
         // The name stays readable on any picture.
         Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f)))).padding(start = 10.dp, top = if (wide) 40.dp else 16.dp, bottom = if (wide) 12.dp else 6.dp, end = 10.dp)) {
             Text(app.name, style = if (wide) MaterialTheme.typography.titleLarge else MaterialTheme.typography.labelLarge, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
