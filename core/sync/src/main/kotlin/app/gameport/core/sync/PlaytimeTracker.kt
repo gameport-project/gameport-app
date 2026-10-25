@@ -59,7 +59,7 @@ class PlaytimeTracker @Inject constructor(
 
     /** The game came to the screen. */
     @Synchronized
-    fun resumed(packageName: String) {
+    fun resumed(packageName: String, processId: Int = 0) {
         val game = gameOf(packageName) ?: return
         game.release?.cancel()
         game.release = null
@@ -69,7 +69,7 @@ class PlaytimeTracker @Inject constructor(
         listener?.back(packageName)
         if (!game.steamHeld && settings.countPlaytimeOnSteam.value) {
             game.steamHeld = true
-            scope.launch { withSession { it.holdPlaying(game.appId) } }
+            scope.launch { withSession { it.holdPlaying(game.appId, processId) } }
         }
         startWatchdog()
     }

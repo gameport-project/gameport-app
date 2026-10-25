@@ -107,6 +107,9 @@ class SteamSession(private val cellId: Int = 0, private val onAccountRegion: (cu
 
     @Volatile private var playingApp = 0
 
+    /** The process of the game that Steam was last told of (the one of GamePort itself until the game says its own). */
+    @Volatile private var playingProcess = 0
+
     /** When the account was last declared as playing a game, to tell a refusal (Steam drops the connection at once) from an ordinary loss. */
     @Volatile private var playingSentAt = 0L
     @Volatile private var playingJob: kotlinx.coroutines.Job? = null
@@ -114,12 +117,39 @@ class SteamSession(private val cellId: Int = 0, private val onAccountRegion: (cu
     /** The game the player is playing right now, held for as long as it is on screen so Steam counts its time. */
     @Volatile private var sessionApp = 0
 
-    private suspend fun sendPlaying(appId: Int) {
+    /** The Steam build id of each game that was asked about, kept for the session. */
+    private val buildIds = java.util.concurrent.ConcurrentHashMap<Int, Int>()
+
+    /** The build Steam publishes today on the public branch of [appId], or 0 when it cannot be told: part of what Steam's own clients say when a game starts. */
+    private suspend fun buildIdOf(appId: Int): Int = buildIds[appId] ?: runCatching {
+        // Never holds up the message for long: the game is starting, and a ticket waits for it.
+        kotlinx.coroutines.withTimeoutOrNull(BUILD_ID_WAIT_MS) {
+            val tokens = apps.picsGetAccessTokens(listOf(appId), emptyList()).await().appTokens
+            val info = apps.picsGetProductInfo(listOf(`in`.dragonbra.javasteam.steam.handlers.steamapps.PICSRequest(appId, tokens[appId] ?: 0L)), emptyList()).await()
+            info.results.flatMap { it.apps.values }.firstOrNull { it.id == appId }?.keyValues?.get("depots")?.get("branches")?.get("public")?.get("buildid")?.asInteger(0)
+        } ?: 0
+    }.getOrDefault(0).also { if (it != 0) buildIds[appId] = it }
+
+    /**
+     * The build of [appId] Steam was last said to be on, from what is already known. A ticket waits for this message and the game for its ticket, so the lookup is never
+     * waited for here: when it is not known yet it is started, and a later message has it ([waitForBuild] is for a message nobody is waiting on).
+     */
+    private suspend fun knownBuildId(appId: Int, waitForBuild: Boolean): Int {
+        buildIds[appId]?.let { return it }
+        if (waitForBuild) return buildIdOf(appId)
+        scope.launch { buildIdOf(appId) }
+        return 0
+    }
+
+    private suspend fun sendPlaying(appId: Int, processId: Int = 0, waitForBuild: Boolean = false) {
         val message = `in`.dragonbra.javasteam.base.ClientMsgProtobuf<CMsgClientGamesPlayed.Builder>(
             CMsgClientGamesPlayed::class.java,
             `in`.dragonbra.javasteam.enums.EMsg.ClientGamesPlayedWithDataBlob,
         )
-        if (appId != 0) message.body.addGamesPlayed(CMsgClientGamesPlayed.GamePlayed.newBuilder().setGameId(appId.toLong()))
+        val buildId = if (appId != 0) knownBuildId(appId, waitForBuild) else 0
+        val gameProcess = processId.takeIf { it > 0 } ?: android.os.Process.myPid()
+        fillPlaying(message.body, appId, accountId.toInt(), gameProcess, android.os.Process.myPid(), buildId)
+        Log.i("GPSteamTicket", if (appId == 0) "told Steam the account is in no game" else "told Steam the account is in $appId (process $gameProcess, build $buildId)")
         // What Steam answers is written down for a few seconds: it is how a refused playing session shows (see [PlayingElsewhere]).
         if (appId != 0) {
             connectTokens.traceFor(TRACE_MS)
@@ -127,13 +157,14 @@ class SteamSession(private val cellId: Int = 0, private val onAccountRegion: (cu
         }
         client.send(message)
         playingApp = appId
+        playingProcess = if (appId != 0) gameProcess else 0
     }
 
     /** Tells Steam the account is in [appId] until [releasePlaying]: the time it runs is counted. */
-    suspend fun holdPlaying(appId: Int) {
+    suspend fun holdPlaying(appId: Int, processId: Int = 0) {
         sessionApp = appId
         playingJob?.cancel()
-        if (playingApp != appId) sendPlaying(appId)
+        if (playingApp != appId || (processId > 0 && processId != playingProcess)) sendPlaying(appId, processId, waitForBuild = true)
     }
 
     /** The game left the screen: Steam is told the account is no longer in it. */
@@ -412,6 +443,30 @@ private fun httpClient(traffic: ConcurrentHashMap<Int, AtomicLong>): OkHttpClien
         .pingInterval(15, TimeUnit.SECONDS)
         .build()
 }
+
+/**
+ * What Steam's own clients put in the message that says which game the account is in: the game, a process, who owns it, how it was started and on what
+ * kind of system. With the game alone Steam records the time played, but the other devices of the account do not show the game as played recently.
+ * Nothing is said for 0 (the account is in no game). [buildId] is the build Steam publishes, 0 when not known.
+ */
+internal fun fillPlaying(body: CMsgClientGamesPlayed.Builder, appId: Int, accountId: Int, processId: Int, parentProcessId: Int = 0, buildId: Int = 0) {
+    body.setClientOsType(`in`.dragonbra.javasteam.enums.EOSType.AndroidUnknown.code())
+    if (appId == 0) return
+    val game = CMsgClientGamesPlayed.GamePlayed.newBuilder()
+        .setGameId(appId.toLong())
+        .setProcessId(processId)
+        .setOwnerId(accountId)
+        .setLaunchSource(PLAYING_LAUNCH_SOURCE)
+        // The process of the game, started by GamePort as Steam's client would start it.
+        .addProcessIdList(CMsgClientGamesPlayed.ProcessInfo.newBuilder().setProcessId(processId).setProcessIdParent(parentProcessId).setParentIsSteam(true))
+    if (buildId != 0) game.setGameBuildId(buildId)
+    body.addGamesPlayed(game)
+}
+
+/** The value GameNative sends as the launch source of a game started by the app itself; Steam's meaning for it is not documented. */
+private const val PLAYING_LAUNCH_SOURCE = 100
+
+private const val BUILD_ID_WAIT_MS = 2_000L
 
 private const val HTTP_MAX_REQUESTS = 64
 private const val HTTP_MAX_REQUESTS_PER_HOST = 16

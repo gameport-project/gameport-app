@@ -131,7 +131,7 @@ class CloudProvider : ContentProvider() {
             Bundle().apply { putString(STATUS, OK) }
         }
         // The game came to the screen, is still there, or left it: the time it is on screen is counted (see PlaytimeTracker).
-        "resumed" -> okAfter { watchLife(packageName, extras); entryPoint.playtime().resumed(packageName) }
+        "resumed" -> okAfter { watchLife(packageName, extras); entryPoint.playtime().resumed(packageName, android.os.Binder.getCallingPid()) }
         "alive" -> okAfter { watchLife(packageName, extras); entryPoint.playtime().alive(packageName) }
         "paused" -> okAfter { watchLife(packageName, extras); entryPoint.playtime().paused(packageName) }
         // The game's process is ending (it quit by itself, or its last screen closed): how long it lasted shows a problem.
