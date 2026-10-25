@@ -5,6 +5,7 @@ import android.app.Application;
 import android.content.ContentProvider;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
@@ -644,6 +645,16 @@ public final class GamePortHookProvider extends ContentProvider {
         return out.toString("UTF-8");
     }
 
+    /** Whether GamePort's patch left this mark in the game's manifest (see the patches that write one). */
+    private static boolean hasPatchMark(Context context, String key) {
+        try {
+            android.content.pm.ApplicationInfo info = context.getPackageManager().getApplicationInfo(context.getPackageName(), PackageManager.GET_META_DATA);
+            return info.metaData != null && info.metaData.containsKey(key);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     private static String readLine(File file) {
         try {
             java.io.BufferedReader in = new java.io.BufferedReader(new java.io.FileReader(file));
@@ -736,6 +747,7 @@ public final class GamePortHookProvider extends ContentProvider {
             // The play space that the headset's recentering moves, in place of the fixed one a game asks for (auto, on or off).
             android.system.Os.setenv("GAMEPORT_XR_LOCAL_FLOOR", localFloor, true);
             Log.i(TAG, "seated mode " + seated + ", eye height " + eyeCm + " cm, controller overrides " + (controls.isEmpty() ? "none" : controls));
+            Log.i(TAG, "patches: vr_game_activity=" + hasPatchMark(context, "app.gameport.vr_game_activity"));
         } catch (Throwable t) {
             Log.w(TAG, "could not pass the seated settings on", t);
         }

@@ -34,12 +34,18 @@ object VrLauncherPatch : ApkPatch {
     override fun apply(session: PatchSession, context: PatchContext, assets: PatchAssets) {
         // A flat game is not a VR app: its launcher entry stays as it is.
         if (context.isVr == false) return
-        session.manifest.takeNodesEach({ named("manifest") }) {
+        patchManifest(session.manifest)
+    }
+
+    internal fun patchManifest(manifest: JSONObject) {
+        manifest.takeNodesEach({ named("manifest") }) {
             takeNodesEach({ named("application") }) {
                 takeNodesEach({ named("activity") }) {
+                    val isGameActivity = nameAttribute() == VrGameActivityPatch.UNREAL_GAME_ACTIVITY
                     takeNodesEach({ named("intent-filter") }) {
-                        val isLauncher = elem<JSONArray>("nodes").elemEach<JSONObject> { named("category") }
-                            .any { it.nameAttribute() in LAUNCHER_CATEGORIES }
+                        val categories = elem<JSONArray>("nodes").elemEach<JSONObject> { named("category") }.mapNotNull { it.nameAttribute() }
+                        // The VR-only filter of an Unreal GameActivity (see VrGameActivityPatch) is not a launcher entry: a second pass leaves it as it is.
+                        val isLauncher = categories.any { it in LAUNCHER_CATEGORIES } && !(isGameActivity && LAUNCHER !in categories)
                         takeNodes {
                             if (!isLauncher) this else {
                                 JSONArray().put(namedElement("action", "android.intent.action.MAIN")).also { nodes ->
