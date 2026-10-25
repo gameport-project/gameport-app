@@ -1,6 +1,7 @@
 package app.gameport.core.designsystem
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -37,6 +38,22 @@ fun AttentionBadge(modifier: Modifier = Modifier, size: Dp = 28.dp) {
             drawRoundRect(Color.White, topLeft = androidx.compose.ui.geometry.Offset(left, top), size = androidx.compose.ui.geometry.Size(width, bar), cornerRadius = androidx.compose.ui.geometry.CornerRadius(width / 2f))
             drawCircle(Color.White, radius = width / 2f, center = androidx.compose.ui.geometry.Offset(s / 2f, top + bar + gap + width / 2f))
         }
+    }
+}
+
+/** A small orange wrench, the icon of the patch button: a game on a cover that has a patch to apply. */
+@Composable
+fun PatchBadge(modifier: Modifier = Modifier, size: Dp = 28.dp) {
+    Box(
+        modifier = modifier.size(size).clip(CircleShape).background(Color(0xFFFF9800)),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.material3.Icon(
+            Icons.Filled.Build,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(size * 0.6f),
+        )
     }
 }
 

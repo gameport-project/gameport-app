@@ -168,6 +168,7 @@
     <string name="help_compat_few">When few players answered, a note says the result may not be reliable. A game tried with the offline mode says so too.</string>
     <string name="help_notices_title">Notices of an installed game</string>
     <string name="help_notices_text">A notice appears on the page of an installed game only when something applies. Orange and red marks need attention, green is a new version, and blue only informs.</string>
+    <string name="help_cover_patch">On a cover, an orange wrench means the game has a patch to apply.</string>
     <string name="help_notice_update">A new version of the game is available. A button updates it.</string>
     <string name="help_notice_patch">A newer GamePort patch exists for the game. A button patches it again.</string>
     <string name="help_notice_problem">The game closed almost right away or crashed. A button prepares a report that helps find out why.</string>

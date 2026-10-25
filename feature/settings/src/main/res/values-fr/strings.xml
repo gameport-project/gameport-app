@@ -168,6 +168,7 @@
     <string name="help_compat_few">Quand peu de joueurs ont répondu, une note indique que le résultat n\'est peut-être pas fiable. Un jeu essayé avec le mode hors ligne le dit aussi.</string>
     <string name="help_notices_title">Avis d\'un jeu installé</string>
     <string name="help_notices_text">Un avis apparaît sur la page d\'un jeu installé seulement quand quelque chose s\'applique. Les marques orange et rouges demandent de l\'attention, le vert est une nouvelle version, et le bleu informe seulement.</string>
+    <string name="help_cover_patch">Sur une jaquette, une clé orange signifie que le jeu a un patch à appliquer.</string>
     <string name="help_notice_update">Une nouvelle version du jeu est disponible. Un bouton la met à jour.</string>
     <string name="help_notice_patch">Un patch GamePort plus récent existe pour le jeu. Un bouton le patche à nouveau.</string>
     <string name="help_notice_problem">Le jeu s\'est fermé presque aussitôt ou a planté. Un bouton prépare un rapport qui aide à comprendre pourquoi.</string>

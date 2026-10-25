@@ -49,6 +49,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.gameport.core.designsystem.AttentionBadge
+import app.gameport.core.designsystem.PatchBadge
 import app.gameport.core.designsystem.CompatGlyph
 import app.gameport.core.designsystem.CompatOrange
 import app.gameport.core.designsystem.GlassChip
@@ -120,6 +121,10 @@ internal fun HelpSection(onStartComplete: () -> Unit, onStartTour: (TourKind) ->
                 }
                 Text(stringResource(noticeText(case)))
             }
+        }
+        Row(Modifier.readable(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+            Box(Modifier.size(24.dp), Alignment.Center) { PatchBadge(size = 20.dp) }
+            Text(stringResource(R.string.help_cover_patch))
         }
     }
 

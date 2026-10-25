@@ -72,6 +72,9 @@ class GameIssuesRepository @Inject constructor(
         }.toSet()
     }
 
+    /** Ids of the games whose patch is older than the current one: the ones the patch button is for. */
+    fun observePatchesToApply(): Flow<Set<Int>> = installer.observeOutdatedPatches()
+
     /** Opens the screen where the player resolves the game's save conflict. */
     fun conflictIntent(appId: Int): Intent? = installed.all()[appId]?.let { packageName ->
         Intent().setClassName(context.packageName, "app.gameport.feature.sync.SyncActivity")

@@ -11,12 +11,17 @@ import kotlinx.coroutines.flow.Flow
 /** The games that need the player's attention (see GameIssuesRepository). */
 fun interface AttentionSource {
     fun observe(): Flow<Set<Int>>
+
+    /** Among them, the games with a patch to apply: they get a wrench, the others an exclamation mark. */
+    fun observePatches(): Flow<Set<Int>> = kotlinx.coroutines.flow.flowOf(emptySet())
 }
 
 internal class InstallAttentionSource @Inject constructor(
     private val issues: GameIssuesRepository,
 ) : AttentionSource {
     override fun observe(): Flow<Set<Int>> = issues.observeAttention()
+
+    override fun observePatches(): Flow<Set<Int>> = issues.observePatchesToApply()
 }
 
 @Module
