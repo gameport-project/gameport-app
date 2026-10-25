@@ -131,6 +131,7 @@ class ProblemReporter @Inject constructor(
                 entry("components.txt", clean(components(packageName)))
                 entry("launch.txt", clean(launchFacts(packageName)))
                 entry("loaded-libraries.txt", clean(store.text(packageName, "libraries.txt").ifBlank { "(the game has not handed it over yet)" }))
+                entry("missing-native.txt", clean(store.text(packageName, "native-gaps.txt").ifBlank { "(the game's log shows no function, library or symbol it asked for and did not find)" }))
                 entry("game-log-start.txt", clean(store.text(packageName, "log-start.txt").ifBlank { "(the game has not handed over its log yet)" }))
                 entry("game-log.txt", clean(store.hookLog(packageName).ifBlank { "(empty: a short run fits in game-log-start.txt, or the game has not handed over its log)" }))
                 // The run before the last one, when the last one began after it ended: the one that explains how it ended.
@@ -405,6 +406,7 @@ class ProblemReporter @Inject constructor(
             components.txt        the game's screens, services, providers, receivers
             launch.txt            how the game is started
             loaded-libraries.txt  the files the game process really loaded (which OpenXR runtime, the shim...)
+            missing-native.txt    the functions, libraries and symbols the game asked for and did not find, each once with how many times: what a stand-in library would have to answer
             game-log-start.txt    the first lines of the game's system log (its start)
             game-log.txt          the latest lines of the game's system log
             previous-run-log-*.txt the same for the run before the last one, when there was one

@@ -46,6 +46,9 @@ final class SessionLog {
     private final Context context;
     private final ArrayList<String> head = new ArrayList<>();
     private final ArrayDeque<String> tail = new ArrayDeque<>();
+
+    /** What the game asked for natively and did not find, seen in its whole log and not only the lines kept (see [NativeGaps]). */
+    private final NativeGaps nativeGaps = new NativeGaps();
     /** The runtime's once-a-second performance lines (frame rate, CPU and GPU levels), kept apart because they would flood the log. */
     private final ArrayDeque<String> performance = new ArrayDeque<>();
     private static final int PERFORMANCE_LINES = 180;
@@ -125,6 +128,7 @@ final class SessionLog {
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), "UTF-8"));
             String line;
             while ((line = reader.readLine()) != null) {
+                nativeGaps.scan(line);
                 synchronized (head) {
                     if (head.size() < HEAD_LINES) head.add(line);
                     else {
@@ -189,6 +193,7 @@ final class SessionLog {
         synchronized (performance) { for (String line : performance) perf.append(line).append('\n'); }
         extras.putByteArray("performanceGz", gzip(perf.toString()));
         extras.putString("launch", launchInfo);
+        extras.putString("nativeGaps", nativeGaps.report());
         extras.putString("libraries", libraries);
         // Which run this is: GamePort keeps the log of the run before when a new one begins.
         extras.putInt("pid", android.os.Process.myPid());

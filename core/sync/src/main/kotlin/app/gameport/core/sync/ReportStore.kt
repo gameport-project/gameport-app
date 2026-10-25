@@ -42,6 +42,8 @@ class ReportStore @Inject constructor(
         extras.getByteArray("engineGz")?.let { gunzip(it)?.let { text -> File(folder, ENGINE_LOG).writeBytes(text) } }
         extras.getString("libraries")?.takeIf { it.isNotEmpty() }?.let { File(folder, LIBRARIES).writeText(it.takeLast(MAX_CHARS)) }
         extras.getString("launch")?.takeIf { it.isNotEmpty() }?.let { File(folder, LAUNCH).writeText(it.takeLast(MAX_CHARS)) }
+        // Said at every hand-over, empty when the run has met none: what an earlier run found must not stay as if this one had.
+        extras.getString("nativeGaps")?.let { gaps -> if (gaps.isEmpty()) File(folder, NATIVE_GAPS).delete() else File(folder, NATIVE_GAPS).writeText(gaps.take(MAX_CHARS)) }
         extras.getByteArray("traceGz")?.let { gz ->
             gunzip(gz, MAX_TRACE_BYTES)?.let { trace ->
                 File(folder, TOMBSTONE).writeBytes(trace)
@@ -152,6 +154,7 @@ class ReportStore @Inject constructor(
         const val ENGINE_LOG = "engine.log"
         const val PERFORMANCE = "performance.txt"
         const val LIBRARIES = "libraries.txt"
+        const val NATIVE_GAPS = "native-gaps.txt"
         const val LAUNCH = "launch.txt"
         const val TOMBSTONE = "tombstone.pb"
         const val TOMBSTONE_INFO = "tombstone-info.txt"
