@@ -58,7 +58,8 @@ internal class InstalledGamesUpdatesSource @Inject constructor(
     private val patching: app.gameport.core.sync.PatchAllCoordinator,
     private val installer: app.gameport.core.install.GameInstallRepository,
 ) : UpdatesSource {
-    override fun observe(): Flow<List<String>> = updates.updates.map { list -> list.map { it.name } }
+    // The notice at the top of the home is for the updates to start: a game whose update is going on is not in it.
+    override fun observe(): Flow<List<String>> = kotlinx.coroutines.flow.combine(updates.updates, installer.observeUpdating()) { list, running -> list.filter { it.appId !in running }.map { it.name } }
 
     override fun observeApp(): Flow<String?> = app.state.map { state ->
         (state as? AppUpdateState.Available)?.release?.version?.takeIf { app.canUpdateInPlace }
