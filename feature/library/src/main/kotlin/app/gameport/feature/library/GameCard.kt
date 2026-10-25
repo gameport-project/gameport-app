@@ -86,6 +86,9 @@ internal val FavoriteRed = Color(0xFFE53935)
  * [showPill] is on, room is kept above the cover for the pill that names the game while it is highlighted.
  */
 @OptIn(ExperimentalFoundationApi::class)
+/** The green of the update mark, which the spinner of an update that is going on shares. */
+private val UpdateGreen = androidx.compose.ui.graphics.Color(0xFF66BB6A)
+
 @Composable
 internal fun GameCard(
     game: Game,
@@ -97,6 +100,8 @@ internal fun GameCard(
     needsPatch: Boolean = false,
     hasQuestion: Boolean = false,
     hasUpdate: Boolean = false,
+    /** The update of the game is going on: a spinner stands in for the mark. */
+    isUpdating: Boolean = false,
     /** What the players who use this kind of device say of the game, once enough of them did. */
     compat: app.gameport.core.model.CompatLevel? = null,
     showTitle: Boolean = true,
@@ -189,11 +194,12 @@ internal fun GameCard(
             }
             Badges(game, Modifier.align(Alignment.TopEnd).padding(8.dp))
             // Small, so they do not hide the artwork: a wrench for a patch to apply, orange "!" for the rest that needs attention, blue "?" for a question, green for an update.
-            if (needsAttention || hasQuestion || hasUpdate) {
+            if (needsAttention || hasQuestion || hasUpdate || isUpdating) {
                 Row(Modifier.align(Alignment.TopStart).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (needsPatch) PatchBadge(size = 18.dp) else if (needsAttention) AttentionBadge(size = 18.dp)
                     if (hasQuestion) QuestionBadge(size = 18.dp)
                     if (hasUpdate) UpdateBadge(size = 18.dp)
+                    if (isUpdating) androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = UpdateGreen)
                 }
             }
         }

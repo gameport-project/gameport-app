@@ -113,6 +113,22 @@ class GameInstallRepository @Inject constructor(
     fun observe(appId: Int): Flow<InstallState> =
         combine(operations, packages.packageChanges()) { ops, _ -> stateOf(appId, ops) }
 
+    /**
+     * The installed games whose update is going on, or was cut short and is about to go on: a spinner shows on their cover instead of the
+     * "update available" mark. A paused or failed update is not going on, so the mark stays.
+     */
+    fun observeUpdating(): Flow<Set<Int>> =
+        combine(operations, packages.packageChanges()) { ops, _ ->
+            installed.all().filter { (appId, pkg) -> packages.isInstalled(pkg) && isUpdating(appId, ops) }.keys
+        }
+
+    private fun isUpdating(appId: Int, ops: Map<Int, InstallState>): Boolean {
+        // Nothing is waiting to go on again while GamePort is offline or replacing itself: the resume does not start then.
+        if (ops[appId] == null && (auth.offline.value || gate.updating.value)) return false
+        val directory = downloadDirectory(appId)
+        return InterruptedWork.updating(ops[appId], File(directory, UPDATE_FILE).exists(), File(directory, PAUSED_FILE).exists(), File(directory, FAILED_FILE).exists())
+    }
+
     /** Every game that is being installed, left half-installed, or installed: the downloads page. */
     fun observeAll(): Flow<Map<Int, InstallState>> =
         combine(operations, packages.packageChanges()) { ops, _ ->
@@ -343,7 +359,11 @@ class GameInstallRepository @Inject constructor(
     }
 
     /** Installs Steam's newer build of an installed game over it, with the DLC it was installed with. Saves stay. */
-    fun update(game: Game) = install(game, builds.get(game.appId)?.dlc.orEmpty())
+    fun update(game: Game) {
+        // The marker goes in before the work starts: if GamePort stops meanwhile, the update is told apart from the leftovers of something else.
+        runCatching { downloadDirectory(game.appId).apply { mkdirs() }.let { File(it, UPDATE_FILE).createNewFile() } }
+        install(game, builds.get(game.appId)?.dlc.orEmpty())
+    }
 
     private fun keepAlive(start: Boolean) {
         val intent = Intent(context, InstallForegroundService::class.java)
@@ -767,12 +787,17 @@ class GameInstallRepository @Inject constructor(
         if (auth.offline.value || gate.updating.value) return
         for (appId in leftoverIds()) {
             val directory = downloadDirectory(appId)
-            if (File(directory, PAUSED_FILE).exists() || File(directory, FAILED_FILE).exists()) continue
-            if (installed.all()[appId]?.let(packages::isInstalled) == true) continue
-            if (jobs[appId]?.isActive == true) continue
+            val action = InterruptedWork.resume(
+                installed = installed.all()[appId]?.let(packages::isInstalled) == true,
+                hasUpdateMarker = File(directory, UPDATE_FILE).exists(),
+                paused = File(directory, PAUSED_FILE).exists(),
+                failed = File(directory, FAILED_FILE).exists(),
+                running = jobs[appId]?.isActive == true,
+            )
+            if (action == InterruptedWork.Resume.NO) continue
             val game = kotlinx.coroutines.withTimeoutOrNull(RESUME_LOOKUP_MS) { library.observeGame(appId).first() } ?: continue
-            events.note(appId, "download left half done: going on with it")
-            install(game, null)
+            events.note(appId, if (action == InterruptedWork.Resume.UPDATE) "update left half done: going on with it" else "download left half done: going on with it")
+            if (action == InterruptedWork.Resume.UPDATE) update(game) else install(game, null)
         }
     }
 
@@ -1061,6 +1086,8 @@ private const val ALLOCATED_EVERY_MS = 3_000L
 /** Written in a download's folder when the player pauses it, or when it failed for a reason of its own: GamePort does not resume it by itself. */
 private const val PAUSED_FILE = ".gameport-paused"
 private const val FAILED_FILE = ".gameport-failed"
+/** Kept in the download folder of an installed game while its update runs, so that an update cut short goes on by itself like any download. */
+private const val UPDATE_FILE = ".gameport-update"
 
 /** What GamePort waits after signing in before it resumes the downloads left half done, and how long it waits for a game's data. */
 private const val RESUME_DELAY_MS = 5_000L

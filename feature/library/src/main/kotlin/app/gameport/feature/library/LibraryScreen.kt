@@ -418,6 +418,7 @@ private fun Rail(
                         needsPatch = game.appId in state.patchToApply,
                         hasQuestion = game.appId in state.questions,
                         hasUpdate = game.appId in state.updatable,
+                isUpdating = game.appId in state.updating,
                         compat = state.compat[game.appId],
                         showTitle = display.coverTitles,
                         favorite = game.appId in state.favoriteIds,

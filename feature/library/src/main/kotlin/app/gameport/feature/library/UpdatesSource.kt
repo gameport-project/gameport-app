@@ -23,6 +23,9 @@ interface UpdatesSource {
     /** The ids of those games, to mark their covers. */
     fun observeIds(): Flow<Set<Int>> = flowOf(emptySet())
 
+    /** The ids of the games whose update is going on: their cover shows a spinner instead of the mark. */
+    fun observeUpdating(): Flow<Set<Int>> = flowOf(emptySet())
+
     /** The version of GamePort itself that can be installed, if a newer one exists. */
     fun observeApp(): Flow<String?> = flowOf(null)
 
@@ -61,7 +64,10 @@ internal class InstalledGamesUpdatesSource @Inject constructor(
         (state as? AppUpdateState.Available)?.release?.version?.takeIf { app.canUpdateInPlace }
     }
 
-    override fun observeIds(): Flow<Set<Int>> = updates.updates.map { list -> list.map { it.appId }.toSet() }
+    // An update that is going on is not offered again.
+    override fun observeIds(): Flow<Set<Int>> = kotlinx.coroutines.flow.combine(updates.updates, installer.observeUpdating()) { list, running -> list.map { it.appId }.toSet() - running }
+
+    override fun observeUpdating(): Flow<Set<Int>> = installer.observeUpdating()
 
     override fun observeConnection(): Flow<SteamConnection> = auth.connection
 

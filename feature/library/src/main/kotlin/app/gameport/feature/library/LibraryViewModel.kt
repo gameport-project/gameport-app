@@ -62,6 +62,8 @@ sealed interface LibraryUiState {
         val appUpdate: String? = null,
         /** Installed games with a newer build, to mark their covers in green. */
         val updatable: Set<Int> = emptySet(),
+        /** Installed games whose update is going on: a spinner on their cover. */
+        val updating: Set<Int> = emptySet(),
         /** How GamePort stands with Steam; a notice shows when it is not connected. */
         val connection: SteamConnection = SteamConnection.ONLINE,
         /** How many installed games are behind on patches, and the run that patches them. */
@@ -75,7 +77,7 @@ sealed interface LibraryUiState {
     ) : LibraryUiState
 }
 
-private class HeaderInfo(val games: List<String>, val app: String?, val connection: SteamConnection, val ids: Set<Int>, val patchAll: PatchAllInfo, val installing: Int = 0)
+private class HeaderInfo(val games: List<String>, val app: String?, val connection: SteamConnection, val ids: Set<Int>, val patchAll: PatchAllInfo, val installing: Int = 0, val updating: Set<Int> = emptySet())
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
@@ -99,9 +101,9 @@ class LibraryViewModel @Inject constructor(
         },
         combine(
             combine(updates.observe(), updates.observeApp(), updates.observeConnection(), updates.observeIds(), updates.observePatchAll()) { games, app, connection, ids, patchAll -> HeaderInfo(games, app, connection, ids, patchAll) },
-            updates.observeInstalling(),
-        ) { info, installing -> HeaderInfo(info.games, info.app, info.connection, info.ids, info.patchAll, installing) },
-    ) { state, info -> state.copy(updates = info.games, appUpdate = info.app, connection = info.connection, updatable = info.ids, patchAll = info.patchAll, installing = info.installing) }
+            combine(updates.observeInstalling(), updates.observeUpdating()) { installing, updating -> installing to updating },
+        ) { info, (installing, updating) -> HeaderInfo(info.games, info.app, info.connection, info.ids, info.patchAll, installing, updating) },
+    ) { state, info -> state.copy(updates = info.games, appUpdate = info.app, connection = info.connection, updatable = info.ids, updating = info.updating, patchAll = info.patchAll, installing = info.installing) }
 
     val uiState: StateFlow<LibraryUiState> = combine(shelf, catalog.observe(), tab, catalog.observePrices()) { state, android, shownTab, prices ->
         // A search looks through the library and shows no row; a device without VR is shown flat games only.
