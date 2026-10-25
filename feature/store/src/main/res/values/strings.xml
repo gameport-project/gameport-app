@@ -81,6 +81,12 @@
     <string name="store_price_free">Free</string>
     <string name="store_price_paid">Paid</string>
     <string name="store_group_adult">Adult content</string>
+    <string name="storemedia_title">Pictures and trailer</string>
+    <string name="storemedia_trailer">Trailer</string>
+    <string name="storemedia_close">Close</string>
+    <string name="storemedia_previous">Previous</string>
+    <string name="storemedia_next">Next</string>
+    <string name="storemedia_unplayable">This trailer cannot be played here.</string>
     <string name="store_adult_only">Only</string>
     <string name="store_adult_hidden">Hidden</string>
     <string name="store_group_types">Type</string>

@@ -107,12 +107,13 @@ private val COVER_OVER_PICTURE: Dp get() = COVER_WIDTH * 1.5f - (BUTTON_BLOCK_HE
 @Composable
 fun StoreGameScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, viewModel: StoreGameViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    StoreGameContent(state, onBack, onGameClick, viewModel::onAddToLibrary)
+    val media by viewModel.media.collectAsStateWithLifecycle()
+    StoreGameContent(state, onBack, onGameClick, viewModel::onAddToLibrary, media)
 }
 
 /** The page from what it shows: the screen feeds it from the catalog, the tour of the page feeds it a made-up game. */
 @Composable
-internal fun StoreGameContent(state: StoreGameUiState, onBack: () -> Unit, onGameClick: (Int) -> Unit, onAddToLibrary: () -> Unit) {
+internal fun StoreGameContent(state: StoreGameUiState, onBack: () -> Unit, onGameClick: (Int) -> Unit, onAddToLibrary: () -> Unit, media: app.gameport.core.model.AppMedia? = null) {
     val context = LocalContext.current
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp)) {
@@ -126,7 +127,7 @@ internal fun StoreGameContent(state: StoreGameUiState, onBack: () -> Unit, onGam
                     Text(stringResource(R.string.storegame_not_listed), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     SteamButton(null) { openOnSteam(context, content.appId) }
                 }
-                else -> Details(content, content.app, onGameClick, onAddToLibrary, context)
+                else -> Details(content, content.app, onGameClick, onAddToLibrary, context, media)
             }
         }
     }
@@ -141,7 +142,7 @@ private fun Modifier.pullUp(amount: Dp): Modifier = layout { measurable, constra
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Details(content: StoreGameUiState.Content, app: AndroidApp, onGameClick: (Int) -> Unit, onAdd: () -> Unit, context: Context) {
+private fun Details(content: StoreGameUiState.Content, app: AndroidApp, onGameClick: (Int) -> Unit, onAdd: () -> Unit, context: Context, media: app.gameport.core.model.AppMedia?) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.fillMaxWidth().widthIn(max = CONTENT_WIDTH)) {
             Box {
@@ -188,6 +189,9 @@ private fun Details(content: StoreGameUiState.Content, app: AndroidApp, onGameCl
                     }
                 }
             }
+        }
+        if (media != null && !media.isEmpty) {
+            Section(stringResource(R.string.storemedia_title)) { MediaGallery(app.appid, media) }
         }
         Box(Modifier.tourTarget(TourIds.STOREGAME_DETAILS)) { Section(stringResource(R.string.storegame_details)) {
             // Two halves side by side where there is room: the facts, and the languages as a table. One under the other on a narrow screen.

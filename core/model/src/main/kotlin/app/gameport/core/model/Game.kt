@@ -113,6 +113,9 @@ object SteamImages {
     private const val BASE = "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps"
 
     fun asset(appId: Int, file: String): String = "$BASE/$appId/$file"
+
+    /** A path under the folder of the apps, for the pictures named by something else than an app (the thumbnail of a trailer). */
+    fun path(path: String): String = "$BASE/$path"
 }
 
 /** Snapshot of the library: [isScanning] stays true while Steam is still being queried. */

@@ -72,6 +72,7 @@ class StoreGameViewModel @Inject constructor(
     private val priceRepository: PriceRepository,
     private val accountRegion: AccountRegion,
     private val freeLicenses: FreeLicenseRepository,
+    private val mediaRepository: app.gameport.core.sync.MediaRepository,
 ) : ViewModel() {
     private val appId = savedStateHandle.toRoute<StoreGameRoute>().appId
     private val language = CatalogLanguages.of(Locale.getDefault())
@@ -134,7 +135,12 @@ class StoreGameViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), StoreGameUiState.Loading)
 
+    /** The screenshots and trailers of the page, once the device has the file that holds them. */
+    val media: StateFlow<app.gameport.core.model.AppMedia?> = mediaRepository.observe(appId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     init {
+        viewModelScope.launch { runCatching { mediaRepository.refreshIfStale() } }
         viewModelScope.launch { runCatching { catalog.refreshIfStale() } }
         // The history is read from the device at once, so the page has it without waiting; then the network is asked, and the page takes what it brings.
         viewModelScope.launch {

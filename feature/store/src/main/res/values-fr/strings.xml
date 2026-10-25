@@ -81,6 +81,12 @@
     <string name="store_price_free">Gratuits</string>
     <string name="store_price_paid">Payants</string>
     <string name="store_group_adult">Contenu pour adultes</string>
+    <string name="storemedia_title">Images et bande-annonce</string>
+    <string name="storemedia_trailer">Bande-annonce</string>
+    <string name="storemedia_close">Fermer</string>
+    <string name="storemedia_previous">Précédent</string>
+    <string name="storemedia_next">Suivant</string>
+    <string name="storemedia_unplayable">Cette bande-annonce ne peut pas être lue ici.</string>
     <string name="store_adult_only">Seulement</string>
     <string name="store_adult_hidden">Masqué</string>
     <string name="store_group_types">Type</string>
