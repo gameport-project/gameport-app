@@ -184,7 +184,7 @@
     <string name="game_version_flat">Version sans VR</string>
     <string name="report_open">Signaler un problème</string>
     <string name="report_title">Signaler un problème</string>
-    <string name="report_message">Cela envoie au projet un fichier qui aide à comprendre pourquoi %1$s ne fonctionne pas. Il ne contient que des informations techniques, sans données personnelles. Un ticket sur GitHub peut aussi être ouvert.</string>
+    <string name="report_message">Cela envoie au projet un fichier technique qui aide à comprendre pourquoi %1$s ne fonctionne pas, sans données personnelles. Un ticket sur GitHub peut aussi être ouvert.</string>
     <string name="report_contents">Il contient les versions de GamePort, du jeu et de son patch.\nL\'appareil et son système.\nLes choix du joueur pour le jeu, et la façon dont il a tourné, images par seconde comprises.\nLes fichiers du jeu et tout ce que contient son APK.\nLes interfaces Steam qu\'il demande.\nLe journal du jeu, son démarrage et ses dernières lignes, et celui de GamePort.\nLa façon dont ses dernières exécutions se sont terminées, avec le rapport de plantage gardé par Android.\nCe que GamePort a fait pour lui, comme le téléchargement, le patch et l\'installation.\nLes numéros de compte, les adresses e-mail, les adresses réseau et le nom du compte sont retirés des fichiers texte.</string>
     <string name="report_working">Préparation du rapport…</string>
     <string name="report_ticket">Créer un ticket sur GitHub</string>
@@ -227,6 +227,8 @@
     <string name="gamecompat_mode_on">Activé</string>
     <string name="gamecompat_mode_off">Désactivé</string>
     <string name="report_send">Envoyer le rapport</string>
+    <string name="report_description_label">Décrire le problème (facultatif)</string>
+    <string name="report_description_why">Quelques mots aident beaucoup : le rapport montre comment le jeu a tourné, pas ce qui a été vu.</string>
     <string name="report_status_sent">Rapport envoyé, merci.</string>
     <string name="report_status_waiting">Le rapport sera envoyé dès que cet appareil sera en ligne.</string>
     <string name="report_status_refused">Le rapport n\'a pas pu être envoyé.</string>
@@ -242,4 +244,6 @@
         <item quantity="one">Le jeu dit qu\'%1$d de ses gros fichiers manque, il ne peut donc pas charger ses données. La réparation le télécharge à nouveau.</item>
         <item quantity="other">Le jeu dit que %1$d de ses gros fichiers manquent, il ne peut donc pas charger ses données. La réparation les télécharge à nouveau.</item>
     </plurals>
+    <string name="report_contents_show">Voir ce que contient le rapport</string>
+    <string name="report_contents_hide">Masquer le contenu du rapport</string>
 </resources>

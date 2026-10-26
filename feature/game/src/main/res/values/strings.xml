@@ -185,7 +185,7 @@
     <string name="game_version_flat">Version without VR</string>
     <string name="report_open">Report a problem</string>
     <string name="report_title">Report a problem</string>
-    <string name="report_message">This sends the project a file that helps find why %1$s does not work. It holds technical facts only and no personal data; a ticket on GitHub can be opened too.</string>
+    <string name="report_message">This sends the project a technical file that helps find why %1$s does not work, with no personal data. A ticket on GitHub can be opened too.</string>
     <string name="report_contents">It contains the versions of GamePort, of the game and of its patch.\nThe device and its system.\nThe player\'s choices for the game, and how it ran, frame rate included.\nThe game\'s files and everything inside its APK.\nThe Steam interfaces it asks for.\nThe game\'s log, its start and its latest lines, and GamePort\'s.\nHow its last runs ended, with the crash report Android kept.\nWhat GamePort did for it, such as the download, the patch and the install.\nAccount numbers, e-mail addresses, network addresses and the account name are removed from the text files.</string>
     <string name="report_working">Preparing the report…</string>
     <string name="report_ticket">Create a ticket on GitHub</string>
@@ -228,6 +228,8 @@
     <string name="gamecompat_mode_on">On</string>
     <string name="gamecompat_mode_off">Off</string>
     <string name="report_send">Send the report</string>
+    <string name="report_description_label">Describe the problem (optional)</string>
+    <string name="report_description_why">A few words help a lot: the report shows how the game ran, not what was seen.</string>
     <string name="report_status_sent">Report sent, thanks.</string>
     <string name="report_status_waiting">The report will be sent as soon as this device is online.</string>
     <string name="report_status_refused">The report could not be sent.</string>
@@ -243,4 +245,6 @@
         <item quantity="one">The game says %1$d of its large files is missing, so it cannot load its data. Repairing downloads it again.</item>
         <item quantity="other">The game says %1$d of its large files are missing, so it cannot load its data. Repairing downloads them again.</item>
     </plurals>
+    <string name="report_contents_show">See what the report contains</string>
+    <string name="report_contents_hide">Hide what the report contains</string>
 </resources>

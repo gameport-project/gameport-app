@@ -128,4 +128,18 @@ class CompatTest {
         assertEquals(emptyList<CompatCounts>(), CompatSummary.parse("""{"v":1,"games":[]}""")!!.games)
         assertNull(CompatSummary.parse("""{"v":2,"games":[]}"""))
     }
+
+    @Test
+    fun `the symptoms players reported are read from the summary, most reported first, and an unknown code is left out`() {
+        val text = """{"v":1,"games":[{"appId":5,"works":1,"fails":3,"issues":{"no_sound":2,"slow":3,"from_the_future":9},
+            "devices":{"pico":{"works":1,"fails":3,"issues":{"slow":3,"no_sound":2,"from_the_future":9}}}}]}"""
+        val own = CompatSummary.parse(text)!!.of(5)!!.devices.getValue("pico")
+        assertEquals(listOf(Symptom.SLOW to 3, Symptom.NO_SOUND to 2), own.reported())
+    }
+
+    @Test
+    fun `a summary without symptoms reports none`() {
+        val text = """{"v":1,"games":[{"appId":5,"works":2,"fails":0,"devices":{"quest":{"works":2,"fails":0}}}]}"""
+        assertEquals(emptyList<Pair<Symptom, Int>>(), CompatSummary.parse(text)!!.of(5)!!.devices.getValue("quest").reported())
+    }
 }

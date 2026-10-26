@@ -95,6 +95,8 @@ class GameViewModel @Inject constructor(
     private val compat: app.gameport.core.sync.CompatRepository,
     incompatibleGames: app.gameport.core.settings.IncompatibleGames,
     private val launchOptions: app.gameport.core.steam.LaunchOptionsRepository,
+    private val verdicts: app.gameport.core.settings.GameVerdicts,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
 ) : ViewModel() {
     init {
         // The arguments Steam lists for starting the game are kept now, so the game starts with them even without a connection.
@@ -207,12 +209,16 @@ class GameViewModel @Inject constructor(
     internal val reportProgress: StateFlow<ReportProgress> = _reportProgress
 
     /** The report is made now and sent to the project, even when the automatic sending is off: the player asked. */
-    internal fun onSendReport(game: Game) {
+    internal fun onSendReport(game: Game, description: String? = null, symptoms: Set<app.gameport.core.model.Symptom> = emptySet()) {
         if (_reportProgress.value == ReportProgress.Working) return
+        // A problem reported by hand counts as "it did not work" for the players' totals, unless the player already said so; what was ticked goes with that answer.
+        val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
+        verdicts.reportedProblem(appId, version, java.time.LocalDate.now().toString())
+        if (symptoms.isNotEmpty()) verdicts.setIssues(appId, symptoms)
         viewModelScope.launch {
             _reportProgress.value = ReportProgress.Working
             val failure = ((uiState.value as? GameUiState.Content)?.install as? InstallState.Failed)?.error?.takeIf { it.reportable }?.toString()
-            val status = reportSender.sendByHand(game, failure)
+            val status = reportSender.sendByHand(game, failure, description, symptoms)
             _reportProgress.value = ReportProgress.Done(status)
             // The report said why it was made; the notice has done its job.
             if (status == app.gameport.core.sync.ReportStatus.SENT || status == app.gameport.core.sync.ReportStatus.WAITING) onDismissProblem()

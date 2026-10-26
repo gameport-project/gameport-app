@@ -52,4 +52,18 @@
     <string name="tour_leave">Leave the tour</string>
     <string name="tour_continue">Keep going</string>
     <string name="tour_help">Guided tour of this page</string>
+    <string name="symptom_no_image">Nothing shows (black screen)</string>
+    <string name="symptom_flat_window">A flat window instead of VR</string>
+    <string name="symptom_closes">Closes by itself</string>
+    <string name="symptom_stuck_loading">Stuck on loading</string>
+    <string name="symptom_no_controls">Controls missing or wrong</string>
+    <string name="symptom_no_sound">No sound</string>
+    <string name="symptom_no_online">Cannot play online</string>
+    <string name="symptom_slow">Slow or stuttering</string>
+    <string name="symptom_no_passthrough">No passthrough</string>
+    <string name="symptom_visual">Wrong colors or broken image</string>
+    <string name="symptom_other">Something else</string>
+    <string name="symptom_picker_label">What goes wrong?</string>
+    <string name="symptom_picker_hint">Choose one or more</string>
+    <string name="report_sent_big">Report sent</string>
 </resources>

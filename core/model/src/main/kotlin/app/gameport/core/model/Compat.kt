@@ -5,7 +5,17 @@ import kotlinx.serialization.json.Json
 
 /** What the players of one kind of device said about a game. [worksOffline] is part of [works]. */
 @Serializable
-data class DeviceCounts(val works: Int, val fails: Int, val worksOffline: Int = 0, val offlineOnly: Int = 0)
+data class DeviceCounts(
+    val works: Int,
+    val fails: Int,
+    val worksOffline: Int = 0,
+    val offlineOnly: Int = 0,
+    /** What players ticked as going wrong, by code of [Symptom] (see the relay's README). Only what the relay counted. */
+    val issues: Map<String, Int> = emptyMap(),
+) {
+    /** The symptoms players reported, most reported first; a code this version does not know is left out. */
+    fun reported(): List<Pair<Symptom, Int>> = issues.mapNotNull { (code, n) -> Symptom.parse(listOf(code)).firstOrNull()?.let { it to n } }.sortedWith(compareByDescending<Pair<Symptom, Int>> { it.second }.thenBy { it.first.ordinal })
+}
 
 /**
  * What the players said about one game, as the relay publishes it (see the relay's README): the totals, and the same for each kind of device
@@ -19,6 +29,7 @@ data class CompatCounts(
     val worksOffline: Int = 0,
     val devices: Map<String, DeviceCounts> = emptyMap(),
     val offlineOnly: Int = 0,
+    val issues: Map<String, Int> = emptyMap(),
 )
 
 @Serializable

@@ -35,8 +35,8 @@
     <string name="storegame_metacritic">Metacritic %1$d</string>
     <string name="storegame_open_steam">See on Steam</string>
     <string name="storegame_open_library">Open its page in my library</string>
-    <string name="storegame_multi_warning">Has a multiplayer part: it works in some games and not in others.</string>
-    <string name="storegame_multi_warning_detail">GamePort focuses on single player and saves. The online part of a game, its servers and its matchmaking, works for some games now and not yet for others, and the game may not start.</string>
+    <string name="storegame_multi_warning">Has a multiplayer part: it works in several games, and a few rare ones are blocked, for example by an APK protection.</string>
+    <string name="storegame_multi_warning_detail">The online part of a game, its servers and its matchmaking, works in several games. A few rare games will not work, because of an APK protection or another block.</string>
     <string name="storegame_add">Add to the library</string>
     <string name="storegame_adding">Adding…</string>
     <string name="storegame_add_title">Add to the library</string>

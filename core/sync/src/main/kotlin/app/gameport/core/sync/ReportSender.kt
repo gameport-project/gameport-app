@@ -173,8 +173,8 @@ class ReportSender @Inject constructor(
     }
 
     /** The player asked from the game's page: the report is made now and sent, even when the automatic sending is off. */
-    suspend fun sendByHand(game: Game, installFailure: String? = null): ReportStatus = lock.withLock {
-        val zip = reporter.bytes(game, installFailure = installFailure) ?: return ReportStatus.UNAVAILABLE
+    suspend fun sendByHand(game: Game, installFailure: String? = null, description: String? = null, symptoms: Set<app.gameport.core.model.Symptom> = emptySet()): ReportStatus = lock.withLock {
+        val zip = reporter.bytes(game, installFailure = installFailure, description = description, symptoms = symptoms) ?: return ReportStatus.UNAVAILABLE
         runCatching { outbox.put(game.appId, zip) }.onFailure {
             Log.w(TAG, "${game.appId}: the report could not be kept", it)
             return ReportStatus.UNAVAILABLE

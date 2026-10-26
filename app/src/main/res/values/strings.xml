@@ -17,8 +17,8 @@
     <string name="verdict_offline_only">Works offline only</string>
     <string name="verdict_later">Not now</string>
     <string name="report_title">Thanks for the answer</string>
-    <string name="report_intro">Sorry it did not work. To help find what went wrong, a small technical report goes with the answer. It holds the versions, files and logs of the game, never a name, an e-mail address or an account.</string>
-    <string name="report_intro_offline">Thanks for the answer. To help understand what does not work online, a small technical report goes with it. It holds the versions, files and logs of the game, never a name, an e-mail address or an account.</string>
+    <string name="report_intro">Sorry it did not work. A small technical report goes with the answer: versions, files and logs of the game, never a name, an e-mail address or an account.</string>
+    <string name="report_intro_offline">Thanks for the answer. A small technical report goes with it: versions, files and logs of the game, never a name, an e-mail address or an account.</string>
     <string name="report_status_working">Preparing the report…</string>
     <string name="report_status_sent">Report sent, thanks.</string>
     <string name="report_status_waiting">The report will be sent as soon as this device is online.</string>
@@ -29,6 +29,8 @@
     <string name="report_save_failed">The report could not be saved.</string>
     <string name="report_download">Download the report</string>
     <string name="report_send">Send the report</string>
+    <string name="report_description_label">Describe the problem (optional)</string>
+    <string name="report_description_why">A few words help a lot: the report shows how the game ran, not what was seen.</string>
     <string name="report_close">Close</string>
     <string name="whatsnew_games">Games concerned:</string>
     <plurals name="whatsnew_alert_title">

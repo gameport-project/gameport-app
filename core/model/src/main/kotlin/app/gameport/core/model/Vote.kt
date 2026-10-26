@@ -2,6 +2,7 @@ package app.gameport.core.model
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -41,6 +42,11 @@ data class VoteMessage(
     val gameBuild: String? = null,
     /** The game worked with GamePort's offline mode on (see [OfflineEvidence]). Only said when true. */
     val offline: Boolean = false,
+    /** What the player ticked as going wrong, as the codes of [Symptom]. Only said for an answer that is not "it worked", and only when there is something. */
+    val issues: List<String> = emptyList(),
+    /** What the device calls itself (`Build.MODEL`, `Build.DEVICE`), so the project can name the exact device behind [device]. Left out when empty. */
+    val model: String = "",
+    val codename: String = "",
 ) {
     fun toJson(): String = buildJsonObject {
         put("v", 1)
@@ -51,6 +57,9 @@ data class VoteMessage(
         put("voter", voter)
         gameBuild?.let { put("game", JsonPrimitive(it)) }
         if (offline) put("offline", true)
+        if (issues.isNotEmpty()) put("issues", JsonArray(issues.map { JsonPrimitive(it) }))
+        if (model.isNotBlank()) put("model", model.trim())
+        if (codename.isNotBlank()) put("codename", codename.trim())
     }.toString()
 }
 
@@ -63,10 +72,12 @@ data class GameVerdict(
     val sent: Boolean = true,
     /** The answer was "it worked", and the game had been played with the offline mode on. */
     val offline: Boolean = false,
+    /** What the player ticked as going wrong with the answer, as codes of [Symptom]. */
+    val issues: List<String> = emptyList(),
 )
 
 /** An answer that has not reached the relay yet. */
-data class Answer(val appId: Int, val verdict: Verdict, val offline: Boolean)
+data class Answer(val appId: Int, val verdict: Verdict, val offline: Boolean, val issues: List<String> = emptyList())
 
 /** The last sign of life of a game that is being played: when, and whether it was "the game left the screen". Kept on disk, so it outlives GamePort. */
 @Serializable
@@ -129,8 +140,29 @@ data class VerdictBook(
     fun dismissed(appId: Int, appVersion: String, today: String): VerdictBook =
         copy(games = games + (appId to (games[appId] ?: GameVerdict()).copy(askedFor = appVersion, askedDay = today)), pending = pending - appId)
 
+    /**
+     * What went wrong, ticked by the player after an answer that says something did: it is written with the answer, which goes again to the relay
+     * (the relay keeps one answer for a player and a game, so it replaces the first). Nothing is kept for "it worked", or when nothing changed.
+     */
+    fun withIssues(appId: Int, symptoms: Set<Symptom>, send: Boolean): VerdictBook {
+        val game = games[appId] ?: return this
+        if (game.verdict != Verdict.FAILS.wire && game.verdict != Verdict.OFFLINE_ONLY.wire) return this
+        val codes = Symptom.write(symptoms).split(',').filter { it.isNotEmpty() }
+        return if (codes == game.issues) this else copy(games = games + (appId to game.copy(issues = codes, sent = !send)))
+    }
+
+    /**
+     * The player reported a problem with the game by hand: that counts as "it did not work", unless they already said so, or said it only works without the
+     * network (the report then adds to that answer, it does not replace it). The answer goes to the relay with the next ones.
+     */
+    fun reportedProblem(appId: Int, appVersion: String, today: String, send: Boolean): VerdictBook {
+        val known = games[appId]?.verdict
+        if (known == Verdict.FAILS.wire || known == Verdict.OFFLINE_ONLY.wire) return this
+        return answered(appId, Verdict.FAILS, appVersion, today, send)
+    }
+
     /** The answers the relay has not received yet. */
-    fun unsent(): List<Answer> = games.mapNotNull { (appId, game) -> if (!game.sent) Verdict.fromWire(game.verdict)?.let { Answer(appId, it, game.offline) } else null }
+    fun unsent(): List<Answer> = games.mapNotNull { (appId, game) -> if (!game.sent) Verdict.fromWire(game.verdict)?.let { Answer(appId, it, game.offline, game.issues) } else null }
 
     /** The relay received this answer, unless the player changed it meanwhile. */
     fun sent(appId: Int, verdict: Verdict): VerdictBook {

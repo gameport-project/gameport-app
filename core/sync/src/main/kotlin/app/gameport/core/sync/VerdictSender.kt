@@ -98,9 +98,11 @@ class VerdictSender @Inject constructor(
         lock.withLock {
             if (!verdicts.share.value) return
             val kind = device.kind
+            val model = device.model
+            val codename = device.codename
             sendAnswers(
                 verdicts.book.value.unsent(),
-                { answer -> VoteMessage(answer.appId, answer.verdict, appVersion, kind, verdicts.voterId, offline = answer.offline) },
+                { answer -> VoteMessage(answer.appId, answer.verdict, appVersion, kind, verdicts.voterId, offline = answer.offline, issues = answer.issues, model = model, codename = codename) },
                 transport,
             ) { answer -> verdicts.update { it.sent(answer.appId, answer.verdict) } }
         }

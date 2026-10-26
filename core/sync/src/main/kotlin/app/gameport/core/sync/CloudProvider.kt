@@ -45,6 +45,7 @@ internal interface CloudEntryPoint {
 
     fun verdictAsker(): VerdictAsker
 
+
     fun lifeWatch(): LifeWatch
 
     fun steamAchievements(): SteamAchievementSync

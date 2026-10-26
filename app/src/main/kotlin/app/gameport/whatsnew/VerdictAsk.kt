@@ -24,12 +24,16 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -48,7 +52,10 @@ import app.gameport.core.designsystem.dialogMaxHeight
 import app.gameport.core.model.AuthState
 import app.gameport.core.model.Verdict
 import app.gameport.core.settings.GameVerdicts
+import app.gameport.core.model.Symptom
+import app.gameport.core.designsystem.SymptomPicker
 import app.gameport.core.sync.ProblemReporter
+import app.gameport.core.sync.ReportDescription
 import app.gameport.core.sync.ReportSender
 import app.gameport.core.sync.ReportStatus
 import app.gameport.core.steam.SteamAuthRepository
@@ -74,7 +81,7 @@ data class VerdictQuestion(val appId: Int, val name: String, val shared: Boolean
  * The window that follows the answer "it did not work": what became of the technical report, and the two ways to take it. [status] is null while the
  * report is being made. [busy] is true while the player's own request is being dealt with.
  */
-data class ReportFollowUp(val appId: Int, val status: ReportStatus?, val busy: Boolean = false, val savedName: String? = null, val saveFailed: Boolean = false, val offlineOnly: Boolean = false)
+data class ReportFollowUp(val appId: Int, val status: ReportStatus?, val busy: Boolean = false, val savedName: String? = null, val saveFailed: Boolean = false, val offlineOnly: Boolean = false, val describedAndSent: Boolean = false)
 
 /**
  * Asks, once a game has closed, whether it worked. The game waits in [GameVerdicts] (see `VerdictAsker`) until GamePort is on screen and the
@@ -118,26 +125,41 @@ class VerdictAskViewModel @Inject constructor(
 
     private suspend fun gameOf(appId: Int) = library.observeLibrary().first().games.firstOrNull { it.appId == appId }
 
-    fun onSendReport() {
+    /**
+     * The player sends the report. With a description, the report is made again with it and replaces the one that went first (the relay keeps one
+     * report for a player and a game); without one, the report that was made goes.
+     */
+    fun onSendReport(description: String, symptoms: Set<Symptom>) {
         val current = _followUp.value?.takeIf { !it.busy } ?: return
         _followUp.value = current.copy(busy = true)
+        // What went wrong goes with the answer itself, so that it can be counted (the report keeps the detail).
+        verdicts.setIssues(current.appId, symptoms)
+        val detailed = ReportDescription.of(description) != null || symptoms.isNotEmpty()
         viewModelScope.launch {
-            val status = reports.sendNow(current.appId)
-            _followUp.update { it?.copy(status = status, busy = false) }
+            val status = if (!detailed) reports.sendNow(current.appId)
+            else gameOf(current.appId)?.let { reports.sendByHand(it, description = description, symptoms = symptoms) } ?: ReportStatus.UNAVAILABLE
+            _followUp.update { it?.copy(status = status, busy = false, describedAndSent = it.describedAndSent || (detailed && (status == ReportStatus.SENT || status == ReportStatus.WAITING))) }
         }
     }
 
-    fun onDownloadReport() {
+    fun onDownloadReport(description: String, symptoms: Set<Symptom>) {
         val current = _followUp.value?.takeIf { !it.busy } ?: return
         _followUp.value = current.copy(busy = true, saveFailed = false)
+        verdicts.setIssues(current.appId, symptoms)
         viewModelScope.launch {
-            val saved = gameOf(current.appId)?.let { reporter.save(it) }
+            val saved = gameOf(current.appId)?.let { reporter.save(it, description = description, symptoms = symptoms) }
             _followUp.update { it?.copy(busy = false, savedName = saved?.fileName, saveFailed = saved == null) }
         }
     }
 
-    fun onCloseReport() {
+    /** Closing with a description that has not gone yet sends it, when the player lets reports go by themselves: they wrote it to be read. */
+    fun onCloseReport(description: String, symptoms: Set<Symptom>) {
+        val current = _followUp.value
         _followUp.value = null
+        if (current != null) verdicts.setIssues(current.appId, symptoms)
+        if (current != null && !current.describedAndSent && (ReportDescription.of(description) != null || symptoms.isNotEmpty()) && verdicts.share.value) {
+            viewModelScope.launch { gameOf(current.appId)?.let { reports.sendByHand(it, description = description, symptoms = symptoms) } }
+        }
     }
 
     fun onLater() {
@@ -201,8 +223,23 @@ fun VerdictAskHost(viewModel: VerdictAskViewModel = hiltViewModel()) {
 
 /** After "it did not work": the report that goes with the answer, what became of it, and the two ways to take it by hand. Closed by its button only. */
 @Composable
-private fun ReportFollowUpDialog(state: ReportFollowUp, onDownload: () -> Unit, onSend: () -> Unit, onClose: () -> Unit) {
+private fun ReportFollowUpDialog(state: ReportFollowUp, onDownload: (String, Set<Symptom>) -> Unit, onSend: (String, Set<Symptom>) -> Unit, onClose: (String, Set<Symptom>) -> Unit) {
+    // What the player writes goes in the report, in their own words: the files show how the game ran, not what was seen.
+    var description by rememberSaveable { mutableStateOf("") }
+    // What was ticked as going wrong goes in the report as fixed codes, which the project can count.
+    var codes by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    val symptoms = Symptom.parse(codes)
+    val written = ReportDescription.of(description) != null || symptoms.isNotEmpty()
     val ready = state.status != null && state.status != ReportStatus.UNAVAILABLE
+    // The report is sent by itself when the window opens; only a send the player asked for closes the window, once the project has it (with the description, if one was written).
+    var sentByHand by rememberSaveable { mutableStateOf(false) }
+    val sentNow = sentByHand && !state.busy && state.status == ReportStatus.SENT && (!written || state.describedAndSent)
+    androidx.compose.runtime.LaunchedEffect(sentByHand, state.busy, state.status, state.describedAndSent) {
+        if (sentNow) {
+            kotlinx.coroutines.delay(1_500L)
+            onClose(description, symptoms)
+        }
+    }
     BackdropDialog(
         onDismissRequest = {},
         maxHeight = dialogMaxHeight(),
@@ -213,7 +250,7 @@ private fun ReportFollowUpDialog(state: ReportFollowUp, onDownload: () -> Unit, 
             }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (sentNow) app.gameport.core.designsystem.ReportSentMark() else Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(if (state.offlineOnly) R.string.report_intro_offline else R.string.report_intro))
                 val (message, color) = when (state.status) {
                     null -> R.string.report_status_working to MaterialTheme.colorScheme.onSurfaceVariant
@@ -224,6 +261,18 @@ private fun ReportFollowUpDialog(state: ReportFollowUp, onDownload: () -> Unit, 
                     ReportStatus.UNAVAILABLE -> R.string.report_status_unavailable to MaterialTheme.colorScheme.onSurfaceVariant
                 }
                 Text(stringResource(message), color = color)
+                SymptomPicker(selected = symptoms, onToggle = { symptom -> codes = (if (symptom in symptoms) symptoms - symptom else symptoms + symptom).map { it.code } })
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it.take(ReportDescription.MAX) },
+                    label = { Text(stringResource(R.string.report_description_label)) },
+                    supportingText = { Text(stringResource(R.string.report_description_why)) },
+                    minLines = 2,
+                    maxLines = 5,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                    colors = app.gameport.core.designsystem.glassTextFieldColors(),
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 state.savedName?.let { Text(stringResource(R.string.report_saved, it), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
                 if (state.saveFailed) Text(stringResource(R.string.report_save_failed), color = FailsRed, style = MaterialTheme.typography.bodySmall)
             }
@@ -232,21 +281,21 @@ private fun ReportFollowUpDialog(state: ReportFollowUp, onDownload: () -> Unit, 
             CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (ready) {
-                        GlassButton(onClick = onDownload, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)) {
+                        GlassButton(onClick = { onDownload(description, symptoms) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)) {
                             Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(stringResource(R.string.report_download), maxLines = 1)
                         }
-                        // Not offered once the relay has it.
-                        if (state.status != ReportStatus.SENT) {
-                            GlassButton(onClick = onSend, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)) {
+                        // Not offered once the relay has it, unless there is a description it does not have yet.
+                        if (state.status != ReportStatus.SENT || (written && !state.describedAndSent)) {
+                            GlassButton(onClick = { sentByHand = true; onSend(description, symptoms) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)) {
                                 Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
                                 Text(stringResource(R.string.report_send), maxLines = 1)
                             }
                         }
                     }
-                    CloseButton(onClose)
+                    CloseButton { onClose(description, symptoms) }
                 }
             }
         },

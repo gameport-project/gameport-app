@@ -34,6 +34,7 @@ import app.gameport.core.model.CompatCounts
 import app.gameport.core.model.CompatLevel
 import app.gameport.core.designsystem.FewAnswersNote
 import app.gameport.core.model.CompatRules
+import app.gameport.core.designsystem.symptomLabel
 import app.gameport.core.model.DeviceCounts
 
 /** The colour of the mark in the header: the orange of the compatibility labels. */
@@ -139,6 +140,14 @@ internal fun DeviceLine(counts: CompatCounts, kind: String, own: DeviceCounts, m
         )
         if (parts.isNotEmpty()) {
             Text(parts.joinToString(" · "), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+        // What players say went wrong, when some did: the reason behind a verdict.
+        own.reported().takeIf { it.isNotEmpty() }?.let { reported ->
+            Text(
+                stringResource(R.string.compat_reported, reported.map { (symptom, n) -> "${symptomLabel(symptom).replaceFirstChar { c -> c.lowercase() }} ($n)" }.joinToString(", ")),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
         if (own.worksOffline > 0) {
             Text(

@@ -45,6 +45,12 @@ class GameVerdicts @Inject constructor(@ApplicationContext context: Context) {
 
     fun answer(appId: Int, verdict: Verdict, appVersion: String, today: String) = update { it.answered(appId, verdict, appVersion, today, send = _share.value) }
 
+    /** A problem reported by hand counts as "it did not work" (see [VerdictBook.reportedProblem]). */
+    fun reportedProblem(appId: Int, appVersion: String, today: String) = update { it.reportedProblem(appId, appVersion, today, send = _share.value) }
+
+    /** What the player ticked as going wrong with the answer they gave for [appId]: it goes to the relay with that answer (see [VerdictBook.withIssues]). */
+    fun setIssues(appId: Int, symptoms: Set<app.gameport.core.model.Symptom>) = update { it.withIssues(appId, symptoms, send = _share.value) }
+
     private fun newVoterId(): String = ByteArray(16).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
 
     private companion object {

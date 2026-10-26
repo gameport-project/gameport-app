@@ -41,6 +41,12 @@ class DeviceProfile @Inject constructor(
 
     val isHeadset: Boolean get() = vrPlatform != null
 
+    /** What the device calls itself (`Build.MODEL`), sent with a vote next to the kind of device so the project can name the exact one. No serial number, no fingerprint. */
+    val model: String get() = info.model
+
+    /** The codename of the device (`Build.DEVICE`), same use as [model]. A debug build that takes itself for a Quest takes the codename of a Quest 3 too. */
+    val codename: String by lazy { if (takesItselfForAQuest()) "eureka" else Build.DEVICE.orEmpty() }
+
     /** The kind of device in the few words the project's totals use ("quest", "pico", "phone", "tablet", "other"): nothing finer than that leaves the device. */
     val kind: String by lazy { VoteDevice.of(vrPlatform?.id, context.resources.configuration.smallestScreenWidthDp >= TABLET_DP) }
 

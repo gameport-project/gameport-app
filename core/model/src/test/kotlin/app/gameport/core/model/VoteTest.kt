@@ -27,6 +27,16 @@ class VoteTest {
     }
 
     @Test
+    fun `the model and the codename are sent when the device has them, trimmed, and left out when empty or blank`() {
+        val with = VoteMessage(1, Verdict.FAILS, "0.9.0", "quest", "0123456789abcdef0123456789abcdef", model = " Quest 3 ", codename = "eureka")
+        val json = Json.parseToJsonElement(with.toJson()).jsonObject
+        assertEquals("Quest 3", json.getValue("model").jsonPrimitive.content)
+        assertEquals("eureka", json.getValue("codename").jsonPrimitive.content)
+        val without = Json.parseToJsonElement(VoteMessage(1, Verdict.FAILS, "0.9.0", "phone", "0123456789abcdef0123456789abcdef", model = "  ").toJson()).jsonObject
+        assertEquals(setOf("v", "appId", "verdict", "app", "device", "voter"), without.keys)
+    }
+
+    @Test
     fun `the game build is sent only when there is one`() {
         val with = VoteMessage(1, Verdict.FAILS, "0.7.2", "pico", "0123456789abcdef0123456789abcdef", "b-1.2")
         assertEquals("b-1.2", Json.parseToJsonElement(with.toJson()).jsonObject.getValue("game").jsonPrimitive.content)
@@ -237,5 +247,61 @@ class VoteTest {
         val book = VerdictBook.fromJson(old)
         assertEquals(setOf(2), book.pending)
         assertTrue(book.openRuns.isEmpty())
+    }
+
+    @Test
+    fun `what was ticked goes with a failing answer and sends it again`() {
+        val answered = VerdictBook().answered(1, Verdict.FAILS, "0.9.0", "2026-10-26", send = true).sent(1, Verdict.FAILS)
+        assertTrue(answered.unsent().isEmpty())
+        val ticked = answered.withIssues(1, setOf(Symptom.NO_SOUND, Symptom.NO_IMAGE), send = true)
+        val again = ticked.unsent().single()
+        assertEquals(listOf("no_image", "no_sound"), again.issues)
+        // The same ticks again change nothing; and the vote that went is not sent a third time.
+        assertEquals(ticked, ticked.withIssues(1, setOf(Symptom.NO_IMAGE, Symptom.NO_SOUND), send = true))
+    }
+
+    @Test
+    fun `nothing is kept for an answer that worked, or for a game that was not answered`() {
+        val worked = VerdictBook().answered(1, Verdict.WORKS, "0.9.0", "2026-10-26", send = true)
+        assertEquals(worked, worked.withIssues(1, setOf(Symptom.SLOW), send = true))
+        assertEquals(VerdictBook(), VerdictBook().withIssues(9, setOf(Symptom.SLOW), send = true))
+    }
+
+    @Test
+    fun `a new answer starts without the ticks of the one before`() {
+        val first = VerdictBook().answered(1, Verdict.FAILS, "0.9.0", "d", send = true).withIssues(1, setOf(Symptom.CLOSES), send = true)
+        assertTrue(first.answered(1, Verdict.OFFLINE_ONLY, "0.9.0", "d", send = true).unsent().single().issues.isEmpty())
+    }
+
+    @Test
+    fun `the message carries the ticks only when there are some`() {
+        val base = VoteMessage(1, Verdict.FAILS, "0.9.0", "pico", "v".repeat(32))
+        assertTrue(!base.toJson().contains("issues"))
+        assertTrue(base.copy(issues = listOf("no_sound", "slow")).toJson().contains("\"issues\":[\"no_sound\",\"slow\"]"))
+    }
+
+    @Test
+    fun `a problem reported by hand counts as it did not work, for a game with no answer or one that worked`() {
+        val none = VerdictBook().reportedProblem(7, "0.9.0", day1, send = true)
+        assertEquals(Verdict.FAILS.wire, none.games[7]?.verdict)
+        assertEquals(listOf(Answer(7, Verdict.FAILS, false)), none.unsent())
+        val worked = VerdictBook().answered(7, Verdict.WORKS, "0.8.0", day1, send = true).sent(7, Verdict.WORKS).reportedProblem(7, "0.9.0", day2, send = true)
+        assertEquals(Verdict.FAILS.wire, worked.games[7]?.verdict)
+        assertEquals(false, worked.games[7]?.sent)
+    }
+
+    @Test
+    fun `a problem reported by hand leaves an answer that already says it did not work, or works only offline`() {
+        val failed = VerdictBook().answered(7, Verdict.FAILS, "0.8.0", day1, send = true).sent(7, Verdict.FAILS)
+        assertEquals(failed, failed.reportedProblem(7, "0.9.0", day2, send = true))
+        val offline = VerdictBook().answered(7, Verdict.OFFLINE_ONLY, "0.8.0", day1, send = true).sent(7, Verdict.OFFLINE_ONLY)
+        assertEquals(offline, offline.reportedProblem(7, "0.9.0", day2, send = true))
+    }
+
+    @Test
+    fun `a problem reported by hand is kept on the device when the player does not share`() {
+        val book = VerdictBook().reportedProblem(7, "0.9.0", day1, send = false)
+        assertEquals(Verdict.FAILS.wire, book.games[7]?.verdict)
+        assertEquals(emptyList<Answer>(), book.unsent())
     }
 }

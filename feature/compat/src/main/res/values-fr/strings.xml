@@ -38,4 +38,5 @@
     <string name="compat_hide_others">Masquer les autres</string>
     <string name="compat_filter_works">Fonctionne</string>
     <string name="compat_filter_fails">Ne fonctionne pas</string>
+    <string name="compat_reported">Les joueurs signalent : %1$s</string>
 </resources>

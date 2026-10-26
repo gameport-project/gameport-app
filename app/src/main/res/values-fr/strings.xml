@@ -17,8 +17,8 @@
     <string name="verdict_offline_only">Marche hors ligne seulement</string>
     <string name="verdict_later">Pas maintenant</string>
     <string name="report_title">Merci pour la réponse</string>
-    <string name="report_intro">Dommage que ça n\'ait pas marché. Pour aider à comprendre ce qui a posé problème, un petit rapport technique accompagne la réponse. Il contient les versions, les fichiers et les journaux du jeu, jamais un nom, une adresse e-mail ou un compte.</string>
-    <string name="report_intro_offline">Merci pour la réponse. Pour aider à comprendre ce qui ne marche pas en ligne, un petit rapport technique l\'accompagne. Il contient les versions, les fichiers et les journaux du jeu, jamais un nom, une adresse e-mail ou un compte.</string>
+    <string name="report_intro">Dommage que ça n\'ait pas marché. Un petit rapport technique accompagne la réponse : versions, fichiers et journaux du jeu, jamais un nom, une adresse e-mail ou un compte.</string>
+    <string name="report_intro_offline">Merci pour la réponse. Un petit rapport technique l\'accompagne : versions, fichiers et journaux du jeu, jamais un nom, une adresse e-mail ou un compte.</string>
     <string name="report_status_working">Préparation du rapport…</string>
     <string name="report_status_sent">Rapport envoyé, merci.</string>
     <string name="report_status_waiting">Le rapport sera envoyé dès que cet appareil sera connecté.</string>
@@ -29,6 +29,8 @@
     <string name="report_save_failed">Le rapport n\'a pas pu être enregistré.</string>
     <string name="report_download">Télécharger le rapport</string>
     <string name="report_send">Envoyer le rapport</string>
+    <string name="report_description_label">Décrire le problème (facultatif)</string>
+    <string name="report_description_why">Quelques mots aident beaucoup : le rapport montre comment le jeu a tourné, pas ce qui a été vu.</string>
     <string name="report_close">Fermer</string>
     <string name="whatsnew_games">Jeux concernés :</string>
     <plurals name="whatsnew_alert_title">

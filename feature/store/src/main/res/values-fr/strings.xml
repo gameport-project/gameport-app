@@ -34,8 +34,8 @@
     <string name="storegame_players_fails">Problèmes, selon les joueurs</string>
     <string name="storegame_metacritic">Metacritic %1$d</string>
     <string name="storegame_open_steam">Voir sur Steam</string>
-    <string name="storegame_multi_warning">A une partie multijoueur : elle fonctionne pour certains jeux et pas pour d\'autres.</string>
-    <string name="storegame_multi_warning_detail">GamePort se concentre sur le jeu solo et les sauvegardes. La partie en ligne d\'un jeu, ses serveurs et son matchmaking, fonctionne pour certains jeux et pas encore pour d\'autres, et le jeu peut ne pas démarrer.</string>
+    <string name="storegame_multi_warning">A une partie multijoueur : elle fonctionne dans plusieurs jeux, et quelques rares jeux sont bloqués, par exemple par une protection de l\'APK.</string>
+    <string name="storegame_multi_warning_detail">La partie en ligne d\'un jeu, ses serveurs et son matchmaking, fonctionne dans plusieurs jeux. Quelques rares jeux ne fonctionneront pas, à cause d\'une protection de l\'APK ou d\'un autre blocage.</string>
     <string name="storegame_add">Ajouter à la bibliothèque</string>
     <string name="storegame_adding">Ajout…</string>
     <string name="storegame_add_title">Ajouter à la bibliothèque</string>
