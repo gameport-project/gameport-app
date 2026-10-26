@@ -303,6 +303,8 @@ class GameInstallRepository @Inject constructor(
                 // A game that was left incomplete is already on the device: only its data is placed again.
                 val alreadyOnDevice = incomplete.all()[game.appId] == packageName && packages.isInstalled(packageName)
                 if (alreadyOnDevice) events.note(game.appId, "$packageName is already on the device, incomplete: only its expansion files are placed again")
+                // The build this download holds, read now: the folder no longer has it once the files are placed.
+                val downloadedManifests = DownloadedManifests.read(directory)
                 setState(game.appId, InstallState.Installing)
                 when (val outcome = if (alreadyOnDevice) PackageGateway.Outcome.Success else packages.install(apks)) {
                     PackageGateway.Outcome.Success -> {
@@ -329,7 +331,7 @@ class GameInstallRepository @Inject constructor(
                         // The arguments Steam lists for starting it, kept for when it is started without a connection.
                         scope.launch { launchOptions.refresh(game.appId) }
                         // What this install came from, to recognise a newer build later.
-                        builds.put(game.appId, InstalledBuild(depots.associate { it.id to it.manifestId }, chosen, expansionBytes))
+                        builds.put(game.appId, InstalledBuild(depots.associate { it.id to (downloadedManifests[it.id] ?: it.manifestId) }, chosen, expansionBytes))
                         updates.markCurrent(game.appId)
                         // The game is ready: Play shows now. Clearing the work folder (possibly gigabytes) is not waited for.
                         clearState(game.appId)
