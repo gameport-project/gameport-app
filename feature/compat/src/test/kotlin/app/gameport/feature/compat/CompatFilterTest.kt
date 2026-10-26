@@ -40,4 +40,17 @@ class CompatFilterTest {
         // Answers of another kind of device do not count for this one.
         assertEquals(false, matches(entry(4, 0, 0), CompatFilter.WORKS, "pico"))
     }
+
+    @Test
+    fun `a VR game is left off the page of a phone or a tablet, and stays on a headset`() {
+        val vr = entry(4, 0, 0).copy(vr = true)
+        assertEquals(false, shownOnDevice(vr, isHeadset = false))
+        assertEquals(true, shownOnDevice(vr, isHeadset = true))
+    }
+
+    @Test
+    fun `a flat game or one not known to be VR stays on every device`() {
+        assertEquals(true, shownOnDevice(entry(4, 0, 0).copy(vr = false), isHeadset = false))
+        assertEquals(true, shownOnDevice(entry(4, 0, 0), isHeadset = false))
+    }
 }

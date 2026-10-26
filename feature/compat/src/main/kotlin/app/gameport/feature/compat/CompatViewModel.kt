@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** One game of the page: what the players said, its name when it is known, and whether the account has it. */
-data class CompatEntry(val counts: CompatCounts, val name: String?, val inLibrary: Boolean, val art: app.gameport.core.model.Art) {
+data class CompatEntry(val counts: CompatCounts, val name: String?, val inLibrary: Boolean, val art: app.gameport.core.model.Art, val vr: Boolean? = null) {
     val players: Int get() = counts.works + counts.offlineOnly + counts.fails
 }
 
@@ -48,6 +48,9 @@ internal fun matches(entry: CompatEntry, filter: CompatFilter, deviceKind: Strin
     }
 }
 
+/** Whether a game belongs on the page of this device: a VR game means nothing on a phone or a tablet. A game not known to be VR (not in the library or the catalog) stays. */
+internal fun shownOnDevice(entry: CompatEntry, isHeadset: Boolean): Boolean = isHeadset || entry.vr != true
+
 /** The games players reported, with names from the account's library and, for the other games, from Steam. */
 private fun entries(summaryGames: List<CompatCounts>, library: Map<Int, app.gameport.core.model.Game>, steamNames: Map<Int, String>, catalog: app.gameport.core.model.AndroidCatalog?) =
     summaryGames.map {
@@ -55,7 +58,7 @@ private fun entries(summaryGames: List<CompatCounts>, library: Map<Int, app.game
         val art = library[it.appId]?.capsuleArt
             ?: catalog?.of(it.appId)?.art(app.gameport.core.model.ArtSlot.COVER, app.gameport.core.model.ArtSlot.HEADER, app.gameport.core.model.ArtSlot.BANNER, app.gameport.core.model.ArtSlot.CAPSULE)
             ?: app.gameport.core.model.Covers.capsule(it.appId)
-        CompatEntry(it, library[it.appId]?.name ?: steamNames[it.appId], inLibrary = it.appId in library, art = art)
+        CompatEntry(it, library[it.appId]?.name ?: steamNames[it.appId], inLibrary = it.appId in library, art = art, vr = library[it.appId]?.androidBuild?.isVr ?: catalog?.of(it.appId)?.vr)
     }
 
 @HiltViewModel
@@ -81,6 +84,7 @@ class CompatViewModel @Inject constructor(
         val needle = text.trim()
         val shown = entries(summary.games.filter { it.appId !in leftOut }, lib.games.associateBy { it.appId }, steamNames, cat)
             .filter { needle.isEmpty() || it.name?.contains(needle, ignoreCase = true) == true || it.counts.appId.toString().contains(needle) }
+            .filter { shownOnDevice(it, device.isHeadset) }
             .filter { matches(it, chosen, device.kind) }
             // The most reported games first, then by name; a game whose name is not known goes after the ones that have one.
             .sortedWith(compareByDescending<CompatEntry> { it.players }.thenBy { it.name == null }.thenBy { it.name.orEmpty().lowercase() })
