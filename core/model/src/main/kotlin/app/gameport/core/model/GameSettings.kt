@@ -18,19 +18,21 @@ enum class PassthroughMode { AUTO, ON, OFF }
 
 /**
  * The games whose VR build leaves out the declaration that lets the headset show the real world behind them, though they have a setting for it (Cubism, since an
- * update of the game). Steam does not say which games use the passthrough, and nothing the game does at run time tells it apart, so this is a list kept by hand:
- * it grows as players report a game whose passthrough does not work.
+ * update of the game). Steam does not say which games use the passthrough, and nothing the game does at run time tells it apart, so this is a list kept by hand: the
+ * developer adds a game to it in the relay's console as players report one whose passthrough does not work, and the app reads it ([GameDefaultsList.passthrough], passed
+ * here as [told]). The games below are the ones the app has always known, kept for when the relay cannot be read.
  */
 object PassthroughGames {
     private val APP_IDS = setOf(804530)
 
-    fun wanted(appId: Int): Boolean = appId in APP_IDS
+    /** [told]: the games the console says declare the passthrough, on top of the ones built in. */
+    fun wanted(appId: Int, told: Set<Int> = emptySet()): Boolean = appId in APP_IDS || appId in told
 
     /** Whether the declaration is given to [appId]: the player's choice, or the list when they left it automatic. */
-    fun declared(mode: PassthroughMode, appId: Int): Boolean = when (mode) {
+    fun declared(mode: PassthroughMode, appId: Int, told: Set<Int> = emptySet()): Boolean = when (mode) {
         PassthroughMode.ON -> true
         PassthroughMode.OFF -> false
-        PassthroughMode.AUTO -> wanted(appId)
+        PassthroughMode.AUTO -> wanted(appId, told)
     }
 }
 

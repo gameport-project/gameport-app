@@ -11,6 +11,7 @@ import app.gameport.core.model.PassthroughGames
 import app.gameport.core.model.PassthroughMode
 import app.gameport.core.model.RecenterMode
 import app.gameport.core.settings.ControllerMappingStore
+import app.gameport.core.settings.GameDefaults
 import app.gameport.core.settings.GameSettingsStore
 import app.gameport.core.steam.SteamLibraryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -28,6 +29,7 @@ class GameCompatViewModel @Inject constructor(
     library: SteamLibraryRepository,
     private val controllers: ControllerMappingStore,
     private val settings: GameSettingsStore,
+    private val gameDefaults: GameDefaults,
     private val installer: GameInstallRepository,
 ) : ViewModel() {
     private val appId = savedStateHandle.toRoute<GameCompatRoute>().appId
@@ -71,13 +73,14 @@ class GameCompatViewModel @Inject constructor(
 
     /** Whether the game declares the headset's passthrough feature: automatic follows the list of games known to need it. A change patches the game again, which applies it. */
     fun onPassthroughChosen(mode: PassthroughMode) {
-        val before = PassthroughGames.declared(gameSettings.value.passthrough, appId)
+        val told = gameDefaults.list.passthrough
+        val before = PassthroughGames.declared(gameSettings.value.passthrough, appId, told)
         settings.set(appId, gameSettings.value.copy(passthrough = mode))
-        if (PassthroughGames.declared(mode, appId) != before) installer.repatch(appId)
+        if (PassthroughGames.declared(mode, appId, told) != before) installer.repatch(appId)
     }
 
     /** True when the list, and not the player, gives this game the declaration. */
-    val passthroughListed: Boolean = PassthroughGames.wanted(appId)
+    val passthroughListed: Boolean get() = PassthroughGames.wanted(appId, gameDefaults.list.passthrough)
 
     /** Automatic gives the game the stand-in when it needs one, off takes away the one GamePort gave. Either way the game is patched again, which applies the choice. */
     fun onOvrPluginStandInChosen(automatic: Boolean) {

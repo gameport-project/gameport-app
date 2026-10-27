@@ -14,6 +14,7 @@ import app.gameport.core.model.reportable
 import app.gameport.core.model.ObbNames
 import app.gameport.core.model.VersionOption
 import app.gameport.core.model.AuthState
+import app.gameport.core.settings.GameDefaults
 import app.gameport.core.patch.GamePatcher
 import app.gameport.core.patch.ApkPatch
 import app.gameport.core.patch.PatchCatalog
@@ -77,7 +78,10 @@ class GameInstallRepository @Inject constructor(
     private val events: GameEventLog,
     private val launchOptions: app.gameport.core.steam.LaunchOptionsRepository,
     private val gameSettings: app.gameport.core.settings.GameSettingsStore,
+    private val gameDefaults: GameDefaults,
     private val reinstallNotice: app.gameport.core.settings.ReinstallNoticeStore,
+    private val userSettings: app.gameport.core.settings.UserSettings,
+    private val memoryNotice: MemoryNotice,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val operations = MutableStateFlow<Map<Int, InstallState>>(emptyMap())
@@ -279,6 +283,7 @@ class GameInstallRepository @Inject constructor(
                     events.note(game.appId, "patching ${downloaded.size} file(s)")
                     // Read before waiting for the lock, so the network is never asked while another game is being patched.
                     val shimFiles = shimAchievements(game.appId)
+                    runCatching { gameDefaults.refreshIfStale(GameDefaults.FOR_A_PATCH_MS) }
                     // Patching rewrites multi-gigabyte files, so one game at a time.
                     patchedDirectory(directory).deleteRecursively()
                     apks = patchLock.withLock { downloaded.map { original ->
@@ -287,7 +292,7 @@ class GameInstallRepository @Inject constructor(
                         // Written under another name and renamed when complete, so an interrupted
                         // patch is never mistaken for a finished one.
                         val partial = File(patched.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || installed.all()[game.appId]?.let(::deviceHasExpansion) == true, vrGameActivity = gameSettings.get(game.appId).openInVr, ovrPluginStandIn = gameSettings.get(game.appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(game.appId).passthrough, game.appId), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlcOf(game), missingDlc = missingDlcOf(game), familyShared = game.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = downloadHasExpansion(directory), owner = context.packageName))
+                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || installed.all()[game.appId]?.let(::deviceHasExpansion) == true, vrGameActivity = gameSettings.get(game.appId).openInVr, ovrPluginStandIn = gameSettings.get(game.appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(game.appId).passthrough, game.appId, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlcOf(game), missingDlc = missingDlcOf(game), familyShared = game.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = downloadHasExpansion(directory), deviceFamily = packages.vrFamily, owner = context.packageName))
                         check(partial.renameTo(patched)) { "Could not finish the patched APK." }
                         // Keep only one copy of a multi-gigabyte game on disk.
                         original.delete()
@@ -372,7 +377,10 @@ class GameInstallRepository @Inject constructor(
         if (start) {
             if (activeJobs.getAndIncrement() == 0) runCatching { ContextCompat.startForegroundService(context, intent) }
         } else if (activeJobs.decrementAndGet() == 0) {
-            context.stopService(intent)
+            // Not stopService: a job that ends at once (a download that fails to start) would stop the service before it announced itself as a foreground service, and
+            // Android ends the whole app for that. The service is asked to stop, and does it after announcing itself.
+            intent.action = InstallForegroundService.ACTION_STOP
+            runCatching { ContextCompat.startForegroundService(context, intent) }.onFailure { context.stopService(intent) }
         }
         _isBusy.value = activeJobs.get() > 0
         gate.setGamesBusy(_isBusy.value)
@@ -527,13 +535,14 @@ class GameInstallRepository @Inject constructor(
                 val game = kotlinx.coroutines.withTimeoutOrNull(3_000) { library.observeGame(appId).first() }
                 val isVr = game?.androidBuild?.isVr?.let { it && packages.isHeadset }
                 val shimFiles = shimAchievements(appId)
+                runCatching { gameDefaults.refreshIfStale(GameDefaults.FOR_A_PATCH_MS) }
                 val patched = patchLock.withLock {
                     patchedDirectory(directory).deleteRecursively()
                     sources.map { original ->
                         val result = File(patchedDirectory(directory), original.name)
                         result.parentFile?.mkdirs()
                         val partial = File(result.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || deviceHasExpansion(packageName), vrGameActivity = gameSettings.get(appId).openInVr, ovrPluginStandIn = gameSettings.get(appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(appId).passthrough, appId), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = game?.let(::ownedDlcOf), missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = deviceHasExpansion(packageName), owner = context.packageName), patches)
+                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || deviceHasExpansion(packageName) || atOriginalCode(packageName), vrGameActivity = gameSettings.get(appId).openInVr, ovrPluginStandIn = gameSettings.get(appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(appId).passthrough, appId, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = game?.let(::ownedDlcOf), missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = deviceHasExpansion(packageName), deviceFamily = packages.vrFamily, owner = context.packageName), patches)
                         check(partial.renameTo(result)) { "Could not finish the patched APK." }
                         result
                     }
@@ -678,6 +687,18 @@ class GameInstallRepository @Inject constructor(
     fun launchIntent(appId: Int, isVr: Boolean? = null): Intent? {
         val packageName = installed.all()[appId]?.takeIf { !belongsToOtherGamePort(it) } ?: return null
         alignObbVersion(packageName)
+        // When the user turned it on, the apps left running in the background are asked to close, so the game starts with more memory.
+        if (userSettings.freeMemoryBeforeLaunch.value) {
+            val before = packages.availableMemory()
+            val asked = packages.trimBackground(setOf(packageName))
+            // Android closes them a moment later, and the game only starts to take memory after that: what the system has free by then tells what came back.
+            scope.launch {
+                kotlinx.coroutines.delay(MEMORY_SETTLE_MS)
+                val freed = (packages.availableMemory() - before).coerceAtLeast(0)
+                events.note(appId, "apps in the background asked to close before the start: $asked, memory back: ${freed / (1024 * 1024)} MB")
+                memoryNotice.report(packageName, freed)
+            }
+        }
         // The arguments Steam lists for the game: a plain switch for VR is given on a headset unless the player left it out.
         val options = launchOptions.cached(appId)
         val own = gameSettings.get(appId)
@@ -728,6 +749,15 @@ class GameInstallRepository @Inject constructor(
         val installedCode = packages.versionCodeOf(packageName) ?: return false
         // Only the expansion files named after a version code can be left unfound by a raised version; the small data files some games put beside it are not.
         return original != installedCode && ObbNames.hasVersioned(File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName").list().orEmpty().toList(), packageName)
+    }
+
+    /**
+     * An installed game that is still at the version code it came with was left there on purpose (a game with expansion files keeps it, since they are named after it), and GamePort
+     * cannot look in Android/obb to see them again: patching it again does not raise the code, or the game and its files would disagree.
+     */
+    private fun atOriginalCode(packageName: String): Boolean {
+        val original = packages.originalVersionCodeOf(packageName) ?: return false
+        return packages.versionCodeOf(packageName) == original
     }
 
     /** True when the game already has files under `Android/obb`, for a game patched again. */
@@ -1041,6 +1071,9 @@ private const val RUN_CONFIRM_TIMEOUT_MS = 3 * 60_000L
 private const val MAX_PLACED_LISTED = 12
 private const val STORAGE_PERMISSION = "android.permission.READ_EXTERNAL_STORAGE"
 private const val MAX_CONCURRENT_DOWNLOADS = 2
+
+/** How long after the apps were asked to close the free memory is read again. */
+private const val MEMORY_SETTLE_MS = 700L
 
 /**
  * Tells the check of files already on disk (progress moves, nothing comes from the network) from a download.
