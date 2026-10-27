@@ -77,6 +77,10 @@
     <string name="settings_continue_scope_description">All: the VR and the flat games started most recently. Shown tab: only those of the tab selected, VR or Flat.</string>
     <string name="settings_send_achievements">Sync achievements with Steam</string>
     <string name="settings_send_achievements_description">Achievements unlocked in a game are added to the Steam account, and the ones the account already has (earned on a PC, for example) are given to the game when it starts. This writes to the account and GamePort cannot take an achievement back. Only achievements unlocked while this is on are sent, and one that cannot be sent right away waits for a connection.</string>
+    <string name="settings_category_performance">Performance</string>
+    <string name="settings_performance_description">Options that give a game more room to run.</string>
+    <string name="settings_free_memory">Free up memory before starting a game</string>
+    <string name="settings_free_memory_description">Before a game starts, the other apps running in the background are closed, so the game has more memory. What those apps had not saved is lost. GamePort and the system apps are left alone.</string>
     <string name="settings_playtime">Count play time on Steam</string>
     <string name="settings_playtime_description">While a game is on screen, Steam is told the account is playing it, so its time counts on the account. Steam allows one game at a time: starting a game here interrupts one running on another device. Time while the device is asleep or the game is not on screen is not counted. The account also shows as online on Steam while a game is on screen.</string>
     <string name="settings_group_colors">Colours</string>
@@ -272,6 +276,7 @@
     <string name="manage_discard_title">Discard this download?</string>
     <string name="manage_discard_text">The files left by the download of %1$s are deleted. It can be started again from the page of the game.</string>
     <string name="manage_parts_recorded">App %1$s · Expansion %2$s (noted at the install)</string>
+    <string name="help_notice_saves_apart">The studio keeps this game\'s Android saves apart from its PC ones, so a player who has played on a PC starts with none. A button opens the saves, where the PC saves can be brought here.</string>
     <string name="help_notice_expansion">The game has large files beside its app and GamePort cannot check that they are all there. A button repairs it by downloading them again.</string>
     <string name="help_notice_expansion_missing">The game itself said that some of its large files are not there, so it cannot load its data. A button repairs it by downloading them again.</string>
 </resources>

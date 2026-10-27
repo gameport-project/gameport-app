@@ -17,6 +17,8 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <!-- Games are launched and detected by package name, which is only visible with this. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- Lets GamePort ask the apps running in the background to close before a game starts, when the user turned that on. -->
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
 
     <application>
         <service

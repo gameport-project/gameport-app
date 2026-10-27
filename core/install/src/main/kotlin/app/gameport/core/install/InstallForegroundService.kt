@@ -31,7 +31,14 @@ class InstallForegroundService : Service() {
             .setContentText(getString(R.string.install_notification_text))
             .setOngoing(true)
             .build()
+        // A service started as a foreground service must announce itself, even when what it was started for is already over: stopping it from outside before it did
+        // is a crash of the whole app. The end is asked with [ACTION_STOP], which goes through here first.
         startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        if (intent?.action == ACTION_STOP) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return START_NOT_STICKY
+        }
         holdLocks()
         return START_NOT_STICKY
     }
@@ -66,6 +73,9 @@ class InstallForegroundService : Service() {
     companion object {
         /** Set by [GameInstallRepository], which is what runs "patch all". */
         @Volatile internal var onClosed: (() -> Unit)? = null
+
+        /** Asks the service to end: it announces itself first, then stops. */
+        internal const val ACTION_STOP = "app.gameport.core.install.STOP_INSTALL_SERVICE"
 
         private const val CHANNEL_ID = "installs"
         private const val NOTIFICATION_ID = 1

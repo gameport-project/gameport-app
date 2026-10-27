@@ -38,6 +38,16 @@ class UserSettings @Inject constructor(
         _speedUnit.value = unit
     }
 
+    private val _freeMemoryBeforeLaunch = MutableStateFlow(prefs.getBoolean(KEY_FREE_MEMORY, true))
+
+    /** Whether the apps running in the background are asked to close just before a game starts. On until the user turns it off. */
+    val freeMemoryBeforeLaunch: StateFlow<Boolean> = _freeMemoryBeforeLaunch.asStateFlow()
+
+    fun setFreeMemoryBeforeLaunch(free: Boolean) {
+        prefs.edit().putBoolean(KEY_FREE_MEMORY, free).apply()
+        _freeMemoryBeforeLaunch.value = free
+    }
+
     private val _countPlaytimeOnSteam = MutableStateFlow(prefs.getBoolean(KEY_COUNT_PLAYTIME, true))
 
     /** Whether Steam is told a game is being played, so its time counts on the account; Steam allows one game at a time per account. */
@@ -199,6 +209,7 @@ class UserSettings @Inject constructor(
         const val KEY_RETURN = "return_to_gameport"
         const val KEY_RETURN_MODE = "return_mode"
         const val KEY_COUNT_PLAYTIME = "count_playtime_on_steam"
+        const val KEY_FREE_MEMORY = "free_memory_before_launch"
         const val KEY_SEND_ACHIEVEMENTS = "send_achievements_to_steam"
         const val KEY_WHATS_NEW_SEEN = "whats_new_seen"
         const val KEY_BACKDROP = "library_backdrop"

@@ -2,4 +2,7 @@
 <resources>
     <string name="install_channel_name">Installation des jeux</string>
     <string name="install_notification_text">Installation d\'un jeu…</string>
+    <string name="memory_channel_name">Mémoire libérée</string>
+    <string name="memory_freed">Mémoire libérée : %1$s</string>
+    <string name="memory_nothing_to_free">Rien à libérer : aucune application ne tournait en arrière-plan.</string>
 </resources>

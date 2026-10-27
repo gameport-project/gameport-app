@@ -99,6 +99,7 @@ private enum class Category(val title: Int) {
     UPDATES(R.string.settings_category_updates),
     MANAGE(R.string.settings_category_manage),
     GAMES(R.string.settings_category_games),
+    PERFORMANCE(R.string.settings_category_performance),
     HIDDEN(R.string.settings_category_hidden),
     INCOMPATIBLE(R.string.settings_category_incompatible),
     HELP(R.string.settings_category_help),
@@ -112,6 +113,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenGame: (Int) -> Unit = {}, startOnUp
     val playerDefaults by viewModel.playerDefaults.collectAsStateWithLifecycle()
     val display by viewModel.display.collectAsStateWithLifecycle()
     val countPlaytime by viewModel.countPlaytimeOnSteam.collectAsStateWithLifecycle()
+    val freeMemory by viewModel.freeMemoryBeforeLaunch.collectAsStateWithLifecycle()
     val sendAchievements by viewModel.sendAchievementsToSteam.collectAsStateWithLifecycle()
     val shareVerdicts by viewModel.shareVerdicts.collectAsStateWithLifecycle()
     val returnMode by viewModel.returnMode.collectAsStateWithLifecycle()
@@ -168,7 +170,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenGame: (Int) -> Unit = {}, startOnUp
             // A wide screen has the categories on the left; a narrow one has them in a row above the page.
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val compact = maxWidth < COMPACT_WIDTH
-                val entries = Category.entries.filter { it != Category.GAMES || viewModel.isHeadset }
+                val entries = Category.entries.filter { (it != Category.GAMES && it != Category.PERFORMANCE) || viewModel.isHeadset }
                 val page: @Composable (Modifier) -> Unit = { modifier ->
                     val pageScroll = rememberScrollState()
                     val pageScope = rememberCoroutineScope()
@@ -207,6 +209,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenGame: (Int) -> Unit = {}, startOnUp
                                 onDiscard = viewModel::onDiscardUnfinished,
                             )
                             Category.GAMES -> GamesSection(playerDefaults.heightCm, viewModel::onDefaultHeightChanged)
+                            Category.PERFORMANCE -> PerformanceSection(freeMemory, viewModel::onFreeMemoryBeforeLaunchChanged)
                             Category.HIDDEN -> HiddenSection(viewModel.hiddenGames.collectAsStateWithLifecycle().value, viewModel::onShowAgain)
                             Category.HELP -> HelpSection(viewModel::onStartCompleteTour, viewModel::onStartTour)
                             Category.INCOMPATIBLE -> IncompatibleSection(
@@ -410,6 +413,19 @@ private fun GamesSection(heightCm: Int, onHeightChanged: (Int) -> Unit) {
         modifier = Modifier.widthIn(max = 720.dp),
     )
     Text(stringResource(R.string.settings_games_height_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable
+private fun PerformanceSection(freeMemory: Boolean, onFreeMemoryChanged: (Boolean) -> Unit) {
+    Text(stringResource(R.string.settings_category_performance), style = MaterialTheme.typography.headlineSmall)
+    Text(stringResource(R.string.settings_performance_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.settings_free_memory), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_free_memory_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = freeMemory, onCheckedChange = onFreeMemoryChanged)
+    }
 }
 
 /** The games hidden in GamePort, each with a button to show it again. Steam's own hidden games are another matter and stay as they are. */

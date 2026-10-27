@@ -135,6 +135,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { auth.setOfflineMode(enabled) }
     }
 
+    val freeMemoryBeforeLaunch: StateFlow<Boolean> = settings.freeMemoryBeforeLaunch
+
+    fun onFreeMemoryBeforeLaunchChanged(free: Boolean) = settings.setFreeMemoryBeforeLaunch(free)
+
     val countPlaytimeOnSteam: StateFlow<Boolean> = settings.countPlaytimeOnSteam
 
     fun onCountPlaytimeOnSteamChanged(count: Boolean) = settings.setCountPlaytimeOnSteam(count)

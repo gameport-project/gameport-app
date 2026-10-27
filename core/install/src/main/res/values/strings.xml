@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="install_channel_name">Game installs</string>
+    <string name="memory_channel_name">Memory freed</string>
+    <string name="memory_freed">Memory freed: %1$s</string>
+    <string name="memory_nothing_to_free">Nothing to free: no app was left running in the background.</string>
     <string name="install_notification_title">GamePort</string>
     <string name="install_notification_text">Installing a game…</string>
 </resources>
