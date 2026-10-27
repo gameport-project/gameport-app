@@ -1,10 +1,12 @@
 package app.gameport.core.install
 
+import android.app.ActivityManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.os.Build
@@ -30,6 +32,9 @@ class PackageGateway @Inject constructor(
 
     /** False on a device without VR: VR patches make no sense there. */
     val isHeadset: Boolean get() = device.isHeadset
+
+    /** The headset family of this device (`meta`, `pico`, `openxr`), null when it is not a headset. */
+    val vrFamily: String? get() = device.vrPlatform?.id
 
     fun packageNameOf(apk: File): String? = runCatching {
         packageManager.getPackageArchiveInfo(apk.absolutePath, 0)?.packageName
@@ -112,6 +117,26 @@ class PackageGateway @Inject constructor(
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             if (immersive) device.vrPlatform?.immersiveLauncherCategories?.forEach(::addCategory)
         }
+
+    /** The memory the system can still give out, in bytes. */
+    fun availableMemory(): Long {
+        val manager = context.getSystemService(ActivityManager::class.java) ?: return 0
+        return ActivityManager.MemoryInfo().also(manager::getMemoryInfo).availMem
+    }
+
+    /**
+     * Asks the apps the user installed to close their background processes, except the ones in [keep] and GamePort: the memory they hold goes back
+     * to the game about to start. Android only closes what is not on screen and not doing foreground work. Returns how many apps were asked.
+     */
+    fun trimBackground(keep: Set<String>): Int {
+        val manager = context.getSystemService(ActivityManager::class.java) ?: return 0
+        val system = ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP
+        val candidates = runCatching { packageManager.getInstalledApplications(0) }.getOrDefault(emptyList())
+            .map { BackgroundTrim.Candidate(it.packageName, it.flags and system != 0) }
+        val targets = BackgroundTrim.targets(candidates, keep + context.packageName)
+        targets.forEach { runCatching { manager.killBackgroundProcesses(it) } }
+        return targets.size
+    }
 
     /** Installs one APK, or a base APK with its splits, in a single session. */
     suspend fun install(apks: List<File>): Outcome {

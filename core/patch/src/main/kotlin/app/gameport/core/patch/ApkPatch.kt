@@ -43,6 +43,8 @@ data class PatchContext(
     val familyShared: Boolean = false,
     /** The game has expansion files (`.obb`, or an `obb/` folder) that it reads from shared storage. */
     val hasExpansionFiles: Boolean = false,
+    /** The headset family of this device (`meta`, `pico`, `openxr`), null when unknown or not a headset ([app.gameport.core.patch.patches.MetaLoaderStubPatch]). */
+    val deviceFamily: String? = null,
     /** The GamePort that patches the game, by its package name: the game's hook talks to that one and to no other. */
     val owner: String = DEFAULT_OWNER,
 ) {
