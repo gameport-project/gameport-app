@@ -29,6 +29,25 @@ class VerdictSenderTest {
     }
 
     @Test
+    fun `the state of the report goes with the answer that carries one`() = runBlocking {
+        val sent = mutableListOf<String>()
+        val withReport: (Answer) -> VoteMessage = { answer -> message(answer).copy(report = answer.report) }
+        sendAnswers(listOf(Answer(1, Verdict.FAILS, false, report = "waiting"), Answer(2, Verdict.FAILS, false)), withReport, { sent += it; Delivery.SENT }) { }
+        assertTrue(sent[0].contains("\"report\":\"waiting\""))
+        assertFalse(sent[1].contains("report"))
+    }
+
+    @Test
+    fun `what became of a report is told to the relay in its own words`() {
+        assertEquals("sent", ReportStatus.SENT.state())
+        assertEquals("waiting", ReportStatus.WAITING.state())
+        assertEquals("refused", ReportStatus.REFUSED.state())
+        assertEquals("none", ReportStatus.UNAVAILABLE.state())
+        // Sending is off: the answer does not go either, so there is nothing to tell.
+        assertEquals(null, ReportStatus.OFF.state())
+    }
+
+    @Test
     fun `it stops at the first answer that does not get through and tells nothing about the others`() = runBlocking {
         val told = mutableListOf<Int>()
         var calls = 0

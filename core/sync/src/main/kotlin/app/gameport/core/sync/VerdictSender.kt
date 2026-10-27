@@ -90,6 +90,8 @@ class VerdictSender @Inject constructor(
 
     /** Sends the answers when GamePort starts, and each time the player answers or changes the setting. What fails is tried again at the next of those. */
     fun start() {
+        // An answer that waited for its report in an earlier run is let go: the process that was sending the report is gone.
+        verdicts.releaseHolds()
         scope.launch { combine(verdicts.book, verdicts.share) { book, share -> share && book.unsent().isNotEmpty() }.collect { if (it) flush() } }
     }
 
@@ -102,7 +104,7 @@ class VerdictSender @Inject constructor(
             val codename = device.codename
             sendAnswers(
                 verdicts.book.value.unsent(),
-                { answer -> VoteMessage(answer.appId, answer.verdict, appVersion, kind, verdicts.voterId, offline = answer.offline, issues = answer.issues, model = model, codename = codename) },
+                { answer -> VoteMessage(answer.appId, answer.verdict, appVersion, kind, verdicts.voterId, offline = answer.offline, issues = answer.issues, model = model, codename = codename, report = answer.report) },
                 transport,
             ) { answer -> verdicts.update { it.sent(answer.appId, answer.verdict) } }
         }

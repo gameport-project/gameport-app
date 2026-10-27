@@ -119,6 +119,70 @@ class VoteTest {
     }
 
     @Test
+    fun `an answer that waits for its report is not sent until the state of the report is known, and then goes with it`() {
+        val held = VerdictBook().answered(1, Verdict.FAILS, "0.9.1", day1, send = true, holdForReport = true)
+        assertTrue(held.games.getValue(1).holding)
+        assertTrue(held.unsent().isEmpty())
+        val stated = held.reportStated(1, ReportStates.SENT, send = true)
+        assertEquals(listOf(Answer(1, Verdict.FAILS, false, report = ReportStates.SENT)), stated.unsent())
+        assertFalse(stated.games.getValue(1).holding)
+    }
+
+    @Test
+    fun `the state of the report goes again with the answer when it changes, and is not sent twice when it does not`() {
+        val sent = VerdictBook().answered(1, Verdict.FAILS, "0.9.1", day1, send = true, holdForReport = true)
+            .reportStated(1, ReportStates.WAITING, send = true).sent(1, Verdict.FAILS)
+        assertTrue(sent.unsent().isEmpty())
+        assertTrue(sent.reportStated(1, ReportStates.WAITING, send = true).unsent().isEmpty())
+        assertEquals(listOf(Answer(1, Verdict.FAILS, false, report = ReportStates.SENT)), sent.reportStated(1, ReportStates.SENT, send = true).unsent())
+    }
+
+    @Test
+    fun `a state the relay does not know is never kept, and one for an answer that worked, or a game without an answer, changes nothing`() {
+        val book = VerdictBook().answered(1, Verdict.FAILS, "0.9.1", day1, send = true, holdForReport = true)
+        assertNull(book.reportStated(1, "lost", send = true).games.getValue(1).report)
+        assertFalse(book.reportStated(1, "lost", send = true).games.getValue(1).holding)
+        val worked = VerdictBook().answered(2, Verdict.WORKS, "0.9.1", day1, send = true).sent(2, Verdict.WORKS)
+        assertEquals(worked, worked.reportStated(2, ReportStates.SENT, send = true))
+        assertEquals(worked, worked.reportStated(9, ReportStates.SENT, send = true))
+    }
+
+    @Test
+    fun `answers that waited for a report of an earlier run are let go with no state`() {
+        val book = VerdictBook().answered(1, Verdict.FAILS, "0.9.1", day1, send = true, holdForReport = true)
+        assertTrue(book.unsent().isEmpty())
+        assertEquals(listOf(Answer(1, Verdict.FAILS, false)), book.releaseHolds().unsent())
+        assertEquals(book.releaseHolds(), book.releaseHolds().releaseHolds())
+    }
+
+    @Test
+    fun `nothing is held, or queued, when the player does not share, and the state changes nothing then`() {
+        val book = VerdictBook().answered(1, Verdict.FAILS, "0.9.1", day1, send = false, holdForReport = true)
+        assertFalse(book.games.getValue(1).holding)
+        assertTrue(book.reportStated(1, ReportStates.NONE, send = false).unsent().isEmpty())
+    }
+
+    @Test
+    fun `the report goes in the message only when it is a word the relay knows`() {
+        val voter = "0123456789abcdef0123456789abcdef"
+        for (state in ReportStates.ALL) {
+            val json = Json.parseToJsonElement(VoteMessage(1, Verdict.FAILS, "0.9.1", "pico", voter, report = state).toJson()).jsonObject
+            assertEquals(state, json.getValue("report").jsonPrimitive.content)
+        }
+        for (bad in listOf(null, "lost", "")) {
+            assertFalse(Json.parseToJsonElement(VoteMessage(1, Verdict.FAILS, "0.9.1", "pico", voter, report = bad).toJson()).jsonObject.containsKey("report"))
+        }
+    }
+
+    @Test
+    fun `an old book without the report is still read`() {
+        val old = """{"games":{"1":{"verdict":"fails","askedFor":"0.9.0","askedDay":"2026-10-08","sent":false}}}"""
+        val book = VerdictBook.fromJson(old)
+        assertEquals(listOf(Answer(1, Verdict.FAILS, false)), book.unsent())
+        assertFalse(book.games.getValue(1).holding)
+    }
+
+    @Test
     fun `an answer is kept on the device and never queued when the player does not share`() {
         val book = VerdictBook().answered(1, Verdict.WORKS, "0.7.2", day1, send = false)
         assertTrue(book.unsent().isEmpty())

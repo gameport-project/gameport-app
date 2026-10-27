@@ -12,6 +12,7 @@ import app.gameport.core.model.GameIssue
 import app.gameport.core.model.InstallError
 import app.gameport.core.settings.ControllerMappingStore
 import app.gameport.core.sync.GameIssuesRepository
+import app.gameport.core.sync.state
 import app.gameport.core.model.Game
 import app.gameport.core.model.InstallState
 import app.gameport.core.model.SpeedUnit
@@ -79,6 +80,7 @@ class GameViewModel @Inject constructor(
     repository: SteamLibraryRepository,
     private val installer: GameInstallRepository,
     private val issuesRepository: GameIssuesRepository,
+    private val saveSpaces: app.gameport.core.sync.SaveSpaceStore,
     private val controllerMappings: ControllerMappingStore,
     gameSettingsStore: app.gameport.core.settings.GameSettingsStore,
     device: DeviceProfile,
@@ -120,10 +122,10 @@ class GameViewModel @Inject constructor(
     private val baseState: StateFlow<GameUiState> = combine(
         repository.observeLibrary().toGameState(appId),
         installer.observe(appId),
-        issuesRepository.observe(appId),
+        combine(issuesRepository.observe(appId), saveSpaces.observe(appId)) { issues, saveMode -> issues to saveMode },
         combine(controllerMappings.observe(appId), gameSettingsStore.stageFallback(appId), gameSettingsStore.observe(appId)) { mapping, fallback, own -> Triple(mapping, fallback && own.recenter == app.gameport.core.model.RecenterMode.AUTO, own) },
         combine(playHistory.favorites, playHistory.hidden) { starred, hidden -> starred to hidden },
-    ) { game, install, issues, (controllers, compatNotice), (favorites, hidden) ->
+    ) { game, install, (issues, saveMode), (controllers, compatNotice), (favorites, hidden) ->
         if (game !is GameUiState.Content) return@combine game
         // Patching or updating a game that is already installed is not a first install: the game
         // keeps its Play and uninstall buttons, and the panel shows the progress.
@@ -138,7 +140,7 @@ class GameViewModel @Inject constructor(
             else -> Repatch.None
         }
         val shown = if (repatch != Repatch.None && installedPackage != null) InstallState.Installed(installedPackage) else install
-        game.copy(install = shown, issues = issues, repatch = repatch, controllerProfile = device.isHeadset, controllerFrame = device.isHeadset && controllers.forced, controllerAutomatic = device.isHeadset && controllers.automatic, compatNotice = device.isHeadset && compatNotice, favorite = appId in favorites, hidden = appId in hidden, vrDevice = device.isHeadset)
+        game.copy(install = shown, issues = issues + listOfNotNull(GameIssue.SavesApart.takeIf { !saveMode.usesPc && game.game.androidBuild?.saveRules?.any { it.pcCloudPrefix != null } == true }), repatch = repatch, controllerProfile = device.isHeadset, controllerFrame = device.isHeadset && controllers.forced, controllerAutomatic = device.isHeadset && controllers.automatic, compatNotice = device.isHeadset && compatNotice, favorite = appId in favorites, hidden = appId in hidden, vrDevice = device.isHeadset)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), GameUiState.Loading)
 
@@ -219,6 +221,8 @@ class GameViewModel @Inject constructor(
             _reportProgress.value = ReportProgress.Working
             val failure = ((uiState.value as? GameUiState.Content)?.install as? InstallState.Failed)?.error?.takeIf { it.reportable }?.toString()
             val status = reportSender.sendByHand(game, failure, description, symptoms)
+            // The answer says what became of the report; it goes again when that changed.
+            verdicts.reportStated(appId, status.state())
             _reportProgress.value = ReportProgress.Done(status)
             // The report said why it was made; the notice has done its job.
             if (status == app.gameport.core.sync.ReportStatus.SENT || status == app.gameport.core.sync.ReportStatus.WAITING) onDismissProblem()

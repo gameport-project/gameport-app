@@ -388,7 +388,7 @@ class ProblemReporter @Inject constructor(
         const val MIB = 1024L * 1024L
 
         /** What the relay accepts (see its README): a report is sent only when it fits. */
-        const val MAX_SENT_BYTES = 1_000_000
+        const val MAX_SENT_BYTES = 2_000_000
         const val MAX_APK_ENTRIES = 6000
         const val MAX_SCANNED_LIBRARY = 200L * 1024 * 1024
         val README = """

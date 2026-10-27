@@ -58,12 +58,14 @@ import app.gameport.core.sync.ProblemReporter
 import app.gameport.core.sync.ReportDescription
 import app.gameport.core.sync.ReportSender
 import app.gameport.core.sync.ReportStatus
+import app.gameport.core.sync.state
 import app.gameport.core.steam.SteamAuthRepository
 import app.gameport.core.steam.SteamLibraryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.LocalDate
 import javax.inject.Inject
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -73,6 +75,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** The game the player is asked about, and whether the answer will be sent to the project. */
 data class VerdictQuestion(val appId: Int, val name: String, val shared: Boolean, val cover: app.gameport.core.model.Art)
@@ -107,18 +110,31 @@ class VerdictAskViewModel @Inject constructor(
     private val _followUp = MutableStateFlow<ReportFollowUp?>(null)
     val followUp: StateFlow<ReportFollowUp?> = _followUp.asStateFlow()
 
-    fun onAnswer(verdict: Verdict) {
-        val asked = question.value ?: return
-        verdicts.answer(asked.appId, verdict, version, today)
-        // A game that did not work, or whose online part does not, leaves something to look at in the report.
-        if (verdict == Verdict.FAILS || verdict == Verdict.OFFLINE_ONLY) startReport(asked.appId, offlineOnly = verdict == Verdict.OFFLINE_ONLY)
+    private companion object {
+        /** How long the answer waits for its report to go before it leaves on its own, saying the report is still waiting. */
+        const val REPORT_WAIT_MS = 15_000L
     }
 
-    /** "It did not work", or "works offline only": the report is made from the run that just ended and goes by itself when sending is on and the device has a network. */
+    fun onAnswer(verdict: Verdict) {
+        val asked = question.value ?: return
+        // A game that did not work, or whose online part does not, leaves something to look at in the report: the report goes first, and the answer waits to say what became of it.
+        val withReport = verdict == Verdict.FAILS || verdict == Verdict.OFFLINE_ONLY
+        verdicts.answer(asked.appId, verdict, version, today, holdForReport = withReport)
+        if (withReport) startReport(asked.appId, offlineOnly = verdict == Verdict.OFFLINE_ONLY)
+    }
+
+    /**
+     * "It did not work", or "works offline only": the report is made from the run that just ended and goes by itself when sending is on and the device has a network. The answer
+     * is held until the report has gone (or [REPORT_WAIT_MS] has passed, so a slow connection never keeps the answer back), then goes saying what became of the report. A report that is
+     * still on its way when the answer leaves is told as waiting, and the answer goes again with the end of it.
+     */
     private fun startReport(appId: Int, offlineOnly: Boolean) {
         _followUp.value = ReportFollowUp(appId, status = null, offlineOnly = offlineOnly)
+        val sending = viewModelScope.async { gameOf(appId)?.let { reports.sendAfterFailure(it) } ?: ReportStatus.UNAVAILABLE }
         viewModelScope.launch {
-            val status = gameOf(appId)?.let { reports.sendAfterFailure(it) } ?: ReportStatus.UNAVAILABLE
+            val early = withTimeoutOrNull(REPORT_WAIT_MS) { sending.await() }
+            verdicts.reportStated(appId, (early ?: ReportStatus.WAITING).state())
+            val status = early ?: sending.await().also { verdicts.reportStated(appId, it.state()) }
             _followUp.update { it?.copy(status = status) }
         }
     }
@@ -138,6 +154,8 @@ class VerdictAskViewModel @Inject constructor(
         viewModelScope.launch {
             val status = if (!detailed) reports.sendNow(current.appId)
             else gameOf(current.appId)?.let { reports.sendByHand(it, description = description, symptoms = symptoms) } ?: ReportStatus.UNAVAILABLE
+            // The answer says what became of the report; it goes again when that changed.
+            verdicts.reportStated(current.appId, status.state())
             _followUp.update { it?.copy(status = status, busy = false, describedAndSent = it.describedAndSent || (detailed && (status == ReportStatus.SENT || status == ReportStatus.WAITING))) }
         }
     }

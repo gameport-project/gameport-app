@@ -39,6 +39,15 @@ enum class ReportStatus {
     UNAVAILABLE,
 }
 
+/** The word that tells the relay what became of the report (see [app.gameport.core.model.ReportStates]), or null when nothing is worth saying (sending is off: the answer does not go either). */
+fun ReportStatus.state(): String? = when (this) {
+    ReportStatus.SENT -> app.gameport.core.model.ReportStates.SENT
+    ReportStatus.WAITING -> app.gameport.core.model.ReportStates.WAITING
+    ReportStatus.REFUSED -> app.gameport.core.model.ReportStates.REFUSED
+    ReportStatus.UNAVAILABLE -> app.gameport.core.model.ReportStates.NONE
+    ReportStatus.OFF -> null
+}
+
 /** The facts that come with a report, never more: see the README of the relay. */
 data class ReportMeta(val appId: Int, val appVersion: String, val device: String, val voter: String)
 

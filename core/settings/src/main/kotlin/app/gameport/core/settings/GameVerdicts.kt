@@ -43,7 +43,15 @@ class GameVerdicts @Inject constructor(@ApplicationContext context: Context) {
         _book.value = updated
     }
 
-    fun answer(appId: Int, verdict: Verdict, appVersion: String, today: String) = update { it.answered(appId, verdict, appVersion, today, send = _share.value) }
+    /** [holdForReport]: the answer waits to say what became of its report (see [VerdictBook.reportStated]), so the report goes first. */
+    fun answer(appId: Int, verdict: Verdict, appVersion: String, today: String, holdForReport: Boolean = false) =
+        update { it.answered(appId, verdict, appVersion, today, send = _share.value, holdForReport = holdForReport) }
+
+    /** What became of the report of [appId], one of [app.gameport.core.model.ReportStates] or null: the answer goes, or goes again, with it. */
+    fun reportStated(appId: Int, state: String?) = update { it.reportStated(appId, state, send = _share.value) }
+
+    /** Answers that waited for a report of an earlier run of GamePort are let go. */
+    fun releaseHolds() = update { it.releaseHolds() }
 
     /** A problem reported by hand counts as "it did not work" (see [VerdictBook.reportedProblem]). */
     fun reportedProblem(appId: Int, appVersion: String, today: String) = update { it.reportedProblem(appId, appVersion, today, send = _share.value) }

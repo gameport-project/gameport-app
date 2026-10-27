@@ -47,6 +47,11 @@ data class VoteMessage(
     /** What the device calls itself (`Build.MODEL`, `Build.DEVICE`), so the project can name the exact device behind [device]. Left out when empty. */
     val model: String = "",
     val codename: String = "",
+    /**
+     * What became of the technical report that went just before this answer (see [ReportStates]): sent, waiting on the device, refused, or none. Only said for an answer that
+     * says something went wrong, and only when it is known.
+     */
+    val report: String? = null,
 ) {
     fun toJson(): String = buildJsonObject {
         put("v", 1)
@@ -60,7 +65,21 @@ data class VoteMessage(
         if (issues.isNotEmpty()) put("issues", JsonArray(issues.map { JsonPrimitive(it) }))
         if (model.isNotBlank()) put("model", model.trim())
         if (codename.isNotBlank()) put("codename", codename.trim())
+        report?.takeIf { it in ReportStates.ALL }?.let { put("report", it) }
     }.toString()
+}
+
+/** The words that tell the relay what became of a report (see its README): the report goes first, and the answer says whether it got there. */
+object ReportStates {
+    const val SENT = "sent"
+
+    /** Kept on the device: no connection, or the relay was busy. It goes at the next start of GamePort. */
+    const val WAITING = "waiting"
+    const val REFUSED = "refused"
+
+    /** There is none: the game is not installed, or the report is too large. */
+    const val NONE = "none"
+    val ALL = setOf(SENT, WAITING, REFUSED, NONE)
 }
 
 /** What is known about one game: the last answer, the version of GamePort and the day it was last asked, and whether the answer reached the relay. */
@@ -74,10 +93,14 @@ data class GameVerdict(
     val offline: Boolean = false,
     /** What the player ticked as going wrong with the answer, as codes of [Symptom]. */
     val issues: List<String> = emptyList(),
+    /** What became of the report that went with the answer, as one of [ReportStates]; null when it is not known (or the answer is "it worked"). */
+    val report: String? = null,
+    /** The answer waits for its report to be sent, so as to say what became of it: it is not sent while this is true (see [VerdictBook.reportStated], [VerdictBook.releaseHolds]). */
+    val holding: Boolean = false,
 )
 
 /** An answer that has not reached the relay yet. */
-data class Answer(val appId: Int, val verdict: Verdict, val offline: Boolean, val issues: List<String> = emptyList())
+data class Answer(val appId: Int, val verdict: Verdict, val offline: Boolean, val issues: List<String> = emptyList(), val report: String? = null)
 
 /** The last sign of life of a game that is being played: when, and whether it was "the game left the screen". Kept on disk, so it outlives GamePort. */
 @Serializable
@@ -128,10 +151,13 @@ data class VerdictBook(
     /** The game is back on screen: the run it was left from goes on, so the question about it no longer waits. */
     fun resumed(appId: Int): VerdictBook = if (appId in pending) copy(pending = pending - appId) else this
 
-    /** The player answered. [send] is false when they chose not to share: the answer stays on this device. */
-    fun answered(appId: Int, verdict: Verdict, appVersion: String, today: String, send: Boolean): VerdictBook =
+    /**
+     * The player answered. [send] is false when they chose not to share: the answer stays on this device. [holdForReport] keeps the answer from going until the state of its report
+     * is known ([reportStated]): the report is sent first, and the answer says what became of it.
+     */
+    fun answered(appId: Int, verdict: Verdict, appVersion: String, today: String, send: Boolean, holdForReport: Boolean = false): VerdictBook =
         copy(
-            games = games + (appId to GameVerdict(verdict.wire, appVersion, today, sent = !send, offline = verdict == Verdict.WORKS && appId in offlineRuns)),
+            games = games + (appId to GameVerdict(verdict.wire, appVersion, today, sent = !send, offline = verdict == Verdict.WORKS && appId in offlineRuns, holding = send && holdForReport)),
             pending = pending - appId,
             offlineRuns = offlineRuns - appId,
         )
@@ -161,8 +187,23 @@ data class VerdictBook(
         return answered(appId, Verdict.FAILS, appVersion, today, send)
     }
 
-    /** The answers the relay has not received yet. */
-    fun unsent(): List<Answer> = games.mapNotNull { (appId, game) -> if (!game.sent) Verdict.fromWire(game.verdict)?.let { Answer(appId, it, game.offline, game.issues) } else null }
+    /**
+     * What became of the report that goes with the answer for [appId]: the answer is let go (when it was held) and goes again to the relay when the state changed, which replaces the
+     * first one there. Nothing is kept for "it worked", or when nothing changed. [state] is one of [ReportStates], or null when it is not known.
+     */
+    fun reportStated(appId: Int, state: String?, send: Boolean): VerdictBook {
+        val game = games[appId] ?: return this
+        if (game.verdict != Verdict.FAILS.wire && game.verdict != Verdict.OFFLINE_ONLY.wire) return this
+        val kept = state?.takeIf { it in ReportStates.ALL }
+        if (!game.holding && game.report == kept) return this
+        return copy(games = games + (appId to game.copy(report = kept, holding = false, sent = if (send) false else game.sent)))
+    }
+
+    /** Every answer that waited for its report is let go, as it was: the process that was sending the report is gone (GamePort was closed), so nothing will say more. */
+    fun releaseHolds(): VerdictBook = if (games.values.none { it.holding }) this else copy(games = games.mapValues { (_, game) -> if (game.holding) game.copy(holding = false) else game })
+
+    /** The answers the relay has not received yet, but for the ones that wait for their report. */
+    fun unsent(): List<Answer> = games.mapNotNull { (appId, game) -> if (!game.sent && !game.holding) Verdict.fromWire(game.verdict)?.let { Answer(appId, it, game.offline, game.issues, game.report) } else null }
 
     /** The relay received this answer, unless the player changed it meanwhile. */
     fun sent(appId: Int, verdict: Verdict): VerdictBook {
