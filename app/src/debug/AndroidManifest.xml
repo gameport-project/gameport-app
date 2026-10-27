@@ -6,6 +6,10 @@
         <receiver
             android:name="app.gameport.debug.CloudDebugReceiver"
             android:exported="true" />
+        <!-- Development only: does what the button that clears this device's saves does, for a game, and logs the outcome. -->
+        <receiver
+            android:name="app.gameport.debug.ClearSavesDebugReceiver"
+            android:exported="true" />
         <receiver
             android:name="app.gameport.debug.PatchDebugReceiver"
             android:exported="true" />

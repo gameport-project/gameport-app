@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import app.gameport.core.steam.session.SteamInspector
+import app.gameport.core.steam.session.fetchCloud
 import app.gameport.core.steam.session.SteamSessionHolder
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.File
@@ -16,7 +17,8 @@ import kotlinx.coroutines.launch
 /**
  * adb shell am broadcast -n app.gameport.dev/app.gameport.debug.SteamInspectReceiver --ei appId <id> [--ei depot <id> --es manifest <gid>]
  * Writes what Steam publishes for the app, as the signed-in account sees it (depots, branches, settings), to files/inspect/<appId>.txt,
- * and with a depot and a manifest the list of its files with their sizes and SHA-1 to files/inspect/<appId>-<depot>.txt. Read only.
+ * and with a depot and a manifest the list of its files with their sizes and SHA-1 to files/inspect/<appId>-<depot>.txt.
+ * With `--ez cloud true`, the names, sizes and dates of the files Steam Cloud holds for the app go to files/inspect/<appId>-cloud.txt (never their content). Read only.
  */
 @AndroidEntryPoint
 class SteamInspectReceiver : BroadcastReceiver() {
@@ -37,6 +39,14 @@ class SteamInspectReceiver : BroadcastReceiver() {
             runCatching {
                 File(directory, "$appId.txt").writeText(SteamInspector.describe(session, appId))
                 Log.i(TAG, "app $appId described")
+                if (intent.getBooleanExtra("cloud", false)) {
+                    val cloud = session.fetchCloud(appId)
+                    File(directory, "$appId-cloud.txt").writeText(
+                        "change ${cloud.changeNumber}, ${cloud.files.size} file(s)\n" +
+                            cloud.files.joinToString("\n") { "${it.name} | ${it.sizeBytes} bytes | ${java.util.Date(it.timestampMillis)} | state ${it.state} | platforms ${it.platformsToSync}${if (it.deleted) " | deleted" else ""}" },
+                    )
+                    Log.i(TAG, "app $appId cloud listed: ${cloud.files.size} file(s)")
+                }
                 if (depot != 0 && manifest != null) {
                     File(directory, "$appId-$depot-$manifest.txt").writeText(SteamInspector.manifest(session, appId, depot, manifest, branch))
                     Log.i(TAG, "depot $depot manifest $manifest listed")

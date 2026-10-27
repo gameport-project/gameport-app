@@ -1,5 +1,7 @@
 package app.gameport.core.steam
 
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import app.gameport.core.steam.session.SteamSessionHolder
 import `in`.dragonbra.javasteam.depotdownloader.IDownloadListener
 import `in`.dragonbra.javasteam.depotdownloader.data.AppItem
@@ -21,7 +23,10 @@ class JavaSteamGameDownloader @Inject constructor(
 ) : GameDownloader {
     override suspend fun download(appId: Int, depotIds: List<Int>, directory: File, depotBytes: Map<Int, Long>, onProgress: (Float, Long) -> Unit) {
         withContext(Dispatchers.IO) {
-            val session = sessions.current.value ?: error("Not signed in to Steam")
+            // Right after GamePort starts, the connection to Steam may not be made yet (a download that goes on by itself starts as soon as the account is known): it is waited for.
+            val session = sessions.current.value
+                ?: kotlinx.coroutines.withTimeoutOrNull(SESSION_WAIT_MS) { sessions.current.filterNotNull().first() }
+                ?: error("Not signed in to Steam")
             val startBytes = session.receivedBytes(depotIds)
             directory.mkdirs()
             // Resuming: the downloader must check what is already there, not believe its own notes (see [DownloadState]).
@@ -78,3 +83,5 @@ private const val PROGRESS_TICK_MS = 1_000L
 
 /** Told before any chunk is complete: the progress is not known yet, and the one the install already shows (a resumed download) stays. */
 const val NO_PROGRESS_YET = -1f
+
+private const val SESSION_WAIT_MS = 30_000L

@@ -32,13 +32,16 @@ final class ProviderLink implements GamePortLink {
     }
 
     @Override
-    public Begin begin() throws IOException {
-        Bundle result = call("begin", null);
+    public Begin begin(boolean launch, int pass) throws IOException {
+        Bundle extras = new Bundle();
+        extras.putBoolean("launch", launch);
+        extras.putInt("pass", pass);
+        Bundle result = call("begin", extras);
         String status = result.getString("status", "ERROR");
         List<SaveRule> rules = new ArrayList<>();
         String[] lines = result.getStringArray("rules");
         if (lines != null) for (String line : lines) rules.add(SaveRule.parse(line));
-        return new Begin(status, rules);
+        return new Begin(status, rules, result.getBoolean("more", false));
     }
 
     @Override

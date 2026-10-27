@@ -10,6 +10,21 @@ data class SaveFileState(val path: String, val local: SaveFileInfo?, val cloud: 
     val identical: Boolean get() = local != null && cloud != null && local.sha1 == cloud.sha1
 }
 
+/**
+ * The Windows copy of a game's saves, which Steam keeps apart from the Android one for some games. [files] set this device's files beside
+ * the Windows ones (the "cloud" side of each is the Windows file). [usePc]: each start, they feed this device. [sendPc]: this device also
+ * writes to them. [backupMillis] is when the clean copy of the Windows saves was made (0 when none), [backupFiles] how many files it holds.
+ */
+data class PcSaves(
+    val files: List<SaveFileState>,
+    val usePc: Boolean,
+    val sendPc: Boolean,
+    val backupMillis: Long,
+    val backupFiles: Int,
+) {
+    val hasFiles: Boolean get() = files.any { it.cloud != null }
+}
+
 /** What the player asked for at the next launch of the game, once the games sync runs. */
 enum class SaveDirection { RESTORE_FROM_CLOUD, SEND_TO_CLOUD }
 
@@ -24,6 +39,8 @@ data class SaveOverview(
     /** When GamePort last looked at Steam Cloud, or 0 if it never did. */
     val cloudSeenMillis: Long,
     val pending: SaveDirection?,
+    /** The Windows copy of the saves, when the studio keeps it apart from the Android one; null when there is none to offer. */
+    val pc: PcSaves? = null,
 ) {
     val hasLocal: Boolean get() = files.any { it.local != null }
     val hasCloud: Boolean get() = files.any { it.cloud != null }

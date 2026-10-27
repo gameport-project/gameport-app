@@ -8,15 +8,24 @@ import `in`.dragonbra.javasteam.types.KeyValue
  *
  * Steam names the folders after Windows roots such as `WinAppDataLocalLow`. For Android builds it
  * publishes a root override that moves such a root to `AndroidExternalData` (the shared storage)
- * and rewrites the path, typically into `Android/data/<package>/files`. Rules without an
- * Android mapping cannot be synced and are left out.
+ * and rewrites the path, typically into `Android/data/<package>/files`. A root can also name the private
+ * data of the game (`AndroidInternalData`). Rules without an Android mapping cannot be synced and are left out.
+ *
+ * Some studios keep the Android saves apart from the Windows ones instead: two rules with their own roots and no override
+ * between them. The Windows rule of such a pair is kept as [CachedSaveRule.pcCloudPrefix] of the Android one, so the player
+ * can choose to use the Windows saves.
  */
 internal object SaveRulesParser {
-    private const val SUPPORTED_ROOT = "AndroidExternalData"
+    private const val SHARED_ROOT = "AndroidExternalData"
+    private const val INTERNAL_ROOT = "AndroidInternalData"
+
+    /** Marks a folder in the private data of the game (`<package>/files/...`): the hook, inside the game, is the one that can reach it. */
+    const val INTERNAL_PREFIX = "@internal/"
 
     fun parse(ufs: KeyValue): List<CachedSaveRule> {
-        val overrides = ufs["rootoverrides"].children.filter { it["os"].value.equals("Android", ignoreCase = true) }
-        return ufs["savefiles"].children.mapNotNull { file ->
+        val overrides = ufs["rootoverrides"].children.filter(::appliesToAndroid)
+        val files = ufs["savefiles"].children
+        return files.mapNotNull { file ->
             val platforms = file["platforms"].children.mapNotNull { it.value?.lowercase() }
             if (platforms.isNotEmpty() && "android" !in platforms) return@mapNotNull null
 
@@ -24,29 +33,64 @@ internal object SaveRulesParser {
             val path = file["path"].value.orEmpty().normalized()
             val override = overrides.firstOrNull { it["root"].value == root }
             var local = path
+            var apart = false
             if (override != null) {
-                if (override["useinstead"].value != SUPPORTED_ROOT) return@mapNotNull null
+                val target = override["useinstead"].value
+                if (target != SHARED_ROOT && target != INTERNAL_ROOT) return@mapNotNull null
                 override["pathtransforms"].children.forEach { transform ->
                     val find = transform["find"].value.orEmpty().normalized()
                     if (find.isNotEmpty()) local = local.replace(find, transform["replace"].value.orEmpty().normalized())
                 }
                 val added = override["addpath"].value.orEmpty().normalized()
                 if (added.isNotEmpty()) local = if (local.isEmpty()) added else "$added/$local"
-            } else if (root == SUPPORTED_ROOT) {
+                if (target == INTERNAL_ROOT) local = INTERNAL_PREFIX + local.trim('/')
+            } else if (root == INTERNAL_ROOT) {
+                // The path is written from the folder that holds the private data of every app: `<package>/files/saves`.
+                local = INTERNAL_PREFIX + local.trim('/')
+                apart = true
+            } else if (root == SHARED_ROOT) {
                 // The developer named the Android root directly. Some write the path from the shared
                 // storage (`Android/data/<package>/files`), others from `Android/data` (`<package>/files`).
                 if (!local.startsWith("Android/")) local = "Android/data/$local"
+                apart = true
             } else {
                 return@mapNotNull null
             }
 
+            val pattern = file["pattern"].value.orEmpty().ifEmpty { "*" }
+            val recursive = file["recursive"].asInteger(0) != 0
             CachedSaveRule(
                 localDir = local.trim('/'),
-                pattern = file["pattern"].value.orEmpty().ifEmpty { "*" },
-                recursive = file["recursive"].asInteger(0) != 0,
+                pattern = pattern,
+                recursive = recursive,
                 cloudPrefix = "%$root%$path",
+                pcCloudPrefix = if (apart) windowsTwin(files, overrides, pattern, recursive) else null,
             )
         }
+    }
+
+    /**
+     * The Windows rule kept apart from an Android one: a Windows root, for Windows, with the same pattern, and that no override
+     * brings to Android (otherwise it is already the Android rule). Null when the studio has none.
+     */
+    private fun windowsTwin(files: List<KeyValue>, overrides: List<KeyValue>, pattern: String, recursive: Boolean): String? {
+        val candidates = files.filter { file ->
+            val root = file["root"].value.orEmpty()
+            val platforms = file["platforms"].children.mapNotNull { it.value?.lowercase() }
+            root.startsWith("Win", ignoreCase = true) &&
+                (platforms.isEmpty() || "windows" in platforms) &&
+                overrides.none { it["root"].value == root } &&
+                file["pattern"].value.orEmpty().ifEmpty { "*" }.equals(pattern, ignoreCase = true)
+        }
+        val twin = candidates.firstOrNull { (it["recursive"].asInteger(0) != 0) == recursive } ?: candidates.firstOrNull() ?: return null
+        return "%${twin["root"].value}%${twin["path"].value.orEmpty().normalized()}"
+    }
+
+    /** An override applies to Android when it names Android, or names another system with `!=` ("every system but that one"). */
+    private fun appliesToAndroid(override: KeyValue): Boolean {
+        val os = override["os"].value ?: return false
+        val equal = override["oscompare"].value?.trim() != "!="
+        return os.equals("Android", ignoreCase = true) == equal
     }
 
     private fun String.normalized() = replace('\\', '/').trim('/')

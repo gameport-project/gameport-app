@@ -19,7 +19,7 @@ final class SaveSync {
         void info(String message);
     }
 
-    private final File root;
+    private final SaveRoots roots;
     private final File backupRoot;
     private final GamePortLink link;
     private final Log log;
@@ -27,6 +27,8 @@ final class SaveSync {
     // How the saves were the last time they were all sent (or found identical to the cloud), the last time GamePort was told what they are,
     // and the last look. A save is sent when it differs from the first, once it has stopped changing.
     private String lastSyncedSignature = "";
+    /** When this process began: what the game wrote after it is what tells where it keeps its saves. */
+    private final long startedAt = System.currentTimeMillis();
     private String lastReportedSignature = "";
     private String lastScannedSignature = "";
     private String stableSignature = "";
@@ -37,7 +39,11 @@ final class SaveSync {
     private List<SaveRule> knownRules;
 
     SaveSync(File root, File backupRoot, GamePortLink link, Log log, long conflictWaitMs) {
-        this.root = root;
+        this(new SaveRoots(root), backupRoot, link, log, conflictWaitMs);
+    }
+
+    SaveSync(SaveRoots roots, File backupRoot, GamePortLink link, Log log, long conflictWaitMs) {
+        this.roots = roots;
         this.backupRoot = backupRoot;
         this.link = link;
         this.log = log;
@@ -64,7 +70,10 @@ final class SaveSync {
     synchronized boolean reportLocal() {
         if (knownRules == null) return false;
         try {
-            List<LocalFile> files = new LocalScanner(root).scan(knownRules);
+            // Where the game really writes may not be where Steam says: it is looked at, and what is seen is used from then on.
+            String learnt = roots.observe(knownRules, startedAt);
+            if (learnt != null) log.info(learnt);
+            List<LocalFile> files = new LocalScanner(roots).scan(knownRules);
             lastScannedSignature = signature(files);
             if (!lastScannedSignature.equals(lastReportedSignature)) {
                 link.observe(files);
@@ -118,17 +127,28 @@ final class SaveSync {
 
     private void run(boolean launch) {
         currentBackup = null;
+        // GamePort may want more than one look at Steam Cloud (the Windows saves, then the Android ones). Each is a whole sync of its own.
+        int pass = 0;
+        while (runPass(launch, pass) == NEXT) pass++;
+    }
+
+    private static final int FAILED = 0;
+    private static final int NEXT = 1;
+    private static final int DONE = 2;
+
+    /** One look at Steam Cloud. */
+    private int runPass(boolean launch, int pass) {
         try {
-            GamePortLink.Begin begin = link.begin();
+            GamePortLink.Begin begin = link.begin(launch, pass);
             if (!"READY".equals(begin.status)) {
                 log.info("sync skipped: " + begin.status);
-                return;
+                return FAILED;
             }
             knownRules = begin.rules;
-            LocalScanner scanner = new LocalScanner(root);
+            LocalScanner scanner = new LocalScanner(roots);
             List<LocalFile> files = scanner.scan(begin.rules);
             String signature = signature(files);
-            if (!launch && signature.equals(lastSyncedSignature)) return;
+            if (!launch && pass == 0 && signature.equals(lastSyncedSignature)) return DONE;
 
             GamePortLink.Plan plan = link.plan(files, null);
             log.info("plan: " + plan.action);
@@ -136,24 +156,52 @@ final class SaveSync {
                 if (!launch) {
                     // Both sides changed: the player decides at the next start, not while playing, and it is not asked again for the same saves.
                     blockedSignature = signature;
-                    return;
+                    return FAILED;
                 }
                 plan = resolveConflict(scanner, begin.rules);
-                if (plan == null) return;
+                if (plan == null) return FAILED;
             }
             if ("DOWNLOAD".equals(plan.action)) {
-                if (!launch) return;
+                if (!launch) return FAILED;
                 applyDownload(plan, scanner, begin.rules);
             } else if ("UPLOAD".equals(plan.action)) {
                 // A send that did not go through leaves the saves as not sent, so it is tried again.
-                if (!applyUpload(plan)) return;
+                if (!applyUpload(plan)) return FAILED;
             }
+            if (begin.more) return NEXT;
             lastSyncedSignature = signature(scanner.scan(begin.rules));
+            return DONE;
         } catch (Exception e) {
             log.info("sync failed, leaving saves untouched: " + e);
+            return FAILED;
         } finally {
             link.end();
         }
+    }
+
+    /**
+     * Moves every save of this device, in either place the game may keep them, to the backup folder: nothing is removed for good, and nothing is
+     * asked of Steam. Asked by GamePort, with the game not running. Returns how many files were put aside.
+     */
+    synchronized int putLocalSavesAside(List<SaveRule> rules) throws IOException {
+        List<LocalFile> files = new LocalScanner(roots).scan(rules);
+        int moved = 0;
+        currentBackup = null;
+        for (LocalFile file : files) {
+            File here = roots.resolve(file.rel);
+            if (here.exists()) {
+                moveToBackup(here, file.rel);
+                moved++;
+            }
+            File there = roots.counterpart(file.rel);
+            if (there != null && there.exists()) moveToBackup(there, file.rel + ".other-place");
+        }
+        // What the sync last agreed on no longer holds: the next look at the saves starts afresh.
+        lastSyncedSignature = "";
+        lastScannedSignature = "";
+        lastReportedSignature = "";
+        log.info("put " + moved + " save file(s) of this device aside in the backup folder");
+        return moved;
     }
 
     /** Asks the player and waits; returns the plan for the side they chose, or null if they did not answer. */
@@ -184,7 +232,7 @@ final class SaveSync {
 
     private void applyDownload(GamePortLink.Plan plan, LocalScanner scanner, List<SaveRule> rules) throws IOException {
         for (GamePortLink.Download download : plan.downloads) {
-            File target = new File(root, download.rel);
+            File target = roots.resolve(download.rel);
             File temp = new File(target.getPath() + ".gpdl");
             File parent = target.getParentFile();
             if (parent != null) parent.mkdirs();
@@ -198,10 +246,21 @@ final class SaveSync {
             if (target.exists()) moveToBackup(target, download.rel);
             if (!temp.renameTo(target)) throw new IOException("could not place " + download.rel);
             if (download.timestamp > 0) target.setLastModified(download.timestamp);
+            // While it is not known where the game looks for its saves, they are put in both places: it finds them either way.
+            File other = roots.alternate(download.rel);
+            if (other != null) {
+                if (other.getParentFile() != null) other.getParentFile().mkdirs();
+                try (InputStream in = new java.io.FileInputStream(target); OutputStream out = new FileOutputStream(other)) {
+                    copy(in, out);
+                }
+                if (download.timestamp > 0) other.setLastModified(download.timestamp);
+            }
         }
         for (String rel : plan.deleteLocal) {
-            File file = new File(root, rel);
+            File file = roots.resolve(rel);
             if (file.exists()) moveToBackup(file, rel);
+            File other = roots.alternate(rel);
+            if (other != null && other.exists() && !other.delete()) log.info("could not remove the second copy of " + rel);
         }
         link.acknowledge(scanner.scan(rules));
         log.info("downloaded " + plan.downloads.size() + " file(s), removed " + plan.deleteLocal.size());
@@ -209,7 +268,7 @@ final class SaveSync {
 
     private boolean applyUpload(GamePortLink.Plan plan) throws IOException {
         for (String rel : plan.uploads) {
-            try (InputStream in = new java.io.FileInputStream(new File(root, rel)); OutputStream out = link.push(rel)) {
+            try (InputStream in = new java.io.FileInputStream(roots.resolve(rel)); OutputStream out = link.push(rel)) {
                 copy(in, out);
             }
         }
@@ -221,7 +280,7 @@ final class SaveSync {
     /** Copies every current save aside before the cloud version replaces them. */
     private void backUpLocal(List<LocalFile> files) throws IOException {
         for (LocalFile file : files) {
-            File source = new File(root, file.rel);
+            File source = roots.resolve(file.rel);
             File copy = new File(backupDir(), shortPath(file.rel));
             if (copy.getParentFile() != null) copy.getParentFile().mkdirs();
             try (InputStream in = new java.io.FileInputStream(source); OutputStream out = new FileOutputStream(copy)) {

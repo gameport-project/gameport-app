@@ -74,4 +74,57 @@ class SaveRulesParserTest {
         }
         assertEquals(1, SaveRulesParser.parse(windowsOnly).size)
     }
+
+    /** Quantum Void: one rule for Windows with no Android mapping, one that names the private data of the game. */
+    @Test
+    fun `an android rule in the private data of the game is kept, marked as internal`() {
+        val quantumVoid = kv(
+            "ufs", null,
+            kv(
+                "savefiles", null,
+                kv("0", null, kv("root", "WinAppDataLocalLow"), kv("path", "Tactical Nounours/Quantum Void/Saves"), kv("pattern", "*"), kv("platforms", null, kv("1", "Windows")), kv("recursive", "1")),
+                kv("1", null, kv("root", "AndroidInternalData"), kv("path", "com.tacticalnounours.quantumvoid/files/saves"), kv("pattern", "*"), kv("platforms", null, kv("1", "Android")), kv("recursive", "1")),
+            ),
+        )
+
+        val rules = SaveRulesParser.parse(quantumVoid)
+
+        assertEquals(1, rules.size)
+        assertEquals("@internal/com.tacticalnounours.quantumvoid/files/saves", rules[0].localDir)
+        assertEquals("%AndroidInternalData%com.tacticalnounours.quantumvoid/files/saves", rules[0].cloudPrefix)
+        assertEquals(true, rules[0].recursive)
+        // The Windows rule kept apart is remembered, to offer the Windows saves.
+        assertEquals("%WinAppDataLocalLow%Tactical Nounours/Quantum Void/Saves", rules[0].pcCloudPrefix)
+    }
+
+    @Test
+    fun `a rule linked to android by an override has no separate windows copy`() {
+        val rules = SaveRulesParser.parse(ancientDungeon())
+
+        assertEquals(listOf<String?>(null, null), rules.map { it.pcCloudPrefix })
+    }
+
+    @Test
+    fun `an android rule without a windows rule has no windows copy`() {
+        val coral = kv(
+            "ufs", null,
+            kv("savefiles", null, kv("0", null, kv("root", "AndroidExternalData"), kv("path", "Android/data/com.x.coral/files/User"), kv("pattern", "*.dat"), kv("platforms", null, kv("1", "Android")))),
+        )
+
+        assertEquals(null, SaveRulesParser.parse(coral).single().pcCloudPrefix)
+    }
+
+    @Test
+    fun `an override for every system but windows applies to android`() {
+        val ufs = kv(
+            "ufs", null,
+            kv("savefiles", null, kv("0", null, kv("root", "WinAppDataLocal"), kv("path", "Studio/Game"), kv("pattern", "*"))),
+            kv(
+                "rootoverrides", null,
+                kv("0", null, kv("root", "WinAppDataLocal"), kv("os", "Windows"), kv("oscompare", "!="), kv("useinstead", "AndroidExternalData"), kv("addpath", "Android/data/com.studio.game/files")),
+            ),
+        )
+
+        assertEquals("Android/data/com.studio.game/files/Studio/Game", SaveRulesParser.parse(ufs).single().localDir)
+    }
 }

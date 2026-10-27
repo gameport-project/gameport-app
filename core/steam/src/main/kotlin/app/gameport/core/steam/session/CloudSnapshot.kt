@@ -13,6 +13,8 @@ data class CloudFileEntry(
     val deleted: Boolean = false,
     /** Steam's raw storage state (0 persisted, 1 forgotten, 2 deleted), for diagnostics. */
     val state: Int = 0,
+    /** The platforms Steam syncs the file to, as the bit set it publishes (0 when it does not say), for diagnostics. */
+    val platformsToSync: Int = 0,
 )
 
 /** What Steam Cloud holds for an app at one moment. */
@@ -37,6 +39,7 @@ suspend fun SteamSession.fetchCloud(appId: Int, sinceChange: Long = 0): CloudSna
             sizeBytes = file.rawFileSize,
             deleted = file.persistState == ECloudStoragePersistState.k_ECloudStoragePersistStateDeleted,
             state = file.persistState.number,
+            platformsToSync = file.platformsToSync,
         )
     }
     return CloudSnapshot(list.currentChangeNumber, files)

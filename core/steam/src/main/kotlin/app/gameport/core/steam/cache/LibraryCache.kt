@@ -23,6 +23,8 @@ data class CachedSaveRule(
     val pattern: String,
     val recursive: Boolean,
     val cloudPrefix: String,
+    /** How Steam names the Windows copy of the same saves, when the studio keeps one apart from the Android one. */
+    val pcCloudPrefix: String? = null,
 )
 
 @Serializable
@@ -65,10 +67,15 @@ interface LibraryCacheStore {
     fun save(accountId: Long, cache: CachedLibrary)
 
     fun clear()
+
+    /** Marks an app as not inspected yet, so the next scan reads what Steam publishes for it again (a changed game, a changed way to save). */
+    fun forgetChecked(accountId: Long, appId: Int) {
+        load(accountId)?.let { save(accountId, it.copy(checkedApps = it.checkedApps - appId)) }
+    }
 }
 
-/** Version 4 adds the save rules used for the cloud sync, version 6 the build id of each depot, version 8 the artwork names and the parent app. */
-const val CACHE_VERSION = 9
+/** Version 4 adds the save rules used for the cloud sync, version 6 the build id of each depot, version 8 the artwork names and the parent app, version 10 the Windows copy of the saves and the private data root. */
+const val CACHE_VERSION = 10
 
 @Singleton
 class FileLibraryCacheStore @Inject constructor(

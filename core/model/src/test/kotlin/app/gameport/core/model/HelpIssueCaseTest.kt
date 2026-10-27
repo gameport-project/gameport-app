@@ -16,6 +16,7 @@ class HelpIssueCaseTest {
         GameIssue.ExpansionMayBeMissing,
         GameIssue.ExpansionMissing(missing = 2),
         GameIssue.SaveSyncFailed(offline = true),
+        GameIssue.SavesApart,
     )
 
     @Test

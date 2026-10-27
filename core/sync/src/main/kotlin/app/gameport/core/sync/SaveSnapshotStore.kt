@@ -20,6 +20,8 @@ data class SaveSnapshot(
     val cloudAt: Long = 0,
     val local: List<SnapFile> = emptyList(),
     val cloud: List<SnapFile> = emptyList(),
+    /** The Windows copy of the saves, null when the game has none apart from the Android one. */
+    val pc: List<SnapFile>? = null,
 )
 
 /**
@@ -45,6 +47,9 @@ class SaveSnapshotStore @Inject constructor(
 
     @Synchronized
     fun saveCloud(appId: Int, files: List<SnapFile>) = update(appId) { it.copy(cloudAt = System.currentTimeMillis(), cloud = files) }
+
+    @Synchronized
+    fun savePc(appId: Int, files: List<SnapFile>?) = update(appId) { it.copy(pc = files) }
 
     @Synchronized
     fun clear() {

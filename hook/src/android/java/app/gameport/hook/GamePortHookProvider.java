@@ -63,7 +63,10 @@ public final class GamePortHookProvider extends ContentProvider {
             File root = Environment.getExternalStorageDirectory();
             File files = context.getExternalFilesDir(null);
             File backups = new File(files != null ? files : context.getFilesDir(), "gameport-backup");
-            sync = new SaveSync(root, backups, new ProviderLink(context), new SaveSync.Log() {
+            // The private data of the game is in the folder that holds the data of every app; only this process can read it.
+            // Where the game was seen writing its saves is kept in a small file of its own folder, which the sync never reads as a save.
+            SaveRoots roots = new SaveRoots(root, context.getDataDir().getParentFile(), context.getPackageName(), new File(context.getFilesDir(), "gameport/saves_place"));
+            sync = new SaveSync(roots, backups, new ProviderLink(context), new SaveSync.Log() {
                 @Override public void info(String message) { Log.i(TAG, message); }
             }, CONFLICT_WAIT_MS);
             if (startedToSendSaves(context)) {
@@ -157,6 +160,7 @@ public final class GamePortHookProvider extends ContentProvider {
     public Bundle call(String method, String arg, Bundle extras) {
         if ("obb_pull".equals(method)) return pullExpansionFiles();
         if ("obb_report".equals(method)) return reportExpansionFiles();
+        if ("clear_saves".equals(method)) return putSavesAside(extras);
         if (!"catchup".equals(method)) return super.call(method, arg, extras);
         Context context = getContext();
         if (context == null || sync == null || !calledByGamePort(context)) return null;
@@ -172,6 +176,28 @@ public final class GamePortHookProvider extends ContentProvider {
             tellGamePort(context, "catchup_done");
             exitIfNobodyPlays();
         }
+        return out;
+    }
+
+    /**
+     * GamePort asks for the saves on this device to be put aside (a test, a clean start): the game's own folders can only be reached from here. The rules come
+     * with the call, so nothing is asked of Steam, and nothing is removed from it. A process started only for this goes away again.
+     */
+    private Bundle putSavesAside(Bundle extras) {
+        Context context = getContext();
+        if (context == null || sync == null || !calledByGamePort(context)) return null;
+        Bundle out = new Bundle();
+        try {
+            java.util.List<SaveRule> rules = new java.util.ArrayList<>();
+            String[] lines = extras == null ? null : extras.getStringArray("rules");
+            if (lines != null) for (String line : lines) rules.add(SaveRule.parse(line));
+            out.putInt("moved", sync.putLocalSavesAside(rules));
+            out.putString("status", "OK");
+        } catch (Throwable t) {
+            Log.w(TAG, "could not put the saves aside", t);
+            out.putString("status", "ERROR");
+        }
+        exitIfNobodyPlays();
         return out;
     }
 

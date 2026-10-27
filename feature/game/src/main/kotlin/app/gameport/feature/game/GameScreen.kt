@@ -612,6 +612,7 @@ private fun GameDetails(
                         onDismissRepatchError = onDiscard,
                         onPermissions = onOpenPermissions,
                         onConflict = onResolveConflict,
+                        onSaves = onOpenSaves,
                         onControllers = onOpenControllers,
                         onActivateFrame = onActivateFrame,
                         onRepair = onRepair,
@@ -868,6 +869,7 @@ private fun IssuesPanel(
     onDismissRepatchError: () -> Unit,
     onPermissions: () -> Unit,
     onConflict: () -> Unit,
+    onSaves: () -> Unit,
     onControllers: () -> Unit,
     onActivateFrame: () -> Unit,
     onRepair: () -> Unit,
@@ -953,6 +955,8 @@ private fun IssuesPanel(
                     IssueRow(stringResource(R.string.issue_storage_permission), stringResource(R.string.game_storage_open), onPermissions, enabled = !busy)
                 GameIssue.SaveConflict ->
                     IssueRow(stringResource(R.string.issue_save_conflict), stringResource(R.string.issue_save_conflict_action), onConflict, enabled = !busy)
+                GameIssue.SavesApart ->
+                    IssueRow(stringResource(R.string.issue_saves_apart), stringResource(R.string.issue_saves_apart_action), onSaves, enabled = !busy, info = true)
                 is GameIssue.SaveSyncFailed ->
                     IssueRow(stringResource(if (issue.offline) R.string.issue_sync_offline else R.string.issue_sync_failed))
                 is GameIssue.ControllerSilent ->

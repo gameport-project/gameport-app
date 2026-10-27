@@ -11,10 +11,17 @@ interface GamePortLink {
     final class Begin {
         final String status;
         final List<SaveRule> rules;
+        /** Another look at Steam Cloud follows this one (the Windows saves, then the Android ones). */
+        final boolean more;
 
         Begin(String status, List<SaveRule> rules) {
+            this(status, rules, false);
+        }
+
+        Begin(String status, List<SaveRule> rules, boolean more) {
             this.status = status;
             this.rules = rules;
+            this.more = more;
         }
     }
 
@@ -48,7 +55,8 @@ interface GamePortLink {
         }
     }
 
-    Begin begin() throws IOException;
+    /** [launch] is the sync before the game reads its saves; [pass] counts the looks at Steam Cloud of this sync, from 0. */
+    Begin begin(boolean launch, int pass) throws IOException;
 
     /** [force] is null, "local" or "cloud" (the player's choice after a conflict). */
     Plan plan(List<LocalFile> files, String force) throws IOException;

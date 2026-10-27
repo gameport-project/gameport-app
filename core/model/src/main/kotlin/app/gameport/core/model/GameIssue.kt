@@ -41,6 +41,12 @@ sealed interface GameIssue {
 
     /** The last save sync could not reach Steam ([offline]) or could not send the saves. */
     data class SaveSyncFailed(val offline: Boolean) : GameIssue
+
+    /**
+     * The studio keeps this game's Android saves apart from its PC ones, so a player who has played on a PC starts with none. A notice, not a
+     * problem: the page of the saves offers to bring the PC saves here, and it never lights the cover badge.
+     */
+    data object SavesApart : GameIssue
 }
 
 /**
@@ -49,4 +55,4 @@ sealed interface GameIssue {
  */
 val GameIssue.needsAttention: Boolean
     get() = this !is GameIssue.ControllerMappingAvailable && this !is GameIssue.ControllerSilent && this !is GameIssue.UpdateAvailable &&
-        this !is GameIssue.ReinstallMayHelp && this !is GameIssue.ExpansionMayBeMissing
+        this !is GameIssue.ReinstallMayHelp && this !is GameIssue.ExpansionMayBeMissing && this !is GameIssue.SavesApart

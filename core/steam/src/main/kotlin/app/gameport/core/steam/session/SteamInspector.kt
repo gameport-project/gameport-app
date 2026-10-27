@@ -26,6 +26,8 @@ object SteamInspector {
             root["config"].dump(this, 1)
             appendLine("[depots]")
             root["depots"].dump(this, 1)
+            appendLine("[ufs]")
+            root["ufs"].dump(this, 1)
         }
     }
 

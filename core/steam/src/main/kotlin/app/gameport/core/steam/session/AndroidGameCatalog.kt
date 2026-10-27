@@ -167,7 +167,7 @@ internal fun libraryOf(shown: Collection<CachedGame>, owned: Set<Int>, visible: 
                 packageName = null,
                 isVr = game.isVr,
                 baseDepots = depots.filter { it.dlcAppId == null },
-                saveRules = game.saveRules.map { SaveRule(it.localDir, it.pattern, it.recursive, it.cloudPrefix) },
+                saveRules = game.saveRules.map { SaveRule(it.localDir, it.pattern, it.recursive, it.cloudPrefix, it.pcCloudPrefix) },
                 dlc = depots.filter { it.dlcAppId != null }.groupBy { it.dlcAppId!! }.map { (dlcAppId, dlcDepots) ->
                     DlcContent(dlcAppId, dlcNames[dlcAppId] ?: "DLC $dlcAppId", owned = dlcAppId in visible, depots = dlcDepots)
                 }.sortedBy { it.name.lowercase() },

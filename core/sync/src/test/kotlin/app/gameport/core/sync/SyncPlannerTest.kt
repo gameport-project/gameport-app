@@ -94,4 +94,36 @@ class SyncPlannerTest {
         val action = SyncPlanner.plan(local("a" to "2"), cloud("a" to "1"), 99, baseline)
         assertEquals(listOf("a"), (action as SyncAction.Upload).files.map { it.rel })
     }
+
+    /**
+     * The Windows saves are brought in, then the sync looks at the Android space, which does not hold them yet. With no record of an earlier
+     * agreement the device's files are simply sent; nothing is deleted anywhere.
+     */
+    @Test
+    fun `after bringing the windows saves in, the empty android space receives them and nothing is deleted`() {
+        val action = SyncPlanner.plan(local("a" to "1", "b" to "2"), emptyMap(), 7, baseline = null)
+
+        action as SyncAction.Upload
+        assertEquals(2, action.files.size)
+        assertEquals(emptyList<CloudFile>(), action.deleteCloud)
+    }
+
+    /** Why the record of an agreement is forgotten when the sync changes space: kept, it would read as the Android space having deleted the files. */
+    @Test
+    fun `an agreement kept from the windows space would delete the files brought in`() {
+        val kept = Baseline(changeNumber = 7, files = mapOf("a" to "1", "b" to "2"))
+
+        val action = SyncPlanner.plan(local("a" to "1", "b" to "2"), emptyMap(), 7, kept)
+
+        assertEquals(listOf("a", "b"), (action as SyncAction.Download).deleteLocal.sorted())
+    }
+
+    @Test
+    fun `sending the device's saves to a windows space that holds others removes only what the device lacks`() {
+        val action = SyncPlanner.plan(local("a" to "2"), cloud("a" to "1", "b" to "3"), 7, baseline = Baseline(7, mapOf("a" to "1", "b" to "3")))
+
+        action as SyncAction.Upload
+        assertEquals(listOf("a"), action.files.map { it.rel })
+        assertEquals(listOf("b"), action.deleteCloud.map { it.rel })
+    }
 }

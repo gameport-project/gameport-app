@@ -19,6 +19,7 @@ enum class HelpIssueCase(val tone: IssueTone) {
     REINSTALL(IssueTone.QUESTION),
     EXPANSION_UNCHECKED(IssueTone.INFO),
     EXPANSION_MISSING(IssueTone.ATTENTION),
+    SAVES_APART(IssueTone.INFO),
     ;
 
     companion object {
@@ -34,6 +35,7 @@ enum class HelpIssueCase(val tone: IssueTone) {
             GameIssue.ExpansionMayBeMissing -> EXPANSION_UNCHECKED
             is GameIssue.ExpansionMissing -> EXPANSION_MISSING
             is GameIssue.SaveSyncFailed -> SAVE_SYNC_FAILED
+            GameIssue.SavesApart -> SAVES_APART
         }
     }
 }

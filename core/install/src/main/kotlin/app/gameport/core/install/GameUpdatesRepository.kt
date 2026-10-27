@@ -23,6 +23,7 @@ class GameUpdatesRepository @Inject constructor(
     private val installed: InstalledGames,
     private val builds: InstalledBuilds,
     private val sessions: SteamSessionHolder,
+    private val library: app.gameport.core.steam.SteamLibraryRepository,
 ) {
     private val _updates = MutableStateFlow<List<GameUpdate>>(emptyList())
     val updates: StateFlow<List<GameUpdate>> = _updates.asStateFlow()
@@ -38,6 +39,7 @@ class GameUpdatesRepository @Inject constructor(
         val current = runCatching { session.currentBuilds(appIds) }
             .onFailure { Log.w(TAG, "update check failed", it) }
             .getOrNull() ?: return
+        val before = _updates.value.map { it.appId }.toSet()
         _updates.value = appIds.mapNotNull { appId ->
             val now = current[appId] ?: return@mapNotNull null
             val recorded = builds.get(appId)
@@ -52,11 +54,15 @@ class GameUpdatesRepository @Inject constructor(
             }
             if (changed) GameUpdate(appId, now.name) else null
         }.sortedBy { it.name.lowercase() }
+        // An update can change how the game saves (a root override, another folder): what Steam publishes for it is read again as soon as it is seen.
+        _updates.value.filter { it.appId !in before }.forEach { library.refreshGame(it.appId) }
     }
 
     /** The game was just installed from the newest build. */
     fun markCurrent(appId: Int) {
         _updates.update { list -> list.filterNot { it.appId == appId } }
+        // Updated: what Steam publishes for the new build is read once more, so the games' pages and the save sync follow it.
+        library.refreshGame(appId)
     }
 
     /** Forgets the update list (used when signing out). */

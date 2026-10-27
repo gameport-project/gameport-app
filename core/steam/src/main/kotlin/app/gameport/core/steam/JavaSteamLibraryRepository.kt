@@ -29,7 +29,7 @@ import kotlinx.coroutines.flow.shareIn
 /** One scan shared by every screen; it restarts when the signed-in session changes. */
 @Singleton
 class JavaSteamLibraryRepository @Inject constructor(
-    sessions: SteamSessionHolder,
+    private val sessions: SteamSessionHolder,
     private val cacheStore: LibraryCacheStore,
     auth: SteamAuthRepository,
     private val age: app.gameport.core.settings.AgeStore,
@@ -62,6 +62,12 @@ class JavaSteamLibraryRepository @Inject constructor(
     override fun observeLibrary(): Flow<Library> = visible
 
     override fun observeGame(appId: Int): Flow<Game?> = visible.map { lib -> lib.games.firstOrNull { it.appId == appId } }
+
+    override fun refreshGame(appId: Int) {
+        val account = sessions.current.value?.accountId ?: return
+        cacheStore.forgetChecked(account, appId)
+        rescan()
+    }
 
     /** What a scan depends on: the session, the connection, who is signed in, and how many times it was asked again. */
     private data class Scan(val session: app.gameport.core.steam.session.SteamSession?, val offline: Boolean, val state: AuthState, val round: Int)

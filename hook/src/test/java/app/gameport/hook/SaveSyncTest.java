@@ -299,6 +299,100 @@ public class SaveSyncTest {
         assertTrue(link.committed);
     }
 
+    @Test
+    public void everyLookAtSteamCloudIsAWholeSyncOfItsOwn() throws IOException {
+        link.passes = 2;
+
+        sync().syncAtLaunch();
+
+        assertEquals(Arrays.asList("launch0", "launch1"), link.begun);
+        assertEquals(2, link.planCalls);
+    }
+
+    @Test
+    public void aSyncWithOneLookAsksOnce() throws IOException {
+        sync().syncAtLaunch();
+
+        assertEquals(Arrays.asList("launch0"), link.begun);
+    }
+
+    @Test
+    public void aLookThatFailsStopsTheNextOnesAndLeavesTheSavesToBeSentAgain() throws IOException {
+        write("g/a.sav", "mine");
+        link.passes = 2;
+        link.failingPass = 1;
+        SaveSync sync = sync();
+
+        sync.syncAtLaunch();
+        // The look at the second place did not go through: the saves still count as not sent, so a later look tries again.
+        link.failingPass = -1;
+        link.begun.clear();
+        sync.uploadIfChanged();
+
+        assertEquals(Arrays.asList("play0", "play1"), link.begun);
+    }
+
+    @Test
+    public void whileThePlaceIsUnknownDownloadedSavesAreWrittenInBothPlaces() throws IOException {
+        File shared = temp.newFolder("shared2");
+        File internal = temp.newFolder("internal2");
+        SaveRoots roots = new SaveRoots(shared, internal, "com.Studio.Game", new File(internal, "place"));
+        link.ruleDir = "@internal/com.studio.game/files/saves";
+        link.plan = new GamePortLink.Plan("DOWNLOAD",
+                Arrays.asList(new GamePortLink.Download("cloud/a", "@internal/com.studio.game/files/saves/a.sav", sha1("cloud save"), 5_000L)),
+                Collections.<String>emptyList(), Collections.<String>emptyList());
+        link.cloudContent.put("cloud/a", "cloud save");
+
+        new SaveSync(roots, backups, link, new SaveSync.Log() {
+            @Override public void info(String message) {}
+        }, 2_000).syncAtLaunch();
+
+        File inShared = new File(shared, "Android/data/com.Studio.Game/files/saves/a.sav");
+        File inPrivate = new File(internal, "com.Studio.Game/files/saves/a.sav");
+        assertEquals("cloud save", new String(Files.readAllBytes(inShared.toPath()), "UTF-8"));
+        assertEquals("cloud save", new String(Files.readAllBytes(inPrivate.toPath()), "UTF-8"));
+        // The copies carry the date Steam holds, not the time of the download: they are not taken for what the game wrote.
+        assertEquals(5_000L, inShared.lastModified());
+        assertEquals(5_000L, inPrivate.lastModified());
+    }
+
+    @Test
+    public void savesPutAsideGoToTheBackupFolderAndNothingIsAskedOfSteam() throws IOException {
+        write("g/a.sav", "mine");
+        write("g/b.sav", "other");
+
+        int moved = sync().putLocalSavesAside(Arrays.asList(new SaveRule("g", "*.sav", true)));
+
+        assertEquals(2, moved);
+        assertFalse(new File(root, "g/a.sav").exists());
+        assertFalse(new File(root, "g/b.sav").exists());
+        File backupDay = backups.listFiles()[0];
+        assertEquals("mine", new String(Files.readAllBytes(new File(backupDay, "g/a.sav").toPath()), "UTF-8"));
+        // The link was not used at all: no sync began, nothing was sent.
+        assertTrue(link.begun.isEmpty());
+        assertFalse(link.committed);
+    }
+
+    @Test
+    public void putAsideAlsoMovesTheCopyInTheOtherPlace() throws IOException {
+        File shared = temp.newFolder("shared3");
+        File internal = temp.newFolder("internal3");
+        SaveRoots roots = new SaveRoots(shared, internal, "com.Studio.Game", new File(internal, "place"));
+        File inShared = new File(shared, "Android/data/com.Studio.Game/files/saves/a.sav");
+        File inPrivate = new File(internal, "com.Studio.Game/files/saves/a.sav");
+        inShared.getParentFile().mkdirs();
+        inPrivate.getParentFile().mkdirs();
+        Files.write(inShared.toPath(), "x".getBytes("UTF-8"));
+        Files.write(inPrivate.toPath(), "x".getBytes("UTF-8"));
+
+        new SaveSync(roots, backups, link, new SaveSync.Log() {
+            @Override public void info(String message) {}
+        }, 2_000).putLocalSavesAside(Arrays.asList(new SaveRule("@internal/com.studio.game/files/saves", "*", true)));
+
+        assertFalse(inShared.exists());
+        assertFalse(inPrivate.exists());
+    }
+
     private final class FakeLink implements GamePortLink {
         String status = "READY";
         Plan plan = new Plan("NONE", Collections.<Download>emptyList(), Collections.<String>emptyList(), Collections.<String>emptyList());
@@ -308,9 +402,16 @@ public class SaveSyncTest {
         String choice = "PENDING";
         boolean acknowledged, committed, ended, conflictShown, commitResult = true;
         int planCalls, observed;
+        /** How many looks at Steam Cloud a sync makes, and the pass that fails (-1 for none). */
+        int passes = 1, failingPass = -1;
+        /** The folder of the rule the fake link hands out. */
+        String ruleDir = "g";
+        final List<String> begun = new ArrayList<>();
 
-        @Override public Begin begin() {
-            return new Begin(status, new ArrayList<>(Arrays.asList(new SaveRule("g", "*.sav", true))));
+        @Override public Begin begin(boolean launch, int pass) {
+            begun.add((launch ? "launch" : "play") + pass);
+            if (pass == failingPass) return new Begin("OFFLINE", new ArrayList<SaveRule>());
+            return new Begin(status, new ArrayList<>(Arrays.asList(new SaveRule(ruleDir, "*.sav", true))), pass < passes - 1);
         }
         @Override public Plan plan(List<LocalFile> files, String force) {
             planCalls++;

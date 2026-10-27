@@ -9,6 +9,7 @@ class GameIssueTest {
     fun `the questions and the notices never light the orange mark`() {
         assertFalse(GameIssue.ReinstallMayHelp.needsAttention)
         assertFalse(GameIssue.ExpansionMayBeMissing.needsAttention)
+        assertFalse(GameIssue.SavesApart.needsAttention)
         assertFalse(GameIssue.UpdateAvailable.needsAttention)
         assertFalse(GameIssue.ControllerSilent(activated = false).needsAttention)
         assertFalse(GameIssue.ControllerMappingAvailable("touch").needsAttention)

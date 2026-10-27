@@ -41,6 +41,8 @@ internal interface CloudEntryPoint {
 
     fun achievementNotifier(): AchievementNotifier
 
+    fun memoryNotice(): app.gameport.core.install.MemoryNotice
+
     fun playDecisions(): PlayDecisions
 
     fun verdictAsker(): VerdictAsker
@@ -132,7 +134,12 @@ class CloudProvider : ContentProvider() {
             Bundle().apply { putString(STATUS, OK) }
         }
         // The game came to the screen, is still there, or left it: the time it is on screen is counted (see PlaytimeTracker).
-        "resumed" -> okAfter { watchLife(packageName, extras); entryPoint.playtime().resumed(packageName, android.os.Binder.getCallingPid()) }
+        "resumed" -> okAfter {
+            watchLife(packageName, extras)
+            entryPoint.playtime().resumed(packageName, android.os.Binder.getCallingPid())
+            // The game is on screen: what closing the apps in the background gave back can be announced over it.
+            entryPoint.memoryNotice().gameShown(packageName)
+        }
         "alive" -> okAfter { watchLife(packageName, extras); entryPoint.playtime().alive(packageName) }
         "paused" -> okAfter { watchLife(packageName, extras); entryPoint.playtime().paused(packageName) }
         // The game's process is ending (it quit by itself, or its last screen closed): how long it lasted shows a problem.
@@ -204,9 +211,15 @@ class CloudProvider : ContentProvider() {
         }
         "obb_progress" -> okAfter { entryPoint.expansionHandoff().reportProgress(packageName, extras.getLong("done"), extras.getLong("total")) }
         "obb_done" -> okAfter { entryPoint.expansionHandoff().reportDone(packageName, extras.getBoolean("ok"), extras.getString("reason")) }
-        "begin" -> when (val result = runBlocking { if (!coordinator.isCatchUp(packageName)) noteLaunch(packageName); coordinator.begin(packageName) }) {
+        // A hook that looks at more than one place of Steam Cloud (the Windows saves, then the Android ones) says which look this is; an older one does not.
+        "begin" -> when (val result = runBlocking {
+            val pass = extras.getInt("pass", 0)
+            if (pass == 0 && !coordinator.isCatchUp(packageName)) noteLaunch(packageName)
+            coordinator.begin(packageName, extras.getBoolean("launch", true), pass, knowsPasses = extras.containsKey("pass"))
+        }) {
             is BeginResult.Ready -> Bundle().apply {
                 putString(STATUS, READY)
+                putBoolean("more", result.more)
                 putStringArray(RULES, result.rules.map { listOf(it.localDir, it.pattern, if (it.recursive) "1" else "0", it.cloudPrefix).joinToString("\t") }.toTypedArray())
             }
             BeginResult.Offline -> Bundle().apply { putString(STATUS, OFFLINE) }

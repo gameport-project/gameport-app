@@ -33,12 +33,15 @@ data class DlcContent(
  * storage root (for example `Android/data/<package>/files`); [cloudPrefix] is how Steam names the
  * same folder (for example `%WinAppDataLocalLow%Studio/Game`). Both may contain the tokens
  * `{64BitSteamID}` and `{Steam3AccountID}`, which stand for the signed-in account.
+ * A [localDir] starting with `@internal/` is in the private data of the game (see the hook), not in the shared storage.
+ * [pcCloudPrefix] is how Steam names the Windows copy of the same saves, when the studio keeps one apart from the Android one (no override links them).
  */
 data class SaveRule(
     val localDir: String,
     val pattern: String,
     val recursive: Boolean,
     val cloudPrefix: String,
+    val pcCloudPrefix: String? = null,
 )
 
 data class AndroidBuild(

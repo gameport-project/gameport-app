@@ -15,16 +15,21 @@ final class LocalScanner {
     /** Folders GamePort itself keeps inside a game's data: never save files, and backups hold copies of them. */
     private static final String[] OWN_FOLDERS = {"gameport-backup", "gameport"};
 
-    private final File root;
+    private final SaveRoots roots;
 
     LocalScanner(File root) {
-        this.root = root;
+        this(new SaveRoots(root));
+    }
+
+    LocalScanner(SaveRoots roots) {
+        this.roots = roots;
     }
 
     List<LocalFile> scan(List<SaveRule> rules) throws IOException {
+        roots.prepare(rules);
         List<LocalFile> found = new ArrayList<>();
         for (SaveRule rule : rules) {
-            File dir = rule.localDir.isEmpty() ? root : new File(root, rule.localDir);
+            File dir = rule.localDir.isEmpty() ? roots.shared() : roots.resolve(rule.localDir);
             walk(dir, rule.localDir, rule, found);
         }
         // Two rules can cover the same file (several patterns in one folder); count it once.
