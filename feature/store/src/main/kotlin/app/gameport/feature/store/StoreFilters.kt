@@ -123,6 +123,28 @@ private fun StoreFilter.excludes(): Set<StoreFilter> = when (this) {
     else -> emptySet()
 }
 
+/** The filters that look at what the players said of a game on this device: a game nobody said anything about passes neither. */
+internal val COMPAT_FILTERS = setOf(StoreFilter.COMPATIBLE, StoreFilter.INCOMPATIBLE)
+
+/**
+ * How many games the compatibility filter leaves out for want of a word from the players: those that pass the search and every other filter, and that nobody has reported on for this
+ * device. Zero when no compatibility filter is on. It is what an empty list can mean other than "nothing is compatible".
+ */
+internal fun withoutReports(
+    apps: List<AndroidApp>,
+    text: String,
+    filters: StoreFilters,
+    ownedIds: Set<Int>,
+    today: LocalDate,
+    vrDevice: Boolean,
+    prices: Map<Int, StorePrice> = emptyMap(),
+    levels: Map<Int, CompatLevel> = emptyMap(),
+): Int {
+    if (filters.quick.none { it in COMPAT_FILTERS }) return 0
+    val others = filters.copy(quick = filters.quick - COMPAT_FILTERS)
+    return storeList(apps, text, others, ownedIds, today, vrDevice, prices, levels = levels).count { levels[it.appid] == null }
+}
+
 /** The language codes of a game for the list [kind] names. */
 internal fun AndroidApp.languagesOf(kind: LanguageKind): List<String> = when (kind) {
     LanguageKind.TEXT -> languages

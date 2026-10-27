@@ -56,6 +56,7 @@ import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.FilterList
@@ -223,9 +224,23 @@ fun StoreScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, onStoreGame: (In
                             }
                         }
                         StateFilters(current, viewModel)
+                        val compatOn = current.filters.quick.any { it in COMPAT_FILTERS }
                         if (current.apps.isEmpty()) {
-                            Text(stringResource(R.string.store_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (compatOn) {
+                                CompatEmpty(current.withoutReports, wanted = StoreFilter.COMPATIBLE in current.filters.quick, onRemove = viewModel::onCompatFilterRemoved)
+                            } else {
+                                Text(stringResource(R.string.store_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         } else {
+                            // The compatibility filter lists only the games the players reported on: the others are not hidden for being incompatible, and the list says so.
+                            if (compatOn && current.withoutReports > 0) {
+                                Text(
+                                    pluralStringResource(R.plurals.store_compat_hidden, current.withoutReports, current.withoutReports),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(bottom = 8.dp),
+                                )
+                            }
                             val covers = current.viewMode == StoreViewMode.COVERS
                             // Whatever narrows or orders the list, quick filter, panel, sort or search, sends it back to its top. The first composition, and the return from a
                             // game page, keep the place the list was at.
@@ -319,6 +334,31 @@ private fun sortValueOf(app: AndroidApp, sort: StoreSort): String? = when (sort)
 }
 
 /** Three three-way switches on one low row: what can be installed, what the account has, and what works on this device. "All" is each one's first position, and it lists the games nobody rated too. */
+/**
+ * What an empty list says when a compatibility filter is on. The filter keeps only the games that players reported on for this device, so an empty list does not mean that
+ * nothing is compatible: when games were left out for want of a report, the text says so, with how many, and the filter can be removed from there.
+ */
+@Composable
+private fun CompatEmpty(withoutReports: Int, wanted: Boolean, onRemove: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 24.dp)) {
+        if (withoutReports > 0) {
+            Text(stringResource(R.string.store_compat_empty_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.store_compat_empty_text), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(pluralStringResource(R.plurals.store_compat_hidden, withoutReports, withoutReports), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            Text(
+                stringResource(if (wanted) R.string.store_compat_none_works else R.string.store_compat_none_fails),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        GlassButton(onClick = onRemove, contentPadding = PaddingValues(horizontal = 16.dp)) {
+            Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.store_compat_remove))
+        }
+    }
+}
+
 @Composable
 private fun StateFilters(state: StoreUiState.Content, viewModel: StoreViewModel) {
     val quick = state.filters.quick

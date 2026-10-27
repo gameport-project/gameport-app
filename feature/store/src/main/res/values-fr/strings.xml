@@ -8,6 +8,15 @@
     <string name="store_search_hint">Rechercher un jeu ou un studio</string>
     <string name="store_unavailable">La liste n\'a pas encore pu être chargée.</string>
     <string name="store_empty">Aucun jeu ne correspond.</string>
+    <string name="store_compat_empty_title">Aucun retour pour cet appareil</string>
+    <string name="store_compat_empty_text">La compatibilité repose sur les retours que les joueurs envoient après une partie. Une liste vide ne veut pas dire que les jeux sont incompatibles, seulement qu\'aucun n\'a encore reçu de retour.</string>
+    <string name="store_compat_none_works">Aucun jeu de ces filtres n\'a été signalé comme fonctionnant sur cet appareil.</string>
+    <string name="store_compat_none_fails">Aucun jeu de ces filtres n\'a été signalé comme ne fonctionnant pas sur cet appareil.</string>
+    <string name="store_compat_remove">Retirer le filtre de compatibilité</string>
+    <plurals name="store_compat_hidden">
+        <item quantity="one">%1$d jeu sans retour pour cet appareil n\'est pas listé.</item>
+        <item quantity="other">%1$d jeux sans retour pour cet appareil ne sont pas listés.</item>
+    </plurals>
     <string name="store_filter_vr">VR</string>
     <string name="store_filter_flat">Plat</string>
     <string name="store_filter_installable">Installable</string>

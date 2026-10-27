@@ -61,6 +61,8 @@ sealed interface StoreUiState {
         val coverWidth: Int = CoverSize.SMALL.dp,
         /** What the players of this kind of device say of the games they were enough to try. */
         val levels: Map<Int, CompatLevel> = emptyMap(),
+        /** The games a compatibility filter leaves out because nobody reported on them for this device (see [withoutReports]); zero without such a filter. */
+        val withoutReports: Int = 0,
         val deviceKind: String = "",
         /** The picture of the game pointed at fills the page behind, as on the home, with the strength the player set for it. */
         val backdrop: Boolean = true,
@@ -153,6 +155,7 @@ class StoreViewModel @Inject constructor(
             promos = forDevice.filter { (StoreFilter.VR !in chosen.quick || it.vr) && (StoreFilter.FLAT !in chosen.quick || !it.vr) }.filter { it.installable && it.appid !in ids && ((prices[it.appid] as? StorePrice.Paid)?.discountPercent ?: 0) > 0 }
                 .sortedByDescending { (prices[it.appid] as StorePrice.Paid).discountPercent }.take(PROMO_LIMIT),
             levels = levels,
+            withoutReports = withoutReports(listed.apps, text, chosen, ids, today, device.isHeadset, prices, levels),
             deviceKind = device.kind,
             backdrop = userSettings.display.value.backdrop,
             backdropStrength = userSettings.display.value.backdropStrength,
@@ -180,6 +183,9 @@ class StoreViewModel @Inject constructor(
     }
 
     fun onFilterToggled(filter: StoreFilter) = filters.update { it.toggled(filter) }
+
+    /** The compatibility filter goes off, so the games nobody reported on are listed again. */
+    fun onCompatFilterRemoved() = filters.update { it.copy(quick = it.quick - COMPAT_FILTERS) }
 
     /** A choice among filters that exclude each other (a tab, a state): the ones of the group go off, then [chosen] goes on, or none for "all". */
     fun onGroupChosen(group: Set<StoreFilter>, chosen: StoreFilter?) = filters.update { it.copy(quick = it.quick - group + listOfNotNull(chosen)) }

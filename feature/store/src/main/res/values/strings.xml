@@ -8,6 +8,15 @@
     <string name="store_search_hint">Search a game or a studio</string>
     <string name="store_unavailable">The list could not be loaded yet.</string>
     <string name="store_empty">No game matches.</string>
+    <string name="store_compat_empty_title">No report yet for this device</string>
+    <string name="store_compat_empty_text">Compatibility comes from the reports that players send after a game. An empty list does not mean that the games are incompatible, only that none has been reported yet.</string>
+    <string name="store_compat_none_works">No game with these filters has been reported as working on this device.</string>
+    <string name="store_compat_none_fails">No game with these filters has been reported as not working on this device.</string>
+    <string name="store_compat_remove">Remove the compatibility filter</string>
+    <plurals name="store_compat_hidden">
+        <item quantity="one">%1$d game with no report for this device is not listed.</item>
+        <item quantity="other">%1$d games with no report for this device are not listed.</item>
+    </plurals>
     <string name="store_filter_vr">VR</string>
     <string name="store_filter_flat">Flat</string>
     <string name="store_filter_installable">Installable</string>

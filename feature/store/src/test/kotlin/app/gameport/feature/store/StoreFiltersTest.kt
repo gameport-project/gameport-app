@@ -41,6 +41,34 @@ class StoreFiltersTest {
 
     private fun quick(vararg filters: StoreFilter) = StoreFilters(quick = filters.toSet())
 
+    private val levels = mapOf(1 to CompatLevel.WORKS, 2 to CompatLevel.FAILS)
+
+    private fun hidden(filters: StoreFilters, text: String = "", vrDevice: Boolean = true) = withoutReports(apps, text, filters, emptySet(), today, vrDevice, levels = levels)
+
+    @Test
+    fun `the games a compatibility filter leaves out are the ones nobody reported on, among those that pass the other filters`() {
+        // Games 3, 4 and 5 have no report: with only the compatibility filter on, they are what an empty or short list does not show.
+        assertEquals(3, hidden(quick(StoreFilter.COMPATIBLE)))
+        assertEquals(3, hidden(quick(StoreFilter.INCOMPATIBLE)))
+        // Flat games with a compatible filter: Bravo failed, Delta has no report, so the list is empty and one game is left out for want of a report.
+        assertEquals(emptyList<Int>(), storeList(apps, "", quick(StoreFilter.FLAT, StoreFilter.COMPATIBLE), emptySet(), today, true, levels = levels).map { it.appid })
+        assertEquals(1, hidden(quick(StoreFilter.FLAT, StoreFilter.COMPATIBLE)))
+    }
+
+    @Test
+    fun `the other filters and the search narrow what is counted, and a device without VR counts no VR game`() {
+        assertEquals(1, hidden(quick(StoreFilter.COMPATIBLE, StoreFilter.INSTALLABLE, StoreFilter.VR)))
+        assertEquals(1, hidden(quick(StoreFilter.COMPATIBLE), text = "echo"))
+        assertEquals(1, hidden(quick(StoreFilter.COMPATIBLE), vrDevice = false))
+    }
+
+    @Test
+    fun `nothing is left out when no compatibility filter is on, or when every game passing the other filters has a report`() {
+        assertEquals(0, hidden(quick()))
+        assertEquals(0, hidden(quick(StoreFilter.FLAT)))
+        assertEquals(0, hidden(quick(StoreFilter.COMPATIBLE), text = "alpha"))
+    }
+
     @Test
     fun `the newest come first, then the best liked, then by name`() {
         assertEquals(listOf(1, 5, 2, 4, 3), ids())
