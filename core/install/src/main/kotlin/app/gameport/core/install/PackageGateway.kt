@@ -138,8 +138,11 @@ class PackageGateway @Inject constructor(
         return targets.size
     }
 
-    /** Installs one APK, or a base APK with its splits, in a single session. */
-    suspend fun install(apks: List<File>): Outcome {
+    /**
+     * Installs one APK, or a base APK with its splits, in a single session. [note] is told the steps (the files handed to the system, the confirmation it asks for),
+     * so that a report says where an installation that seems stuck is.
+     */
+    suspend fun install(apks: List<File>, note: (String) -> Unit = {}): Outcome {
         val installer = packageManager.packageInstaller
         val sessionId = withContext(Dispatchers.IO) {
             val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
@@ -160,7 +163,8 @@ class PackageGateway @Inject constructor(
             }
             id
         }
-        return awaitStatus(sessionId) { intentSender -> installer.openSession(sessionId).use { it.commit(intentSender) } }
+        note("install: ${apks.sumOf { it.length() } / (1024 * 1024)} MB handed to the system's installer, committing")
+        return awaitStatus(sessionId, note) { intentSender -> installer.openSession(sessionId).use { it.commit(intentSender) } }
     }
 
     /** What an APK says about itself, enough to tell the builds of one game apart. Null when it cannot be read. */
@@ -180,7 +184,7 @@ class PackageGateway @Inject constructor(
     suspend fun uninstall(packageName: String): Outcome =
         awaitStatus(packageName.hashCode()) { intentSender -> packageManager.packageInstaller.uninstall(packageName, intentSender) }
 
-    private suspend fun awaitStatus(token: Int, start: (android.content.IntentSender) -> Unit): Outcome =
+    private suspend fun awaitStatus(token: Int, note: (String) -> Unit = {}, start: (android.content.IntentSender) -> Unit): Outcome =
         suspendCancellableCoroutine { continuation ->
             val action = "${context.packageName}.PACKAGE_RESULT.$token"
             val receiver = object : BroadcastReceiver() {
@@ -189,7 +193,12 @@ class PackageGateway @Inject constructor(
                         PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                             @Suppress("DEPRECATION")
                             val confirmation = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
-                            confirmation?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)?.let(context::startActivity)
+                            if (confirmation == null) note("install: the system asks for a confirmation but gave no window to open")
+                            else {
+                                note("install: the system asks for a confirmation, its window is opened")
+                                runCatching { context.startActivity(confirmation.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                                    .onFailure { note("install: the confirmation window could not be opened (${it.javaClass.simpleName}: ${it.message})") }
+                            }
                         }
                         else -> {
                             context.unregisterReceiver(this)

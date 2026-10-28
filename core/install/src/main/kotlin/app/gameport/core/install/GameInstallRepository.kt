@@ -311,7 +311,7 @@ class GameInstallRepository @Inject constructor(
                 // The build this download holds, read now: the folder no longer has it once the files are placed.
                 val downloadedManifests = DownloadedManifests.read(directory)
                 setState(game.appId, InstallState.Installing)
-                when (val outcome = if (alreadyOnDevice) PackageGateway.Outcome.Success else packages.install(apks)) {
+                when (val outcome = if (alreadyOnDevice) PackageGateway.Outcome.Success else packages.install(apks) { events.note(game.appId, it) }) {
                     PackageGateway.Outcome.Success -> {
                         if (!alreadyOnDevice) events.note(game.appId, "installed $packageName")
                         // Not playable yet: the expansion files have to be in place, under the name the game looks for.
@@ -548,7 +548,7 @@ class GameInstallRepository @Inject constructor(
                     }
                 }
                 setState(appId, InstallState.Installing)
-                val outcome = if (confirmTimeoutMs == null) packages.install(patched) else kotlinx.coroutines.withTimeoutOrNull(confirmTimeoutMs) { packages.install(patched) }
+                val outcome = if (confirmTimeoutMs == null) packages.install(patched) { events.note(appId, it) } else kotlinx.coroutines.withTimeoutOrNull(confirmTimeoutMs) { packages.install(patched) { events.note(appId, it) } }
                     ?: PackageGateway.Outcome.Cancelled.also { events.note(appId, "the update was not confirmed in time: given up") }
                 events.note(appId, "re-patch install outcome: $outcome")
                 if (outcome == PackageGateway.Outcome.Success) alignObbVersion(packageName)
