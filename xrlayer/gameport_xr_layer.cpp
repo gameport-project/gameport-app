@@ -62,6 +62,9 @@ PFN_xrCreateSwapchain g_createSwapchain = nullptr;
 PFN_xrSuggestInteractionProfileBindings g_suggestBindings = nullptr;
 PFN_xrDestroySwapchain g_destroySwapchain = nullptr;
 PFN_xrStringToPath g_stringToPath = nullptr;
+PFN_xrCreateAction g_createAction = nullptr;
+std::mutex g_actionNamesMutex;
+std::unordered_map<uint64_t, std::string> g_actionNames;  // the game's own name for each action, so the log can say what a control is for
 PFN_xrPathToString g_pathToString = nullptr;
 PFN_xrGetCurrentInteractionProfile g_getCurrentProfile = nullptr;
 
@@ -692,6 +695,16 @@ bool EmulateFrom(XrInstance instance, const std::string& sourceProfile, const ch
              (unsigned)bindings.size(), (unsigned)given.size(), droppedCount, dropped.c_str(), (int)result);
     }
     LOGI("%s controls, where each went:%s", sourceKind, tableText.c_str());
+    // What each control is for, by the name the game gave its action (so a report says which control opens a menu).
+    {
+        std::lock_guard<std::mutex> lock(g_actionNamesMutex);
+        int shown = 0;
+        for (const XrActionSuggestedBinding& binding : given) {
+            if (shown++ >= 80) break;
+            auto name = g_actionNames.find((uint64_t)binding.action);
+            LOGI("%s action '%s' is bound to %s", sourceKind, name == g_actionNames.end() ? "?" : name->second.c_str(), PathText(instance, binding.binding).c_str());
+        }
+    }
     std::vector<std::string> shared;
     for (const auto& [device, sources] : sharedMap) {
         std::string line;
@@ -856,6 +869,15 @@ void EmulateIfNeeded(XrInstance instance) {
     if (!valve.empty()) EmulateFrom(instance, valve, "valve", stash[valve]);
 }
 
+XrResult XRAPI_CALL Layer_xrCreateAction(XrActionSet actionSet, const XrActionCreateInfo* createInfo, XrAction* action) {
+    XrResult result = g_createAction ? g_createAction(actionSet, createInfo, action) : XR_ERROR_FUNCTION_UNSUPPORTED;
+    if (XR_SUCCEEDED(result) && createInfo && action) {
+        std::lock_guard<std::mutex> lock(g_actionNamesMutex);
+        if (g_actionNames.size() < 2000) g_actionNames[(uint64_t)*action] = createInfo->actionName;
+    }
+    return result;
+}
+
 XrResult XRAPI_CALL Layer_xrSuggestInteractionProfileBindings(XrInstance instance, const XrInteractionProfileSuggestedBinding* suggested) {
     std::string profile;
     size_t actions = 0;
@@ -962,6 +984,7 @@ XrResult XRAPI_CALL Layer_xrGetInstanceProcAddr(XrInstance instance, const char*
         {"xrGetCurrentInteractionProfile", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrGetCurrentInteractionProfile)},
         {"xrAttachSessionActionSets", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrAttachSessionActionSets)},
         {"xrSuggestInteractionProfileBindings", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrSuggestInteractionProfileBindings)},
+        {"xrCreateAction", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrCreateAction)},
         {"xrPollEvent", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrPollEvent)},
         {"xrStringToPath", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrStringToPath)},
         {"xrGetActionStateBoolean", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrGetActionStateBoolean)},
@@ -1125,6 +1148,7 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
     Load("xrSuggestInteractionProfileBindings", g_suggestBindings);
     Load("xrDestroySwapchain", g_destroySwapchain);
     Load("xrStringToPath", g_stringToPath);
+    Load("xrCreateAction", g_createAction);
     Load("xrPathToString", g_pathToString);
     Load("xrGetCurrentInteractionProfile", g_getCurrentProfile);
     Load("xrEnumerateViewConfigurationViews", g_enumerateViews);
