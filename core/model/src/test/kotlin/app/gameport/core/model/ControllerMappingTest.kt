@@ -64,6 +64,10 @@ class ControllerMappingTest {
         val a = allocate(set("left:bumper", "right:bumper"))
         assertEquals(list("left:squeeze"), a[c("left:bumper")])
         assertEquals(list("right:squeeze"), a[c("right:bumper")])
+        // The Steam Frame's profile calls them shoulders.
+        val s = allocate(set("left:shoulder", "right:shoulder"))
+        assertEquals(list("left:squeeze"), s[c("left:shoulder")])
+        assertEquals(list("right:squeeze"), s[c("right:shoulder")])
         val b = allocate(set("right:bumper", "right:squeeze"))
         assertEquals(list("right:squeeze"), b[c("right:squeeze")])
         assertEquals(list("right:squeeze"), b[c("right:bumper")])

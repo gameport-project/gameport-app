@@ -77,6 +77,9 @@ inline const Targets& Fallbacks(const std::string& source) {
         {"left:dpad_right", {"left:y", "left:x"}},
         {"left:bumper", {"left:squeeze"}},
         {"right:bumper", {"right:squeeze"}},
+        // The Steam Frame's profile names the bumpers "shoulder" (the older name in these tables is "bumper"): the same controls.
+        {"left:shoulder", {"left:squeeze"}},
+        {"right:shoulder", {"right:squeeze"}},
     };
     static const Targets none;
     auto it = table.find(source);
@@ -86,7 +89,7 @@ inline const Targets& Fallbacks(const std::string& source) {
 // The order in which the fallbacks are given out: the face buttons first, then the D-pad, the bumpers and the rest.
 inline const std::vector<std::string>& FallbackOrder() {
     static const std::vector<std::string> order = {"right:x", "right:y", "left:dpad_up", "left:dpad_down", "left:dpad_left", "left:dpad_right",
-                                                   "right:menu", "left:bumper", "right:bumper"};
+                                                   "right:menu", "left:bumper", "right:bumper", "left:shoulder", "right:shoulder"};
     return order;
 }
 
@@ -175,7 +178,7 @@ inline bool ActionsLookSilent(unsigned polls, unsigned active, long long elapsed
 // Whether an input path belongs to the Steam Frame's controllers only: the controllers of a Meta device have no D-pad, no bumper and no view button.
 // A table whose profile name could not be read is recognised as the Steam Frame's by these.
 inline bool IsFrameControlPath(const std::string& path) {
-    return path.find("/input/dpad_") != std::string::npos || path.find("/input/bumper") != std::string::npos || path.find("/input/view") != std::string::npos;
+    return path.find("/input/dpad_") != std::string::npos || path.find("/input/bumper") != std::string::npos || path.find("/input/shoulder") != std::string::npos || path.find("/input/view") != std::string::npos;
 }
 
 // How the actions of a game's Steam Frame table compare with those of its tables for the device's own controllers. Measured on Unity and Unreal games:

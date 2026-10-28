@@ -54,11 +54,14 @@ object ControllerLayout {
         "left:dpad_right" to listOf("left:y", "left:x"),
         "left:bumper" to listOf("left:squeeze"),
         "right:bumper" to listOf("right:squeeze"),
+        // The Steam Frame's profile names the bumpers "shoulder": the same controls.
+        "left:shoulder" to listOf("left:squeeze"),
+        "right:shoulder" to listOf("right:squeeze"),
     ).entries.associate { (source, list) -> ref(source) to list.map(::ref) }
 
     /** The order in which the fallbacks are given out: the face buttons first, then the D-pad, the bumpers and the rest. */
     private val fallbackOrder: List<ControlRef> = listOf(
-        "right:x", "right:y", "left:dpad_up", "left:dpad_down", "left:dpad_left", "left:dpad_right", "right:menu", "left:bumper", "right:bumper",
+        "right:x", "right:y", "left:dpad_up", "left:dpad_down", "left:dpad_left", "left:dpad_right", "right:menu", "left:bumper", "right:bumper", "left:shoulder", "right:shoulder",
     ).map(::ref)
 
     /**

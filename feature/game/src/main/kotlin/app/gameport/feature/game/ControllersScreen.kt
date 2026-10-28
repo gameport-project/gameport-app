@@ -241,7 +241,7 @@ private fun controlLabel(group: String): String = when (group) {
     "thumbstick" -> stringResource(R.string.control_thumbstick)
     "menu" -> stringResource(R.string.control_menu)
     "view" -> stringResource(R.string.control_view)
-    "bumper" -> stringResource(R.string.control_bumper)
+    "bumper", "shoulder" -> stringResource(R.string.control_bumper)
     "dpad_up" -> stringResource(R.string.control_dpad_up)
     "dpad_down" -> stringResource(R.string.control_dpad_down)
     "dpad_left" -> stringResource(R.string.control_dpad_left)
@@ -254,4 +254,4 @@ private fun controlLabel(group: String): String = when (group) {
 private fun targetLabel(target: ControlRef): String =
     stringResource(R.string.controllers_target, stringResource(if (target.hand == Hand.LEFT) R.string.controllers_left_short else R.string.controllers_right_short), controlLabel(target.group))
 
-private val ORDER = listOf("thumbstick", "trigger", "squeeze", "bumper", "a", "b", "x", "y", "menu", "view", "dpad_up", "dpad_down", "dpad_left", "dpad_right")
+private val ORDER = listOf("thumbstick", "trigger", "squeeze", "bumper", "shoulder", "a", "b", "x", "y", "menu", "view", "dpad_up", "dpad_down", "dpad_left", "dpad_right")

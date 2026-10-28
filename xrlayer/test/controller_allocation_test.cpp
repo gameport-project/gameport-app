@@ -62,6 +62,10 @@ int main() {
         auto a = gp::Allocate({"left:bumper", "right:bumper"}, none(), false);
         CHECK(a["left:bumper"] == T({"left:squeeze"}));
         CHECK(a["right:bumper"] == T({"right:squeeze"}));
+        // The profile of the Steam Frame calls them shoulders.
+        auto s = gp::Allocate({"left:shoulder", "right:shoulder"}, none(), false);
+        CHECK(s["left:shoulder"] == T({"left:squeeze"}));
+        CHECK(s["right:shoulder"] == T({"right:squeeze"}));
         auto b = gp::Allocate({"right:bumper", "right:squeeze"}, none(), false);
         CHECK(b["right:squeeze"] == T({"right:squeeze"}));
         CHECK(b["right:bumper"] == T({"right:squeeze"}));
@@ -145,6 +149,7 @@ int main() {
     // A table is the Steam Frame's when it binds a control only that controller has.
     CHECK(gp::IsFrameControlPath("/user/hand/left/input/dpad_up/click"));
     CHECK(gp::IsFrameControlPath("/user/hand/right/input/bumper/click"));
+    CHECK(gp::IsFrameControlPath("/user/hand/left/input/shoulder/click"));
     CHECK(gp::IsFrameControlPath("/user/hand/left/input/view/click"));
     CHECK(!gp::IsFrameControlPath("/user/hand/left/input/thumbstick/x"));
     CHECK(!gp::IsFrameControlPath("/user/hand/right/input/a/click"));
