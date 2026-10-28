@@ -19,13 +19,27 @@ class InstalledGames @Inject constructor(
 
     @Synchronized
     fun all(): Map<Int, String> =
-        runCatching { Json.decodeFromString(serializer, file.readText()) }.getOrDefault(emptyMap())
+        oneAppPerPackage(runCatching { Json.decodeFromString(serializer, file.readText()) }.getOrDefault(emptyMap()))
 
+    /** A package that was recorded again moves to the end of the list: the last app installed over a package is the one that owns it. */
     @Synchronized
-    fun put(appId: Int, packageName: String) = write(all() + (appId to packageName))
+    fun put(appId: Int, packageName: String) = write(all().filterValues { it != packageName } + (appId to packageName))
 
     @Synchronized
     fun remove(appId: Int) = write(all() - appId)
+
+    companion object {
+        /**
+         * A package belongs to one Steam app: a game and its demo share one, and installing one over the other replaces it. Where the record holds both (it did before
+         * this rule), the one recorded last, which is the one installed over the other, keeps the package; everything that looks an app up from a package (the tickets
+         * a game is given, its playing time, its saves) then finds the one that is really there.
+         */
+        internal fun oneAppPerPackage(recorded: Map<Int, String>): Map<Int, String> {
+            val owner = LinkedHashMap<String, Int>()
+            recorded.forEach { (appId, packageName) -> owner[packageName] = appId }
+            return recorded.filter { (appId, packageName) -> owner[packageName] == appId }
+        }
+    }
 
     private fun write(map: Map<Int, String>) {
         file.writeText(Json.encodeToString(serializer, map))
