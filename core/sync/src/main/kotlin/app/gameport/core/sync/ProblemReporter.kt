@@ -127,6 +127,7 @@ class ProblemReporter @Inject constructor(
                 entry("performance.txt", clean(store.text(packageName, "performance.txt").ifBlank { "(no performance line received from the game: it has not run with the current patch, or the runtime printed none while it ran)" }))
                 entry("network.txt", clean(store.text(packageName, "network.txt").ifBlank { "(no traffic line received from the game: it has not run with the current patch)" }))
                 entry("threads.txt", clean(store.text(packageName, "threads.txt").ifBlank { "(no thread list received from the game: it has not run with the current patch)" }))
+                store.diagnostics(packageName).forEach { (name, text) -> entry(name, clean(text)) }
                 entry("files.txt", clean(files(packageName)))
                 if (!lean) entry("apk-contents.txt", clean(apkContents(packageName)))
                 entry("steam-interfaces.txt", clean(steamInterfaces(packageName)))
@@ -428,6 +429,8 @@ class ProblemReporter @Inject constructor(
             performance.txt       the runtime's frame rate, CPU and GPU lines from the last minutes of play
             network.txt           how much data the game received and sent over time (tells whether a transfer moves)
             threads.txt           what each thread of the game was doing 8, 20 and 45 s after its start (waiting or working)
+            diag-*.txt            diagnostics from inside the game: when its screens came and went (lifecycle), whether it can write where it keeps its data (storage),
+                                  the state of the network and whether the servers online games use can be reached (network-state, reach), what its threads were doing (stacks)
             files.txt             the game's APK and expansion files (names and sizes)
             apk-contents.txt      every file inside the game's APK (names and sizes)
             steam-interfaces.txt  the Steam interface versions the game's libraries ask for

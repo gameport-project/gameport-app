@@ -41,6 +41,7 @@ class ReportStore @Inject constructor(
         extras.getByteArray("performanceGz")?.let { gunzip(it)?.let { text -> File(folder, PERFORMANCE).writeBytes(text) } }
         extras.getByteArray("networkGz")?.let { gunzip(it)?.let { text -> File(folder, NETWORK).writeBytes(text) } }
         extras.getByteArray("threadsGz")?.let { gunzip(it)?.let { text -> File(folder, THREADS).writeBytes(text) } }
+        extras.getByteArray("diagGz")?.let { gunzip(it)?.let { text -> saveDiagnostics(folder, String(text, Charsets.UTF_8)) } }
         extras.getByteArray("engineGz")?.let { gunzip(it)?.let { text -> File(folder, ENGINE_LOG).writeBytes(text) } }
         extras.getString("libraries")?.takeIf { it.isNotEmpty() }?.let { File(folder, LIBRARIES).writeText(it.takeLast(MAX_CHARS)) }
         extras.getString("launch")?.takeIf { it.isNotEmpty() }?.let { File(folder, LAUNCH).writeText(it.takeLast(MAX_CHARS)) }
@@ -60,6 +61,19 @@ class ReportStore @Inject constructor(
             if (changed && ExitReasons.isCrash(previousExit.lineSequence().firstOrNull().orEmpty())) suspect(packageName, Suspicion.CRASH)
         }
     }
+
+    /** The diagnostic files of a hand-over: each starts with a line holding U+0001 and its name, and runs to the next such line. */
+    private fun saveDiagnostics(folder: File, text: String) {
+        text.split('\u0001').drop(1).forEach { block ->
+            val name = block.substringBefore('\n').filter { it.isLetterOrDigit() || it == '-' }.take(40)
+            if (name.isNotEmpty()) File(folder, "$DIAG_PREFIX$name.txt").writeText(block.substringAfter('\n').take(MAX_CHARS))
+        }
+    }
+
+    /** The diagnostic files the game handed over, by report file name. */
+    fun diagnostics(packageName: String): Map<String, String> =
+        File(directory, safe(packageName)).listFiles { file -> file.isFile && file.name.startsWith(DIAG_PREFIX) }.orEmpty().sortedBy { it.name }
+            .associate { it.name to runCatching { it.readText() }.getOrDefault("") }
 
     /** Deletes what the games handed over more than [cutoffMillis] ago, and the folders of games no longer installed. */
     fun purge(cutoffMillis: Long, installedPackages: Set<String>) {
@@ -157,6 +171,7 @@ class ReportStore @Inject constructor(
         const val PERFORMANCE = "performance.txt"
         const val NETWORK = "network.txt"
         const val THREADS = "threads.txt"
+        const val DIAG_PREFIX = "diag-"
         const val LIBRARIES = "libraries.txt"
         const val NATIVE_GAPS = "native-gaps.txt"
         const val LAUNCH = "launch.txt"

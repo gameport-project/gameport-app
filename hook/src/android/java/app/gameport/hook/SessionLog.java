@@ -64,6 +64,10 @@ final class SessionLog {
     private static final long[] THREAD_SNAPSHOTS_MS = {8_000, 20_000, 45_000};
     private int threadsVersion;
     private int sentThreadsVersion = -1;
+    /** Files of diagnostics from {@link Diagnostics}, by name: each is sent as a file of the report (diag-<name>.txt). */
+    private final java.util.LinkedHashMap<String, String> diagnostics = new java.util.LinkedHashMap<>();
+    private int diagnosticsVersion;
+    private int sentDiagnosticsVersion = -1;
     private Handler handler;
     private int version;
     private int sentVersion = -1;
@@ -105,12 +109,21 @@ final class SessionLog {
         }, "gameport-net");
         net.setDaemon(true);
         net.start();
+        new Diagnostics(context, this).start();
         Thread snapshots = new Thread(new Runnable() {
             @Override public void run() { followThreads(); }
         }, "gameport-threads");
         snapshots.setDaemon(true);
         snapshots.start();
         scheduleNext();
+    }
+
+    /** Keeps a diagnostic file (replacing the one of the same name); it goes to GamePort with the next hand-over. */
+    void putDiagnostic(String name, String text) {
+        synchronized (diagnostics) {
+            diagnostics.put(name, text);
+            diagnosticsVersion++;
+        }
     }
 
     /** Writes the state of every thread of the game (read from /proc, which a process may read for itself) at a few moments after its start. */
@@ -284,9 +297,11 @@ final class SessionLog {
         synchronized (network) { networkAt = networkVersion; }
         int threadsAt;
         synchronized (threads) { threadsAt = threadsVersion; }
+        int diagnosticsAt;
+        synchronized (diagnostics) { diagnosticsAt = diagnosticsVersion; }
         synchronized (head) {
             at = version;
-            if (at == sentVersion && performanceAt == sentPerformanceVersion && networkAt == sentNetworkVersion && threadsAt == sentThreadsVersion && librariesSignature.equals(sentLibraries) && exitSent) return;
+            if (at == sentVersion && performanceAt == sentPerformanceVersion && networkAt == sentNetworkVersion && threadsAt == sentThreadsVersion && diagnosticsAt == sentDiagnosticsVersion && librariesSignature.equals(sentLibraries) && exitSent) return;
             StringBuilder h = new StringBuilder();
             for (String line : head) h.append(line).append('\n');
             StringBuilder t = new StringBuilder();
@@ -306,6 +321,11 @@ final class SessionLog {
         StringBuilder snapshots = new StringBuilder();
         synchronized (threads) { for (String text : threads) snapshots.append(text).append('\n'); }
         extras.putByteArray("threadsGz", gzip(snapshots.toString()));
+        StringBuilder diag = new StringBuilder();
+        synchronized (diagnostics) {
+            for (java.util.Map.Entry<String, String> file : diagnostics.entrySet()) diag.append('\u0001').append(file.getKey()).append('\n').append(file.getValue()).append('\n');
+        }
+        extras.putByteArray("diagGz", gzip(diag.toString()));
         extras.putString("launch", launchInfo);
         extras.putString("nativeGaps", nativeGaps.report());
         extras.putString("libraries", libraries);
@@ -325,6 +345,7 @@ final class SessionLog {
                 sentPerformanceVersion = performanceAt;
                 sentNetworkVersion = networkAt;
                 sentThreadsVersion = threadsAt;
+                sentDiagnosticsVersion = diagnosticsAt;
                 sentLibraries = librariesSignature;
                 exitSent = true;
             }
