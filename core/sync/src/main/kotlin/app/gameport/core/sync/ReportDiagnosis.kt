@@ -47,7 +47,9 @@ object ReportDiagnosis {
                     else -> "no"
                 },
             )
-            appendLine("Steam library loaded: " + yes(libraries.contains("libsteam_api") || libraries.contains("libsteamclient")))
+            appendLine("Steam library of the game loaded: " + yes(libraries.contains("libsteam_api")))
+            // The game's library loads the shim only when the game starts Steam: not there, the game did not get that far.
+            appendLine("Steam stand-in of GamePort (shim) loaded: " + yes(libraries.contains("libsteamclient")))
         } else {
             appendLine("loaded libraries: not handed over")
         }
