@@ -906,6 +906,19 @@ XrResult XRAPI_CALL Layer_xrSuggestInteractionProfileBindings(XrInstance instanc
         LOGI("xrSuggestInteractionProfileBindings(%s, %u bindings, %zu actions) -> kept back", profile.c_str(), suggested->countSuggestedBindings, actions);
         return XR_SUCCESS;
     }
+    // Pico's runtime does not answer "path unsupported" for the Steam Frame's profile, which it does not know: it crashes inside itself (a null name copied) at the
+    // first table it is given for it (Moss, Metro). That table is kept, as for any profile the device does not have, and translated onto the device's own controllers
+    // when the game attaches its actions.
+    if (suggested && g_family == Family::Pico && IsValveProfile(profile)) {
+        LOGI("xrSuggestInteractionProfileBindings(%s, %u bindings, %zu actions) -> kept for the translation: this runtime does not know that profile", profile.c_str(),
+             suggested->countSuggestedBindings, actions);
+        return XR_SUCCESS;
+    }
+    if (suggested) {
+        // Said before the call, so that a crash inside the runtime leaves the name of the profile in the log.
+        LOGI("xrSuggestInteractionProfileBindings(%s, %u bindings, %zu actions): handed to the runtime", profile.empty() ? "<unnamed profile>" : profile.c_str(),
+             suggested->countSuggestedBindings, actions);
+    }
     XrResult result = SuggestTolerant(instance, suggested, profile.c_str());
     if (suggested) {
         LOGI("xrSuggestInteractionProfileBindings(%s, %u bindings, %zu actions) -> %d", profile.empty() ? "<unnamed profile>" : profile.c_str(),
@@ -1185,7 +1198,7 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
     const char* eye = getenv("GAMEPORT_XR_EYE_CM");
     g_seated = seated && strcmp(seated, "1") == 0 && eye && atoi(eye) > 0;
     g_targetEyeMeters = g_seated ? atoi(eye) / 100.0f : 0.0f;
-    LOGI("GamePort OpenXR layer active; seated mode %s (target eye height %.2f m); extensions:", g_seated ? "on" : "off", g_targetEyeMeters);
+    LOGI("GamePort OpenXR layer active; seated mode %s (target eye height %.2f m); extensions the game asked for:", g_seated ? "on" : "off", g_targetEyeMeters);
     for (uint32_t i = 0; info && i < info->enabledExtensionCount; i++) LOGI("  %s", info->enabledExtensionNames[i]);
     return result;
 }
