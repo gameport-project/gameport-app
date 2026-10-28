@@ -1027,6 +1027,7 @@ void Load(const char* name, T& target) {
 
 constexpr const char* kEyeFoveation = "XR_META_foveation_eye_tracked";
 constexpr const char* kEyeGaze = "XR_EXT_eye_gaze_interaction";
+constexpr const char* kPicoControllers = "XR_BD_controller_interaction";
 constexpr const char* kAndroidCreate = "XR_KHR_android_create_instance";
 
 // XrInstanceCreateInfoAndroidKHR, written here so that the layer needs no platform header.
@@ -1041,6 +1042,18 @@ constexpr XrStructureType kAndroidCreateType = (XrStructureType)1000008000;
 bool HasExtension(const std::vector<XrExtensionProperties>& list, const char* name) {
     for (const auto& e : list) if (strcmp(e.extensionName, name) == 0) return true;
     return false;
+}
+
+// Whether the runtime lists an extension among those it offers.
+bool RuntimeOffers(XrApiLayerNextInfo* next, const char* name) {
+    PFN_xrGetInstanceProcAddr getProc = next->nextGetInstanceProcAddr;
+    PFN_xrEnumerateInstanceExtensionProperties enumerate = nullptr;
+    if (!getProc || XR_FAILED(getProc(XR_NULL_HANDLE, "xrEnumerateInstanceExtensionProperties", (PFN_xrVoidFunction*)&enumerate)) || !enumerate) return false;
+    uint32_t count = 0;
+    if (XR_FAILED(enumerate(nullptr, 0, &count, nullptr)) || count == 0) return false;
+    std::vector<XrExtensionProperties> offered(count, {XR_TYPE_EXTENSION_PROPERTIES});
+    if (XR_FAILED(enumerate(nullptr, count, &count, offered.data()))) return false;
+    return HasExtension(offered, name);
 }
 
 // Whether the device can follow the eyes, as the runtime says it in a short instance of its own (asked for XR_EXT_eye_gaze_interaction, which is the standard
@@ -1127,18 +1140,29 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
     // Pico's runtime takes some of Meta's extensions and then crashes inside itself when the game starts to use them on a device that cannot do what they say
     // (Moss: the foveation that follows the eyes, on a device without eye tracking). Whether the extension is passed on is the player's choice for this game
     // (on, off), and by default it follows what the device says it can do.
+    // And Pico's own controllers (their interaction profiles) exist for a game only when the instance has Pico's extension for them: a game made for another device
+    // never asks for it, and the bindings translated onto Pico's controllers would be refused. It is added when the runtime offers it.
     std::vector<const char*> kept;
     XrInstanceCreateInfo filtered;
     const XrInstanceCreateInfo* toPass = info;
-    if (info && DropEyeFoveation(info, layerInfo, next)) {
-        for (uint32_t i = 0; i < info->enabledExtensionCount; i++) {
-            if (strcmp(info->enabledExtensionNames[i], kEyeFoveation) == 0) {
-                LOGI("extension %s not passed on", kEyeFoveation);
-                continue;
+    if (info) {
+        const bool dropEye = DropEyeFoveation(info, layerInfo, next);
+        const char* family = getenv("GAMEPORT_XR_FAMILY");
+        bool hasPicoControllers = false;
+        for (uint32_t i = 0; i < info->enabledExtensionCount; i++) if (strcmp(info->enabledExtensionNames[i], kPicoControllers) == 0) hasPicoControllers = true;
+        const bool addPicoControllers = family && Lower(family).find("pico") != std::string::npos && !hasPicoControllers && RuntimeOffers(next, kPicoControllers);
+        if (dropEye || addPicoControllers) {
+            for (uint32_t i = 0; i < info->enabledExtensionCount; i++) {
+                if (dropEye && strcmp(info->enabledExtensionNames[i], kEyeFoveation) == 0) {
+                    LOGI("extension %s not passed on", kEyeFoveation);
+                    continue;
+                }
+                kept.push_back(info->enabledExtensionNames[i]);
             }
-            kept.push_back(info->enabledExtensionNames[i]);
-        }
-        if (kept.size() != info->enabledExtensionCount) {
+            if (addPicoControllers) {
+                kept.push_back(kPicoControllers);
+                LOGI("extension %s added: the game did not ask for it, and Pico's controllers need it", kPicoControllers);
+            }
             filtered = *info;
             filtered.enabledExtensionCount = (uint32_t)kept.size();
             filtered.enabledExtensionNames = kept.data();
