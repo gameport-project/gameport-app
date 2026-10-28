@@ -287,10 +287,31 @@ class ProblemReporter @Inject constructor(
         (context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager)?.getMemoryInfo(memory)
         appendLine("memory total=${memory.totalMem / MIB} MiB available=${memory.availMem / MIB} MiB lowMemory=${memory.lowMemory}")
         (context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager)?.let { appendLine("thermalStatus=${it.currentThermalStatus}") }
+        append(openXrFacts())
         appendLine("features of interest:")
         val interesting = listOf("vr", "xr", "oculus", "pico", "meta", "tracking", "passthrough", "controller", "openxr", "vulkan", "opengl")
         context.packageManager.systemAvailableFeatures.mapNotNull { it.name }.filter { name -> interesting.any { name.contains(it, ignoreCase = true) } }.sorted()
             .forEach { appendLine("  $it") }
+    }
+
+    /**
+     * What this device offers a game's OpenXR loader to find the runtime: the brokers the standard (Khronos) loader asks, the runtime packages, and the OpenXR
+     * libraries of the system. Read only, and nothing about the player.
+     */
+    private fun openXrFacts(): String = buildString {
+        val manager = context.packageManager
+        appendLine("OpenXR on this device:")
+        for (authority in listOf("org.khronos.openxr.runtime_broker", "org.khronos.openxr.system_runtime_broker")) {
+            val provider = runCatching { manager.resolveContentProvider(authority, 0) }.getOrNull()
+            appendLine("  broker $authority: ${provider?.packageName ?: "absent"}")
+        }
+        val runtimes = runCatching { manager.getInstalledPackages(0) }.getOrDefault(emptyList())
+            .filter { it.packageName.contains("openxr", ignoreCase = true) || it.packageName.contains("xr.runtime", ignoreCase = true) }
+        if (runtimes.isEmpty()) appendLine("  runtime packages: none") else runtimes.forEach { appendLine("  runtime package ${it.packageName} ${it.versionName} (${it.longVersionCode})") }
+        for (folder in listOf("/system/lib64", "/system_ext/lib64", "/vendor/lib64", "/product/lib64")) {
+            val names = runCatching { File(folder).list()?.filter { it.contains("openxr", ignoreCase = true) }?.sorted() }.getOrNull().orEmpty()
+            if (names.isNotEmpty()) appendLine("  $folder: ${names.joinToString()}")
+        }
     }
 
     /** The checks of the headset's maker the game carries (see [ReportDiagnosis.vendorChecks]), read from its manifest and the names inside its APK. */
