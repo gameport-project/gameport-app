@@ -30,8 +30,8 @@ Three pieces are native or generated and checked in as assets of `core/patch`; r
 
 Games record which patch generation patched them, so GamePort can offer to patch again when its own is newer.
 
-- **Release builds** use `PatchVersioning.GENERATION` alone. It is raised when a release is prepared, and only if the patches or the binaries they inject (Steam shim, hook, OpenXR layer) changed since the previous release. It is the only number to touch for that.
-- **Debug builds** add a fingerprint of the injected binaries, so during development a rebuilt shim, hook or layer marks earlier games as outdated without raising anything. A change to the patches' own logic, which a fingerprint cannot see, raises `PatchVersioning.DEV_REVISION`; it goes back to 0 when `GENERATION` is raised.
+- **Release builds** use `PatchVersioning.GENERATION`, plus `PatchVersioning.DEV_REVISION` (0 in a release, above 0 in an alpha built before the next release). `GENERATION` is raised when a release is prepared, and only if the patches or the binaries they inject (Steam shim, hook, OpenXR layer) changed since the previous release. It is the only number to touch for that.
+- **Debug builds** add a fingerprint of the injected binaries, so during development a rebuilt shim, hook or layer marks earlier games as outdated without raising anything. A change to the patches' own logic, which a fingerprint cannot see, raises `PatchVersioning.DEV_REVISION` (an alpha then patches again the games a release patched); it goes back to 0 when `GENERATION` is raised.
 
 ### The debug key
 

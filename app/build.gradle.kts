@@ -11,6 +11,8 @@ android {
         applicationId = "app.gameport"
         versionCode = 901
         versionName = "0.9.1"
+        // The CI names an alpha build "<version>-alpha.<n>": the number stays the release's, the name tells the build apart in a report.
+        (findProperty("versionNameSuffix") as String?)?.let { versionName += it }
     }
 
     // One debug key for everyone: a build from a developer's machine and one from the CI update each other.
