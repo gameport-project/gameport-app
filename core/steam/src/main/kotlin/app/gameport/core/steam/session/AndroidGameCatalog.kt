@@ -186,7 +186,7 @@ internal fun libraryOf(
                     } + dlcApps.filter { it.parent == game.appId }.map { app ->
                         DlcContent(
                             app.appId, app.name, owned = app.appId in visible,
-                            depots = app.depots.map { AndroidDepot(it.id, app.appId, it.installBytes, it.downloadBytes, it.manifestId) },
+                            depots = app.depots.map { AndroidDepot(it.id, app.appId, it.installBytes, it.downloadBytes, it.manifestId, declaredBy = app.appId) },
                         )
                     }
                     ).distinctBy { it.appId }.sortedBy { it.name.lowercase() },

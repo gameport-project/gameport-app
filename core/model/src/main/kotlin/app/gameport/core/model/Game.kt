@@ -14,6 +14,11 @@ data class AndroidDepot(
     val downloadBytes: Long,
     /** Id of the build Steam publishes for this depot; it changes when the game is updated (0 if unknown). */
     val manifestId: Long = 0,
+    /**
+     * The Steam app whose record declares this depot, when it is not the game itself: a game that sells its content as DLC leaves each DLC app to declare its own depots, and
+     * Steam gives the key of a depot, and its files, only to the app that declares it. Null when the game declares it.
+     */
+    val declaredBy: Int? = null,
 )
 
 /** Extra content of a game, sold separately; its depots are only fetched when chosen. */

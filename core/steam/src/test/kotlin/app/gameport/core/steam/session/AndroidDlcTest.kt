@@ -58,5 +58,7 @@ class AndroidDlcTest {
         assertEquals(listOf(true, false), dlc.map { it.owned })
         assertTrue(library.games.single().androidBuild!!.baseDepots.map { it.id } == listOf(3530822))
         assertEquals(listOf(4684161), dlc.first().depots.map { it.id })
+        // Its depots are declared by the DLC app itself, which is the app to ask for their files.
+        assertEquals(4684160, dlc.first().depots.single().declaredBy)
     }
 }

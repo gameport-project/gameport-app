@@ -176,7 +176,10 @@ class GameInstallRepository @Inject constructor(
         events.note(game.appId, "install requested for ${game.name} (dlc: ${dlc ?: "same as before"})")
         val directory = downloadDirectory(game.appId)
         val chosen = dlc ?: readChosenDlc(directory)
-        val depots = game.androidBuild?.depotsFor(chosen).orEmpty()
+        // What the game declares goes in its download. An extra content that its own app declares (a game that sells its content as DLC) cannot: Steam gives its files only to
+        // that app, so it is fetched on its own once the game is installed.
+        val separately = game.androidBuild?.dlc.orEmpty().filter { it.appId in chosen && it.owned && it.depots.any { depot -> depot.declaredBy != null } }
+        val depots = game.androidBuild?.depotsFor(chosen).orEmpty().filter { it.declaredBy == null }
         notEnoughSpace(game.appId, depots)?.let { return fail(game.appId, it) }
         directory.mkdirs()
         // The player asks for it: it is not paused nor failed any more.
@@ -338,11 +341,13 @@ class GameInstallRepository @Inject constructor(
                         // The arguments Steam lists for starting it, kept for when it is started without a connection.
                         scope.launch { launchOptions.refresh(game.appId) }
                         // What this install came from, to recognise a newer build later.
-                        builds.put(game.appId, InstalledBuild(depots.associate { it.id to (downloadedManifests[it.id] ?: it.manifestId) }, chosen, expansionBytes))
+                        builds.put(game.appId, InstalledBuild(depots.associate { it.id to (downloadedManifests[it.id] ?: it.manifestId) }, chosen - separately.map { it.appId }.toSet(), expansionBytes))
                         updates.markCurrent(game.appId)
                         // The game is ready: Play shows now. Clearing the work folder (possibly gigabytes) is not waited for.
                         clearState(game.appId)
                         directory.deleteRecursively()
+                        // The extra content chosen with the game that its own app declares: one after the other, each with its own progress in the game's settings.
+                        for (content in separately) fetchDlc(game, content, packageName)
                     }
                     PackageGateway.Outcome.Cancelled -> clearState(game.appId)
                     PackageGateway.Outcome.Conflict -> fail(game.appId, InstallError.VersionConflict)
@@ -397,7 +402,7 @@ class GameInstallRepository @Inject constructor(
     /** The extra content of the game that is on the device, and among it the ones that can be taken off alone. Follows the work on the extra content. */
     fun observeInstalledDlc(appId: Int): Flow<Pair<Set<Int>, Set<Int>>> = dlcWork.map {
         val build = builds.get(appId)
-        build?.dlc.orEmpty() to build?.dlcFiles?.keys.orEmpty()
+        build?.dlc.orEmpty().let { it to it }
     }.distinctUntilChanged()
 
     /** Dismisses the error of the last try on an extra content. */
@@ -412,82 +417,137 @@ class GameInstallRepository @Inject constructor(
 
     /**
      * Adds an extra content the account has to the installed game: its depots are downloaded alone, its files placed with the game's expansion files (see [ExpansionFiles]),
-     * and the paths kept so that it can be taken off alone ([removeDlc]). The game itself is not touched, nor installed again.
+     * and the paths kept. The game itself is not touched, nor installed again.
      */
     fun installDlc(game: Game, dlcAppId: Int) = synchronized(jobs) {
         if (jobs[game.appId]?.isActive == true || dlcWork.value[game.appId]?.error == null && dlcWork.value.containsKey(game.appId)) return@synchronized
         val packageName = installedPackage(game.appId) ?: return@synchronized
         val content = game.androidBuild?.dlc?.firstOrNull { it.appId == dlcAppId && it.owned && it.depots.isNotEmpty() } ?: return@synchronized
-        if (auth.offline.value) return@synchronized dlcError(game.appId, dlcAppId, "offline")
-        val directory = dlcDirectory(game.appId, dlcAppId)
-        val space = SpaceNeeds.toInstall(content.installBytes, 0L)
-        directory.mkdirs()
-        if (directory.usableSpace < space) {
-            directory.deleteRecursively()
-            return@synchronized dlcError(game.appId, dlcAppId, "not enough space: ${space / 1_000_000} MB needed, ${directory.usableSpace / 1_000_000} MB free")
-        }
-        events.note(game.appId, "extra content ${content.name} ($dlcAppId) requested: ${content.depots.size} depot(s), ${content.installBytes / 1_000_000} MB")
-        dlcWork.update { it + (game.appId to app.gameport.core.model.DlcWork(dlcAppId)) }
         keepAlive(start = true)
-        val job = scope.launch(start = CoroutineStart.LAZY) {
-            try {
-                downloadSlots.withPermit {
-                    downloader.download(game.appId, content.depots.map { it.id }, directory, content.depots.associate { it.id to it.downloadBytes }) { progress, _ ->
-                        if (progress >= 0f) dlcWork.update { it + (game.appId to app.gameport.core.model.DlcWork(dlcAppId, progress = minOf(progress, 0.99f))) }
-                    }
-                }
-                val problems = mutableListOf<String>()
-                val target = File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName")
-                val placed = withContext(Dispatchers.IO) { ExpansionFiles.place(directory, target, packageName, skipped = PATCHED_DIR, problems = problems, replaceOlder = false) }
-                if (problems.isNotEmpty() || placed.isEmpty()) {
-                    // Whatever was placed stays out of the ledger: nothing is claimed that is only half there.
-                    val reason = if (problems.isNotEmpty()) problems.take(MAX_PLACED_LISTED).joinToString("; ") else "the download holds no file to place"
-                    return@launch dlcError(game.appId, dlcAppId, "could not be placed: $reason")
-                }
-                alignObbVersion(packageName)
-                val build = builds.get(game.appId)
-                if (build != null) builds.put(game.appId, build.copy(dlc = build.dlc + dlcAppId, dlcFiles = build.dlcFiles + (dlcAppId to placed)))
-                events.note(game.appId, "extra content ${content.name} ($dlcAppId) placed in Android/obb/$packageName: ${placed.take(MAX_PLACED_LISTED).joinToString()}${if (placed.size > MAX_PLACED_LISTED) " and ${placed.size - MAX_PLACED_LISTED} more" else ""}")
-                dlcWork.update { it - game.appId }
-            } catch (e: CancellationException) {
-                dlcWork.update { it - game.appId }
-                throw e
-            } catch (e: Exception) {
-                events.failure(game.appId, "extra content $dlcAppId", e)
-                dlcError(game.appId, dlcAppId, e.message ?: e.javaClass.simpleName)
-            } finally {
-                directory.deleteRecursively()
-            }
-        }
+        val job = scope.launch(start = CoroutineStart.LAZY) { fetchDlc(game, content, packageName) }
         job.invokeOnCompletion { keepAlive(start = false) }
         jobs[game.appId] = job
         job.start()
     }
 
-    /** Takes an extra content off the installed game: the files GamePort placed for it. Only for the ones added from the page; the others share the game's files. */
+    /**
+     * Downloads the depots of an extra content alone, places their files, and records them on the build of the game (the extra content it is, and the manifests of its
+     * depots, for the tracking of its updates). Tells its progress and its failure through [dlcWork]; true when it is in place.
+     */
+    private suspend fun fetchDlc(game: Game, content: app.gameport.core.model.DlcContent, packageName: String): Boolean {
+        val dlcAppId = content.appId
+        if (auth.offline.value) return false.also { dlcError(game.appId, dlcAppId, "offline") }
+        val directory = dlcDirectory(game.appId, dlcAppId)
+        val space = SpaceNeeds.toInstall(content.installBytes, 0L)
+        directory.mkdirs()
+        if (directory.usableSpace < space) {
+            directory.deleteRecursively()
+            return false.also { dlcError(game.appId, dlcAppId, "not enough space: ${space / 1_000_000} MB needed, ${directory.usableSpace / 1_000_000} MB free") }
+        }
+        events.note(game.appId, "extra content ${content.name} ($dlcAppId) requested: ${content.depots.size} depot(s) declared by app ${content.depots.first().declaredBy ?: game.appId}, ${content.installBytes / 1_000_000} MB")
+        dlcWork.update { it + (game.appId to app.gameport.core.model.DlcWork(dlcAppId)) }
+        return try {
+            downloadSlots.withPermit {
+                // Steam gives a depot's key, and its files, to the app that declares it: the DLC app for a game that sells its content as DLC, else the game.
+                downloader.download(content.depots.first().declaredBy ?: game.appId, content.depots.map { it.id }, directory, content.depots.associate { it.id to it.downloadBytes }) { progress, _ ->
+                    if (progress >= 0f) dlcWork.update { it + (game.appId to app.gameport.core.model.DlcWork(dlcAppId, progress = minOf(progress, 0.99f))) }
+                }
+            }
+            val problems = mutableListOf<String>()
+            val target = File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName")
+            val placed = withContext(Dispatchers.IO) { ExpansionFiles.place(directory, target, packageName, skipped = PATCHED_DIR, problems = problems, replaceOlder = false) }
+            if (problems.isNotEmpty() || placed.isEmpty()) {
+                val reason = if (problems.isNotEmpty()) problems.take(MAX_PLACED_LISTED).joinToString("; ") else "the download holds no file to place (${besidesApks(directory)})"
+                dlcError(game.appId, dlcAppId, "could not be placed: $reason")
+                false
+            } else {
+                alignObbVersion(packageName)
+                val build = builds.get(game.appId)
+                if (build != null) {
+                    builds.put(game.appId, build.copy(dlc = build.dlc + dlcAppId, dlcFiles = build.dlcFiles + (dlcAppId to placed)))
+                }
+                events.note(game.appId, "extra content ${content.name} ($dlcAppId) placed in Android/obb/$packageName: ${placed.take(MAX_PLACED_LISTED).joinToString()}${if (placed.size > MAX_PLACED_LISTED) " and ${placed.size - MAX_PLACED_LISTED} more" else ""}")
+                dlcWork.update { it - game.appId }
+                true
+            }
+        } catch (e: CancellationException) {
+            dlcWork.update { it - game.appId }
+            throw e
+        } catch (e: Exception) {
+            events.failure(game.appId, "extra content $dlcAppId", e)
+            dlcError(game.appId, dlcAppId, e.message ?: e.javaClass.simpleName)
+            false
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    /**
+     * Takes an extra content off the installed game, whichever way it came: added from the game's settings (GamePort kept the paths it placed) or installed with the game (its
+     * files are found in the list Steam publishes for its depots). Nothing is deleted that another depot of the game also holds, or that is not the size Steam says; if
+     * Steam's lists cannot be read, nothing is deleted at all.
+     */
     fun removeDlc(game: Game, dlcAppId: Int) {
         val packageName = installedPackage(game.appId) ?: return
         val build = builds.get(game.appId) ?: return
-        val files = build.dlcFiles[dlcAppId] ?: return dlcError(game.appId, dlcAppId, "it was installed with the game: only a new installation of the game can take it off")
+        val content = game.androidBuild?.dlc?.firstOrNull { it.appId == dlcAppId } ?: return
         if (dlcWork.value.containsKey(game.appId)) return
         dlcWork.update { it + (game.appId to app.gameport.core.model.DlcWork(dlcAppId, removing = true)) }
         scope.launch(Dispatchers.IO) {
             try {
                 val target = File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName")
-                val failed = files.filterNot { relative -> runCatching { File(target, relative).let { !it.exists() || it.delete() } }.getOrDefault(false) }
-                // The folders the files leave empty go too, from the deepest.
-                files.map { File(target, it).parentFile }.distinct().sortedByDescending { it?.path?.length ?: 0 }.forEach { folder ->
+                val planned: List<DlcRemoval.Planned> = build.dlcFiles[dlcAppId]?.map { DlcRemoval.Planned(it, -1L) }
+                    ?: plannedFromSteam(game, build, content, packageName)
+                    ?: return@launch dlcError(game.appId, dlcAppId, "Steam's list of files could not be read: nothing was removed")
+                var removed = 0
+                var absent = 0
+                val different = mutableListOf<String>()
+                val failed = mutableListOf<String>()
+                for (file in planned) {
+                    val onDisk = File(target, file.relativePath)
+                    when {
+                        !onDisk.exists() -> absent++
+                        !onDisk.isFile -> Unit
+                        file.size >= 0 && onDisk.length() != file.size -> different += file.relativePath
+                        onDisk.delete() -> removed++
+                        else -> failed += file.relativePath
+                    }
+                }
+                // The folders the files leave empty go too, from the deepest; the game's own folders keep their files, so they stay.
+                planned.map { File(target, it.relativePath).parentFile }.distinct().sortedByDescending { it?.path?.length ?: 0 }.forEach { folder ->
                     if (folder != null && folder != target && folder.list()?.isEmpty() == true) folder.delete()
                 }
-                if (failed.isNotEmpty()) return@launch dlcError(game.appId, dlcAppId, "${failed.size} file(s) could not be removed: ${failed.take(MAX_PLACED_LISTED).joinToString()}")
-                builds.get(game.appId)?.let { current -> builds.put(game.appId, current.copy(dlc = current.dlc - dlcAppId, dlcFiles = current.dlcFiles - dlcAppId)) }
-                events.note(game.appId, "extra content $dlcAppId taken off: ${files.size} file(s) removed")
+                events.note(game.appId, "extra content ${content.name} ($dlcAppId) taken off: $removed file(s) removed, $absent already absent, ${different.size} left (not the size Steam says), ${failed.size} not removable")
+                if (failed.isNotEmpty() || different.isNotEmpty()) {
+                    return@launch dlcError(game.appId, dlcAppId, "${failed.size + different.size} file(s) were left: " + (failed + different).take(MAX_PLACED_LISTED).joinToString())
+                }
+                val depotIds = content.depots.map { it.id }.toSet()
+                builds.get(game.appId)?.let { current ->
+                    builds.put(game.appId, current.copy(dlc = current.dlc - dlcAppId, dlcFiles = current.dlcFiles - dlcAppId, manifests = current.manifests - depotIds))
+                }
                 dlcWork.update { it - game.appId }
             } catch (e: Exception) {
                 events.failure(game.appId, "removing extra content $dlcAppId", e)
                 dlcError(game.appId, dlcAppId, e.message ?: e.javaClass.simpleName)
             }
         }
+    }
+
+    /**
+     * The files of an extra content installed with the game, from Steam's lists: those of its depots, less what the depots that stay hold (the game's, and the other extra
+     * content's) and the files placed by the extra content added from the settings. Null when a list cannot be read, so that nothing is deleted on a guess.
+     */
+    private suspend fun plannedFromSteam(game: Game, build: InstalledBuild, content: app.gameport.core.model.DlcContent, packageName: String): List<DlcRemoval.Planned>? {
+        val own = content.depots.map { it.id }.toSet()
+        val declaring = game.androidBuild?.dlc.orEmpty().flatMap { it.depots }.associate { it.id to (it.declaredBy ?: game.appId) }
+        val dlcFiles = content.depots.flatMap { depot ->
+            downloader.manifestFiles(depot.declaredBy ?: game.appId, depot.id, build.manifests[depot.id] ?: depot.manifestId) ?: return null
+        }
+        val kept = build.manifests.filterKeys { it !in own }.flatMap { (depotId, manifestId) ->
+            downloader.manifestFiles(declaring[depotId] ?: game.appId, depotId, manifestId) ?: return null
+        }.map { it.first }
+        val keptPlaced = build.dlcFiles.filterKeys { it != content.appId }.values.flatten()
+        return DlcRemoval.plan(dlcFiles, kept, keptPlaced, packageName)
     }
 
     /** The Android package of the game if it is installed on this device. */

@@ -21,6 +21,11 @@ import kotlinx.coroutines.withContext
 class JavaSteamGameDownloader @Inject constructor(
     private val sessions: SteamSessionHolder,
 ) : GameDownloader {
+    override suspend fun manifestFiles(appId: Int, depotId: Int, manifestId: Long): List<Pair<String, Long>>? = withContext(Dispatchers.IO) {
+        val session = sessions.current.value ?: return@withContext null
+        app.gameport.core.steam.session.SteamInspector.manifestFiles(session, appId, depotId, manifestId)
+    }
+
     override suspend fun download(appId: Int, depotIds: List<Int>, directory: File, depotBytes: Map<Int, Long>, onProgress: (Float, Long) -> Unit) {
         withContext(Dispatchers.IO) {
             // Right after GamePort starts, the connection to Steam may not be made yet (a download that goes on by itself starts as soon as the account is known): it is waited for.
