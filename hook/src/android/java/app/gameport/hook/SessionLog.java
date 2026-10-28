@@ -3,6 +3,7 @@ package app.gameport.hook;
 import android.app.ActivityManager;
 import android.app.ApplicationExitInfo;
 import android.content.Context;
+import android.net.TrafficStats;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -52,6 +53,12 @@ final class SessionLog {
     /** The runtime's once-a-second performance lines (frame rate, CPU and GPU levels), kept apart because they would flood the log. */
     private final ArrayDeque<String> performance = new ArrayDeque<>();
     private static final int PERFORMANCE_LINES = 180;
+    /** How much data the game has received and sent, sampled every few seconds: tells whether a transfer that looks stuck moves at all. */
+    private final ArrayDeque<String> network = new ArrayDeque<>();
+    private static final int NETWORK_LINES = 300;
+    private static final long NETWORK_EVERY_MS = 5_000;
+    private int networkVersion;
+    private int sentNetworkVersion = -1;
     private Handler handler;
     private int version;
     private int sentVersion = -1;
@@ -88,7 +95,50 @@ final class SessionLog {
         }, "gameport-perf");
         perf.setDaemon(true);
         perf.start();
+        Thread net = new Thread(new Runnable() {
+            @Override public void run() { followNetwork(); }
+        }, "gameport-net");
+        net.setDaemon(true);
+        net.start();
         scheduleNext();
+    }
+
+    /**
+     * Samples the bytes this game received and sent (the system's counters for its own uid, which any app may read). A line is kept when something moved, and
+     * at least every half minute otherwise, so a quiet stretch shows as one.
+     */
+    private void followNetwork() {
+        try {
+            int uid = android.os.Process.myUid();
+            long started = System.currentTimeMillis();
+            long lastRx = TrafficStats.getUidRxBytes(uid);
+            long lastTx = TrafficStats.getUidTxBytes(uid);
+            if (lastRx == TrafficStats.UNSUPPORTED || lastTx == TrafficStats.UNSUPPORTED) {
+                synchronized (network) { network.addLast("the system does not count this game's traffic"); networkVersion++; }
+                return;
+            }
+            long lastWritten = 0;
+            while (true) {
+                Thread.sleep(NETWORK_EVERY_MS);
+                long rx = TrafficStats.getUidRxBytes(uid);
+                long tx = TrafficStats.getUidTxBytes(uid);
+                long now = System.currentTimeMillis();
+                long moved = (rx - lastRx) + (tx - lastTx);
+                if (moved > 0 || now - lastWritten >= 30_000) {
+                    String line = ((now - started) / 1000) + " s: received " + rx + " B (+" + (rx - lastRx) + "), sent " + tx + " B (+" + (tx - lastTx) + ")";
+                    synchronized (network) {
+                        network.addLast(line);
+                        if (moved > 0) networkVersion++;
+                        if (network.size() > NETWORK_LINES) network.removeFirst();
+                    }
+                    lastWritten = now;
+                }
+                lastRx = rx;
+                lastTx = tx;
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "the game's traffic cannot be followed", t);
+        }
     }
 
     /** Sends what is new now (the game left the screen or is closing). */
@@ -176,9 +226,11 @@ final class SessionLog {
         String librariesSignature = librariesSignature(libraries);
         int performanceAt;
         synchronized (performance) { performanceAt = performanceVersion; }
+        int networkAt;
+        synchronized (network) { networkAt = networkVersion; }
         synchronized (head) {
             at = version;
-            if (at == sentVersion && performanceAt == sentPerformanceVersion && librariesSignature.equals(sentLibraries) && exitSent) return;
+            if (at == sentVersion && performanceAt == sentPerformanceVersion && networkAt == sentNetworkVersion && librariesSignature.equals(sentLibraries) && exitSent) return;
             StringBuilder h = new StringBuilder();
             for (String line : head) h.append(line).append('\n');
             StringBuilder t = new StringBuilder();
@@ -192,6 +244,9 @@ final class SessionLog {
         StringBuilder perf = new StringBuilder();
         synchronized (performance) { for (String line : performance) perf.append(line).append('\n'); }
         extras.putByteArray("performanceGz", gzip(perf.toString()));
+        StringBuilder traffic = new StringBuilder();
+        synchronized (network) { for (String line : network) traffic.append(line).append('\n'); }
+        extras.putByteArray("networkGz", gzip(traffic.toString()));
         extras.putString("launch", launchInfo);
         extras.putString("nativeGaps", nativeGaps.report());
         extras.putString("libraries", libraries);
@@ -209,6 +264,7 @@ final class SessionLog {
             if (result != null) {
                 sentVersion = at;
                 sentPerformanceVersion = performanceAt;
+                sentNetworkVersion = networkAt;
                 sentLibraries = librariesSignature;
                 exitSent = true;
             }

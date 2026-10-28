@@ -39,6 +39,7 @@ class ReportStore @Inject constructor(
         extras.getByteArray("headGz")?.let { gunzip(it)?.let { text -> File(folder, LOG_START).writeBytes(text) } }
         extras.getByteArray("logGz")?.let { gunzip(it)?.let { text -> File(folder, HOOK_LOG).writeBytes(text) } }
         extras.getByteArray("performanceGz")?.let { gunzip(it)?.let { text -> File(folder, PERFORMANCE).writeBytes(text) } }
+        extras.getByteArray("networkGz")?.let { gunzip(it)?.let { text -> File(folder, NETWORK).writeBytes(text) } }
         extras.getByteArray("engineGz")?.let { gunzip(it)?.let { text -> File(folder, ENGINE_LOG).writeBytes(text) } }
         extras.getString("libraries")?.takeIf { it.isNotEmpty() }?.let { File(folder, LIBRARIES).writeText(it.takeLast(MAX_CHARS)) }
         extras.getString("launch")?.takeIf { it.isNotEmpty() }?.let { File(folder, LAUNCH).writeText(it.takeLast(MAX_CHARS)) }
@@ -153,6 +154,7 @@ class ReportStore @Inject constructor(
         const val LOG_START = "log-start.txt"
         const val ENGINE_LOG = "engine.log"
         const val PERFORMANCE = "performance.txt"
+        const val NETWORK = "network.txt"
         const val LIBRARIES = "libraries.txt"
         const val NATIVE_GAPS = "native-gaps.txt"
         const val LAUNCH = "launch.txt"
