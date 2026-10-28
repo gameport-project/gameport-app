@@ -70,6 +70,8 @@ inline const Targets& Fallbacks(const std::string& source) {
         {"right:x", {"left:x", "left:y"}},
         {"right:y", {"left:y", "left:x"}},
         {"right:menu", {"left:menu"}},
+        // Some games bind their menu to the view button as well as to the menu button: it shares the menu's control, the same action being bound to both.
+        {"left:view", {"left:menu"}},
         // Valve maps the Touch's top button onto the Frame's left, up and right and its bottom one onto down; the other way round, by what the game uses.
         {"left:dpad_up", {"left:y", "left:x"}},
         {"left:dpad_down", {"left:x", "left:y"}},
@@ -89,7 +91,7 @@ inline const Targets& Fallbacks(const std::string& source) {
 // The order in which the fallbacks are given out: the face buttons first, then the D-pad, the bumpers and the rest.
 inline const std::vector<std::string>& FallbackOrder() {
     static const std::vector<std::string> order = {"right:x", "right:y", "left:dpad_up", "left:dpad_down", "left:dpad_left", "left:dpad_right",
-                                                   "right:menu", "left:bumper", "right:bumper", "left:shoulder", "right:shoulder"};
+                                                   "right:menu", "left:view", "left:bumper", "right:bumper", "left:shoulder", "right:shoulder"};
     return order;
 }
 

@@ -75,10 +75,11 @@ class ControllerMappingTest {
     }
 
     @Test
-    fun `the right menu goes to the left one, the view buttons and unknown controls go nowhere`() {
+    fun `the right menu goes to the left one, and so does the left view button, the right view and unknown controls go nowhere`() {
         val a = allocate(set("right:menu", "left:view", "right:view", "left:steam"))
         assertEquals(list("left:menu"), a[c("right:menu")])
-        assertTrue(a.getValue(c("left:view")).isEmpty() && a.getValue(c("right:view")).isEmpty() && a.getValue(c("left:steam")).isEmpty())
+        assertEquals(list("left:menu"), a[c("left:view")])
+        assertTrue(a.getValue(c("right:view")).isEmpty() && a.getValue(c("left:steam")).isEmpty())
     }
 
     @Test

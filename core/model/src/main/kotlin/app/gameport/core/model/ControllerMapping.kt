@@ -47,6 +47,8 @@ object ControllerLayout {
         "right:x" to listOf("left:x", "left:y"),
         "right:y" to listOf("left:y", "left:x"),
         "right:menu" to listOf("left:menu"),
+        // Some games bind their menu to the view button as well as to the menu button: it shares the menu's control, the same action being bound to both.
+        "left:view" to listOf("left:menu"),
         // Valve relates the Touch's top button to the Frame's left, up and right and its bottom one to down; the other way round, by what the game uses.
         "left:dpad_up" to listOf("left:y", "left:x"),
         "left:dpad_down" to listOf("left:x", "left:y"),
@@ -61,7 +63,7 @@ object ControllerLayout {
 
     /** The order in which the fallbacks are given out: the face buttons first, then the D-pad, the bumpers and the rest. */
     private val fallbackOrder: List<ControlRef> = listOf(
-        "right:x", "right:y", "left:dpad_up", "left:dpad_down", "left:dpad_left", "left:dpad_right", "right:menu", "left:bumper", "right:bumper", "left:shoulder", "right:shoulder",
+        "right:x", "right:y", "left:dpad_up", "left:dpad_down", "left:dpad_left", "left:dpad_right", "right:menu", "left:view", "left:bumper", "right:bumper", "left:shoulder", "right:shoulder",
     ).map(::ref)
 
     /**

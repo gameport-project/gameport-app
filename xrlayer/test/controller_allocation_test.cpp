@@ -71,11 +71,13 @@ int main() {
         CHECK(b["right:bumper"] == T({"right:squeeze"}));
         CHECK(gp::SharedTargets(b)["right:squeeze"].size() == 2);
     }
-    // The right menu goes to the left menu; the view buttons and unknown controls go nowhere.
+    // The right menu goes to the left menu, and so does the left view button (the same action may be bound to both); the right view and unknown controls go nowhere.
     {
         auto a = gp::Allocate({"right:menu", "left:view", "right:view", "left:steam"}, none(), false);
         CHECK(a["right:menu"] == T({"left:menu"}));
-        CHECK(a["left:view"].empty() && a["right:view"].empty() && a["left:steam"].empty());
+        CHECK(a["left:view"] == T({"left:menu"}));
+        CHECK(a["right:view"].empty() && a["left:steam"].empty());
+        CHECK(gp::SharedTargets(a)["left:menu"].size() == 2);
     }
     // A control the game does not use takes nothing: only what is used competes.
     {

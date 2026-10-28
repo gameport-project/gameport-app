@@ -63,6 +63,10 @@ PFN_xrSuggestInteractionProfileBindings g_suggestBindings = nullptr;
 PFN_xrDestroySwapchain g_destroySwapchain = nullptr;
 PFN_xrStringToPath g_stringToPath = nullptr;
 PFN_xrCreateAction g_createAction = nullptr;
+PFN_xrEndSession g_endSession = nullptr;
+PFN_xrRequestExitSession g_requestExit = nullptr;
+PFN_xrDestroySession g_destroySession = nullptr;
+PFN_xrDestroyInstance g_destroyInstance = nullptr;
 std::mutex g_actionNamesMutex;
 std::unordered_map<uint64_t, std::string> g_actionNames;  // the game's own name for each action, so the log can say what a control is for
 PFN_xrPathToString g_pathToString = nullptr;
@@ -371,6 +375,7 @@ XrResult XRAPI_CALL Layer_xrWaitFrame(XrSession session, const XrFrameWaitInfo* 
 
 XrResult XRAPI_CALL Layer_xrBeginSession(XrSession session, const XrSessionBeginInfo* info) {
     XrResult result = g_beginSession(session, info);
+    LOGI("xrBeginSession(view configuration %d) -> %d", info ? (int)info->primaryViewConfigurationType : -1, (int)result);
     if (XR_SUCCEEDED(result)) {
         g_session = session;
         g_samples = 0;
@@ -900,6 +905,28 @@ void EmulateIfNeeded(XrInstance instance) {
     if (!valve.empty()) EmulateFrom(instance, valve, "valve", stash[valve]);
 }
 
+// The calls that end a session or an instance: logged, so that a report shows who closed what (the game by itself, or the runtime).
+XrResult XRAPI_CALL Layer_xrEndSession(XrSession session) {
+    XrResult result = g_endSession(session);
+    LOGI("xrEndSession -> %d", (int)result);
+    return result;
+}
+
+XrResult XRAPI_CALL Layer_xrRequestExitSession(XrSession session) {
+    LOGI("the game asks the runtime to end the session (xrRequestExitSession)");
+    return g_requestExit(session);
+}
+
+XrResult XRAPI_CALL Layer_xrDestroySession(XrSession session) {
+    LOGI("xrDestroySession");
+    return g_destroySession(session);
+}
+
+XrResult XRAPI_CALL Layer_xrDestroyInstance(XrInstance instance) {
+    LOGI("xrDestroyInstance");
+    return g_destroyInstance(instance);
+}
+
 XrResult XRAPI_CALL Layer_xrCreateAction(XrActionSet actionSet, const XrActionCreateInfo* createInfo, XrAction* action) {
     XrResult result = g_createAction ? g_createAction(actionSet, createInfo, action) : XR_ERROR_FUNCTION_UNSUPPORTED;
     if (XR_SUCCEEDED(result) && createInfo && action) {
@@ -974,6 +1001,15 @@ XrResult XRAPI_CALL Layer_xrStringToPath(XrInstance instance, const char* pathSt
 // Only watches: the runtime announces a recentering with an event, and what the game does with it is the game's. The first ones are written in the log.
 XrResult XRAPI_CALL Layer_xrPollEvent(XrInstance instance, XrEventDataBuffer* data) {
     XrResult result = g_pollEvent(instance, data);
+    // The states of the session, in order: what the game was told, and when, tells where a game that quits or never shows an image stopped.
+    if (result == XR_SUCCESS && data && data->type == XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED) {
+        const auto* change = reinterpret_cast<const XrEventDataSessionStateChanged*>(data);
+        LOGI("session state -> %d (1 idle, 2 ready, 3 synchronized, 4 visible, 5 focused, 6 stopping, 7 loss pending, 8 exiting)", (int)change->state);
+    } else if (result == XR_SUCCESS && data && data->type == XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING) {
+        LOGI("the runtime announces that the instance will be lost");
+    } else if (result == XR_SUCCESS && data && data->type == XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED) {
+        LOGI("the runtime announces a change of the interaction profile in use");
+    }
     if (result == XR_SUCCESS && data && data->type == XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING) {
         const auto* change = reinterpret_cast<const XrEventDataReferenceSpaceChangePending*>(data);
         static std::atomic<int> logged{0};
@@ -1029,6 +1065,10 @@ XrResult XRAPI_CALL Layer_xrGetInstanceProcAddr(XrInstance instance, const char*
         {"xrAttachSessionActionSets", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrAttachSessionActionSets)},
         {"xrSuggestInteractionProfileBindings", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrSuggestInteractionProfileBindings)},
         {"xrCreateAction", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrCreateAction)},
+        {"xrEndSession", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrEndSession)},
+        {"xrRequestExitSession", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrRequestExitSession)},
+        {"xrDestroySession", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrDestroySession)},
+        {"xrDestroyInstance", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrDestroyInstance)},
         {"xrPollEvent", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrPollEvent)},
         {"xrStringToPath", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrStringToPath)},
         {"xrGetActionStateBoolean", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrGetActionStateBoolean)},
@@ -1217,6 +1257,10 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
     Load("xrDestroySwapchain", g_destroySwapchain);
     Load("xrStringToPath", g_stringToPath);
     Load("xrCreateAction", g_createAction);
+    Load("xrEndSession", g_endSession);
+    Load("xrRequestExitSession", g_requestExit);
+    Load("xrDestroySession", g_destroySession);
+    Load("xrDestroyInstance", g_destroyInstance);
     Load("xrPathToString", g_pathToString);
     Load("xrGetCurrentInteractionProfile", g_getCurrentProfile);
     Load("xrEnumerateViewConfigurationViews", g_enumerateViews);
@@ -1242,6 +1286,21 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
     g_family = familyOf(said ? Lower(said) : "");
     if (g_family == Family::Unknown) g_family = familyOf(runtime);
     LOGI("controller family %d (GamePort said '%s', runtime '%s')", (int)g_family, said ? said : "", runtime.c_str());
+    // What this runtime offers: a game that asks for something absent, or that a runtime takes and then crashes on, is told by comparing with the list below.
+    {
+        PFN_xrEnumerateInstanceExtensionProperties enumerate = nullptr;
+        if (XR_SUCCEEDED(g_nextGetInstanceProcAddr(XR_NULL_HANDLE, "xrEnumerateInstanceExtensionProperties", (PFN_xrVoidFunction*)&enumerate)) && enumerate) {
+            uint32_t count = 0;
+            if (XR_SUCCEEDED(enumerate(nullptr, 0, &count, nullptr)) && count > 0) {
+                std::vector<XrExtensionProperties> offered(count, {XR_TYPE_EXTENSION_PROPERTIES});
+                if (XR_SUCCEEDED(enumerate(nullptr, count, &count, offered.data()))) {
+                    std::string names;
+                    for (const auto& e : offered) names += std::string(names.empty() ? "" : " ") + e.extensionName;
+                    LOGI("the runtime offers %u extension(s): %s", count, names.c_str());
+                }
+            }
+        }
+    }
     const char* prefer = getenv("GAMEPORT_XR_PREFER_FRAME");
     g_preferFrame = prefer && strcmp(prefer, "1") == 0;
     const char* floor = getenv("GAMEPORT_XR_LOCAL_FLOOR");
