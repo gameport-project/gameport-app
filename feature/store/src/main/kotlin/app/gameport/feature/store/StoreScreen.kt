@@ -224,7 +224,7 @@ fun StoreScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, onStoreGame: (In
                             }
                         }
                         StateFilters(current, viewModel)
-                        val compatOn = current.filters.quick.any { it in COMPAT_FILTERS }
+                        val compatOn = current.filters.quick.any { it in COMPAT_FILTERS && it != StoreFilter.UNREPORTED }
                         if (current.apps.isEmpty()) {
                             if (compatOn) {
                                 CompatEmpty(current.withoutReports, wanted = StoreFilter.COMPATIBLE in current.filters.quick, onRemove = viewModel::onCompatFilterRemoved)
@@ -364,7 +364,7 @@ private fun StateFilters(state: StoreUiState.Content, viewModel: StoreViewModel)
     val quick = state.filters.quick
     val availability = setOf(StoreFilter.INSTALLABLE, StoreFilter.FUTURE)
     val library = setOf(StoreFilter.OWNED, StoreFilter.NOT_OWNED)
-    val compat = setOf(StoreFilter.COMPATIBLE, StoreFilter.INCOMPATIBLE)
+    val compat = COMPAT_FILTERS
     Row(Modifier.fillMaxWidth().padding(bottom = 12.dp).tourTarget(TourIds.STORE_STATE), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         PillTabs(
             labels = listOf(stringResource(R.string.store_all), stringResource(R.string.store_avail_installable), stringResource(R.string.store_avail_future)),
@@ -391,14 +391,15 @@ private fun StateFilters(state: StoreUiState.Content, viewModel: StoreViewModel)
             textStyle = MaterialTheme.typography.labelMedium,
         )
         PillTabs(
-            labels = listOf(stringResource(R.string.store_compat_all), stringResource(R.string.store_compat_yes), stringResource(R.string.store_compat_no)),
+            labels = listOf(stringResource(R.string.store_compat_all), stringResource(R.string.store_compat_yes), stringResource(R.string.store_compat_no), stringResource(R.string.store_compat_unreported, state.withoutReports)),
             selectedIndex = when {
                 StoreFilter.COMPATIBLE in quick -> 1
                 StoreFilter.INCOMPATIBLE in quick -> 2
+                StoreFilter.UNREPORTED in quick -> 3
                 else -> 0
             },
-            onSelect = { viewModel.onGroupChosen(compat, listOf(null, StoreFilter.COMPATIBLE, StoreFilter.INCOMPATIBLE)[it]) },
-            modifier = Modifier.width(330.dp),
+            onSelect = { viewModel.onGroupChosen(compat, listOf(null, StoreFilter.COMPATIBLE, StoreFilter.INCOMPATIBLE, StoreFilter.UNREPORTED)[it]) },
+            modifier = Modifier.width(440.dp),
             height = 34.dp,
             textStyle = MaterialTheme.typography.labelMedium,
         )

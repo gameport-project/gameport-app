@@ -61,7 +61,7 @@ sealed interface StoreUiState {
         val coverWidth: Int = CoverSize.SMALL.dp,
         /** What the players of this kind of device say of the games they were enough to try. */
         val levels: Map<Int, CompatLevel> = emptyMap(),
-        /** The games a compatibility filter leaves out because nobody reported on them for this device (see [withoutReports]); zero without such a filter. */
+        /** The games a compatibility filter leaves out because nobody reported on them for this device (see [withoutReports]), also the count of the "not tested yet" entry. */
         val withoutReports: Int = 0,
         val deviceKind: String = "",
         /** The picture of the game pointed at fills the page behind, as on the home, with the strength the player set for it. */

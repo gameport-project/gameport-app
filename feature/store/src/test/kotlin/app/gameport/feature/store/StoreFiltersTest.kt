@@ -63,9 +63,8 @@ class StoreFiltersTest {
     }
 
     @Test
-    fun `nothing is left out when no compatibility filter is on, or when every game passing the other filters has a report`() {
-        assertEquals(0, hidden(quick()))
-        assertEquals(0, hidden(quick(StoreFilter.FLAT)))
+    fun `nothing is counted when every game passing the other filters has a report`() {
+        assertEquals(0, hidden(quick(StoreFilter.FLAT, StoreFilter.COMPATIBLE), text = "bravo"))
         assertEquals(0, hidden(quick(StoreFilter.COMPATIBLE), text = "alpha"))
     }
 
@@ -304,5 +303,14 @@ class StoreFiltersTest {
         assertEquals(listOf(1, 2, 3, 4, 5), order(StoreSort.NAME))
         assertEquals(listOf(5, 2, 4), order(StoreSort.RATING).take(3))
         assertEquals(listOf(4, 1, 2), order(StoreSort.PRICE_DESC).take(3))
+    }
+
+    @Test
+    fun `not tested yet lists only the games nobody reported on, and its count does not depend on the compatibility filter`() {
+        val levels = mapOf(1 to CompatLevel.WORKS, 4 to CompatLevel.FAILS)
+        assertEquals(setOf(2, 3, 5), storeList(apps, "", quick(StoreFilter.UNREPORTED), emptySet(), today, true, levels = levels).map { it.appid }.toSet())
+        assertEquals(3, withoutReports(apps, "", StoreFilters(), emptySet(), today, true, levels = levels))
+        assertEquals(3, withoutReports(apps, "", quick(StoreFilter.UNREPORTED), emptySet(), today, true, levels = levels))
+        assertEquals(setOf(StoreFilter.UNREPORTED), StoreFilters(quick = setOf(StoreFilter.COMPATIBLE)).toggled(StoreFilter.UNREPORTED).quick)
     }
 }

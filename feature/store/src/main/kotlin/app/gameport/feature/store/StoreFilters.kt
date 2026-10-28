@@ -32,6 +32,9 @@ enum class StoreFilter {
     /** The players say it does not work on this device. */
     INCOMPATIBLE,
 
+    /** Nobody has reported on the game for this device yet: neither that it works nor that it does not. */
+    UNREPORTED,
+
     /** Only the apps with nudity or sexual content. */
     ADULT,
 
@@ -114,8 +117,9 @@ private fun StoreFilter.excludes(): Set<StoreFilter> = when (this) {
     StoreFilter.FUTURE -> setOf(StoreFilter.INSTALLABLE)
     StoreFilter.OWNED -> setOf(StoreFilter.NOT_OWNED)
     StoreFilter.NOT_OWNED -> setOf(StoreFilter.OWNED)
-    StoreFilter.COMPATIBLE -> setOf(StoreFilter.INCOMPATIBLE)
-    StoreFilter.INCOMPATIBLE -> setOf(StoreFilter.COMPATIBLE)
+    StoreFilter.COMPATIBLE -> setOf(StoreFilter.INCOMPATIBLE, StoreFilter.UNREPORTED)
+    StoreFilter.INCOMPATIBLE -> setOf(StoreFilter.COMPATIBLE, StoreFilter.UNREPORTED)
+    StoreFilter.UNREPORTED -> setOf(StoreFilter.COMPATIBLE, StoreFilter.INCOMPATIBLE)
     StoreFilter.ADULT -> setOf(StoreFilter.NOT_ADULT)
     StoreFilter.NOT_ADULT -> setOf(StoreFilter.ADULT)
     StoreFilter.FREE -> setOf(StoreFilter.PAID)
@@ -123,12 +127,12 @@ private fun StoreFilter.excludes(): Set<StoreFilter> = when (this) {
     else -> emptySet()
 }
 
-/** The filters that look at what the players said of a game on this device: a game nobody said anything about passes neither. */
-internal val COMPAT_FILTERS = setOf(StoreFilter.COMPATIBLE, StoreFilter.INCOMPATIBLE)
+/** The filters that look at what the players said of a game on this device. A game nobody said anything about passes the first two, and only that one passes [StoreFilter.UNREPORTED]. */
+internal val COMPAT_FILTERS = setOf(StoreFilter.COMPATIBLE, StoreFilter.INCOMPATIBLE, StoreFilter.UNREPORTED)
 
 /**
- * How many games the compatibility filter leaves out for want of a word from the players: those that pass the search and every other filter, and that nobody has reported on for this
- * device. Zero when no compatibility filter is on. It is what an empty list can mean other than "nothing is compatible".
+ * How many games nobody has reported on for this device: those that pass the search and every filter other than the compatibility ones. It is what a compatibility
+ * filter leaves out for want of a word from the players, what an empty list can mean other than "nothing is compatible", and the count of the "not tested yet" entry.
  */
 internal fun withoutReports(
     apps: List<AndroidApp>,
@@ -140,7 +144,6 @@ internal fun withoutReports(
     prices: Map<Int, StorePrice> = emptyMap(),
     levels: Map<Int, CompatLevel> = emptyMap(),
 ): Int {
-    if (filters.quick.none { it in COMPAT_FILTERS }) return 0
     val others = filters.copy(quick = filters.quick - COMPAT_FILTERS)
     return storeList(apps, text, others, ownedIds, today, vrDevice, prices, levels = levels).count { levels[it.appid] == null }
 }
@@ -183,6 +186,7 @@ internal fun storeList(
                     StoreFilter.OWNED -> app.appid in ownedIds
                     StoreFilter.NOT_OWNED -> app.appid !in ownedIds
                     StoreFilter.INCOMPATIBLE -> levels[app.appid] == CompatLevel.FAILS
+                    StoreFilter.UNREPORTED -> levels[app.appid] == null
                     StoreFilter.ADULT -> app.isAdult
                     StoreFilter.NOT_ADULT -> !app.isAdult
                     StoreFilter.FREE -> app.isFree(prices[app.appid])

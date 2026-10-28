@@ -130,6 +130,7 @@
     <string name="store_compat_all">All</string>
     <string name="store_compat_yes">Compatible</string>
     <string name="store_compat_no">Not compatible</string>
+    <string name="store_compat_unreported">Not tested yet (%1$d)</string>
     <string name="storegame_price_lowest">Lowest seen</string>
     <string name="storegame_price_last_sale">Last sale</string>
     <string name="storegame_price_no_sale">None</string>
