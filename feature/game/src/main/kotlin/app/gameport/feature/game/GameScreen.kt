@@ -195,7 +195,6 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onDismissProblem = viewModel::onDismissProblem,
         onResetProgress = viewModel::onResetReport,
     )
-    val extraContent by viewModel.extraContent.collectAsStateWithLifecycle()
     GameContent(
         uiState = uiState,
         connection = connection,
@@ -212,7 +211,6 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onReinstallFromScratch = viewModel::onReinstallFromScratch,
         achievements = achievements,
         onOpenAchievements = onOpenAchievements,
-        extra = ExtraContentActions(extraContent, viewModel::onInstallDlc, viewModel::onRemoveDlc, viewModel::onDismissDlcError),
         artworkHeight = artworkHeight,
         onToggleFavorite = viewModel::onToggleFavorite,
         onSetHidden = viewModel::onSetHidden,
@@ -268,7 +266,6 @@ internal fun GameContent(
     onUpdate: () -> Unit,
     achievements: AchievementList? = null,
     onOpenAchievements: () -> Unit = {},
-    extra: ExtraContentActions = ExtraContentActions(),
     artworkHeight: Int = DisplaySettings.DEFAULT_GAME_ARTWORK_HEIGHT,
 ) {
     Scaffold { padding ->
@@ -322,7 +319,6 @@ internal fun GameContent(
                     report = report,
                     achievements = achievements,
                     onOpenAchievements = onOpenAchievements,
-                    extra = extra,
                     artworkHeight = artworkHeight,
                 )
             }
@@ -386,7 +382,6 @@ private fun GameDetails(
     report: ReportActions,
     achievements: AchievementList? = null,
     onOpenAchievements: () -> Unit = {},
-    extra: ExtraContentActions = ExtraContentActions(),
     artworkHeight: Int = DisplaySettings.DEFAULT_GAME_ARTWORK_HEIGHT,
 ) {
     var reporting by remember { mutableStateOf(false) }
@@ -629,8 +624,6 @@ private fun GameDetails(
                 }
                 // A game without achievements, or one Steam has not answered for yet, shows nothing here.
                 achievements?.takeIf { it.items.isNotEmpty() }?.let { AchievementsCard(it, onOpenAchievements) }
-                // The extra content the account has, once the game is on the device: what is installed, and what can be added or taken off.
-                if (install is InstallState.Installed && !extra.state.isEmpty) ExtraContentCard(extra.state, extra.onInstall, extra.onRemove, extra.onDismissError)
             }
             val installed = install is InstallState.Installed
             if (compact) {

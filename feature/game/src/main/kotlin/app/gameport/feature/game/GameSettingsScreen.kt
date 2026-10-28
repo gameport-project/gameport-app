@@ -65,6 +65,7 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
     val installState by viewModel.installState.collectAsStateWithLifecycle()
     val patchRemoved by viewModel.patchRemoved.collectAsStateWithLifecycle()
     val launchOptions by viewModel.launchOptions.collectAsStateWithLifecycle()
+    val extraContent by viewModel.extraContent.collectAsStateWithLifecycle()
     var confirmingRemoval by remember { mutableStateOf(false) }
     if (confirmingRemoval) {
         BackdropDialog(
@@ -138,6 +139,9 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
                             Text(stringResource(R.string.game_settings_permissions_open))
                         }
                     }
+                }
+                if (installState is InstallState.Installed && !extraContent.isEmpty) {
+                    ExtraContentSection(extraContent, viewModel::onInstallDlc, viewModel::onRemoveDlc, viewModel::onDismissDlcError)
                 }
                 if (launchOptions.isNotEmpty()) {
                     LaunchArgumentsSection(

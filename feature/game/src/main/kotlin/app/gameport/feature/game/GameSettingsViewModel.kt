@@ -15,6 +15,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -23,7 +25,7 @@ import kotlinx.coroutines.launch
 class GameSettingsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val store: GameSettingsStore,
-    library: SteamLibraryRepository,
+    private val library: SteamLibraryRepository,
     private val installer: GameInstallRepository,
     device: DeviceProfile,
     private val launchOptionsRepository: app.gameport.core.steam.LaunchOptionsRepository,
@@ -68,6 +70,25 @@ class GameSettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
 
     fun appSettingsIntent() = installer.appSettingsIntent(appId)
+
+    /** The extra content (DLC) of the game that the account has, with what is on the device and the work in progress. */
+    val extraContent: StateFlow<app.gameport.core.model.ExtraContent> = combine(
+        library.observeGame(appId),
+        installer.observeInstalledDlc(appId),
+        installer.observeDlcWork(appId),
+    ) { game, (installed, removable), work ->
+        app.gameport.core.model.ExtraContent.of(game?.androidBuild?.dlc.orEmpty(), installed, removable, work)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), app.gameport.core.model.ExtraContent())
+
+    fun onInstallDlc(dlcAppId: Int) {
+        viewModelScope.launch { library.observeGame(appId).first()?.let { installer.installDlc(it, dlcAppId) } }
+    }
+
+    fun onRemoveDlc(dlcAppId: Int) {
+        viewModelScope.launch { library.observeGame(appId).first()?.let { installer.removeDlc(it, dlcAppId) } }
+    }
+
+    fun onDismissDlcError() = installer.clearDlcError(appId)
 
     fun onRepatch() = installer.repatch(appId)
 
