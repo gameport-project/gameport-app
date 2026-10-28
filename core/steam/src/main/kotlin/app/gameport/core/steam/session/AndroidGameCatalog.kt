@@ -15,6 +15,7 @@ import app.gameport.core.model.Library
 import app.gameport.core.model.Ownership
 import app.gameport.core.steam.cache.CACHE_VERSION
 import app.gameport.core.steam.cache.CachedDepot
+import app.gameport.core.steam.cache.CachedDlcApp
 import app.gameport.core.steam.cache.CachedGame
 import app.gameport.core.steam.cache.CachedLibrary
 import app.gameport.core.steam.cache.LibraryCacheStore
@@ -57,6 +58,8 @@ internal fun SteamSession.androidGames(
     val games = HashMap<Int, CachedGame>()
     cached?.games?.forEach { games[it.appId] = it }
     val dlcNames = HashMap<Int, String>(cached?.dlcNames.orEmpty())
+    val dlcApps = HashMap<Int, CachedDlcApp>()
+    cached?.dlcApps?.forEach { dlcApps[it.appId] = it }
 
     val ownedPackages = licenses.filter { it.ownerAccountID.toLong() == me }.map { it.packageID }.toSet()
     val packageIds = licenses.map { it.packageID }.toSet()
@@ -71,12 +74,12 @@ internal fun SteamSession.androidGames(
             visible += apps
             if (pkg in ownedPackages) owned += apps
         }
-        return libraryOf(games.values.filter { it.appId in visible }, owned, visible, dlcNames, scanning)
+        return libraryOf(games.values.filter { it.appId in visible }, owned, visible, dlcNames, scanning, dlcApps.values)
     }
 
     fun persist() = cacheStore.save(
         me,
-        CachedLibrary(CACHE_VERSION, now(), packageApps.toMap(), checkedApps.toSet(), games.values.toList(), dlcNames.toMap()),
+        CachedLibrary(CACHE_VERSION, now(), packageApps.toMap(), checkedApps.toSet(), games.values.toList(), dlcNames.toMap(), dlcApps.values.toList()),
     )
 
     val unknownPackages = packageIds.filter { it !in packageApps }
@@ -119,6 +122,7 @@ internal fun SteamSession.androidGames(
                         for (app in callback.apps.values) {
                             checkedApps += app.id
                             app.keyValues.toAndroidGame(app.id)?.let { games[app.id] = it }
+                            app.keyValues.toAndroidDlc(app.id)?.let { dlc -> dlcApps[app.id] = dlc; dlcNames[app.id] = dlc.name }
                         }
                     }
                     send(snapshot(scanning = true))
@@ -148,7 +152,14 @@ internal fun SteamSession.androidGames(
 }
 
 /** The library as the screens see it, from the cached games. [owned] and [visible] are app ids. */
-internal fun libraryOf(shown: Collection<CachedGame>, owned: Set<Int>, visible: Set<Int>, dlcNames: Map<Int, String>, scanning: Boolean): Library {
+internal fun libraryOf(
+    shown: Collection<CachedGame>,
+    owned: Set<Int>,
+    visible: Set<Int>,
+    dlcNames: Map<Int, String>,
+    scanning: Boolean,
+    dlcApps: Collection<CachedDlcApp> = emptyList(),
+): Library {
     val list = shown.map { game ->
         val depots = game.depots.map { AndroidDepot(it.id, it.dlcAppId, it.installBytes, it.downloadBytes, it.manifestId) }
         Game(
@@ -168,9 +179,17 @@ internal fun libraryOf(shown: Collection<CachedGame>, owned: Set<Int>, visible: 
                 isVr = game.isVr,
                 baseDepots = depots.filter { it.dlcAppId == null },
                 saveRules = game.saveRules.map { SaveRule(it.localDir, it.pattern, it.recursive, it.cloudPrefix, it.pcCloudPrefix) },
-                dlc = depots.filter { it.dlcAppId != null }.groupBy { it.dlcAppId!! }.map { (dlcAppId, dlcDepots) ->
-                    DlcContent(dlcAppId, dlcNames[dlcAppId] ?: "DLC $dlcAppId", owned = dlcAppId in visible, depots = dlcDepots)
-                }.sortedBy { it.name.lowercase() },
+                // The DLC the game's own depots name, and the DLC apps that carry their depots themselves (a game that sells its content as DLC).
+                dlc = (
+                    depots.filter { it.dlcAppId != null }.groupBy { it.dlcAppId!! }.map { (dlcAppId, dlcDepots) ->
+                        DlcContent(dlcAppId, dlcNames[dlcAppId] ?: "DLC $dlcAppId", owned = dlcAppId in visible, depots = dlcDepots)
+                    } + dlcApps.filter { it.parent == game.appId }.map { app ->
+                        DlcContent(
+                            app.appId, app.name, owned = app.appId in visible,
+                            depots = app.depots.map { AndroidDepot(it.id, app.appId, it.installBytes, it.downloadBytes, it.manifestId) },
+                        )
+                    }
+                    ).distinctBy { it.appId }.sortedBy { it.name.lowercase() },
             ),
         )
     }.sortedBy { it.name.lowercase() }
@@ -182,7 +201,32 @@ internal fun offlineLibrary(cacheStore: LibraryCacheStore, accountId: Long): Flo
     val cached = cacheStore.load(accountId)
     val everything = cached?.games.orEmpty()
     val ids = everything.map { it.appId }.toSet()
-    emit(libraryOf(everything, ids, ids, cached?.dlcNames.orEmpty(), scanning = false))
+    emit(libraryOf(everything, ids, ids, cached?.dlcNames.orEmpty(), scanning = false, dlcApps = cached?.dlcApps.orEmpty()))
+}
+
+/**
+ * A DLC app that carries Android depots of its own: type DLC with a parent game, and a depot tagged Android with a public build. Null for any other app, and for a DLC
+ * without such a depot (the usual one, whose content is in the game's own depots).
+ */
+internal fun KeyValue.toAndroidDlc(appId: Int): CachedDlcApp? {
+    val common = this["common"]
+    if (common["type"].value?.lowercase() != "dlc") return null
+    val parent = common["parent"].asInteger(0).takeIf { it > 0 } ?: return null
+    val depots = this["depots"].children.filter { depot ->
+        depot.name?.toIntOrNull() != null &&
+            depot["config"]["oslist"].value.orEmpty().split(',').any { it.trim() == "android" } &&
+            depot["manifests"]["public"] != KeyValue.INVALID
+    }.map { depot ->
+        CachedDepot(
+            id = depot.name!!.toInt(),
+            dlcAppId = depot["dlcappid"].asInteger(appId).takeIf { it > 0 } ?: appId,
+            installBytes = depot["manifests"]["public"]["size"].asLong(),
+            downloadBytes = depot["manifests"]["public"]["download"].asLong(),
+            manifestId = depot["manifests"]["public"]["gid"].asLong(),
+        )
+    }
+    if (depots.isEmpty()) return null
+    return CachedDlcApp(appId, parent, common["name"].value ?: return null, depots)
 }
 
 private fun KeyValue.toAndroidGame(appId: Int): CachedGame? {

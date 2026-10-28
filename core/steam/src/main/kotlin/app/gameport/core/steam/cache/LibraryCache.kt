@@ -46,6 +46,18 @@ data class CachedGame(
     val parent: Int? = null,
 )
 
+/**
+ * A DLC app that carries an Android depot of its own. A game whose content is sold as DLC (Steam says `hasdepotsindlc`) declares no depot for it: each DLC app lists
+ * its own, tagged Android, with its own manifest. [parent] is the game it belongs to.
+ */
+@Serializable
+data class CachedDlcApp(
+    val appId: Int,
+    val parent: Int,
+    val name: String,
+    val depots: List<CachedDepot>,
+)
+
 /** What a previous scan learned, so the next launch only asks Steam about what is new. */
 @Serializable
 data class CachedLibrary(
@@ -59,6 +71,8 @@ data class CachedLibrary(
     val games: List<CachedGame>,
     /** Names of the DLC apps the games' depots belong to. */
     val dlcNames: Map<Int, String> = emptyMap(),
+    /** The DLC apps the account has that carry an Android depot of their own. */
+    val dlcApps: List<CachedDlcApp> = emptyList(),
 )
 
 interface LibraryCacheStore {
@@ -74,8 +88,8 @@ interface LibraryCacheStore {
     }
 }
 
-/** Version 4 adds the save rules used for the cloud sync, version 6 the build id of each depot, version 8 the artwork names and the parent app, version 10 the Windows copy of the saves and the private data root. */
-const val CACHE_VERSION = 10
+/** Version 4 adds the save rules used for the cloud sync, version 6 the build id of each depot, version 8 the artwork names and the parent app, version 10 the Windows copy of the saves, version 11 the DLC apps with an Android depot of their own, and the private data root. */
+const val CACHE_VERSION = 11
 
 @Singleton
 class FileLibraryCacheStore @Inject constructor(
