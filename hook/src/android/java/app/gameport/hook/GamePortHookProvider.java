@@ -725,6 +725,7 @@ public final class GamePortHookProvider extends ContentProvider {
         String family = "";
         String preferFrame = "0";
         String localFloor = "auto";
+        String eyeFov = "auto";
         try {
             Bundle config = Calls.call(context, Owner.cloud(context), "config", context.getPackageName(), null);
             if (config == null) throw new java.io.IOException("no answer");
@@ -737,11 +738,13 @@ public final class GamePortHookProvider extends ContentProvider {
             preferFrame = config.getBoolean("xrPreferFrame") ? "1" : "0";
             String recenter = config.getString("xrRecenter");
             localFloor = recenter == null || recenter.isEmpty() ? "auto" : recenter;
+            String eyeFoveation = config.getString("xrEyeFoveation");
+            eyeFov = eyeFoveation == null || eyeFoveation.isEmpty() ? "auto" : eyeFoveation;
             String mode = config.getString("returnMode");
             // A GamePort from before the choice only says whether to come back for a game it started.
             returnMode = mode != null ? mode : (config.getBoolean("returnToGamePort") ? "app" : "never");
             java.io.FileWriter out = new java.io.FileWriter(cache);
-            out.write(seated + "\n" + eyeCm + "\n" + controls + "\n" + family + "\n" + preferFrame + "\n" + localFloor + "\n");
+            out.write(seated + "\n" + eyeCm + "\n" + controls + "\n" + family + "\n" + preferFrame + "\n" + localFloor + "\n" + eyeFov + "\n");
             out.close();
         } catch (Throwable t) {
             try {
@@ -756,6 +759,8 @@ public final class GamePortHookProvider extends ContentProvider {
                 preferFrame = again == null ? "0" : again;
                 String floor = in.readLine();
                 localFloor = floor == null || floor.equals("0") ? "auto" : (floor.equals("1") ? "on" : floor);
+                String fov = in.readLine();
+                eyeFov = fov == null || fov.isEmpty() ? "auto" : fov;
                 in.close();
             } catch (Throwable ignored) {
                 // No earlier answer either: seated mode stays off.
@@ -772,6 +777,8 @@ public final class GamePortHookProvider extends ContentProvider {
             android.system.Os.setenv("GAMEPORT_XR_PREFER_FRAME", preferFrame, true);
             // The play space that the headset's recentering moves, in place of the fixed one a game asks for (auto, on or off).
             android.system.Os.setenv("GAMEPORT_XR_LOCAL_FLOOR", localFloor, true);
+            // The foveation that follows the eyes: kept where the device can do it (auto), always (on) or never (off).
+            android.system.Os.setenv("GAMEPORT_XR_EYE_FOVEATION", eyeFov, true);
             Log.i(TAG, "seated mode " + seated + ", eye height " + eyeCm + " cm, controller overrides " + (controls.isEmpty() ? "none" : controls));
             Log.i(TAG, "patches: vr_game_activity=" + hasPatchMark(context, "app.gameport.vr_game_activity") + " ovrplugin_stand_in=" + hasPatchMark(context, "app.gameport.ovrplugin_stand_in") + " passthrough_feature=" + hasPatchMark(context, "app.gameport.passthrough_feature"));
         } catch (Throwable t) {

@@ -259,6 +259,8 @@
     <string name="gamecompat_recenter_auto">Done automatically for this game: the headset has no play area.</string>
     <string name="gamecompat_passthrough">Let the game show the real world</string>
     <string name="gamecompat_passthrough_legend">A game that can show the real world behind it may not be allowed to by the headset, because its VR build does not say it uses it. Turning this on declares it for this game. Automatic does it for the games known to need it. It is for a game that has a passthrough setting that does not work. A change patches the game again.</string>
+    <string name="gamecompat_eye_foveation">Foveation that follows the eyes</string>
+    <string name="gamecompat_eye_foveation_legend">Some games ask for it, and the system of some devices stops the game when the device has no eye tracking. Automatic keeps it where the device has eye tracking and leaves it out where it has none. Off leaves it out for this game, on keeps it. Applies at the next start of the game.</string>
     <string name="gamecompat_passthrough_auto">Done automatically for this game: its VR build does not say it uses the passthrough.</string>
     <string name="gamecompat_ovrplugin">Smooth out a game that stutters</string>
     <string name="gamecompat_ovrplugin_legend">Some games carry mixed reality scripts from Meta without the library they call, and stutter because they fail at every update. By default the game is given a small stand-in that answers for the missing library. Turning it off is for a game that does not work that way. A change patches the game again.</string>

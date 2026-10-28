@@ -49,7 +49,7 @@ fun GameCompatScreen(onBack: () -> Unit, viewModel: GameCompatViewModel = hiltVi
     val gameName by viewModel.gameName.collectAsStateWithLifecycle()
     val showOpenInVr by viewModel.showOpenInVr.collectAsStateWithLifecycle()
     val showOvrPluginStandIn by viewModel.showOvrPluginStandIn.collectAsStateWithLifecycle()
-    GameCompatContent(mapping, settings, stageFallback, gameName, onBack, viewModel::onUseFrameChanged, viewModel::onRecenterChosen, showOpenInVr, viewModel::onOpenInVrChosen, showOvrPluginStandIn, viewModel::onOvrPluginStandInChosen, viewModel::onPassthroughChosen, viewModel.passthroughListed)
+    GameCompatContent(mapping, settings, stageFallback, gameName, onBack, viewModel::onUseFrameChanged, viewModel::onRecenterChosen, showOpenInVr, viewModel::onOpenInVrChosen, showOvrPluginStandIn, viewModel::onOvrPluginStandInChosen, viewModel::onPassthroughChosen, viewModel.passthroughListed, viewModel.showEyeFoveation, viewModel::onEyeFoveationChosen)
 }
 
 /** The page of the options, from what it shows: the screen feeds it from the game, the tour of the page feeds it made-up values. */
@@ -68,6 +68,8 @@ internal fun GameCompatContent(
     onOvrPluginStandInChosen: (Boolean) -> Unit = {},
     onPassthroughChosen: (PassthroughMode) -> Unit = {},
     passthroughListed: Boolean = false,
+    showEyeFoveation: Boolean = false,
+    onEyeFoveationChosen: (app.gameport.core.model.EyeFoveationMode) -> Unit = {},
 ) {
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp)) {
@@ -101,6 +103,13 @@ internal fun GameCompatContent(
                     selected = settings.passthrough.ordinal,
                     onSelect = { onPassthroughChosen(PassthroughMode.entries[it]) },
                     note = stringResource(R.string.gamecompat_passthrough_auto).takeIf { passthroughListed && settings.passthrough == PassthroughMode.AUTO },
+                )
+                if (showEyeFoveation) ChoiceBox(
+                    title = stringResource(R.string.gamecompat_eye_foveation),
+                    legend = stringResource(R.string.gamecompat_eye_foveation_legend),
+                    labels = listOf(R.string.gamecompat_mode_auto, R.string.gamecompat_mode_on, R.string.gamecompat_mode_off).map { stringResource(it) },
+                    selected = settings.eyeFoveation.ordinal,
+                    onSelect = { onEyeFoveationChosen(app.gameport.core.model.EyeFoveationMode.entries[it]) },
                 )
                 if (showOpenInVr) ChoiceBox(
                     title = stringResource(R.string.gamecompat_open_in_vr),

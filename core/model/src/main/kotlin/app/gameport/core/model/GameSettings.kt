@@ -13,6 +13,12 @@ data class PlayerDefaults(
 /** Whether a game gets the play space that the headset's recentering moves: by itself where the headset has no play area, always, or never. */
 enum class RecenterMode { AUTO, ON, OFF }
 
+/**
+ * Whether a game keeps the foveation that follows the eyes (the extension `XR_META_foveation_eye_tracked`): automatic keeps it where the device has eye tracking and
+ * leaves it out where it has none, on keeps it always, off leaves it out always. Some runtimes crash when a game uses it on a device without eye tracking.
+ */
+enum class EyeFoveationMode { AUTO, ON, OFF }
+
 /** Whether a game declares that it uses the headset's passthrough: by itself for the games known to need it, always, or never. */
 enum class PassthroughMode { AUTO, ON, OFF }
 
@@ -44,6 +50,8 @@ data class GameSettings(
     val heightCm: Int? = null,
     /** The game follows the headset's recentering: it gets the play space that recentering moves, in place of a fixed one. */
     val recenter: RecenterMode = RecenterMode.AUTO,
+    /** The foveation that follows the eyes: kept where the device can do it (automatic), always, or never. */
+    val eyeFoveation: EyeFoveationMode = EyeFoveationMode.AUTO,
     /** The arguments the player picked to start the game with; null means none was picked and the ones meant for VR are used (see [LaunchOptions.chosen]). */
     val launchArguments: Set<String>? = null,
     /**

@@ -1,6 +1,7 @@
 package app.gameport.core.settings
 
 import android.content.Context
+import app.gameport.core.model.EyeFoveationMode
 import app.gameport.core.model.GameSettings
 import app.gameport.core.model.PlayerDefaults
 import app.gameport.core.model.PassthroughMode
@@ -39,6 +40,7 @@ class GameSettingsStore @Inject constructor(
         seated = prefs.getBoolean("seated_$appId", false),
         heightCm = if (prefs.contains("height_$appId")) prefs.getInt("height_$appId", 0) else null,
         recenter = recenterOf(appId),
+        eyeFoveation = eyeFoveationOf(appId),
         openInVr = prefs.getBoolean("open_in_vr_$appId", true),
         ovrPluginStandIn = prefs.getBoolean("ovrplugin_stand_in_$appId", true),
         passthrough = passthroughOf(appId),
@@ -68,6 +70,12 @@ class GameSettingsStore @Inject constructor(
             RecenterMode.ON -> editor.putString("recenter_$appId", "on")
             RecenterMode.OFF -> editor.putString("recenter_$appId", "off")
         }
+        // Automatic is the absence of a choice.
+        when (settings.eyeFoveation) {
+            EyeFoveationMode.AUTO -> editor.remove("eye_foveation_$appId")
+            EyeFoveationMode.ON -> editor.putString("eye_foveation_$appId", "on")
+            EyeFoveationMode.OFF -> editor.putString("eye_foveation_$appId", "off")
+        }
         // No pick is the absence of a choice, an empty pick is a choice of none.
         settings.launchArguments?.let { editor.putStringSet("launchargs_$appId", it) } ?: editor.remove("launchargs_$appId")
         // Automatic is the absence of a choice: only a no is written.
@@ -89,6 +97,12 @@ class GameSettingsStore @Inject constructor(
         "on", true -> RecenterMode.ON
         "off" -> RecenterMode.OFF
         else -> RecenterMode.AUTO
+    }
+
+    private fun eyeFoveationOf(appId: Int): EyeFoveationMode = when (prefs.all["eye_foveation_$appId"]) {
+        "on" -> EyeFoveationMode.ON
+        "off" -> EyeFoveationMode.OFF
+        else -> EyeFoveationMode.AUTO
     }
 
     /** A choice written when it was only a switch: an old "true" is a yes. */

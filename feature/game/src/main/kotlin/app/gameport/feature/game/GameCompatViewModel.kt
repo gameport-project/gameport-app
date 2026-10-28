@@ -31,6 +31,7 @@ class GameCompatViewModel @Inject constructor(
     private val settings: GameSettingsStore,
     private val gameDefaults: GameDefaults,
     private val installer: GameInstallRepository,
+    device: app.gameport.core.device.DeviceProfile,
 ) : ViewModel() {
     private val appId = savedStateHandle.toRoute<GameCompatRoute>().appId
 
@@ -58,6 +59,11 @@ class GameCompatViewModel @Inject constructor(
     /** Whether to offer the choice of the stand-in for Meta's OVRPlugin: when the game holds it, or when the player turned it off (to turn it on again). */
     val showOvrPluginStandIn: StateFlow<Boolean> = combine(installer.observeOvrPluginStandIn(appId), gameSettings) { held, chosen -> held || !chosen.ovrPluginStandIn }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
+
+    /** The choice of the foveation that follows the eyes is offered on a Pico, where a runtime may crash on it when the device has no eye tracking. */
+    val showEyeFoveation: Boolean = device.vrPlatform?.id == "pico"
+
+    fun onEyeFoveationChosen(mode: app.gameport.core.model.EyeFoveationMode) = settings.set(appId, gameSettings.value.copy(eyeFoveation = mode))
 
     fun onUseFrameChanged(useFrame: Boolean) = controllers.setUseFrame(appId, useFrame)
 

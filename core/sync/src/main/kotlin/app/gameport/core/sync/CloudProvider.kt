@@ -111,6 +111,8 @@ class CloudProvider : ContentProvider() {
                 putBoolean("seated", settings?.seated == true)
                 // The player asked for the play space that the headset's recentering moves, for a game that keeps a fixed one: auto (where the headset has no play area), on or off.
                 putString("xrRecenter", (settings?.recenter ?: app.gameport.core.model.RecenterMode.AUTO).name.lowercase())
+                // The foveation that follows the eyes: kept where the device can do it (auto), always (on) or never (off).
+                putString("xrEyeFoveation", (settings?.eyeFoveation ?: app.gameport.core.model.EyeFoveationMode.AUTO).name.lowercase())
                 putInt("eyeCm", appId?.let { entryPoint.gameSettings().eyeHeightCm(it) } ?: 0)
                 // The player's controller mapping for the game, empty unless they customise it.
                 putString("xrMap", appId?.let { entryPoint.controllerMappings().layerConfig(it) }.orEmpty())

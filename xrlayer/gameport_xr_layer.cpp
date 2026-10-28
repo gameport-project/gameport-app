@@ -989,22 +989,115 @@ void Load(const char* name, T& target) {
     target = reinterpret_cast<T>(function);
 }
 
+constexpr const char* kEyeFoveation = "XR_META_foveation_eye_tracked";
+constexpr const char* kEyeGaze = "XR_EXT_eye_gaze_interaction";
+constexpr const char* kAndroidCreate = "XR_KHR_android_create_instance";
+
+// XrInstanceCreateInfoAndroidKHR, written here so that the layer needs no platform header.
+struct GpAndroidCreateInfo {
+    XrStructureType type;
+    const void* next;
+    void* applicationVM;
+    void* applicationActivity;
+};
+constexpr XrStructureType kAndroidCreateType = (XrStructureType)1000008000;
+
+bool HasExtension(const std::vector<XrExtensionProperties>& list, const char* name) {
+    for (const auto& e : list) if (strcmp(e.extensionName, name) == 0) return true;
+    return false;
+}
+
+// Whether the device can follow the eyes, as the runtime says it in a short instance of its own (asked for XR_EXT_eye_gaze_interaction, which is the standard
+// way): 1 yes, 0 no, -1 not known. Nothing here may stop a game: every step that fails answers "not known".
+int ProbeEyeTracking(const XrInstanceCreateInfo* info, const XrApiLayerCreateInfo* layerInfo, XrApiLayerNextInfo* next) {
+    PFN_xrGetInstanceProcAddr getProc = next->nextGetInstanceProcAddr;
+    PFN_xrEnumerateInstanceExtensionProperties enumerate = nullptr;
+    if (!getProc || XR_FAILED(getProc(XR_NULL_HANDLE, "xrEnumerateInstanceExtensionProperties", (PFN_xrVoidFunction*)&enumerate)) || !enumerate) return -1;
+    uint32_t count = 0;
+    if (XR_FAILED(enumerate(nullptr, 0, &count, nullptr)) || count == 0) return -1;
+    std::vector<XrExtensionProperties> offered(count, {XR_TYPE_EXTENSION_PROPERTIES});
+    if (XR_FAILED(enumerate(nullptr, count, &count, offered.data()))) return -1;
+    // A runtime that does not offer the standard extension has nothing to say about eyes.
+    if (!HasExtension(offered, kEyeGaze)) return 0;
+    if (!HasExtension(offered, kAndroidCreate)) return -1;
+    const GpAndroidCreateInfo* android = nullptr;
+    for (const XrBaseInStructure* link = (const XrBaseInStructure*)info->next; link; link = link->next) {
+        if (link->type == kAndroidCreateType) android = (const GpAndroidCreateInfo*)link;
+    }
+    if (!android) return -1;
+    GpAndroidCreateInfo probeAndroid{kAndroidCreateType, nullptr, android->applicationVM, android->applicationActivity};
+    const char* names[] = {kAndroidCreate, kEyeGaze};
+    XrInstanceCreateInfo probeInfo{XR_TYPE_INSTANCE_CREATE_INFO};
+    probeInfo.next = &probeAndroid;
+    probeInfo.applicationInfo = info->applicationInfo;
+    probeInfo.enabledExtensionCount = 2;
+    probeInfo.enabledExtensionNames = names;
+    XrApiLayerCreateInfo below = *layerInfo;
+    below.nextInfo = next->next;
+    XrInstance probe = XR_NULL_HANDLE;
+    if (XR_FAILED(next->nextCreateApiLayerInstance(&probeInfo, &below, &probe)) || probe == XR_NULL_HANDLE) return -1;
+    int answer = -1;
+    PFN_xrGetSystem getSystem = nullptr;
+    PFN_xrGetSystemProperties getProperties = nullptr;
+    PFN_xrDestroyInstance destroy = nullptr;
+    getProc(probe, "xrGetSystem", (PFN_xrVoidFunction*)&getSystem);
+    getProc(probe, "xrGetSystemProperties", (PFN_xrVoidFunction*)&getProperties);
+    getProc(probe, "xrDestroyInstance", (PFN_xrVoidFunction*)&destroy);
+    if (getSystem && getProperties) {
+        XrSystemGetInfo systemInfo{XR_TYPE_SYSTEM_GET_INFO};
+        systemInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
+        XrSystemId system = XR_NULL_SYSTEM_ID;
+        if (XR_SUCCEEDED(getSystem(probe, &systemInfo, &system))) {
+            XrSystemEyeGazeInteractionPropertiesEXT gaze{XR_TYPE_SYSTEM_EYE_GAZE_INTERACTION_PROPERTIES_EXT};
+            XrSystemProperties properties{XR_TYPE_SYSTEM_PROPERTIES, &gaze};
+            if (XR_SUCCEEDED(getProperties(probe, system, &properties))) answer = gaze.supportsEyeGazeInteraction ? 1 : 0;
+        }
+    }
+    if (destroy) destroy(probe);
+    return answer;
+}
+
+// Whether the foveation that follows the eyes is left out of the instance: always when the player said so, never when the player said it is wanted; by default
+// on a Pico (the runtime that crashes with it), unless it says the device has eye tracking. A probe that died (the marker is still there) is not tried again.
+bool DropEyeFoveation(const XrInstanceCreateInfo* info, const XrApiLayerCreateInfo* layerInfo, XrApiLayerNextInfo* next) {
+    bool asked = false;
+    for (uint32_t i = 0; i < info->enabledExtensionCount; i++) if (strcmp(info->enabledExtensionNames[i], kEyeFoveation) == 0) asked = true;
+    if (!asked) return false;
+    const char* said = getenv("GAMEPORT_XR_EYE_FOVEATION");
+    std::string mode = said ? Lower(said) : "auto";
+    if (mode == "on") { LOGI("eye foveation: kept, as the player chose"); return false; }
+    if (mode == "off") { LOGI("eye foveation: left out, as the player chose"); return true; }
+    const char* told = getenv("GAMEPORT_XR_FAMILY");
+    if (!told || Lower(told).find("pico") == std::string::npos) return false;
+    const std::string marker = GamePortFolder() + "xr_probe_pending.txt";
+    if (FILE* leftover = fopen(marker.c_str(), "r")) {
+        fclose(leftover);
+        LOGI("eye foveation: left out, the check of the device did not end the last time");
+        return true;
+    }
+    if (FILE* pending = fopen(marker.c_str(), "w")) { fputs("1\n", pending); fclose(pending); }
+    int eyes = ProbeEyeTracking(info, layerInfo, next);
+    remove(marker.c_str());
+    LOGI("eye foveation: the device %s", eyes == 1 ? "has eye tracking, kept" : (eyes == 0 ? "has no eye tracking, left out" : "does not say, left out"));
+    return eyes != 1;
+}
+
 XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* info, const XrApiLayerCreateInfo* layerInfo, XrInstance* instance) {
     XrApiLayerNextInfo* next = layerInfo->nextInfo;
     g_nextGetInstanceProcAddr = next->nextGetInstanceProcAddr;
 
     XrApiLayerCreateInfo below = *layerInfo;
     below.nextInfo = next->next;
-    // Pico's runtime takes some of Meta's extensions and then crashes inside itself when the game starts to use them
-    // (Moss: eye-tracked foveation). On a Pico they are not passed on, the game then starts without them.
-    const char* told = getenv("GAMEPORT_XR_FAMILY");
+    // Pico's runtime takes some of Meta's extensions and then crashes inside itself when the game starts to use them on a device that cannot do what they say
+    // (Moss: the foveation that follows the eyes, on a device without eye tracking). Whether the extension is passed on is the player's choice for this game
+    // (on, off), and by default it follows what the device says it can do.
     std::vector<const char*> kept;
     XrInstanceCreateInfo filtered;
     const XrInstanceCreateInfo* toPass = info;
-    if (info && told && Lower(told).find("pico") != std::string::npos) {
+    if (info && DropEyeFoveation(info, layerInfo, next)) {
         for (uint32_t i = 0; i < info->enabledExtensionCount; i++) {
-            if (strcmp(info->enabledExtensionNames[i], "XR_META_foveation_eye_tracked") == 0) {
-                LOGI("extension %s not passed on: this runtime crashes with it", info->enabledExtensionNames[i]);
+            if (strcmp(info->enabledExtensionNames[i], kEyeFoveation) == 0) {
+                LOGI("extension %s not passed on", kEyeFoveation);
                 continue;
             }
             kept.push_back(info->enabledExtensionNames[i]);
