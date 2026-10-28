@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -23,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import app.gameport.core.designsystem.DangerButton
 import app.gameport.core.designsystem.GlassButton
 import app.gameport.core.model.ExtraContent
 import app.gameport.core.model.ExtraContentItem
@@ -42,7 +42,7 @@ internal fun ExtraContentSection(
     val work = extra.work
     val busy = work != null && work.error == null
     Text(stringResource(R.string.extra_title), style = MaterialTheme.typography.headlineSmall)
-    Column(Modifier.widthIn(max = 720.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(stringResource(R.string.extra_legend), color = MaterialTheme.colorScheme.onSurfaceVariant)
         extra.items.forEach { item -> ExtraContentRow(item, extra, busy, context, onInstall, onRemove) }
         work?.error?.let { error ->
@@ -77,7 +77,7 @@ private fun ExtraContentRow(
                 )
             }
             when {
-                item.installed && item.removable -> GlassButton(onClick = { onRemove(item.appId) }, enabled = !busy) {
+                item.installed && item.removable -> DangerButton(onClick = { onRemove(item.appId) }, enabled = !busy) {
                     Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.extra_remove))

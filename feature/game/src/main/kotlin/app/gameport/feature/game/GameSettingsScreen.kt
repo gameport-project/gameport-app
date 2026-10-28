@@ -2,6 +2,14 @@ package app.gameport.feature.game
 
 import app.gameport.core.designsystem.GlassButton
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -81,13 +89,22 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
         )
     }
 
+    val installedNow = installState is InstallState.Installed
+    // What the page has to show, as categories like the application's settings: only those that mean something for this game now.
+    val available = buildList {
+        if (installedNow || installState is InstallState.Patching || installState is InstallState.Installing) add(GameCategory.PATCH)
+        if (installedNow) add(GameCategory.PERMISSIONS)
+        if (installedNow && !extraContent.isEmpty) add(GameCategory.EXTRA)
+        if (launchOptions.isNotEmpty()) add(GameCategory.LAUNCH)
+        if (viewModel.isHeadset && isVrGame) add(GameCategory.VR)
+    }
+    var chosen by rememberSaveable { mutableStateOf<String?>(null) }
+    val category = available.firstOrNull { it.name == chosen } ?: available.firstOrNull()
+
     Scaffold { padding ->
-        Column(
-            Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-        ) {
+        Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp)) {
             Row(
-                Modifier.fillMaxWidth().padding(top = 16.dp),
+                Modifier.fillMaxWidth().padding(vertical = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -97,100 +114,141 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
                     Text(gameName, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                if (installState is InstallState.Installed || installState is InstallState.Patching || installState is InstallState.Installing) {
-                    val busy = installState !is InstallState.Installed
-                    Text(stringResource(R.string.game_settings_patch), style = MaterialTheme.typography.headlineSmall)
-                    Column(Modifier.widthIn(max = 720.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            stringResource(
-                                when {
-                                    busy -> R.string.game_settings_patch_running
-                                    patchRemoved -> R.string.game_settings_patch_removed
-                                    patchOutdated -> R.string.game_settings_patch_outdated
-                                    else -> R.string.game_settings_patch_current
-                                },
-                            ),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Text(stringResource(R.string.game_settings_patch_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            if (patchOutdated || patchRemoved) {
-                                Button(onClick = viewModel::onRepatch, enabled = !busy) {
-                                    Text(stringResource(if (patchRemoved) R.string.game_settings_apply_patch else R.string.game_settings_repatch))
+            if (category == null) {
+                Text(stringResource(R.string.game_settings_nothing), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                // A wide screen has the categories on the left; a narrow one has them in a row above the page.
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    val compact = maxWidth < COMPACT_WIDTH
+                    val page: @Composable (Modifier) -> Unit = { modifier ->
+                        Column(modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                            when (category) {
+                                GameCategory.PATCH -> {
+                                    val busy = installState !is InstallState.Installed
+                                    Text(stringResource(R.string.game_settings_patch), style = MaterialTheme.typography.headlineSmall)
+                                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text(
+                                            stringResource(
+                                                when {
+                                                    busy -> R.string.game_settings_patch_running
+                                                    patchRemoved -> R.string.game_settings_patch_removed
+                                                    patchOutdated -> R.string.game_settings_patch_outdated
+                                                    else -> R.string.game_settings_patch_current
+                                                },
+                                            ),
+                                            style = MaterialTheme.typography.titleMedium,
+                                        )
+                                        Text(stringResource(R.string.game_settings_patch_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                            if (patchOutdated || patchRemoved) {
+                                                Button(onClick = viewModel::onRepatch, enabled = !busy) {
+                                                    Text(stringResource(if (patchRemoved) R.string.game_settings_apply_patch else R.string.game_settings_repatch))
+                                                }
+                                            } else {
+                                                GlassButton(onClick = viewModel::onRepatch, enabled = !busy) { Text(stringResource(R.string.game_settings_repatch)) }
+                                            }
+                                            if (!patchRemoved) {
+                                                DangerButton(onClick = { confirmingRemoval = true }, enabled = !busy) {
+                                                    Text(stringResource(R.string.game_settings_remove_patch))
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
-                            } else {
-                                GlassButton(onClick = viewModel::onRepatch, enabled = !busy) { Text(stringResource(R.string.game_settings_repatch)) }
-                            }
-                            if (!patchRemoved) {
-                                DangerButton(onClick = { confirmingRemoval = true }, enabled = !busy) {
-                                    Text(stringResource(R.string.game_settings_remove_patch))
+                                GameCategory.PERMISSIONS -> {
+                                    val context = LocalContext.current
+                                    Text(stringResource(R.string.game_settings_permissions), style = MaterialTheme.typography.headlineSmall)
+                                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text(stringResource(R.string.game_settings_permissions_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        GlassButton(onClick = { viewModel.appSettingsIntent()?.let { runCatching { context.startActivity(it) } } }) {
+                                            Text(stringResource(R.string.game_settings_permissions_open))
+                                        }
+                                    }
+                                }
+                                GameCategory.EXTRA -> ExtraContentSection(extraContent, viewModel::onInstallDlc, viewModel::onRemoveDlc, viewModel::onDismissDlcError)
+                                GameCategory.LAUNCH -> LaunchArgumentsSection(
+                                    options = launchOptions,
+                                    picked = settings.launchArguments,
+                                    effective = LaunchOptions.chosen(launchOptions, settings.launchArguments, isVrGame).toSet(),
+                                    onPicked = viewModel::onLaunchArgumentsChanged,
+                                )
+                                GameCategory.VR -> {
+                                    Text(stringResource(R.string.game_settings_vr), style = MaterialTheme.typography.headlineSmall)
+                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(stringResource(R.string.game_settings_seated), style = MaterialTheme.typography.titleMedium)
+                                            Text(stringResource(R.string.game_settings_seated_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        Switch(checked = settings.seated, onCheckedChange = viewModel::onSeatedChanged)
+                                    }
+                                    val height = settings.effectiveHeightCm(defaults)
+                                    Column(Modifier.fillMaxWidth()) {
+                                        Text(stringResource(R.string.game_settings_height, height), style = MaterialTheme.typography.titleMedium)
+                                        Text(
+                                            stringResource(if (settings.followsDefaults) R.string.game_settings_height_global else R.string.game_settings_height_own),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        Slider(
+                                            value = height.toFloat(),
+                                            onValueChange = { viewModel.onHeightChanged(it.toInt()) },
+                                            valueRange = PlayerDefaults.HEIGHT_RANGE_CM.first.toFloat()..PlayerDefaults.HEIGHT_RANGE_CM.last.toFloat(),
+                                            enabled = settings.seated,
+                                        )
+                                        if (!settings.followsDefaults) {
+                                            GlassButton(onClick = viewModel::onUseGlobalConfiguration) {
+                                                Text(stringResource(R.string.game_settings_use_global, defaults.heightCm))
+                                            }
+                                        }
+                                        Text(stringResource(R.string.game_settings_height_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                if (installState is InstallState.Installed) {
-                    val context = LocalContext.current
-                    Text(stringResource(R.string.game_settings_permissions), style = MaterialTheme.typography.headlineSmall)
-                    Column(Modifier.widthIn(max = 720.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(stringResource(R.string.game_settings_permissions_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        GlassButton(onClick = { viewModel.appSettingsIntent()?.let { runCatching { context.startActivity(it) } } }) {
-                            Text(stringResource(R.string.game_settings_permissions_open))
-                        }
-                    }
-                }
-                if (installState is InstallState.Installed && !extraContent.isEmpty) {
-                    ExtraContentSection(extraContent, viewModel::onInstallDlc, viewModel::onRemoveDlc, viewModel::onDismissDlcError)
-                }
-                if (launchOptions.isNotEmpty()) {
-                    LaunchArgumentsSection(
-                        options = launchOptions,
-                        picked = settings.launchArguments,
-                        effective = LaunchOptions.chosen(launchOptions, settings.launchArguments, isVrGame).toSet(),
-                        onPicked = viewModel::onLaunchArgumentsChanged,
-                    )
-                }
-                if (viewModel.isHeadset && isVrGame) {
-                    Text(stringResource(R.string.game_settings_vr), style = MaterialTheme.typography.headlineSmall)
-                    Row(Modifier.widthIn(max = 720.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.game_settings_seated), style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                stringResource(R.string.game_settings_seated_description),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Switch(checked = settings.seated, onCheckedChange = viewModel::onSeatedChanged)
-                    }
-                    val height = settings.effectiveHeightCm(defaults)
-                    Column(Modifier.widthIn(max = 720.dp).fillMaxWidth()) {
-                        Text(stringResource(R.string.game_settings_height, height), style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            stringResource(if (settings.followsDefaults) R.string.game_settings_height_global else R.string.game_settings_height_own),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Slider(
-                            value = height.toFloat(),
-                            onValueChange = { viewModel.onHeightChanged(it.toInt()) },
-                            valueRange = PlayerDefaults.HEIGHT_RANGE_CM.first.toFloat()..PlayerDefaults.HEIGHT_RANGE_CM.last.toFloat(),
-                            enabled = settings.seated,
-                        )
-                        if (!settings.followsDefaults) {
-                            GlassButton(onClick = viewModel::onUseGlobalConfiguration) {
-                                Text(stringResource(R.string.game_settings_use_global, defaults.heightCm))
+                    if (compact) {
+                        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                available.forEach { entry -> GameCategoryItem(entry, entry == category, compact = true) { chosen = entry.name } }
                             }
+                            page(Modifier.weight(1f).fillMaxWidth())
                         }
-                        Text(
-                            stringResource(R.string.game_settings_height_description),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    } else {
+                        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
+                            Column(Modifier.width(260.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                available.forEach { entry -> GameCategoryItem(entry, entry == category, compact = false) { chosen = entry.name } }
+                            }
+                            page(Modifier.weight(1f))
+                        }
                     }
-                } else {
-                    Text(stringResource(R.string.game_settings_nothing), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
+    }
+}
+
+/** The categories of a game's settings, listed on the left as the application's own are. */
+private enum class GameCategory(val title: Int) {
+    PATCH(R.string.game_settings_patch),
+    PERMISSIONS(R.string.game_settings_permissions),
+    EXTRA(R.string.extra_title),
+    LAUNCH(R.string.game_settings_launch),
+    VR(R.string.game_settings_vr),
+}
+
+private val COMPACT_WIDTH = 600.dp
+
+@Composable
+private fun GameCategoryItem(entry: GameCategory, selected: Boolean, compact: Boolean, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.06f),
+        modifier = (if (compact) Modifier else Modifier.fillMaxWidth()).clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick),
+    ) {
+        Text(
+            stringResource(entry.title),
+            modifier = Modifier.padding(if (compact) PaddingValues(horizontal = 16.dp, vertical = 10.dp) else PaddingValues(16.dp)),
+            style = MaterialTheme.typography.titleMedium,
+        )
     }
 }
 
@@ -199,7 +257,7 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
 private fun LaunchArgumentsSection(options: List<LaunchOption>, picked: Set<String>?, effective: Set<String>, onPicked: (Set<String>?) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Text(stringResource(R.string.game_settings_launch), style = MaterialTheme.typography.headlineSmall)
-    Column(Modifier.widthIn(max = 720.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.game_settings_launch_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
             stringResource(if (picked == null) R.string.game_settings_launch_suggested else R.string.game_settings_launch_own),
