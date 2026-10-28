@@ -887,6 +887,12 @@ void EmulateIfNeeded(XrInstance instance) {
         return best;
     };
     if (g_family == Family::Pico) {
+        // The player asked for the Steam Frame's controls and the game has them: they are the ones read (Moss makes its own actions for that profile, which a table
+        // translated from the Touch's would leave without a binding).
+        if (!valve.empty() && g_preferFrame.load() && EmulateFrom(instance, valve, "valve", stash[valve])) {
+            LOGI("the game uses the Steam Frame's controls, as the player asked");
+            return;
+        }
         const std::string touch = richest(kMetaProfiles, sizeof(kMetaProfiles) / sizeof(*kMetaProfiles));
         if (!touch.empty() && EmulateFrom(instance, touch, "touch", stash[touch])) return;
     }
