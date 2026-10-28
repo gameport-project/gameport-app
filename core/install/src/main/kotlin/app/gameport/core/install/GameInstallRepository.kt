@@ -89,6 +89,8 @@ class GameInstallRepository @Inject constructor(
     /** What is being done with an extra content (DLC) of an installed game, by game: one at a time. */
     private val dlcWork = MutableStateFlow<Map<Int, app.gameport.core.model.DlcWork>>(emptyMap())
     private val jobs = HashMap<Int, Job>()
+    /** The games whose installation goes on with the extra content chosen with them: they are not offered to play yet, nor taken for installed, until it is in place. */
+    private val installingExtra: MutableSet<Int> = java.util.concurrent.ConcurrentHashMap.newKeySet()
     private val paused = java.util.Collections.synchronizedSet(HashSet<Int>())
     private val repatching = java.util.Collections.synchronizedSet(HashSet<Int>())
     private val activeJobs = AtomicInteger()
@@ -345,10 +347,18 @@ class GameInstallRepository @Inject constructor(
                         builds.put(game.appId, InstalledBuild(depots.associate { it.id to (downloadedManifests[it.id] ?: it.manifestId) }, chosen - separately.map { it.appId }.toSet(), expansionBytes))
                         updates.markCurrent(game.appId)
                         // The game is ready: Play shows now. Clearing the work folder (possibly gigabytes) is not waited for.
-                        clearState(game.appId)
+                        if (separately.isEmpty()) clearState(game.appId) else installingExtra.add(game.appId)
                         directory.deleteRecursively()
-                        // The extra content chosen with the game that its own app declares: one after the other, each with its own progress in the game's settings.
-                        for (content in separately) fetchDlc(game, content, packageName)
+                        // The extra content chosen with the game that its own app declares, one after the other, in the same place as the install: the game is offered to play only
+                        // when it is all in place. One that fails does not stop the others; its message waits in the game's settings.
+                        if (separately.isNotEmpty()) {
+                            try {
+                                separately.forEachIndexed { index, content -> fetchDlc(game, content, packageName, step = index + 1 to separately.size) }
+                            } finally {
+                                installingExtra.remove(game.appId)
+                                clearState(game.appId)
+                            }
+                        }
                     }
                     PackageGateway.Outcome.Cancelled -> clearState(game.appId)
                     PackageGateway.Outcome.Conflict -> fail(game.appId, InstallError.VersionConflict)
@@ -435,7 +445,7 @@ class GameInstallRepository @Inject constructor(
      * Downloads the depots of an extra content alone, places their files, and records them on the build of the game (the extra content it is, and the manifests of its
      * depots, for the tracking of its updates). Tells its progress and its failure through [dlcWork]; true when it is in place.
      */
-    private suspend fun fetchDlc(game: Game, content: app.gameport.core.model.DlcContent, packageName: String): Boolean {
+    private suspend fun fetchDlc(game: Game, content: app.gameport.core.model.DlcContent, packageName: String, step: Pair<Int, Int>? = null): Boolean {
         val dlcAppId = content.appId
         if (auth.offline.value) return false.also { dlcError(game.appId, dlcAppId, "offline") }
         val directory = dlcDirectory(game.appId, dlcAppId)
@@ -447,11 +457,16 @@ class GameInstallRepository @Inject constructor(
         }
         events.note(game.appId, "extra content ${content.name} ($dlcAppId) requested: ${content.depots.size} depot(s) declared by app ${content.depots.first().declaredBy ?: game.appId}, ${content.installBytes / 1_000_000} MB")
         dlcWork.update { it + (game.appId to app.gameport.core.model.DlcWork(dlcAppId)) }
+        // Part of the install of the game: the install's own place tells it.
+        step?.let { setState(game.appId, InstallState.ExtraContent(content.name, it.first, it.second, 0f)) }
         return try {
             downloadSlots.withPermit {
                 // Steam gives a depot's key, and its files, to the app that declares it: the DLC app for a game that sells its content as DLC, else the game.
                 downloader.download(content.depots.first().declaredBy ?: game.appId, content.depots.map { it.id }, directory, content.depots.associate { it.id to it.downloadBytes }) { progress, _ ->
-                    if (progress >= 0f) dlcWork.update { it + (game.appId to app.gameport.core.model.DlcWork(dlcAppId, progress = minOf(progress, 0.99f))) }
+                    if (progress >= 0f) {
+                        dlcWork.update { it + (game.appId to app.gameport.core.model.DlcWork(dlcAppId, progress = minOf(progress, 0.99f))) }
+                        step?.let { setState(game.appId, InstallState.ExtraContent(content.name, it.first, it.second, minOf(progress, 0.99f))) }
+                    }
                 }
             }
             val problems = mutableListOf<String>()
@@ -552,7 +567,7 @@ class GameInstallRepository @Inject constructor(
     }
 
     /** The Android package of the game if it is installed on this device. */
-    fun installedPackage(appId: Int): String? = installed.all()[appId]?.takeIf(packages::isInstalled)
+    fun installedPackage(appId: Int): String? = if (appId in installingExtra) null else installed.all()[appId]?.takeIf(packages::isInstalled)
 
     /** True when the installed game was patched by an older patcher than this GamePort has. */
     fun observePatchOutdated(appId: Int): Flow<Boolean> =

@@ -199,11 +199,12 @@ private fun EntryRow(
                 modifier = Modifier.bleed(NAME_BLEED).clip(RoundedCornerShape(8.dp)).clickable(onClick = onOpen).padding(horizontal = NAME_BLEED),
             )
             when (val state = entry.state) {
-                InstallState.Queued, is InstallState.Downloading, InstallState.Patching, InstallState.Installing, InstallState.Finishing -> {
+                InstallState.Queued, is InstallState.Downloading, InstallState.Patching, InstallState.Installing, InstallState.Finishing, is InstallState.ExtraContent -> {
                     // The same steps and words as on the game's page.
                     state.stage?.let { InstallStepper(it) }
-                    installStatusText(state, speedUnit)?.let { Text(it) }
+                    app.gameport.core.designsystem.InstallStatusLine(state, speedUnit)
                     if (state is InstallState.Downloading) LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
+                    else if (state is InstallState.ExtraContent) LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
                     else LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
                 is InstallState.ChoosingVersion -> Text(stringResource(R.string.downloads_choose_version))
@@ -218,7 +219,7 @@ private fun EntryRow(
         }
         val actions: @Composable () -> Unit = {
             when (entry.state) {
-                InstallState.Queued, is InstallState.Downloading -> {
+                InstallState.Queued, is InstallState.Downloading, is InstallState.ExtraContent -> {
                     if (entry.state is InstallState.Downloading) GlassButton(onClick = onPause) { Text(stringResource(R.string.downloads_pause)) }
                     DangerButton(onClick = onCancel) { Text(stringResource(R.string.downloads_cancel)) }
                 }

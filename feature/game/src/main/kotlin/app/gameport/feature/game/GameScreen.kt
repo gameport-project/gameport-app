@@ -703,6 +703,8 @@ private fun InstallActions(
             DangerButton(onClick = onDiscard) { Text(stringResource(R.string.game_discard)) }
         }
         InstallState.Queued -> Progress(state = install, speedUnit = speedUnit, onCancel = onCancel)
+        // The game is installed and its extra content is being put in place: the same place and the same steps, the game not offered to play yet.
+        is InstallState.ExtraContent -> Progress(state = install, speedUnit = speedUnit, onCancel = onCancel)
         is InstallState.Downloading -> Progress(state = install, speedUnit = speedUnit, onCancel = onCancel, onPause = onPause)
         is InstallState.ChoosingVersion -> {
             VersionDialog(install.options, onChosen = onVersionChosen)
@@ -752,8 +754,9 @@ private fun Progress(state: InstallState, speedUnit: SpeedUnit, onCancel: (() ->
     Column(Modifier.widthIn(max = 460.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         InstallStepper(stage)
         if (state is InstallState.Downloading) LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
+        else if (state is InstallState.ExtraContent) LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
         else LinearProgressIndicator(Modifier.fillMaxWidth())
-        installStatusText(state, speedUnit)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+        app.gameport.core.designsystem.InstallStatusLine(state, speedUnit, style = MaterialTheme.typography.bodyMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             onPause?.let { androidx.compose.material3.OutlinedButton(onClick = it) { Text(stringResource(R.string.game_pause)) } }
             onCancel?.let { DangerButton(onClick = it) { Text(stringResource(R.string.game_cancel)) } }

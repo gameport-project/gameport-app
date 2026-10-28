@@ -40,6 +40,7 @@
     <string name="install_verifying">Checking files already downloaded… %1$d%%</string>
     <string name="install_patching">Preparing the game for Steam… this can take a few minutes</string>
     <string name="install_installing">Installing… a confirmation may be asked on screen</string>
+    <string name="install_extra">Extra content %1$d/%2$d · %3$d%%</string>
     <string name="install_finishing">Putting the files of the game in place… it can be played right after</string>
     <string name="price_free">Free</string>
     <string name="tour_progress">Step %1$d of %2$d</string>

@@ -35,6 +35,12 @@ sealed interface InstallState {
     /** Android installed the game; GamePort now puts its expansion files in place and registers it. The game is not ready to play yet. */
     data object Finishing : InstallState
 
+    /**
+     * The game is installed and its extra content chosen with it is being fetched, one after the other: [name] is the one being fetched, [index] of [total] (from 1), and
+     * [progress] its download, 0..1. The game is not ready to play yet.
+     */
+    data class ExtraContent(val name: String, val index: Int, val total: Int, val progress: Float) : InstallState
+
     /** [otherGamePort]: the package name of another GamePort on the device that patched the game, which then is the one that starts and updates it. */
     data class Installed(val packageName: String, val otherGamePort: String? = null) : InstallState
 
@@ -114,6 +120,6 @@ val InstallState.stage: InstallStage?
         InstallState.Queued, is InstallState.Downloading -> InstallStage.DOWNLOAD
         InstallState.Patching -> InstallStage.PATCH
         InstallState.Installing -> InstallStage.INSTALL
-        InstallState.Finishing -> InstallStage.FINISH
+        InstallState.Finishing, is InstallState.ExtraContent -> InstallStage.FINISH
         else -> null
     }

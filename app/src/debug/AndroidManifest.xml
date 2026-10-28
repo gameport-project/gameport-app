@@ -29,6 +29,10 @@
         <receiver
             android:name="app.gameport.debug.ObbRepairReceiver"
             android:exported="true" />
+        <!-- Development only: installs a game, adds or takes off its extra content, and says what the library and the device hold for it, without the screen. -->
+        <receiver
+            android:name="app.gameport.debug.GameDebugReceiver"
+            android:exported="true" />
         <!-- Development only: puts the question "did it work?" for a game, without playing it. -->
         <receiver
             android:name="app.gameport.debug.VerdictAskReceiver"

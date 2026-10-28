@@ -56,7 +56,24 @@ fun installStatusText(state: InstallState, speedUnit: SpeedUnit): String? = when
     InstallState.Patching -> stringResource(R.string.install_patching)
     InstallState.Installing -> stringResource(R.string.install_installing)
     InstallState.Finishing -> stringResource(R.string.install_finishing)
+    is InstallState.ExtraContent -> stringResource(R.string.install_extra, state.index, state.total, (state.progress * 100).toInt())
     else -> null
+}
+
+/**
+ * What an install says it is doing, on one line whatever it says: the words of [installStatusText], and for the extra content being put in place after the game its name, cut with
+ * an ellipsis when it is long, before a figure that stays where it is. So the area of the install keeps its height from one step to the next.
+ */
+@Composable
+fun InstallStatusLine(state: InstallState, speedUnit: SpeedUnit, modifier: Modifier = Modifier, style: androidx.compose.ui.text.TextStyle = androidx.compose.material3.LocalTextStyle.current) {
+    if (state is InstallState.ExtraContent) {
+        androidx.compose.foundation.layout.Row(modifier, horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+            androidx.compose.material3.Text(state.name, style = style, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            androidx.compose.material3.Text(installStatusText(state, speedUnit).orEmpty(), style = style, maxLines = 1)
+        }
+    } else {
+        installStatusText(state, speedUnit)?.let { androidx.compose.material3.Text(it, modifier, style = style) }
+    }
 }
 
 /** The time left of a download in words: under a minute, minutes, then hours and minutes (rounded up to the minute, so it never says 0). */
