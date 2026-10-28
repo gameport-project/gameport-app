@@ -56,6 +56,46 @@ PFN_xrLocateSpace g_locateSpace = nullptr;
 PFN_xrLocateSpaces g_locateSpaces = nullptr;
 PFN_xrLocateViews g_locateViews = nullptr;
 PFN_xrEndFrame g_endFrame = nullptr;
+PFN_xrEnumerateEnvironmentBlendModes g_enumerateBlendModes = nullptr;
+// The player chose passthrough for this game: the alpha blend mode is offered to it when the runtime does not (see Layer_xrEnumerateEnvironmentBlendModes).
+std::atomic<bool> g_offerAlphaBlend{false};
+std::atomic<bool> g_alphaOffered{false};   // the runtime did not offer it and the layer did
+std::atomic<bool> g_alphaRefused{false};   // the runtime refused a frame in that mode: frames go out opaque from then on
+
+// The headset refuses the alpha blend mode for some apps (the runtime answers -42 to a frame in that mode, whatever the manifest says), but it shows the real world to an app
+// that submits Meta's passthrough layer under its own. A game that asks for the alpha blend mode is given that layer: the frame goes out opaque, with the passthrough layer
+// first and the game's layers blending over it by their own alpha.
+constexpr const char* kFbPassthrough = "XR_FB_passthrough";
+PFN_xrCreatePassthroughFB g_createPassthrough = nullptr;
+PFN_xrCreatePassthroughLayerFB g_createPassthroughLayer = nullptr;
+XrPassthroughFB g_passthrough = XR_NULL_HANDLE;
+XrPassthroughLayerFB g_passthroughLayer = XR_NULL_HANDLE;
+std::atomic<bool> g_passthroughAdded{false};   // the extension is in the instance (the layer added it, or the game asked for it)
+std::atomic<int> g_passthroughState{0};        // 0 not tried, 1 ready, -1 could not be made
+
+bool EnsurePassthrough(XrSession session) {
+    if (g_passthroughState.load() != 0) return g_passthroughState.load() == 1;
+    if (!g_passthroughAdded.load() || !g_nextGetInstanceProcAddr || g_instance == XR_NULL_HANDLE) { g_passthroughState.store(-1); return false; }
+    PFN_xrVoidFunction create = nullptr, layer = nullptr;
+    g_nextGetInstanceProcAddr(g_instance, "xrCreatePassthroughFB", &create);
+    g_nextGetInstanceProcAddr(g_instance, "xrCreatePassthroughLayerFB", &layer);
+    g_createPassthrough = reinterpret_cast<PFN_xrCreatePassthroughFB>(create);
+    g_createPassthroughLayer = reinterpret_cast<PFN_xrCreatePassthroughLayerFB>(layer);
+    if (!g_createPassthrough || !g_createPassthroughLayer) { LOGI("passthrough: the runtime has no function to make a passthrough layer"); g_passthroughState.store(-1); return false; }
+    XrPassthroughCreateInfoFB passthroughInfo{XR_TYPE_PASSTHROUGH_CREATE_INFO_FB};
+    passthroughInfo.flags = XR_PASSTHROUGH_IS_RUNNING_AT_CREATION_BIT_FB;
+    XrResult result = g_createPassthrough(session, &passthroughInfo, &g_passthrough);
+    if (XR_FAILED(result)) { LOGI("passthrough: xrCreatePassthroughFB -> %d", (int)result); g_passthroughState.store(-1); return false; }
+    XrPassthroughLayerCreateInfoFB layerInfo{XR_TYPE_PASSTHROUGH_LAYER_CREATE_INFO_FB};
+    layerInfo.passthrough = g_passthrough;
+    layerInfo.flags = XR_PASSTHROUGH_IS_RUNNING_AT_CREATION_BIT_FB;
+    layerInfo.purpose = XR_PASSTHROUGH_LAYER_PURPOSE_RECONSTRUCTION_FB;
+    result = g_createPassthroughLayer(session, &layerInfo, &g_passthroughLayer);
+    if (XR_FAILED(result)) { LOGI("passthrough: xrCreatePassthroughLayerFB -> %d", (int)result); g_passthroughState.store(-1); return false; }
+    LOGI("passthrough: a passthrough layer is made for the game (it asks for the alpha blend mode)");
+    g_passthroughState.store(1);
+    return true;
+}
 PFN_xrWaitFrame g_waitFrame = nullptr;
 PFN_xrBeginSession g_beginSession = nullptr;
 PFN_xrCreateSwapchain g_createSwapchain = nullptr;
@@ -280,7 +320,51 @@ std::vector<const XrCompositionLayerBaseHeader*> Without(int mode, const std::ve
     return kept;
 }
 
+// What the headset offers for showing the real world behind the game (1 opaque, 2 additive, 3 alpha blend): a game that wants its passthrough asks for the alpha blend one.
+XrResult XRAPI_CALL Layer_xrEnumerateEnvironmentBlendModes(XrInstance instance, XrSystemId systemId, XrViewConfigurationType type, uint32_t capacity, uint32_t* countOut, XrEnvironmentBlendMode* modes) {
+    if (!countOut || !g_offerAlphaBlend.load()) {
+        const XrResult result = g_enumerateBlendModes(instance, systemId, type, capacity, countOut, modes);
+        if (XR_SUCCEEDED(result) && countOut && modes && capacity > 0) {
+            std::string list;
+            for (uint32_t i = 0; i < *countOut && i < capacity; i++) list += " " + std::to_string((int)modes[i]);
+            LOGI("the runtime offers the environment blend modes:%s (1 opaque, 2 additive, 3 alpha blend)", list.c_str());
+        }
+        return result;
+    }
+    // The whole list, to know what the runtime offers and to add to it.
+    uint32_t count = 0;
+    XrResult result = g_enumerateBlendModes(instance, systemId, type, 0, &count, nullptr);
+    if (XR_FAILED(result)) return result;
+    std::vector<XrEnvironmentBlendMode> list(count);
+    result = g_enumerateBlendModes(instance, systemId, type, count, &count, list.data());
+    if (XR_FAILED(result)) return result;
+    list.resize(count);
+    bool offered = false;
+    for (auto mode : list) if (mode == XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND) offered = true;
+    std::string text;
+    for (auto mode : list) text += " " + std::to_string((int)mode);
+    if (!offered && type == XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO) {
+        list.push_back(XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND);
+        g_alphaOffered.store(true);
+        if (capacity > 0) LOGI("the runtime offers the environment blend modes:%s; the alpha blend mode is added for the game (passthrough chosen)", text.c_str());
+    } else if (capacity > 0) {
+        LOGI("the runtime offers the environment blend modes:%s (1 opaque, 2 additive, 3 alpha blend)", text.c_str());
+    }
+    *countOut = (uint32_t)list.size();
+    if (capacity == 0) return XR_SUCCESS;
+    if (capacity < list.size()) return XR_ERROR_SIZE_INSUFFICIENT;
+    for (size_t i = 0; i < list.size(); i++) modes[i] = list[i];
+    return XR_SUCCESS;
+}
+
 XrResult XRAPI_CALL Layer_xrEndFrame(XrSession session, const XrFrameEndInfo* endInfo) {
+    // Said once, and again when it changes: how the game wants the real world to show behind its image.
+    {
+        static std::atomic<int> lastBlendMode{-1};
+        if (endInfo && lastBlendMode.exchange((int)endInfo->environmentBlendMode) != (int)endInfo->environmentBlendMode) {
+            LOGI("the game's environment blend mode is now %d (1 opaque, 2 additive, 3 alpha blend)", (int)endInfo->environmentBlendMode);
+        }
+    }
     if (!endInfo || endInfo->layerCount == 0) return g_endFrame(session, endInfo);
     const bool shifting = g_offset.load() != 0.0f;
 
@@ -322,10 +406,55 @@ XrResult XRAPI_CALL Layer_xrEndFrame(XrSession session, const XrFrameEndInfo* en
         }
     }
     std::vector<const XrCompositionLayerBaseHeader*> submitted = Without(g_dropMode.load(), layers);
+    // The game asks for the real world behind its image (the alpha blend mode): the headset's passthrough layer goes first, the game's layers over it blending by their alpha.
+    XrCompositionLayerPassthroughFB passthroughLayer{XR_TYPE_COMPOSITION_LAYER_PASSTHROUGH_FB};
+    std::vector<XrCompositionLayerProjection> blendedProjections;
+    std::vector<XrCompositionLayerQuad> blendedQuads;
+    std::vector<const XrCompositionLayerBaseHeader*> overPassthrough;
+    // Only where the layer itself offered the mode: a game the runtime already gives the alpha blend mode to (Cubism) is left exactly as it was.
+    const bool wantsReal = g_offerAlphaBlend.load() && g_alphaOffered.load() && endInfo->environmentBlendMode == XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND && EnsurePassthrough(session);
+    if (wantsReal) {
+        passthroughLayer.flags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
+        passthroughLayer.space = XR_NULL_HANDLE;
+        passthroughLayer.layerHandle = g_passthroughLayer;
+        blendedProjections.reserve(submitted.size());
+        blendedQuads.reserve(submitted.size());
+        overPassthrough.push_back(reinterpret_cast<const XrCompositionLayerBaseHeader*>(&passthroughLayer));
+        for (const XrCompositionLayerBaseHeader* header : submitted) {
+            if (header && header->type == XR_TYPE_COMPOSITION_LAYER_PROJECTION) {
+                blendedProjections.push_back(*reinterpret_cast<const XrCompositionLayerProjection*>(header));
+                blendedProjections.back().layerFlags |= XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
+                overPassthrough.push_back(reinterpret_cast<const XrCompositionLayerBaseHeader*>(&blendedProjections.back()));
+            } else if (header && header->type == XR_TYPE_COMPOSITION_LAYER_QUAD) {
+                blendedQuads.push_back(*reinterpret_cast<const XrCompositionLayerQuad*>(header));
+                blendedQuads.back().layerFlags |= XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
+                overPassthrough.push_back(reinterpret_cast<const XrCompositionLayerBaseHeader*>(&blendedQuads.back()));
+            } else {
+                overPassthrough.push_back(header);
+            }
+        }
+        submitted = overPassthrough;
+        static std::atomic<bool> told{false};
+        if (!told.exchange(true)) LOGI("passthrough: frames go out with the headset's passthrough layer under the game's (%u layer(s) in all)", (unsigned)submitted.size());
+    }
     XrFrameEndInfo shifted = *endInfo;
     shifted.layers = submitted.data();
     shifted.layerCount = (uint32_t)submitted.size();
+    if (wantsReal) shifted.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+    // The alpha blend mode the layer offered: if the runtime refuses a frame in it, the frame goes out opaque (and every later one), so the game stays on screen.
+    const bool alphaOffered = g_alphaOffered.load();
+    if (alphaOffered && g_alphaRefused.load() && shifted.environmentBlendMode == XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND) shifted.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
     XrResult result = g_endFrame(session, &shifted);
+    if (alphaOffered && XR_FAILED(result) && shifted.environmentBlendMode == XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND) {
+        XrFrameEndInfo opaque = shifted;
+        opaque.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+        const XrResult second = g_endFrame(session, &opaque);
+        LOGI("the runtime refused a frame in the alpha blend mode (%d); sent opaque -> %d", (int)result, (int)second);
+        if (XR_SUCCEEDED(second)) { g_alphaRefused.store(true); return second; }
+    } else if (alphaOffered && XR_SUCCEEDED(result) && shifted.environmentBlendMode == XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND) {
+        static std::atomic<bool> told{false};
+        if (!told.exchange(true)) LOGI("the runtime accepted a frame in the alpha blend mode");
+    }
     if (result == XR_ERROR_LAYER_INVALID) {
         for (int mode = g_dropMode.load() + 1; mode <= 2; mode++) {
             std::vector<const XrCompositionLayerBaseHeader*> kept = Without(mode, layers);
@@ -919,6 +1048,9 @@ XrResult XRAPI_CALL Layer_xrRequestExitSession(XrSession session) {
 
 XrResult XRAPI_CALL Layer_xrDestroySession(XrSession session) {
     LOGI("xrDestroySession");
+    g_passthrough = XR_NULL_HANDLE;
+    g_passthroughLayer = XR_NULL_HANDLE;
+    g_passthroughState.store(0);
     return g_destroySession(session);
 }
 
@@ -1056,6 +1188,7 @@ XrResult XRAPI_CALL Layer_xrGetInstanceProcAddr(XrInstance instance, const char*
         {"xrLocateSpaces", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrLocateSpaces)},
         {"xrLocateViews", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrLocateViews)},
         {"xrEndFrame", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrEndFrame)},
+        {"xrEnumerateEnvironmentBlendModes", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrEnumerateEnvironmentBlendModes)},
         {"xrWaitFrame", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrWaitFrame)},
         {"xrBeginSession", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrBeginSession)},
         {"xrCreateSwapchain", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrCreateSwapchain)},
@@ -1222,13 +1355,25 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
         bool hasPicoControllers = false;
         for (uint32_t i = 0; i < info->enabledExtensionCount; i++) if (strcmp(info->enabledExtensionNames[i], kPicoControllers) == 0) hasPicoControllers = true;
         const bool addPicoControllers = family && Lower(family).find("pico") != std::string::npos && !hasPicoControllers && RuntimeOffers(next, kPicoControllers);
-        if (dropEye || addPicoControllers) {
+        const char* chosen = getenv("GAMEPORT_XR_ALPHA_BLEND");
+        bool hasPassthrough = false;
+        for (uint32_t i = 0; i < info->enabledExtensionCount; i++) if (strcmp(info->enabledExtensionNames[i], kFbPassthrough) == 0) hasPassthrough = true;
+        // Added only to a game that enables XR_FB_swapchain_update_state, like the one the headset refused the alpha blend mode to: for any other game the instance is not touched.
+        bool hasUpdateState = false;
+        for (uint32_t i = 0; i < info->enabledExtensionCount; i++) if (strcmp(info->enabledExtensionNames[i], "XR_FB_swapchain_update_state") == 0) hasUpdateState = true;
+        const bool addPassthrough = chosen && chosen[0] == '1' && hasUpdateState && !hasPassthrough && RuntimeOffers(next, kFbPassthrough);
+        g_passthroughAdded.store(hasPassthrough || addPassthrough);
+        if (dropEye || addPicoControllers || addPassthrough) {
             for (uint32_t i = 0; i < info->enabledExtensionCount; i++) {
                 if (dropEye && strcmp(info->enabledExtensionNames[i], kEyeFoveation) == 0) {
                     LOGI("extension %s not passed on", kEyeFoveation);
                     continue;
                 }
                 kept.push_back(info->enabledExtensionNames[i]);
+            }
+            if (addPassthrough) {
+                kept.push_back(kFbPassthrough);
+                LOGI("extension %s added: the player chose passthrough for this game", kFbPassthrough);
             }
             if (addPicoControllers) {
                 kept.push_back(kPicoControllers);
@@ -1250,6 +1395,7 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
     Load("xrLocateSpaces", g_locateSpaces);
     Load("xrLocateViews", g_locateViews);
     Load("xrEndFrame", g_endFrame);
+    Load("xrEnumerateEnvironmentBlendModes", g_enumerateBlendModes);
     Load("xrWaitFrame", g_waitFrame);
     Load("xrBeginSession", g_beginSession);
     Load("xrCreateSwapchain", g_createSwapchain);
@@ -1300,6 +1446,10 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
                 }
             }
         }
+    }
+    {
+        const char* alpha = getenv("GAMEPORT_XR_ALPHA_BLEND");
+        g_offerAlphaBlend.store(alpha && alpha[0] == '1');
     }
     const char* prefer = getenv("GAMEPORT_XR_PREFER_FRAME");
     g_preferFrame = prefer && strcmp(prefer, "1") == 0;
