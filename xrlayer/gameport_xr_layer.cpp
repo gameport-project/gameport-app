@@ -995,7 +995,28 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
 
     XrApiLayerCreateInfo below = *layerInfo;
     below.nextInfo = next->next;
-    XrResult result = next->nextCreateApiLayerInstance(info, &below, instance);
+    // Pico's runtime takes some of Meta's extensions and then crashes inside itself when the game starts to use them
+    // (Moss: eye-tracked foveation). On a Pico they are not passed on, the game then starts without them.
+    const char* told = getenv("GAMEPORT_XR_FAMILY");
+    std::vector<const char*> kept;
+    XrInstanceCreateInfo filtered;
+    const XrInstanceCreateInfo* toPass = info;
+    if (info && told && Lower(told).find("pico") != std::string::npos) {
+        for (uint32_t i = 0; i < info->enabledExtensionCount; i++) {
+            if (strcmp(info->enabledExtensionNames[i], "XR_META_foveation_eye_tracked") == 0) {
+                LOGI("extension %s not passed on: this runtime crashes with it", info->enabledExtensionNames[i]);
+                continue;
+            }
+            kept.push_back(info->enabledExtensionNames[i]);
+        }
+        if (kept.size() != info->enabledExtensionCount) {
+            filtered = *info;
+            filtered.enabledExtensionCount = (uint32_t)kept.size();
+            filtered.enabledExtensionNames = kept.data();
+            toPass = &filtered;
+        }
+    }
+    XrResult result = next->nextCreateApiLayerInstance(toPass, &below, instance);
     if (XR_FAILED(result)) return result;
 
     g_instance = *instance;
