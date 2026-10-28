@@ -73,7 +73,7 @@ final class ObbPuller {
 
     private static Result copy(Context context, Uri cloud, String pkg, String name, long size, File part, File target, long[] done, long total, Log log) throws IOException {
         Uri uri = cloud.buildUpon().appendPath("obb").appendQueryParameter("pkg", pkg).appendQueryParameter("name", name).build();
-        ParcelFileDescriptor descriptor = context.getContentResolver().openFileDescriptor(uri, "r");
+        ParcelFileDescriptor descriptor = Calls.openFile(context, uri, "r");
         if (descriptor == null) return new Result(false, "GamePort would not give " + name);
         long written = 0;
         long lastReport = 0;

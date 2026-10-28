@@ -79,13 +79,15 @@ final class ProviderLink implements GamePortLink {
     @Override
     public InputStream fetch(String cloudName) throws IOException {
         Uri uri = base.buildUpon().appendPath("fetch").appendQueryParameter("pkg", pkg).appendQueryParameter("name", cloudName).build();
-        return context.getContentResolver().openInputStream(uri);
+        ParcelFileDescriptor descriptor = Calls.openFile(context, uri, "r");
+        if (descriptor == null) throw new FileNotFoundException("no download for " + cloudName);
+        return new ParcelFileDescriptor.AutoCloseInputStream(descriptor);
     }
 
     @Override
     public OutputStream push(String rel) throws IOException {
         Uri uri = base.buildUpon().appendPath("push").appendQueryParameter("pkg", pkg).appendQueryParameter("rel", rel).build();
-        ParcelFileDescriptor descriptor = context.getContentResolver().openFileDescriptor(uri, "w");
+        ParcelFileDescriptor descriptor = Calls.openFile(context, uri, "w");
         if (descriptor == null) throw new FileNotFoundException("no upload target for " + rel);
         return new ParcelFileDescriptor.AutoCloseOutputStream(descriptor);
     }

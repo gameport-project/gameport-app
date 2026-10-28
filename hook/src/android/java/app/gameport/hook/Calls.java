@@ -4,7 +4,10 @@ import android.content.ContentProviderClient;
 import android.content.Context;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
+
+import java.io.IOException;
 
 /**
  * The calls of the game to GamePort. They go through an unstable connection to its provider: when GamePort is stopped (a headset does it a few
@@ -13,6 +16,22 @@ import android.os.RemoteException;
  */
 final class Calls {
     private Calls() {}
+
+    /**
+     * Same as {@code ContentResolver.openFileDescriptor}, through the same unstable connection: the usual one ties the game to GamePort's life, and the game was stopped
+     * with it when the headset stopped GamePort while a file was being opened. Null when GamePort gives nothing; the descriptor stays valid once GamePort is gone.
+     */
+    static ParcelFileDescriptor openFile(Context context, Uri uri, String mode) throws IOException {
+        ContentProviderClient client = context.getContentResolver().acquireUnstableContentProviderClient(uri);
+        if (client == null) return null;
+        try {
+            return client.openFile(uri, mode);
+        } catch (RemoteException e) {
+            throw new IOException("GamePort went away while opening " + uri.getLastPathSegment(), e);
+        } finally {
+            client.close();
+        }
+    }
 
     /** Same as {@code ContentResolver.call}: the answer, or null when GamePort gave none; an exception when it is gone. */
     static Bundle call(Context context, Uri uri, String method, String arg, Bundle extras) {

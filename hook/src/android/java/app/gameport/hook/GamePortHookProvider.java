@@ -99,6 +99,9 @@ public final class GamePortHookProvider extends ContentProvider {
             // The player cancelled the launch: nothing else is set up, the game closes.
             if (prepareSteamTicket(context)) return;
             watchTicketRequests(context);
+            watchRelayRequests(context, "workshop");
+            watchRelayRequests(context, "dlc");
+            watchBrowseRequests(context);
             pullAchievementsFromSteam(context);
             watchAchievements(context);
             reportControllerProfile(context);
@@ -510,6 +513,292 @@ public final class GamePortHookProvider extends ContentProvider {
     }
 
     /**
+     * A Workshop item that GamePort has downloaded waits in the game's expansion folder, the one place GamePort and the game both reach. Before the game is told where it
+     * is, it is copied into the game's own data folder (made by the game itself, so nothing about it is special), and that is the folder the game is given. The copy is made
+     * once, in a part folder that is renamed when whole. If anything fails, the game is given the original folder.
+     */
+    private static final java.util.Set<String> toldWorkshop = new java.util.HashSet<>();
+
+    /** Said once for each different thing: this runs every second, and a line each time would fill the log. */
+    private static void toldOnce(String line) {
+        synchronized (toldWorkshop) {
+            if (toldWorkshop.add(line)) Log.i(TAG, line);
+        }
+    }
+
+    private static String inGameFolder(Context context, String item) {
+        try {
+            String[] fields = item.split("\t", -1);
+            if (fields.length < 5 || !"INSTALLED".equals(fields[1])) {
+                if (fields.length >= 2) toldOnce("workshop item " + fields[0] + " is " + fields[1] + ": nothing to copy yet");
+                return item;
+            }
+            File files = context.getExternalFilesDir(null);
+            if (files == null) { toldOnce("workshop item " + fields[0] + " not copied: the game has no external files folder"); return item; }
+            long id = Long.parseLong(fields[0]);
+            long expected = Long.parseLong(fields[3]);
+            File root = new File(files, "gameport/workshop");
+            File target = new File(root, fields[0]);
+            if (folderSize(target) != expected || expected == 0) {
+                if (!pullWorkshopItem(context, id, root, target, expected)) return item;
+            }
+            fields[4] = target.getPath();
+            StringBuilder out = new StringBuilder();
+            for (int i = 0; i < fields.length; i++) out.append(i == 0 ? "" : "\t").append(fields[i]);
+            toldOnce("workshop item " + fields[0] + " is given from " + target.getPath());
+            return out.toString();
+        } catch (Throwable t) {
+            toldOnce("workshop item copy failed: " + t);
+            Log.w(TAG, "could not copy a workshop item into the game's folder", t);
+            return item;
+        }
+    }
+
+    /**
+     * Copies a Workshop item from GamePort, which serves its files, into the game's own folder: a folder GamePort makes cannot be entered by the game, and the one the game
+     * makes can. Made in a part folder, renamed when the sizes add up.
+     */
+    private static boolean pullWorkshopItem(Context context, long id, File root, File target, long expected) throws java.io.IOException {
+        android.net.Uri cloud = Owner.cloud(context);
+        String pkg = context.getPackageName();
+        Bundle extras = new Bundle();
+        extras.putLong("id", id);
+        Bundle list = Calls.call(context, cloud, "workshop_files", pkg, extras);
+        String[] names = list == null ? null : list.getStringArray("names");
+        long[] sizes = list == null ? null : list.getLongArray("sizes");
+        if (names == null || sizes == null || names.length != sizes.length || names.length == 0) { toldOnce("workshop item " + id + " not copied: GamePort gave no list of files"); return false; }
+        File part = new File(root, id + ".part");
+        deleteTree(part);
+        deleteTree(target);
+        long total = 0;
+        for (int i = 0; i < names.length; i++) {
+            String name = names[i];
+            if (name.startsWith("/") || name.contains("..")) { toldOnce("workshop item " + id + " not copied: a file has a name that is not allowed"); deleteTree(part); return false; }
+            File out = new File(part, name);
+            File parent = out.getParentFile();
+            if (parent != null && !parent.isDirectory() && !parent.mkdirs()) { toldOnce("workshop item " + id + " not copied: cannot make " + parent.getPath()); deleteTree(part); return false; }
+            android.net.Uri uri = cloud.buildUpon().appendPath("workshop").appendQueryParameter("pkg", pkg).appendQueryParameter("id", String.valueOf(id)).appendQueryParameter("name", name).build();
+            android.os.ParcelFileDescriptor descriptor = Calls.openFile(context, uri, "r");
+            if (descriptor == null) { toldOnce("workshop item " + id + " not copied: GamePort would not give " + name); deleteTree(part); return false; }
+            java.io.InputStream in = new java.io.FileInputStream(descriptor.getFileDescriptor());
+            try {
+                java.io.FileOutputStream stream = new java.io.FileOutputStream(out);
+                try {
+                    byte[] buffer = new byte[1 << 20];
+                    int read;
+                    while ((read = in.read(buffer)) > 0) { stream.write(buffer, 0, read); total += read; }
+                } finally {
+                    stream.close();
+                }
+            } finally {
+                try { in.close(); } catch (java.io.IOException ignored) { }
+                descriptor.close();
+            }
+        }
+        if (total != expected || !part.renameTo(target)) {
+            toldOnce("workshop item " + id + " not copied: " + total + " bytes came, " + expected + " expected");
+            deleteTree(part);
+            return false;
+        }
+        Log.i(TAG, "workshop item " + id + " copied into the game's own folder (" + total / 1024 + " KB, " + names.length + " file(s))");
+        return true;
+    }
+
+    /** "id:size" for each item whose copy in the game's folder is whole (a part folder is not). */
+    private static String[] heldWorkshopCopies(Context context) {
+        java.util.ArrayList<String> held = new java.util.ArrayList<>();
+        File files = context.getExternalFilesDir(null);
+        File[] folders = files == null ? null : new File(files, "gameport/workshop").listFiles();
+        if (folders != null) {
+            for (File folder : folders) {
+                if (folder.isDirectory() && folder.getName().matches("[0-9]+")) held.add(folder.getName() + ":" + folderSize(folder));
+            }
+        }
+        return held.toArray(new String[0]);
+    }
+
+    /** The copies of items GamePort no longer lists (the account left them) go from the game's folder, with any part folder a stopped copy left. */
+    private static void pruneWorkshopCopies(Context context, java.util.Set<String> keep) {
+        File files = context.getExternalFilesDir(null);
+        File[] folders = files == null ? null : new File(files, "gameport/workshop").listFiles();
+        if (folders == null) return;
+        for (File folder : folders) {
+            String name = folder.getName();
+            boolean part = name.endsWith(".part");
+            String id = part ? name.substring(0, name.length() - 5) : name;
+            if (!id.matches("[0-9]+") || (!part && keep.contains(id))) continue;
+            long size = folderSize(folder);
+            deleteTree(folder);
+            Log.i(TAG, "workshop item " + id + (part ? " (a copy that was stopped)" : " (the account left it)") + " taken away from the game's folder (" + size / 1024 + " KB freed)");
+        }
+    }
+
+    private static long folderSize(File folder) {
+        long total = 0;
+        File[] children = folder.listFiles();
+        if (children == null) return 0;
+        for (File child : children) total += child.isDirectory() ? folderSize(child) : child.length();
+        return total;
+    }
+
+    private static void deleteTree(File file) {
+        File[] children = file.listFiles();
+        if (children != null) for (File child : children) deleteTree(child);
+        file.delete();
+    }
+
+    private static void copyTree(File source, File target) throws java.io.IOException {
+        if (source.isDirectory()) {
+            if (!target.mkdirs() && !target.isDirectory()) throw new java.io.IOException("cannot make " + target);
+            File[] children = source.listFiles();
+            if (children != null) for (File child : children) copyTree(child, new File(target, child.getName()));
+            return;
+        }
+        java.io.FileInputStream in = new java.io.FileInputStream(source);
+        try {
+            java.io.FileOutputStream out = new java.io.FileOutputStream(target);
+            try {
+                byte[] buffer = new byte[1 << 20];
+                int read;
+                while ((read = in.read(buffer)) > 0) out.write(buffer, 0, read);
+            } finally {
+                out.close();
+            }
+        } finally {
+            in.close();
+        }
+    }
+
+    private static void writeInstalledDlc(Context context, String ids, String withContent, String ownedApps) {
+        if (ids == null) return;
+        try {
+            File files = context.getExternalFilesDir(null);
+            File folder = new File(files != null ? files : context.getFilesDir(), "gameport/steam_settings");
+            if (!folder.isDirectory() && !folder.mkdirs()) return;
+            StringBuilder text = new StringBuilder("# c: has files of its own, i: is on the device\n");
+            if (withContent != null) for (String id : withContent.split(",")) if (!id.isEmpty()) text.append("c:").append(id).append('\n');
+            for (String id : ids.split(",")) if (!id.isEmpty()) text.append("i:").append(id).append('\n');
+            writeAll(new File(folder, "dlc_installed.txt"), text.toString().getBytes("UTF-8"));
+            // Every app the account can use: a game that asks about any extra content is told whether the account has it. Not written while Steam has not answered.
+            if (ownedApps != null && !ownedApps.isEmpty()) writeAll(new File(folder, "owned_apps.txt"), ownedApps.replace(',', '\n').concat("\n").getBytes("UTF-8"));
+        } catch (Throwable t) {
+            Log.w(TAG, "could not write the list of installed extra contents", t);
+        }
+    }
+
+    /**
+     * A page of Steam the game opens in its overlay (a Workshop page, where a player subscribes to an item) is opened in the headset's browser: the shim leaves the address
+     * in {@code browse.request}. Only pages of Steam are opened.
+     */
+    private void watchBrowseRequests(final Context context) {
+        File files = context.getExternalFilesDir(null);
+        final File request = new File(new File(files != null ? files : context.getFilesDir(), "gameport"), "browse.request");
+        Thread watcher = new Thread(new Runnable() {
+            @Override public void run() {
+                while (!Thread.currentThread().isInterrupted()) {
+                    try {
+                        if (request.isFile()) {
+                            String url = readText(request);
+                            request.delete();
+                            if (url != null) url = url.trim();
+                            if (url != null && (url.startsWith("https://steamcommunity.com/") || url.startsWith("https://store.steampowered.com/"))) {
+                                android.content.Intent view = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url));
+                                view.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                                context.startActivity(view);
+                                Log.i(TAG, "opened a Steam page in the browser");
+                            }
+                        }
+                        Thread.sleep(700);
+                    } catch (InterruptedException e) {
+                        return;
+                    } catch (Throwable t) {
+                        Log.w(TAG, "could not open the page", t);
+                        try { Thread.sleep(2_000); } catch (InterruptedException e) { return; }
+                    }
+                }
+            }
+        }, "gameport-browse");
+        watcher.setDaemon(true);
+        watcher.start();
+    }
+
+    /**
+     * What the game asks of Steam that GamePort does (the Workshop items it fetches, the extra contents it installs; see the shim): the shim lists in {@code <kind>.request} the ids the game asked for, one per line, and this thread
+     * asks GamePort about them every moment, until every one is installed or has failed, and leaves what it answers in {@code <kind>.state} (one line per item, fields
+     * separated by tabs). The shim reads that file to tell the game how far each item is.
+     */
+    private void watchRelayRequests(final Context context, final String kind) {
+        File files = context.getExternalFilesDir(null);
+        final File dir = new File(files != null ? files : context.getFilesDir(), "gameport");
+        final File request = new File(dir, kind + ".request");
+        final File state = new File(dir, kind + ".state");
+        Thread watcher = new Thread(new Runnable() {
+            @Override public void run() {
+                long seen = 0;
+                boolean settled = false;
+                int lastCount = -1;
+                boolean lastDone = false;
+                // The Workshop items the account is subscribed to are asked about from time to time, even when the game asked for none.
+                long lastPoll = 0;
+                while (!Thread.currentThread().isInterrupted()) {
+                    try {
+                        long stamp = request.lastModified();
+                        if (stamp != seen) { seen = stamp; settled = false; }
+                        boolean periodic = "workshop".equals(kind) && SystemClock.elapsedRealtime() - lastPoll > 20_000;
+                        if ((request.isFile() && !settled) || periodic) {
+                            lastPoll = SystemClock.elapsedRealtime();
+                            java.util.ArrayList<Long> ids = new java.util.ArrayList<>();
+                            String requested = request.isFile() ? readText(request) : "";
+                            for (String line : (requested == null ? "" : requested).split("\n")) {
+                                try { if (!line.trim().isEmpty()) ids.add(Long.parseLong(line.trim())); } catch (NumberFormatException ignored) { }
+                            }
+                            if (!ids.isEmpty() || periodic) {
+                                long[] array = new long[ids.size()];
+                                for (int i = 0; i < array.length; i++) array[i] = ids.get(i);
+                                Bundle extras = new Bundle();
+                                extras.putLongArray("ids", array);
+                                // What the game holds whole already, so that GamePort can drop its own copy of those.
+                                if ("workshop".equals(kind)) extras.putStringArray("have", heldWorkshopCopies(context));
+                                Bundle result = Calls.call(context, Owner.cloud(context), kind, context.getPackageName(), extras);
+                                String[] items = result == null ? null : result.getStringArray("items");
+                                if (items != null) {
+                                    StringBuilder text = new StringBuilder();
+                                    boolean allDone = true;
+                                    java.util.HashSet<String> answered = new java.util.HashSet<>();
+                                    for (String item : items) {
+                                        if ("workshop".equals(kind)) {
+                                            answered.add(item.split("\t", 2)[0]);
+                                            item = inGameFolder(context, item);
+                                        }
+                                        text.append(item).append('\n');
+                                        String[] fields = item.split("\t", -1);
+                                        if (fields.length > 1 && !"INSTALLED".equals(fields[1]) && !"FAILED".equals(fields[1])) allDone = false;
+                                    }
+                                    writeAll(state, text.toString().getBytes("UTF-8"));
+                                    // An item the account left is taken away from the game's folder too, but only when GamePort read the subscriptions.
+                                    if ("workshop".equals(kind) && result.getBoolean("known", false)) pruneWorkshopCopies(context, answered);
+                                    settled = allDone;
+                                    if (items.length != lastCount || allDone != lastDone) Log.i(TAG, kind + ": " + items.length + " item(s) answered" + (allDone ? ", all settled" : ""));
+                                    lastCount = items.length;
+                                    lastDone = allDone;
+                                }
+                            }
+                        }
+                        Thread.sleep(settled ? 500 : 700);
+                    } catch (InterruptedException e) {
+                        return;
+                    } catch (Throwable t) {
+                        Log.w(TAG, kind + " request failed", t);
+                        try { Thread.sleep(2_000); } catch (InterruptedException e) { return; }
+                    }
+                }
+            }
+        }, "gameport-" + kind);
+        watcher.setDaemon(true);
+        watcher.start();
+    }
+
+    /**
      * Before the game reads its record of unlocked achievements, GamePort adds to it what the Steam account has: achievements earned on
      * another device are then known here and the game does not unlock them again. Nothing is ever taken out of the record. If Steam
      * cannot be asked in time, or the account has nothing more, the file is left as it is.
@@ -733,6 +1022,8 @@ public final class GamePortHookProvider extends ContentProvider {
             eyeCm = String.valueOf(config.getInt("eyeCm"));
             String map = config.getString("xrMap");
             controls = map == null ? "" : map;
+            // The extra contents on the device now, for the Steam interface to answer "installed" for them only (its file is read when the game asks).
+            writeInstalledDlc(context, config.getString("dlcInstalled"), config.getString("dlcWithContent"), config.getString("ownedApps"));
             String platform = config.getString("xrFamily");
             family = platform == null ? "" : platform;
             preferFrame = config.getBoolean("xrPreferFrame") ? "1" : "0";
@@ -779,6 +1070,8 @@ public final class GamePortHookProvider extends ContentProvider {
             android.system.Os.setenv("GAMEPORT_XR_LOCAL_FLOOR", localFloor, true);
             // The foveation that follows the eyes: kept where the device can do it (auto), always (on) or never (off).
             android.system.Os.setenv("GAMEPORT_XR_EYE_FOVEATION", eyeFov, true);
+            // A game whose passthrough GamePort declared (the player chose it): the layer offers the alpha blend mode that shows the real world when the headset does not.
+            android.system.Os.setenv("GAMEPORT_XR_ALPHA_BLEND", hasPatchMark(context, "app.gameport.passthrough_feature") ? "1" : "0", true);
             Log.i(TAG, "seated mode " + seated + ", eye height " + eyeCm + " cm, controller overrides " + (controls.isEmpty() ? "none" : controls));
             Log.i(TAG, "patches: vr_game_activity=" + hasPatchMark(context, "app.gameport.vr_game_activity") + " ovrplugin_stand_in=" + hasPatchMark(context, "app.gameport.ovrplugin_stand_in") + " passthrough_feature=" + hasPatchMark(context, "app.gameport.passthrough_feature"));
         } catch (Throwable t) {
