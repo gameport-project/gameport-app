@@ -130,4 +130,6 @@ object SteamImages {
 data class Library(
     val games: List<Game>,
     val isScanning: Boolean,
+    /** Every app the account can use (its own and the family's), games or not: what a game is told when it asks whether an extra content is owned. Empty until Steam has answered. */
+    val ownedAppIds: Set<Int> = emptySet(),
 )

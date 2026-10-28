@@ -127,4 +127,75 @@ class SaveRulesParserTest {
 
         assertEquals("Android/data/com.studio.game/files/Studio/Game", SaveRulesParser.parse(ufs).single().localDir)
     }
+
+    /** What Steam publishes for Cubism: the path is rewritten from `Android/data`, with no `Android/data` in front. */
+    private fun cubism(): KeyValue = kv(
+        "ufs", null,
+        kv("savefiles", null, kv("0", null, kv("root", "WinAppDataLocalLow"), kv("path", "tvb/cubism/"), kv("pattern", "*.save"), kv("recursive", "1"))),
+        kv(
+            "rootoverrides", null,
+            kv(
+                "0", null,
+                kv("root", "WinAppDataLocalLow"), kv("os", "Android"), kv("oscompare", "="), kv("useinstead", "AndroidExternalData"),
+                kv("pathtransforms", null, kv("0", null, kv("find", "tvb/cubism/"), kv("replace", "com.tvb.cubism/files/"))),
+            ),
+        ),
+    )
+
+    @Test
+    fun `a path rewritten from the android data folder is placed under it`() {
+        val rules = SaveRulesParser.parse(cubism())
+
+        assertEquals(true, rules.all { it.localDir == "Android/data/com.tvb.cubism/files" })
+    }
+
+    @Test
+    fun `the name Steam describes comes first, the older android name only after it`() {
+        val rules = SaveRulesParser.parse(cubism())
+
+        assertEquals(listOf("%WinAppDataLocalLow%tvb/cubism", "%AndroidExternalData%com.tvb.cubism/files"), rules.map { it.cloudPrefix })
+    }
+
+    /** Quantum Void keeps the Android saves apart from the Windows ones, with no override: nothing of it is read differently. */
+    @Test
+    fun `a game with separate windows and android rules and no override is read as before`() {
+        val quantum = kv(
+            "ufs", null,
+            kv(
+                "savefiles", null,
+                kv("0", null, kv("root", "WinAppDataLocalLow"), kv("path", "Tactical Nounours/Quantum Void/Saves"), kv("pattern", "*"), kv("platforms", null, kv("1", "Windows"))),
+                kv("1", null, kv("root", "AndroidInternalData"), kv("path", "com.tacticalnounours.quantumvoid/files/saves"), kv("pattern", "*"), kv("platforms", null, kv("1", "Android"))),
+            ),
+        )
+
+        val rules = SaveRulesParser.parse(quantum)
+
+        assertEquals(1, rules.size)
+        assertEquals("@internal/com.tacticalnounours.quantumvoid/files/saves", rules[0].localDir)
+        assertEquals("%AndroidInternalData%com.tacticalnounours.quantumvoid/files/saves", rules[0].cloudPrefix)
+        assertEquals("%WinAppDataLocalLow%Tactical Nounours/Quantum Void/Saves", rules[0].pcCloudPrefix)
+    }
+
+    /** Puzzling Places' replays: the override moves the root but rewrites nothing, and the path is a studio's folder, not the game's own. */
+    @Test
+    fun `a path that does not begin with a package name is left as it was read`() {
+        val ufs = kv(
+            "ufs", null,
+            kv("savefiles", null, kv("0", null, kv("root", "WinAppDataLocal"), kv("path", "PuzzlingPlaces/Saved/Replays"), kv("pattern", "*.replay"))),
+            kv(
+                "rootoverrides", null,
+                kv("0", null, kv("root", "WinAppDataLocal"), kv("os", "Android"), kv("oscompare", "="), kv("useinstead", "AndroidExternalData")),
+            ),
+        )
+
+        val rules = SaveRulesParser.parse(ufs)
+
+        assertEquals(listOf("PuzzlingPlaces/Saved/Replays"), rules.map { it.localDir })
+        assertEquals(listOf("%WinAppDataLocal%PuzzlingPlaces/Saved/Replays"), rules.map { it.cloudPrefix })
+    }
+
+    @Test
+    fun `a rule that already names android data keeps a single cloud name`() {
+        assertEquals(listOf("%WinAppDataLocalLow%ErThu/Ancient_Dungeon"), SaveRulesParser.parse(ancientDungeon()).map { it.cloudPrefix }.distinct())
+    }
 }

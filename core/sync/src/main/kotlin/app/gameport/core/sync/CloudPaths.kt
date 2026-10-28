@@ -27,12 +27,36 @@ class CloudPaths(rules: List<SaveRule>, steamId64: Long, accountId: Long) {
     /** Cloud name for a local file, or null if it is not a save file under any rule. */
     fun toCloud(rel: String): String? {
         val rule = rules.filter { covers(it, rel) }.maxByOrNull { it.localDir.length } ?: return null
+        return cloudNameOf(rule, rel)
+    }
+
+    private fun cloudNameOf(rule: SaveRule, rel: String): String {
         val remainder = rel.removePrefix(rule.localDir).trimStart('/')
         return when {
             rule.cloudPrefix.isEmpty() -> remainder
             rule.cloudPrefix.endsWith("%") -> rule.cloudPrefix + remainder
             else -> "${rule.cloudPrefix}/$remainder"
         }
+    }
+
+    /** The rule a cloud name belongs to (the one [toLocal] reads it with). */
+    private fun ruleFor(cloudName: String): SaveRule? = rules.filter { matches(it, cloudName) }.maxByOrNull { it.cloudPrefix.length }
+
+    /**
+     * Every cloud name a local file can be sent under, the one to use first first: the name of the first rule that covers it, which is the one Steam describes for the game (the rules
+     * that only read older names come after), then the others, then the name the file has in the cloud. The next is tried only when Steam refuses one.
+     */
+    fun uploadNames(rel: String, existing: String?): List<String> {
+        val byRules = rules.filter { covers(it, rel) }.sortedByDescending { it.localDir.length }.map { cloudNameOf(it, rel) }
+        return (byRules + listOfNotNull(existing)).distinct()
+    }
+
+    /**
+     * The cloud files by the path they map to. When two names map to one path (saves sent under an old name and under a new one), the newest is kept, and between files of the
+     * same date the one whose rule comes first.
+     */
+    fun byLocalPath(files: List<CloudFile>): Map<String, CloudFile> = files.groupBy { it.rel }.mapValues { (_, same) ->
+        same.maxWithOrNull(compareBy<CloudFile> { it.timestamp }.thenBy { -rules.indexOf(ruleFor(it.name)) })!!
     }
 
     /**

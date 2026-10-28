@@ -36,6 +36,33 @@ class SyncPlannerTest {
         assertTrue(action is SyncAction.Conflict)
     }
 
+    // The game started over because its saves were not seen (the rules were read wrongly): its new file is not the player's progress.
+    private val startedOver = local("save" to "blank")
+    private val progress = cloud("save" to "progress")
+
+    @Test
+    fun `after the agreement is forgotten, a game that started over never overwrites the saves in the cloud`() {
+        val action = SyncPlanner.plan(startedOver, progress, 17, baseline = null)
+
+        assertTrue(action is SyncAction.Conflict)
+    }
+
+    @Test
+    fun `after the agreement is forgotten, a device with no save takes the saves of the cloud`() {
+        val action = SyncPlanner.plan(emptyMap(), progress, 17, baseline = null)
+
+        assertEquals(listOf("save"), (action as SyncAction.Download).files.map { it.rel })
+    }
+
+    @Test
+    fun `an old agreement kept would send the new file, which is why it is forgotten when the rules are read differently`() {
+        val old = Baseline(changeNumber = 7, files = mapOf("save" to "progress"))
+
+        val action = SyncPlanner.plan(startedOver, progress, 17, baseline = old)
+
+        assertTrue(action is SyncAction.Upload)
+    }
+
     @Test
     fun `only the cloud moved downloads`() {
         val action = SyncPlanner.plan(local("a" to "1"), cloud("a" to "2"), 6, baseline)

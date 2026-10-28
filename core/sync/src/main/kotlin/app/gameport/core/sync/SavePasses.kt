@@ -40,4 +40,12 @@ object SaveRulesSignature {
      * Android ones: if Steam now links them (a root override), the saves are shared already and the choice has nothing left to do.
      */
     fun modeAfterChange(mode: SaveSpaceMode, stillApart: Boolean): SaveSpaceMode = if (stillApart) mode else SaveSpaceMode.ANDROID
+
+    /**
+     * Whether what GamePort agreed on with Steam for this game is no longer to be trusted, called when the rules now differ from the remembered ones. [before] is
+     * the signature remembered (null when none was: a version from before it was kept, or a game never synced), [readDifferently] whether the scan of the library found
+     * the game's rules read differently than before. Without a remembered signature, only a scan that says so is enough: a game seen for the first time has nothing to forget.
+     * An old agreement kept under rules that were read wrongly could send a file that is only the game starting over, over the saves Steam holds.
+     */
+    fun mustForgetAgreement(before: String?, readDifferently: Boolean): Boolean = before != null || readDifferently
 }

@@ -98,6 +98,9 @@ class CloudSyncCoordinator @Inject constructor(
 
     private val active = ConcurrentHashMap<String, Active>()
 
+    // Games for which it was said that Steam holds saves no rule covers (see [begin]).
+    private val unseen: MutableSet<Int> = ConcurrentHashMap.newKeySet()
+
     // Games whose process GamePort started itself, only to send their saves (see [SaveCatchUp]): the hook asks before it starts.
     private val catchUps = ConcurrentHashMap<String, Long>()
 
@@ -242,10 +245,11 @@ class CloudSyncCoordinator @Inject constructor(
             ?: return BeginResult.Offline.also { syncStatus.record(appId, SyncStatus.OFFLINE) }
         val account = (auth.authState.value as? AuthState.SignedIn)?.account
             ?: return BeginResult.Offline.also { syncStatus.record(appId, SyncStatus.OFFLINE) }
-        val game = library.load(session.accountId)?.games?.firstOrNull { it.appId == appId } ?: return BeginResult.Unsupported
+        val cache = library.load(session.accountId)
+        val game = cache?.games?.firstOrNull { it.appId == appId } ?: return BeginResult.Unsupported
         val published = game.saveRules.map { SaveRule(it.localDir, it.pattern, it.recursive, it.cloudPrefix, it.pcCloudPrefix) }
         // The places of Steam Cloud to look at, in order: the Android saves, and the Windows ones before them when the player chose to use them.
-        noticeSavesChange(appId, published)
+        noticeSavesChange(appId, published, readDifferently = appId in cache.rulesChanged)
         val passes = SavePasses.of(spaces.get(appId), published.any { it.pcCloudPrefix != null }, launch, knowsPasses)
         val thisPass = passes.getOrNull(pass) ?: return BeginResult.Unsupported
         if (thisPass.isPc && pass == 0) events.note(appId, if (thisPass == SavePass.PC_DOWNLOAD) "saves: the Windows saves are brought in" else "saves: synced with the Windows saves")
@@ -260,9 +264,14 @@ class CloudSyncCoordinator @Inject constructor(
             return BeginResult.Offline
         }
         val (stray, real) = snapshot.files.filterNot { it.deleted }.partition { OwnFiles.isOwn(it.name) }
-        val cloud = real.mapNotNull { file ->
-            paths.toLocal(file.name)?.let { rel -> rel to CloudFile(file.name, rel, file.sha1, file.sizeBytes.toLong(), file.timestampMillis) }
-        }.toMap()
+        val covered = real.mapNotNull { file ->
+            paths.toLocal(file.name)?.let { rel -> CloudFile(file.name, rel, file.sha1, file.sizeBytes.toLong(), file.timestampMillis) }
+        }
+        val cloud = paths.byLocalPath(covered)
+        // Steam holds saves that no rule of the game reaches: the sync is blind to them, which is how a game starts over without anyone knowing. Said once for each game.
+        if (covered.size < real.size && unseen.add(appId)) {
+            events.note(appId, "saves: ${real.size - covered.size} of the ${real.size} file(s) Steam holds are in a place no rule of the game covers: they are not synced")
+        }
         var changeNumber = snapshot.changeNumber
         if (stray.isNotEmpty()) {
             Log.i(TAG, "removing ${stray.size} stray GamePort file(s) from the cloud")
@@ -382,19 +391,20 @@ class CloudSyncCoordinator @Inject constructor(
      * agreed on with the old places says nothing about the new ones, and would read as files that were deleted: the records are dropped, so the next
      * sync compares afresh and asks if the two sides differ. A choice to use the PC saves goes when the studio now links them itself.
      */
-    private fun noticeSavesChange(appId: Int, published: List<SaveRule>) {
+    private fun noticeSavesChange(appId: Int, published: List<SaveRule>, readDifferently: Boolean) {
         val signature = SaveRulesSignature.of(published)
         val before = spaces.rulesSignature(appId)
         if (before == signature) return
         spaces.setRulesSignature(appId, signature)
-        // The first look: nothing to compare with.
-        if (before == null) return
+        // The first look, and the scan found nothing read differently: nothing to compare with.
+        if (!SaveRulesSignature.mustForgetAgreement(before, readDifferently)) return
         baselines.forgetAndroid(appId)
         baselines.forgetPc(appId)
         val mode = spaces.get(appId)
         val kept = SaveRulesSignature.modeAfterChange(mode, stillApart = published.any { it.pcCloudPrefix != null })
         if (kept != mode) spaces.set(appId, kept)
-        events.note(appId, "saves: Steam changed how this game's saves are described" + if (kept != mode) ", the PC and Android saves are now linked by the studio: GamePort follows it" else ": GamePort follows it")
+        val why = if (before == null) "GamePort reads this game's saves differently than before" else "Steam changed how this game's saves are described"
+        events.note(appId, "saves: $why" + if (kept != mode) ", the PC and Android saves are now linked by the studio: GamePort follows it" else ": the two sides are compared afresh, nothing is overwritten without asking")
     }
 
     // ---- The PC saves ----
@@ -520,25 +530,39 @@ class CloudSyncCoordinator @Inject constructor(
         val sync = active[packageName] ?: return false
         val plan = sync.plan as? SyncAction.Upload ?: return false
         val planned = plan.files
-        if (planned.any { file -> sync.pushed[file.rel]?.takeIf { it.isFile && it.sha1() == file.sha1 } == null }) return false
+        val missing = planned.filter { file -> sync.pushed[file.rel]?.takeIf { it.isFile && it.sha1() == file.sha1 } == null }
+        if (missing.isNotEmpty()) {
+            // What the game's hook sent is not what was planned (the file changed while it was read, or did not arrive): nothing is sent to Steam.
+            events.note(sync.appId, "saves: not sent to Steam, the copy that reached GamePort is not the planned one (${missing.size} of ${planned.size} file(s))")
+            return false
+        }
 
         backupCloudFiles(sync, planned.mapNotNull { sync.cloud[it.rel] } + plan.deleteCloud)
 
-        val uploads = planned.map { file ->
-            CloudUpload(
-                cloudName = sync.cloud[file.rel]?.name ?: sync.paths.toCloud(file.rel) ?: return false,
-                file = sync.pushed.getValue(file.rel),
-                sha1 = file.sha1.hexToBytes(),
-                timestampMillis = file.mtime,
+        // The name Steam describes for the game first, whatever name the file has in the cloud (it may be an older one that Steam no longer takes); the others only if Steam refuses.
+        val names = planned.map { file -> sync.paths.uploadNames(file.rel, sync.cloud[file.rel]?.name) }
+        if (names.any { it.isEmpty() }) return false
+        val sent = UploadFallback.run(names) { chosen ->
+            sync.session.uploadToCloud(
+                appId = sync.appId,
+                uploads = planned.mapIndexed { index, file ->
+                    CloudUpload(
+                        cloudName = chosen[index],
+                        file = sync.pushed.getValue(file.rel),
+                        sha1 = file.sha1.hexToBytes(),
+                        timestampMillis = file.mtime,
+                    )
+                },
+                deletes = plan.deleteCloud.map { it.name },
+                machineName = "GamePort (${Build.MODEL})",
+                clientId = clientId(),
             )
+        } ?: return false.also {
+            syncStatus.record(sync.appId, SyncStatus.FAILED)
+            events.note(sync.appId, "saves: Steam did not accept the upload of ${planned.size} file(s)")
         }
-        val newChange = sync.session.uploadToCloud(
-            appId = sync.appId,
-            uploads = uploads,
-            deletes = plan.deleteCloud.map { it.name },
-            machineName = "GamePort (${Build.MODEL})",
-            clientId = clientId(),
-        ) ?: return false.also { syncStatus.record(sync.appId, SyncStatus.FAILED) }
+        if (sent.round > 0) events.note(sync.appId, "saves: Steam took the saves under another name than the first one tried")
+        val newChange = sent.change
 
         syncStatus.record(sync.appId, SyncStatus.OK)
         // The cloud now holds what this device does.

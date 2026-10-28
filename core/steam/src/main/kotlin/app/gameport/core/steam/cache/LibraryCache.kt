@@ -73,10 +73,26 @@ data class CachedLibrary(
     val dlcNames: Map<Int, String> = emptyMap(),
     /** The DLC apps the account has that carry an Android depot of their own. */
     val dlcApps: List<CachedDlcApp> = emptyList(),
+    /**
+     * The games whose save rules are not what an earlier scan of this device read (GamePort read them differently, or Steam changed them). The sync looks at it once
+     * for each game, to stop trusting what it agreed on with Steam under the old rules.
+     */
+    val rulesChanged: Set<Int> = emptySet(),
 )
+
+/** Whether a game's save rules, as read now, are not the ones known before. Nothing known before (a new game, a first scan) is no change. */
+object SaveRulesChange {
+    fun differ(known: List<CachedSaveRule>?, now: List<CachedSaveRule>): Boolean = known != null && known.toSet() != now.toSet()
+}
+
+/** The cache as it was written, whatever its version; null when the text is not a cache. */
+internal fun decodeLibraryCache(json: Json, text: String): CachedLibrary? = runCatching { json.decodeFromString<CachedLibrary>(text) }.getOrNull()
 
 interface LibraryCacheStore {
     fun load(accountId: Long): CachedLibrary?
+
+    /** The cache of an earlier version, as it was written: not used to show anything (its shape may be old), only to compare with what the next scan reads. */
+    fun loadPrevious(accountId: Long): CachedLibrary? = null
 
     fun save(accountId: Long, cache: CachedLibrary)
 
@@ -88,8 +104,8 @@ interface LibraryCacheStore {
     }
 }
 
-/** Version 4 adds the save rules used for the cloud sync, version 6 the build id of each depot, version 8 the artwork names and the parent app, version 10 the Windows copy of the saves, version 11 the DLC apps with an Android depot of their own, and the private data root. */
-const val CACHE_VERSION = 11
+/** Version 4 adds the save rules used for the cloud sync, version 6 the build id of each depot, version 8 the artwork names and the parent app, version 10 the Windows copy of the saves, version 11 the DLC apps with an Android depot of their own, and the private data root, version 12 the folder of the saves of a game whose path is written from Android/data, version 13 the order of the two cloud names of such a game. */
+const val CACHE_VERSION = 13
 
 @Singleton
 class FileLibraryCacheStore @Inject constructor(
@@ -98,9 +114,11 @@ class FileLibraryCacheStore @Inject constructor(
     private val directory = File(context.filesDir, "library-cache")
     private val json = Json { ignoreUnknownKeys = true }
 
-    override fun load(accountId: Long): CachedLibrary? = runCatching {
-        json.decodeFromString<CachedLibrary>(file(accountId).readText())
-    }.getOrNull()?.takeIf { it.version == CACHE_VERSION }
+    override fun load(accountId: Long): CachedLibrary? = readCache(accountId)?.takeIf { it.version == CACHE_VERSION }
+
+    override fun loadPrevious(accountId: Long): CachedLibrary? = readCache(accountId)?.takeIf { it.version != CACHE_VERSION }
+
+    private fun readCache(accountId: Long): CachedLibrary? = runCatching { file(accountId).readText() }.getOrNull()?.let { decodeLibraryCache(json, it) }
 
     override fun save(accountId: Long, cache: CachedLibrary) {
         runCatching {

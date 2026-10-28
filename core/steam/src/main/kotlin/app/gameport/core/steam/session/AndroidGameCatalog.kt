@@ -18,7 +18,9 @@ import app.gameport.core.steam.cache.CachedDepot
 import app.gameport.core.steam.cache.CachedDlcApp
 import app.gameport.core.steam.cache.CachedGame
 import app.gameport.core.steam.cache.CachedLibrary
+import app.gameport.core.steam.cache.CachedSaveRule
 import app.gameport.core.steam.cache.LibraryCacheStore
+import app.gameport.core.steam.cache.SaveRulesChange
 import `in`.dragonbra.javasteam.steam.handlers.steamapps.PICSRequest
 import `in`.dragonbra.javasteam.types.KeyValue
 import kotlinx.coroutines.async
@@ -60,6 +62,10 @@ internal fun SteamSession.androidGames(
     val dlcNames = HashMap<Int, String>(cached?.dlcNames.orEmpty())
     val dlcApps = HashMap<Int, CachedDlcApp>()
     cached?.dlcApps?.forEach { dlcApps[it.appId] = it }
+    // The save rules of the games as an earlier version read them (a cache of another shape is not shown, but it still says what was known): a game whose rules are read
+    // differently now is noted, for the sync to compare its two sides afresh instead of trusting what it agreed on under the old rules.
+    val knownRules: Map<Int, List<CachedSaveRule>> = if (cached == null) cacheStore.loadPrevious(me)?.games?.associate { it.appId to it.saveRules }.orEmpty() else emptyMap()
+    val rulesChanged = HashSet<Int>(cached?.rulesChanged.orEmpty())
 
     val ownedPackages = licenses.filter { it.ownerAccountID.toLong() == me }.map { it.packageID }.toSet()
     val packageIds = licenses.map { it.packageID }.toSet()
@@ -79,7 +85,7 @@ internal fun SteamSession.androidGames(
 
     fun persist() = cacheStore.save(
         me,
-        CachedLibrary(CACHE_VERSION, now(), packageApps.toMap(), checkedApps.toSet(), games.values.toList(), dlcNames.toMap(), dlcApps.values.toList()),
+        CachedLibrary(CACHE_VERSION, now(), packageApps.toMap(), checkedApps.toSet(), games.values.toList(), dlcNames.toMap(), dlcApps.values.toList(), rulesChanged.toSet()),
     )
 
     val unknownPackages = packageIds.filter { it !in packageApps }
@@ -121,7 +127,10 @@ internal fun SteamSession.androidGames(
                     for (callback in result.results) {
                         for (app in callback.apps.values) {
                             checkedApps += app.id
-                            app.keyValues.toAndroidGame(app.id)?.let { games[app.id] = it }
+                            app.keyValues.toAndroidGame(app.id)?.let { game ->
+                                if (SaveRulesChange.differ(games[app.id]?.saveRules ?: knownRules[app.id], game.saveRules)) rulesChanged += app.id
+                                games[app.id] = game
+                            }
                             app.keyValues.toAndroidDlc(app.id)?.let { dlc -> dlcApps[app.id] = dlc; dlcNames[app.id] = dlc.name }
                         }
                     }
@@ -193,7 +202,7 @@ internal fun libraryOf(
             ),
         )
     }.sortedBy { it.name.lowercase() }
-    return Library(list, scanning)
+    return Library(list, scanning, ownedAppIds = visible)
 }
 
 /** The library from the last scan, for when Steam is not reachable: every cached game counts as owned. */

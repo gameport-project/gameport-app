@@ -1,5 +1,6 @@
 package app.gameport.core.steam.session
 
+import android.util.Log
 import java.io.File
 import java.io.IOException
 import java.util.Date
@@ -20,6 +21,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 class CloudUpload(val cloudName: String, val file: File, val sha1: ByteArray, val timestampMillis: Long)
 
 private const val USER_AGENT = "Valve/Steam HTTP Client 1.0"
+private const val TAG = "GPCloudUpload"
 
 private fun url(https: Boolean, host: String, path: String) = "${if (https) "https" else "http"}://$host$path"
 
@@ -89,7 +91,10 @@ suspend fun SteamSession.uploadToCloud(
                 .setUploadBatchId(batch.batchID)
                 .build()
             val deleted = runCatching { cloudService.clientDeleteFile(request).await() }.getOrNull()
-            if (deleted == null || deleted.result != EResult.OK) success = false
+            if (deleted == null || deleted.result != EResult.OK) {
+                success = false
+                Log.w(TAG, "cloud upload: Steam did not delete $name (${deleted?.result})")
+            }
         }
     }
     for (upload in uploads) {
@@ -123,15 +128,22 @@ suspend fun SteamSession.uploadToCloud(
                     .header("User-Agent", USER_AGENT)
                     .build()
                 val ok = try {
-                    client.configuration.httpClient.newCall(request).execute().use { it.isSuccessful }
+                    client.configuration.httpClient.newCall(request).execute().use { response ->
+                        if (!response.isSuccessful) Log.w(TAG, "cloud upload: a block of ${upload.cloudName} was refused (HTTP ${response.code})")
+                        response.isSuccessful
+                    }
                 } catch (e: IOException) {
+                    Log.w(TAG, "cloud upload: a block of ${upload.cloudName} did not go through (${e.javaClass.simpleName})")
                     false
                 }
                 if (!ok) transferred = false
             }
         }
         val committed = cloud.commitFileUpload(transferred, appId, upload.sha1, upload.cloudName).await()
-        if (!transferred || !committed) success = false
+        if (!transferred || !committed) {
+            success = false
+            Log.w(TAG, "cloud upload: ${upload.cloudName} not accepted (sent whole: $transferred, committed: $committed, ${upload.file.length()} B)")
+        }
     }
 
     cloud.completeAppUploadBatch(appId, batch.batchID, if (success) EResult.OK else EResult.Fail).await()

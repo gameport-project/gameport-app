@@ -63,4 +63,20 @@ class SavePassesTest {
         assertEquals(SaveSpaceMode.ANDROID, SaveRulesSignature.modeAfterChange(SaveSpaceMode.USE_PC_AND_SEND, stillApart = false))
         assertEquals(SaveSpaceMode.USE_PC, SaveRulesSignature.modeAfterChange(SaveSpaceMode.USE_PC, stillApart = true))
     }
+
+    @Test
+    fun `a remembered signature that differs always makes the agreement forgotten`() {
+        assertEquals(true, SaveRulesSignature.mustForgetAgreement(before = "old", readDifferently = false))
+        assertEquals(true, SaveRulesSignature.mustForgetAgreement(before = "old", readDifferently = true))
+    }
+
+    @Test
+    fun `with no signature remembered, a scan that read the rules differently makes the agreement forgotten`() {
+        assertEquals(true, SaveRulesSignature.mustForgetAgreement(before = null, readDifferently = true))
+    }
+
+    @Test
+    fun `a game seen for the first time has nothing to forget`() {
+        assertEquals(false, SaveRulesSignature.mustForgetAgreement(before = null, readDifferently = false))
+    }
 }

@@ -34,6 +34,8 @@ internal object SaveRulesParser {
             val override = overrides.firstOrNull { it["root"].value == root }
             var local = path
             var apart = false
+            // The Android root the cloud files of a game written from `Android/data` are named after: Steam keeps them under it, whatever the Windows root of the rule.
+            var sharedName: String? = null
             if (override != null) {
                 val target = override["useinstead"].value
                 if (target != SHARED_ROOT && target != INTERNAL_ROOT) return@mapNotNull null
@@ -44,6 +46,12 @@ internal object SaveRulesParser {
                 val added = override["addpath"].value.orEmpty().normalized()
                 if (added.isNotEmpty()) local = if (local.isEmpty()) added else "$added/$local"
                 if (target == INTERNAL_ROOT) local = INTERNAL_PREFIX + local.trim('/')
+                else if (!local.startsWith("Android/") && startsWithPackage(local)) {
+                    // Written from `Android/data` (`<package>/files`), like a rule that names the Android root itself. Only a path that begins with a package name is the game's own
+                    // folder: any other (a studio's folder name) is no place the game can write, and is left as it was read.
+                    sharedName = local.trim('/')
+                    local = "Android/data/$local"
+                }
             } else if (root == INTERNAL_ROOT) {
                 // The path is written from the folder that holds the private data of every app: `<package>/files/saves`.
                 local = INTERNAL_PREFIX + local.trim('/')
@@ -59,14 +67,17 @@ internal object SaveRulesParser {
 
             val pattern = file["pattern"].value.orEmpty().ifEmpty { "*" }
             val recursive = file["recursive"].asInteger(0) != 0
-            CachedSaveRule(
+            val rule = CachedSaveRule(
                 localDir = local.trim('/'),
                 pattern = pattern,
                 recursive = recursive,
                 cloudPrefix = "%$root%$path",
                 pcCloudPrefix = if (apart) windowsTwin(files, overrides, pattern, recursive) else null,
             )
-        }
+            // The name Steam describes comes first, and is the one saves are sent under. A game whose rule reaches Android by a path from `Android/data` may hold older saves in
+            // the cloud under the Android root (what an earlier rule of the studio named, and what an earlier GamePort sent): that name comes second, only to read them.
+            if (sharedName == null) listOf(rule) else listOf(rule, rule.copy(cloudPrefix = "%$SHARED_ROOT%$sharedName"))
+        }.flatten()
     }
 
     /**
@@ -91,6 +102,12 @@ internal object SaveRulesParser {
         val os = override["os"].value ?: return false
         val equal = override["oscompare"].value?.trim() != "!="
         return os.equals("Android", ignoreCase = true) == equal
+    }
+
+    /** Whether the first folder of a path is a package name (`com.studio.game`): letters, digits and underscores, with dots. */
+    private fun startsWithPackage(path: String): Boolean {
+        val first = path.trim('/').substringBefore('/')
+        return '.' in first && first.all { it.isLetterOrDigit() || it == '.' || it == '_' } && first.first().isLetter() && first.last() != '.'
     }
 
     private fun String.normalized() = replace('\\', '/').trim('/')
