@@ -887,10 +887,11 @@ void EmulateIfNeeded(XrInstance instance) {
         return best;
     };
     if (g_family == Family::Pico) {
-        // The player asked for the Steam Frame's controls and the game has them: they are the ones read (Moss makes its own actions for that profile, which a table
-        // translated from the Touch's would leave without a binding).
-        if (!valve.empty() && g_preferFrame.load() && EmulateFrom(instance, valve, "valve", stash[valve])) {
-            LOGI("the game uses the Steam Frame's controls, as the player asked");
+        // The game has the Steam Frame's controls: they are the ones read. A game made for the Steam Frame makes its own actions for that profile (Moss), which a table
+        // translated from the Touch's would leave without a binding, and the player would find the game deaf to the controllers. Nothing is detected or asked: a Pico has
+        // no profile the game knows, so both tables have to be translated and the one the game was made for goes first. The Touch's is the fallback.
+        if (!valve.empty() && EmulateFrom(instance, valve, "valve", stash[valve])) {
+            LOGI("the game has the Steam Frame's controls: they are translated onto this device's controllers%s", g_preferFrame.load() ? ", as the player asked" : "");
             return;
         }
         const std::string touch = richest(kMetaProfiles, sizeof(kMetaProfiles) / sizeof(*kMetaProfiles));

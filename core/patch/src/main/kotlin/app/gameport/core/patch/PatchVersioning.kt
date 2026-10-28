@@ -19,7 +19,7 @@ object PatchVersioning {
     const val GENERATION = 9
 
     /** Raised during development when the patches' logic changes; back to 0 at each release. A release build counts it too, so an alpha carries it. */
-    const val DEV_REVISION = 5
+    const val DEV_REVISION = 6
 
     private const val STEP = 1_000
     private val injected = listOf(
