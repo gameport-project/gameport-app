@@ -30,6 +30,16 @@
     <string name="game_kind_vr">VR</string>
     <string name="game_kind_flat">Flat</string>
     <string name="game_dlc_title">Add extra content?</string>
+    <string name="extra_title">Extra content</string>
+    <string name="extra_legend">The extra content of this game that the account has. It is added to the game\'s files, and what was added from here can be removed again.</string>
+    <string name="extra_installed">Installed</string>
+    <string name="extra_not_installed">Not installed · %1$s to download</string>
+    <string name="extra_downloading">Downloading… %1$d%%</string>
+    <string name="extra_removing">Removing…</string>
+    <string name="extra_install">Install</string>
+    <string name="extra_remove">Remove</string>
+    <string name="extra_with_game">Installed with the game: only a new installation of the game takes it off.</string>
+    <string name="extra_failed">The last try did not work: %1$s</string>
     <string name="game_dlc_install">Install (%1$s · %2$s)</string>
     <string name="game_not_found">This game is not in the library.</string>
     <string name="game_settings_title">Game settings</string>

@@ -28,6 +28,16 @@
     <string name="game_owned">Possédé</string>
     <string name="game_family_shared">Partagé par la famille</string>
     <string name="game_kind_flat">Plat</string>
+    <string name="extra_title">Contenu supplémentaire</string>
+    <string name="extra_legend">Le contenu supplémentaire de ce jeu que le compte possède. Il s\'ajoute aux fichiers du jeu, et ce qui a été ajouté d\'ici peut être retiré.</string>
+    <string name="extra_installed">Installé</string>
+    <string name="extra_not_installed">Non installé · %1$s à télécharger</string>
+    <string name="extra_downloading">Téléchargement… %1$d %%</string>
+    <string name="extra_removing">Retrait…</string>
+    <string name="extra_install">Installer</string>
+    <string name="extra_remove">Retirer</string>
+    <string name="extra_with_game">Installé avec le jeu : seule une nouvelle installation du jeu le retire.</string>
+    <string name="extra_failed">Le dernier essai n\'a pas fonctionné : %1$s</string>
     <string name="game_dlc_title">Ajouter du contenu supplémentaire ?</string>
     <string name="game_dlc_install">Installer (%1$s · %2$s)</string>
     <string name="game_not_found">Ce jeu n\'est pas dans la bibliothèque.</string>

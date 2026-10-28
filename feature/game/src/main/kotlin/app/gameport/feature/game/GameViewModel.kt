@@ -77,7 +77,7 @@ sealed interface Repatch {
 @HiltViewModel
 class GameViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    repository: SteamLibraryRepository,
+    private val repository: SteamLibraryRepository,
     private val installer: GameInstallRepository,
     private val issuesRepository: GameIssuesRepository,
     private val saveSpaces: app.gameport.core.sync.SaveSpaceStore,
@@ -112,12 +112,32 @@ class GameViewModel @Inject constructor(
 
     val speedUnit: StateFlow<SpeedUnit> = settings.speedUnit
 
+
     /** How much of the page's height the game's artwork covers, in percent (a look setting). */
     val artworkHeight: StateFlow<Int> = settings.display
         .map { it.gameArtworkHeight }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), app.gameport.core.model.DisplaySettings.DEFAULT_GAME_ARTWORK_HEIGHT)
 
     private val appId = savedStateHandle.toRoute<GameRoute>().appId
+
+    /** The extra content (DLC) of the game that the account has, with what is on the device and the work in progress. */
+    val extraContent: StateFlow<app.gameport.core.model.ExtraContent> = combine(
+        repository.observeGame(appId),
+        installer.observeInstalledDlc(appId),
+        installer.observeDlcWork(appId),
+    ) { game, (installed, removable), work ->
+        app.gameport.core.model.ExtraContent.of(game?.androidBuild?.dlc.orEmpty(), installed, removable, work)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), app.gameport.core.model.ExtraContent())
+
+    fun onInstallDlc(dlcAppId: Int) {
+        viewModelScope.launch { repository.observeGame(appId).first()?.let { installer.installDlc(it, dlcAppId) } }
+    }
+
+    fun onRemoveDlc(dlcAppId: Int) {
+        viewModelScope.launch { repository.observeGame(appId).first()?.let { installer.removeDlc(it, dlcAppId) } }
+    }
+
+    fun onDismissDlcError() = installer.clearDlcError(appId)
 
     private val baseState: StateFlow<GameUiState> = combine(
         repository.observeLibrary().toGameState(appId),
