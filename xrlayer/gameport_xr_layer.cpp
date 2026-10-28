@@ -396,6 +396,30 @@ XrResult XRAPI_CALL Layer_xrCreateSwapchain(XrSession session, const XrSwapchain
         info = &fixed;
     }
     XrResult result = g_createSwapchain(session, info, swapchain);
+    // A runtime may refuse a usage the game asks for out of habit (Pico's: "contains invalid flags" for an input attachment, which Metro Awakening asks for), and the game is
+    // then left with no image at all. Only after a refusal, the swapchain is asked for again with fewer usages: first without the input attachment, then also without the
+    // copies and the unordered access. What the game really needs (color, depth, sampling) stays.
+    XrSwapchainCreateInfo reduced;
+    if (XR_FAILED(result) && info && swapchain) {
+        constexpr XrSwapchainUsageFlags kInputAttachment = 0x80;
+        constexpr XrSwapchainUsageFlags kCopies = 0x04 | 0x08 | 0x10;  // unordered access, transfer source, transfer destination
+        const XrSwapchainUsageFlags steps[] = {info->usageFlags & ~kInputAttachment, info->usageFlags & ~(kInputAttachment | kCopies)};
+        XrSwapchainUsageFlags last = info->usageFlags;
+        for (XrSwapchainUsageFlags usage : steps) {
+            if (usage == last || usage == 0) continue;
+            last = usage;
+            reduced = *info;
+            reduced.usageFlags = usage;
+            const XrResult again = g_createSwapchain(session, &reduced, swapchain);
+            LOGI("xrCreateSwapchain refused usage 0x%llx (%d): asked again with 0x%llx -> %d", (unsigned long long)info->usageFlags, (int)result,
+                 (unsigned long long)usage, (int)again);
+            if (XR_SUCCEEDED(again)) {
+                result = again;
+                info = &reduced;
+                break;
+            }
+        }
+    }
     if (XR_SUCCEEDED(result) && info && swapchain) {
         std::lock_guard<std::mutex> lock(g_mutex);
         g_swapchainSize[*swapchain] = {info->width, info->height};
