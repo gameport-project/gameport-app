@@ -226,4 +226,15 @@ class ExpansionFilesTest {
         assertTrue(before > 0)
         assertEquals("after the files moved, the download holds nothing to count", 0L, ExpansionFiles.bytesToPlace(root, pkg, skipped = "patched"))
     }
+
+    @Test
+    fun `an extra content added to a game keeps the game's own expansion files, and its paths are told for taking it off`() {
+        val target = File(folder.root, "obb/$pkg").apply { mkdirs() }
+        File(target, "main.5.$pkg.obb").writeText("the game's own")
+        val placed = ExpansionFiles.place(download("obb/main.9.$pkg.obb", "obb/Content/puzzle.pak"), target, pkg, skipped = "patched", replaceOlder = false)
+        assertEquals(setOf("main.9.$pkg.obb", "Content/puzzle.pak"), placed.toSet())
+        // The older main file is not taken for superseded: the extra content does not stand for the game's.
+        assertTrue(File(target, "main.5.$pkg.obb").exists())
+        assertTrue(placed.all { File(target, it).isFile })
+    }
 }

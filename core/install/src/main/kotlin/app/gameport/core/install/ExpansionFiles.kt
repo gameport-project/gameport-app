@@ -17,12 +17,20 @@ internal object ExpansionFiles {
      * One file that fails does not stop the others. Each file is made readable by all. What went wrong is added to [problems], one line each (the file and the
      * error), so a report can say why nothing was placed instead of saying there was nothing to place.
      */
-    fun place(downloaded: File, target: File, packageName: String, skipped: String, problems: MutableList<String> = mutableListOf()): List<String> {
+    fun place(
+        downloaded: File,
+        target: File,
+        packageName: String,
+        skipped: String,
+        problems: MutableList<String> = mutableListOf(),
+        /** False for extra content added to a game: what it brings does not replace the game's own files. */
+        replaceOlder: Boolean = true,
+    ): List<String> {
         val files = select(downloaded, packageName, skipped)
         if (files.isEmpty()) return emptyList()
         if (!target.mkdirs() && !target.isDirectory) problems += "the folder ${target.path} cannot be created (exists=${target.exists()}, parent writable=${target.parentFile?.canWrite()})"
         // A new version of the game replaces the expansion files of the old one, whatever code they were renamed to.
-        ObbNames.superseded(target.list().orEmpty().toList(), files.map { it.second }, packageName).forEach { File(target, it).delete() }
+        if (replaceOlder) ObbNames.superseded(target.list().orEmpty().toList(), files.map { it.second }, packageName).forEach { File(target, it).delete() }
         val placed = mutableListOf<String>()
         for ((file, relative) in files) {
             runCatching {

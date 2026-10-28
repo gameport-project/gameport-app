@@ -20,6 +20,11 @@ data class InstalledBuild(
      * written down. Android hides other apps' `Android/obb` folders, so this is the one reliable figure.
      */
     val expansionBytes: Long? = null,
+    /**
+     * For the extra content added later from the game's page, the files it placed (paths under the game's expansion folder), so that it can be taken off alone. The extra
+     * content chosen when the game was installed is in [dlc] but not here: its files are mixed with the game's.
+     */
+    val dlcFiles: Map<Int, List<String>> = emptyMap(),
 )
 
 /** Remembers what each installed game was installed from, to tell when Steam publishes a newer build. */
