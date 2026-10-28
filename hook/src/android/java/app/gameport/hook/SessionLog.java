@@ -59,6 +59,11 @@ final class SessionLog {
     private static final long NETWORK_EVERY_MS = 5_000;
     private int networkVersion;
     private int sentNetworkVersion = -1;
+    /** What each thread of the game was doing at a few moments (state and processor time), to tell a game that waits from one that works when its log stops. */
+    private final ArrayList<String> threads = new ArrayList<>();
+    private static final long[] THREAD_SNAPSHOTS_MS = {8_000, 20_000, 45_000};
+    private int threadsVersion;
+    private int sentThreadsVersion = -1;
     private Handler handler;
     private int version;
     private int sentVersion = -1;
@@ -100,7 +105,56 @@ final class SessionLog {
         }, "gameport-net");
         net.setDaemon(true);
         net.start();
+        Thread snapshots = new Thread(new Runnable() {
+            @Override public void run() { followThreads(); }
+        }, "gameport-threads");
+        snapshots.setDaemon(true);
+        snapshots.start();
         scheduleNext();
+    }
+
+    /** Writes the state of every thread of the game (read from /proc, which a process may read for itself) at a few moments after its start. */
+    private void followThreads() {
+        try {
+            long started = System.currentTimeMillis();
+            for (long at : THREAD_SNAPSHOTS_MS) {
+                long wait = at - (System.currentTimeMillis() - started);
+                if (wait > 0) Thread.sleep(wait);
+                StringBuilder text = new StringBuilder("after " + ((System.currentTimeMillis() - started) / 1000) + " s (tid, name, state S=sleeping R=running D=blocked, processor ticks user+system):\n");
+                File[] tasks = new File("/proc/self/task").listFiles();
+                if (tasks != null) {
+                    Arrays.sort(tasks);
+                    for (File task : tasks) {
+                        try {
+                            String stat = readSmall(new File(task, "stat"));
+                            int open = stat.indexOf('('), close = stat.lastIndexOf(')');
+                            if (open < 0 || close < open) continue;
+                            String[] rest = stat.substring(close + 2).split(" ");
+                            // After the name: state is field 0, utime field 11, stime field 12.
+                            String state = rest.length > 0 ? rest[0] : "?";
+                            long ticks = rest.length > 12 ? Long.parseLong(rest[11]) + Long.parseLong(rest[12]) : -1;
+                            text.append(task.getName()).append(' ').append(stat, open + 1, close).append(' ').append(state).append(' ').append(ticks).append('\n');
+                        } catch (Throwable ignored) {
+                            // A thread that ended meanwhile.
+                        }
+                    }
+                }
+                synchronized (threads) {
+                    threads.add(text.toString());
+                    threadsVersion++;
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "the threads of the game cannot be listed", t);
+        }
+    }
+
+    private static String readSmall(File file) throws java.io.IOException {
+        try (FileInputStream in = new FileInputStream(file)) {
+            byte[] buffer = new byte[2048];
+            int n = in.read(buffer);
+            return n <= 0 ? "" : new String(buffer, 0, n, "UTF-8").trim();
+        }
     }
 
     /**
@@ -228,9 +282,11 @@ final class SessionLog {
         synchronized (performance) { performanceAt = performanceVersion; }
         int networkAt;
         synchronized (network) { networkAt = networkVersion; }
+        int threadsAt;
+        synchronized (threads) { threadsAt = threadsVersion; }
         synchronized (head) {
             at = version;
-            if (at == sentVersion && performanceAt == sentPerformanceVersion && networkAt == sentNetworkVersion && librariesSignature.equals(sentLibraries) && exitSent) return;
+            if (at == sentVersion && performanceAt == sentPerformanceVersion && networkAt == sentNetworkVersion && threadsAt == sentThreadsVersion && librariesSignature.equals(sentLibraries) && exitSent) return;
             StringBuilder h = new StringBuilder();
             for (String line : head) h.append(line).append('\n');
             StringBuilder t = new StringBuilder();
@@ -247,6 +303,9 @@ final class SessionLog {
         StringBuilder traffic = new StringBuilder();
         synchronized (network) { for (String line : network) traffic.append(line).append('\n'); }
         extras.putByteArray("networkGz", gzip(traffic.toString()));
+        StringBuilder snapshots = new StringBuilder();
+        synchronized (threads) { for (String text : threads) snapshots.append(text).append('\n'); }
+        extras.putByteArray("threadsGz", gzip(snapshots.toString()));
         extras.putString("launch", launchInfo);
         extras.putString("nativeGaps", nativeGaps.report());
         extras.putString("libraries", libraries);
@@ -265,6 +324,7 @@ final class SessionLog {
                 sentVersion = at;
                 sentPerformanceVersion = performanceAt;
                 sentNetworkVersion = networkAt;
+                sentThreadsVersion = threadsAt;
                 sentLibraries = librariesSignature;
                 exitSent = true;
             }
