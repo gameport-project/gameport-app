@@ -413,7 +413,10 @@ class GameInstallRepository @Inject constructor(
     /** The extra content of the game that is on the device, and among it the ones that can be taken off alone. Follows the work on the extra content. */
     fun observeInstalledDlc(appId: Int): Flow<Pair<Set<Int>, Set<Int>>> = dlcWork.map {
         val build = builds.get(appId)
-        build?.dlc.orEmpty().let { it to it }
+        val folder = installedPackage(appId)?.let(::obbFolder)
+        // Counted as installed when the record says so and, where it holds the list of files, every one of them is still there.
+        val present = build?.dlc.orEmpty().filter { id -> folder == null || build?.dlcFiles?.get(id)?.all { File(folder, it).exists() } != false }.toSet()
+        present to present
     }.distinctUntilChanged()
 
     /** Dismisses the error of the last try on an extra content. */
@@ -726,11 +729,11 @@ class GameInstallRepository @Inject constructor(
                 }
                 setState(appId, InstallState.Installing)
                 // Installing over the game can leave its expansion folder empty: the files wait aside, and come back whatever the outcome.
-                val keptAside = stashExpansionFiles(appId, packageName)
+                stashExpansionFiles(appId, packageName)
                 val outcome = try { if (confirmTimeoutMs == null) packages.install(patched) { events.note(appId, it) } else kotlinx.coroutines.withTimeoutOrNull(confirmTimeoutMs) { packages.install(patched) { events.note(appId, it) } }
                     ?: PackageGateway.Outcome.Cancelled.also { events.note(appId, "the update was not confirmed in time: given up") }
                 } finally {
-                    if (keptAside > 0) withContext(NonCancellable) { restoreExpansionFiles(appId, packageName) }
+                    withContext(NonCancellable) { restoreExpansionFiles(appId, packageName) }
                 }
                 events.note(appId, "re-patch install outcome: $outcome")
                 if (outcome == PackageGateway.Outcome.Success) alignObbVersion(packageName)
@@ -1210,26 +1213,37 @@ class GameInstallRepository @Inject constructor(
 
     private fun obbStash(packageName: String) = File(context.getExternalFilesDir("obb-stash") ?: File(context.filesDir, "obb-stash"), packageName)
 
+    /** Games being installed over right now: their copy kept aside belongs to that install, which puts it back itself. */
+    private val steppingAside = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
     /** Puts the game's expansion files aside before it is installed over; the number of entries kept (zero when it has none or they cannot be moved). */
     private suspend fun stashExpansionFiles(appId: Int, packageName: String): Int = withContext(Dispatchers.IO) {
-        runCatching { ObbStash.stash(obbFolder(packageName), obbStash(packageName)) }
+        steppingAside += packageName
+        val result = runCatching { ObbStash.stash(obbFolder(packageName), obbStash(packageName)) }
             .onFailure { events.failure(appId, "keeping the expansion files aside", it) }
-            .getOrDefault(0)
-            .also { if (it > 0) events.note(appId, "$it expansion entr${if (it == 1) "y" else "ies"} kept aside while the game is installed over") }
+            .getOrNull() ?: return@withContext 0
+        if (result.moved > 0) events.note(appId, "${result.moved} expansion entr${if (result.moved == 1) "y" else "ies"} kept aside while the game is installed over")
+        result.failures.forEach { events.note(appId, "expansion file not kept aside: $it") }
+        result.moved
     }
 
-    /** Brings back the expansion files kept aside, and says so when the update had removed them. */
+    /** Brings back the expansion files kept aside, and says what happened to each. The copy kept aside stays whenever something went wrong. */
     private suspend fun restoreExpansionFiles(appId: Int, packageName: String) = withContext(Dispatchers.IO) {
-        runCatching { ObbStash.restore(obbStash(packageName), obbFolder(packageName)) }
-            .onFailure { events.failure(appId, "putting the expansion files back", it) }
-            .getOrDefault(0)
-            .also { events.note(appId, if (it > 0) "$it expansion entr${if (it == 1) "y" else "ies"} put back: the update had removed them" else "the expansion files were kept by the update") }
+        try {
+            val result = runCatching { ObbStash.restore(obbStash(packageName), obbFolder(packageName)) }
+                .onFailure { events.failure(appId, "putting the expansion files back", it) }
+                .getOrNull() ?: return@withContext
+            if (result.moved > 0) events.note(appId, "${result.moved} expansion entr${if (result.moved == 1) "y" else "ies"} checked and put back")
+            result.failures.forEach { events.note(appId, "expansion file not put back, the copy kept aside stays: $it") }
+        } finally {
+            steppingAside -= packageName
+        }
     }
 
     /** What a patch stopped half way left aside is put back, for every installed game: found at the start and before a launch. */
     fun restoreLeftExpansionFiles() {
         val root = context.getExternalFilesDir("obb-stash") ?: return
-        root.listFiles()?.filter { it.isDirectory }?.forEach { stash ->
+        root.listFiles()?.filter { it.isDirectory && it.name !in steppingAside }?.forEach { stash ->
             runCatching { ObbStash.restore(stash, obbFolder(stash.name)) }
         }
     }

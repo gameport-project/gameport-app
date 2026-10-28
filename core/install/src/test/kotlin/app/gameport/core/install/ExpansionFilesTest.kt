@@ -237,4 +237,51 @@ class ExpansionFilesTest {
         assertTrue(File(target, "main.5.$pkg.obb").exists())
         assertTrue(placed.all { File(target, it).isFile })
     }
+
+    /** What the game needs from a folder it did not make: to read it and to enter it. */
+    private fun others(file: File): Set<java.nio.file.attribute.PosixFilePermission> =
+        java.nio.file.Files.getPosixFilePermissions(file.toPath()).filter { it.name.startsWith("OTHERS") }.toSet()
+
+    private val read = java.nio.file.attribute.PosixFilePermission.OTHERS_READ
+    private val enter = java.nio.file.attribute.PosixFilePermission.OTHERS_EXECUTE
+
+    private fun shut(file: File) = java.nio.file.Files.setPosixFilePermissions(file.toPath(), java.nio.file.attribute.PosixFilePermissions.fromString(if (file.isDirectory) "rwxrwx---" else "rw-rw----"))
+
+    @Test
+    fun `a folder GamePort made for the expansion is open to the game, not only the files in it`() {
+        val target = File(folder.root, "obb/$pkg")
+        place(download("main.9.$pkg.obb", "assets/dependencies.bundle", "assets/deep/vr.bundle"), target)
+
+        assertTrue(enter in others(File(target, "assets")) && read in others(File(target, "assets")))
+        assertTrue(enter in others(File(target, "assets/deep")))
+        assertTrue(read in others(File(target, "assets/deep/vr.bundle")))
+    }
+
+    @Test
+    fun `a folder that was made shut is opened, deep ones included, and the game's own folder is left alone`() {
+        val target = File(folder.root, "obb/$pkg").apply { mkdirs() }
+        val deep = File(target, "assets/deep").apply { mkdirs() }
+        val file = File(deep, "vr.bundle").apply { writeText("x") }
+        listOf(File(target, "assets"), deep, file).forEach(::shut)
+        shut(target)
+
+        ExpansionFiles.openToAll(target)
+
+        assertTrue(enter in others(File(target, "assets")) && read in others(File(target, "assets")))
+        assertTrue(enter in others(deep) && read in others(deep))
+        assertTrue(read in others(file))
+        assertEquals("the folder the system made for the game keeps its mode", emptySet<java.nio.file.attribute.PosixFilePermission>(), others(target))
+    }
+
+    @Test
+    fun `opening what is already open changes nothing and does not fail on a missing folder`() {
+        val target = File(folder.root, "obb/$pkg")
+        ExpansionFiles.openToAll(target)
+        place(download("assets/a.bundle"), target)
+        val before = others(File(target, "assets"))
+
+        ExpansionFiles.openToAll(target)
+
+        assertEquals(before, others(File(target, "assets")))
+    }
 }

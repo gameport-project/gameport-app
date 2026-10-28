@@ -45,6 +45,8 @@ internal object ExpansionFiles {
                 destination.setReadable(true, false)
             }.onSuccess { placed += relative }.onFailure { problems += "$relative (${file.length()} bytes): ${it.javaClass.simpleName}: ${it.message}" }
         }
+        // The folders made on the way are open to the game too, not only the files in them.
+        openToAll(target)
         return placed
     }
 
@@ -73,11 +75,34 @@ internal object ExpansionFiles {
                 file.length() == destination.length() -> file.delete()
             }
         }
-        directory.walkTopDown().filter { it.isFile && !it.canReadByAll() }.forEach { it.setReadable(true, false) }
+        openToAll(directory)
         return renamed
+    }
+
+    /**
+     * Opens what is under [directory] to every app: a file to be read, a folder to be read and entered. What GamePort makes there is GamePort's, with a mode that keeps everyone
+     * else out, so a game cannot open a file of its own expansion that lies in a folder GamePort made (`assets/` of Escape Simulator): it finds the folder shut, its asset bundles
+     * "cannot be opened", and starts without its VR rig and its texts. [directory] itself is the game's own folder, made by the system, and is left as it is. Safe to run again.
+     */
+    fun openToAll(directory: File) {
+        directory.walkTopDown().forEach { entry ->
+            when {
+                entry == directory -> Unit
+                entry.isDirectory -> if (!entry.canEnterByAll()) {
+                    entry.setReadable(true, false)
+                    entry.setExecutable(true, false)
+                }
+                entry.isFile -> if (!entry.canReadByAll()) entry.setReadable(true, false)
+            }
+        }
     }
 
     private fun File.canReadByAll(): Boolean = runCatching {
         java.nio.file.attribute.PosixFilePermission.OTHERS_READ in java.nio.file.Files.getPosixFilePermissions(toPath())
+    }.getOrDefault(true)
+
+    private fun File.canEnterByAll(): Boolean = runCatching {
+        val modes = java.nio.file.Files.getPosixFilePermissions(toPath())
+        java.nio.file.attribute.PosixFilePermission.OTHERS_READ in modes && java.nio.file.attribute.PosixFilePermission.OTHERS_EXECUTE in modes
     }.getOrDefault(true)
 }
