@@ -42,9 +42,11 @@ class JavaSteamGameDownloader @Inject constructor(
 
             // The speed shown is worked out from what was received over time, so it is told at a steady pace and not only when a chunk completes.
             val latest = java.util.concurrent.atomic.AtomicReference(NO_PROGRESS_YET)
+            var ticks = 0
             val ticker = launch {
                 while (true) {
                     delay(PROGRESS_TICK_MS)
+                    if (++ticks % THREAD_REFRESH_TICKS == 0) DownloadThreads.refresh()
                     onProgress(latest.get(), session.receivedBytes(depotIds) - startBytes)
                 }
             }
@@ -57,10 +59,9 @@ class JavaSteamGameDownloader @Inject constructor(
                         uncompressedBytes: Long,
                     ) {
                         fractionByDepot[depotId] = depotPercentComplete
-                        // What came over the network, so files checked on disk (a resumed download) do not count.
-                        val overall = DownloadProgress.overall(depotIds, fractionByDepot, depotBytes)
-                        latest.set(overall)
-                        onProgress(overall, session.receivedBytes(depotIds) - startBytes)
+                        // What came over the network, so files checked on disk (a resumed download) do not count. Told by the ticker below, twice a second: telling it at every chunk
+                        // (dozens a second on a fast link) made the screens redraw as often, and the app lagged while a game downloaded.
+                        latest.set(DownloadProgress.overall(depotIds, fractionByDepot, depotBytes))
                     }
 
                     override fun onDownloadFailed(item: DownloadItem, error: Throwable) {
@@ -72,21 +73,48 @@ class JavaSteamGameDownloader @Inject constructor(
                 require(depotIds.isNotEmpty()) { "No Android depot to download." }
                 downloader.add(AppItem(appId, installDirectory = directory.absolutePath, depot = depotIds))
                 downloader.finishAdding()
+                // The worker threads run at background priority while this goes on, and only then (see [DownloadThreads]).
+                DownloadThreads.begin()
                 try {
                     downloader.getCompletion().await()
                 } finally {
                     ticker.cancel()
+                    DownloadThreads.end()
                 }
             }
             failure.get()?.let { throw it }
         }
     }
+
+    override suspend fun subscribedWorkshopItems(appId: Int): List<Long>? = withContext(Dispatchers.IO) {
+        val session = sessions.current.value ?: return@withContext null
+        app.gameport.core.steam.session.SteamInspector.subscribedWorkshopIds(session, appId)
+    }
+
+    override suspend fun downloadWorkshopItem(appId: Int, itemId: Long, manifestId: Long, directory: File, onProgress: (Float) -> Unit) {
+        withContext(Dispatchers.IO) {
+            val session = sessions.current.value
+                ?: kotlinx.coroutines.withTimeoutOrNull(SESSION_WAIT_MS) { sessions.current.filterNotNull().first() }
+                ?: error("Not signed in to Steam")
+            require(manifestId > 0L) { "Steam gave no content for this item" }
+            directory.mkdirs()
+            android.util.Log.i("GPWorkshop", "item $itemId: fetching depot $appId at manifest $manifestId")
+            app.gameport.core.steam.session.SteamWorkshopFetch.fetch(session, appId, appId, manifestId, directory, onProgress)
+            android.util.Log.i("GPWorkshop", "item $itemId: fetched")
+        }
+    }
 }
 
-/** How often the received bytes are told to the install, whatever the downloader reports. */
-private const val PROGRESS_TICK_MS = 1_000L
+/** How often the progress and the received bytes are told to the install: the downloader reports at every chunk, which is far too often for a screen. */
+private const val PROGRESS_TICK_MS = 500L
+
+/** The pool starts threads as it needs them: the ones it started since are lowered every this many ticks. */
+private const val THREAD_REFRESH_TICKS = 4
 
 /** Told before any chunk is complete: the progress is not known yet, and the one the install already shows (a resumed download) stays. */
 const val NO_PROGRESS_YET = -1f
 
 private const val SESSION_WAIT_MS = 30_000L
+
+/** A Workshop item that has shown nothing for this long is given up. */
+private const val WORKSHOP_STALL_MS = 30_000L

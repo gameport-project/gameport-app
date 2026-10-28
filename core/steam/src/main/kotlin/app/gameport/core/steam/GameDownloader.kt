@@ -21,4 +21,15 @@ interface GameDownloader {
         depotBytes: Map<Int, Long> = emptyMap(),
         onProgress: (fraction: Float, bytesReceived: Long) -> Unit,
     )
+
+    /**
+     * Downloads the Workshop item [itemId] of [appId] into [directory]: an item is the depot of its game (the depot has the game's number) at the manifest [manifestId] that the item's record gives. [onProgress] gets the
+     * 0..1 progress. Throws if the download fails; cancelling the calling coroutine stops it.
+     */
+    suspend fun downloadWorkshopItem(appId: Int, itemId: Long, manifestId: Long, directory: File, onProgress: (fraction: Float) -> Unit) {
+        error("Workshop items cannot be downloaded here")
+    }
+
+    /** The Workshop items of [appId] the signed-in account is subscribed to (read only), or null when they cannot be read. */
+    suspend fun subscribedWorkshopItems(appId: Int): List<Long>? = null
 }

@@ -14,6 +14,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import java.io.FileNotFoundException
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
 @EntryPoint
@@ -53,6 +54,12 @@ internal interface CloudEntryPoint {
     fun steamAchievements(): SteamAchievementSync
 
     fun expansionHandoff(): app.gameport.core.install.ExpansionHandoff
+
+    fun workshop(): app.gameport.core.install.WorkshopRepository
+
+    fun inGameDlc(): app.gameport.core.install.InGameDlc
+
+    fun installs(): app.gameport.core.install.GameInstallRepository
 }
 
 /**
@@ -73,6 +80,9 @@ internal interface CloudEntryPoint {
  * - `log` (its last log lines, how its last runs ended) -> kept for a problem report
  * - `achievement` (the names) -> the game unlocked achievements: they are announced
  * - `closed` -> the game's process is ending
+ * - `workshop` (the ids of Workshop items the game asks for) -> the state of each, started when new (see [app.gameport.core.install.WorkshopRepository])
+ * - `dlc` (the ids of extra contents the game asks to install) -> the state of each, installing the ones that are not there
+ * - `workshop_files` (an item id) -> the files of that item; they are read through `openFile` (`workshop`)
  * - `obb_list` -> the expansion files that wait for the game, with their sizes; `obb_progress` (done, total) and `obb_done` (ok, reason) -> the game is placing them
  *   in its own folder, which GamePort cannot write on some devices (see [app.gameport.core.install.ExpansionHandoff]). Only while GamePort asked for it.
  *
@@ -108,6 +118,10 @@ class CloudProvider : ContentProvider() {
             val appId = entryPoint.installedGames().all().entries.firstOrNull { it.value == packageName }?.key
             val settings = appId?.let { entryPoint.gameSettings().get(it) }
             Bundle().apply {
+                // The extra contents that are on the device now (the ones the account has and whose files are placed): the game is told only these are installed.
+                putString("dlcInstalled", appId?.let { id -> runCatching { runBlocking { kotlinx.coroutines.withTimeoutOrNull(3_000) { entryPoint.installs().observeInstalledDlc(id).first().first } } }.getOrNull() }.orEmpty().sorted().joinToString(","))
+                putString("ownedApps", runCatching { runBlocking { entryPoint.inGameDlc().ownedApps() } }.getOrDefault(emptySet()).sorted().joinToString(","))
+                putString("dlcWithContent", runCatching { runBlocking { entryPoint.inGameDlc().withContent(packageName) } }.getOrDefault(emptySet()).sorted().joinToString(","))
                 putBoolean("seated", settings?.seated == true)
                 // The player asked for the play space that the headset's recentering moves, for a game that keeps a fixed one: auto (where the headset has no play area), on or off.
                 putString("xrRecenter", (settings?.recenter ?: app.gameport.core.model.RecenterMode.AUTO).name.lowercase())
@@ -206,6 +220,30 @@ class CloudProvider : ContentProvider() {
             putBoolean("catchup", coordinator.isCatchUp(packageName) || entryPoint.expansionHandoff().isRequested(packageName))
         }
         "catchup_done" -> okAfter { coordinator.finishCatchUp(packageName) }
+        "workshop" -> Bundle().apply {
+            // What the game already holds whole ("id:size" for each), so that GamePort can drop its own copy of those.
+            val have = extras.getStringArray("have").orEmpty().mapNotNull { line -> line.split(':').takeIf { it.size == 2 }?.let { (id, size) -> (id.toLongOrNull() ?: return@let null) to (size.toLongOrNull() ?: return@let null) } }.toMap()
+            val answer = runBlocking { entryPoint.workshop().request(packageName, extras.getLongArray("ids")?.toList().orEmpty(), have) }
+            val items = answer.items
+            // The hook takes an item away from the game only when the subscriptions were read.
+            putBoolean("known", answer.subscriptionsKnown)
+            putString(STATUS, OK)
+            // One line per item: id, phase, fraction, size on disk, folder, title, maker, last update, error (tab separated).
+            putStringArray("items", items.map { listOf(it.id, it.phase.name, it.fraction, it.sizeOnDisk, it.folder, it.title.replace('\t', ' '), it.creator, it.updated, it.error.replace('\t', ' ').replace('\n', ' ')).joinToString("\t") }.toTypedArray())
+        }
+        "dlc" -> Bundle().apply {
+            val lines = runBlocking { entryPoint.inGameDlc().request(packageName, extras.getLongArray("ids")?.map { it.toInt() }.orEmpty()) }
+            putString(STATUS, OK)
+            // One line per extra content: id, phase, fraction (tab separated), as for the Workshop.
+            putStringArray("items", lines.map { listOf(it.id, it.phase, it.fraction).joinToString("\t") }.toTypedArray())
+        }
+        // The files of an installed Workshop item, for the game to copy into its own folder (it cannot enter the folders GamePort makes).
+        "workshop_files" -> Bundle().apply {
+            val files = entryPoint.workshop().filesOf(packageName, extras.getLong("id"))
+            putString(STATUS, OK)
+            putStringArray("names", files.map { it.first }.toTypedArray())
+            putLongArray("sizes", files.map { it.second }.toLongArray())
+        }
         "obb_list" -> Bundle().apply {
             val files = if (entryPoint.expansionHandoff().isRequested(packageName)) entryPoint.expansionHandoff().staged(packageName) else emptyList()
             putStringArray("names", files.map { it.name }.toTypedArray())
@@ -295,6 +333,12 @@ class CloudProvider : ContentProvider() {
                     file,
                     ParcelFileDescriptor.MODE_WRITE_ONLY or ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_TRUNCATE,
                 )
+            }
+            // One file of a Workshop item GamePort downloaded for this game.
+            "workshop" -> {
+                val file = entryPoint.workshop().fileOf(packageName, uri.getQueryParameter("id")?.toLongOrNull() ?: 0L, uri.getQueryParameter("name").orEmpty())
+                    ?: throw FileNotFoundException("workshop file unavailable")
+                ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
             }
             // The expansion files of this game, served to the game only while GamePort asked it to place them.
             "obb" -> {

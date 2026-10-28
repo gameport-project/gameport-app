@@ -77,6 +77,45 @@ object SteamInspector {
         }.getOrNull()
     }
 
+    /**
+     * The Workshop items of [appId] the signed-in account is subscribed to, as Steam's client protocol gives them (read only; nothing is subscribed to or changed), or why they
+     * could not be read. [type] is the list asked for (for instance "mysubscriptions").
+     */
+    suspend fun subscribedWorkshop(session: SteamSession, appId: Int, type: String): String = coroutineScope {
+        runCatching {
+            val messages = session.client.getHandler(`in`.dragonbra.javasteam.steam.handlers.steamunifiedmessages.SteamUnifiedMessages::class.java) ?: return@runCatching "no unified messages handler"
+            val service = messages.createService(`in`.dragonbra.javasteam.rpc.service.PublishedFile::class.java)
+            val request = `in`.dragonbra.javasteam.protobufs.steamclient.SteammessagesPublishedfileSteamclient.CPublishedFile_GetUserFiles_Request.newBuilder().apply {
+                steamid = session.client.steamID?.convertToUInt64() ?: error("not signed in")
+                this.appid = appId
+                page = 1
+                numperpage = 50
+                this.type = type
+                idsOnly = true
+            }.build()
+            val answer = kotlinx.coroutines.withTimeout(20_000) { service.getUserFiles(request).await() }
+            val body = answer.body.build()
+            "result ${answer.result} total ${body.total} items ${body.publishedfiledetailsList.map { it.publishedfileid }}"
+        }.getOrElse { "failed: ${it.javaClass.simpleName}: ${it.message}" }
+    }
+
+    /** The ids of the Workshop items of [appId] the signed-in account is subscribed to, or null when Steam did not answer. Read only. */
+    suspend fun subscribedWorkshopIds(session: SteamSession, appId: Int): List<Long>? = runCatching {
+        val messages = session.client.getHandler(`in`.dragonbra.javasteam.steam.handlers.steamunifiedmessages.SteamUnifiedMessages::class.java) ?: return null
+        val service = messages.createService(`in`.dragonbra.javasteam.rpc.service.PublishedFile::class.java)
+        val request = `in`.dragonbra.javasteam.protobufs.steamclient.SteammessagesPublishedfileSteamclient.CPublishedFile_GetUserFiles_Request.newBuilder().apply {
+            steamid = session.client.steamID?.convertToUInt64() ?: return null
+            this.appid = appId
+            page = 1
+            numperpage = 200
+            type = "mysubscriptions"
+            idsOnly = true
+        }.build()
+        val answer = kotlinx.coroutines.withTimeout(15_000) { service.getUserFiles(request).await() }
+        if (answer.result != `in`.dragonbra.javasteam.enums.EResult.OK) return null
+        answer.body.build().publishedfiledetailsList.map { it.publishedfileid }
+    }.getOrNull()
+
     private fun KeyValue.dump(out: StringBuilder, depth: Int) {
         for (child in children) {
             out.append("  ".repeat(depth)).append(child.name)
