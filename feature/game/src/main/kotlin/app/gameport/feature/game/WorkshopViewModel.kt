@@ -22,7 +22,8 @@ import kotlinx.coroutines.launch
 /** What the page of the Workshop is waiting for: the cookies that make Steam see the account, or the word that they could not be made. */
 sealed interface WorkshopState {
     data object Loading : WorkshopState
-    data class Ready(val cookies: WebCookies) : WorkshopState
+    /** The page can open; [cookies] is the account's, or null when the page is shown without it (a page of the shop). */
+    data class Ready(val cookies: WebCookies?) : WorkshopState
     data object Unavailable : WorkshopState
 }
 

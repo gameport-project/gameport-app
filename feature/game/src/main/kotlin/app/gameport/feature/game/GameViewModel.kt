@@ -98,11 +98,14 @@ class GameViewModel @Inject constructor(
     incompatibleGames: app.gameport.core.settings.IncompatibleGames,
     private val launchOptions: app.gameport.core.steam.LaunchOptionsRepository,
     private val verdicts: app.gameport.core.settings.GameVerdicts,
+    private val mediaRepository: app.gameport.core.sync.MediaRepository,
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
 ) : ViewModel() {
     init {
         // The arguments Steam lists for starting the game are kept now, so the game starts with them even without a connection.
         viewModelScope.launch { launchOptions.refresh(savedStateHandle.toRoute<GameRoute>().appId) }
+        // The screenshots and trailers are asked again when the list of them is old; what is kept shows meanwhile.
+        viewModelScope.launch { runCatching { mediaRepository.refreshIfStale() } }
         // The totals of the players are asked again when they are old; what is kept shows meanwhile.
         viewModelScope.launch { compat.refreshIfStale() }
     }
@@ -124,7 +127,7 @@ class GameViewModel @Inject constructor(
         repository.observeLibrary().toGameState(appId),
         installer.observe(appId),
         combine(issuesRepository.observe(appId), saveSpaces.observe(appId)) { issues, saveMode -> issues to saveMode },
-        combine(controllerMappings.observe(appId), gameSettingsStore.stageFallback(appId), gameSettingsStore.observe(appId)) { mapping, fallback, own -> Triple(mapping, fallback && own.recenter == app.gameport.core.model.RecenterMode.AUTO, own) },
+        combine(controllerMappings.observe(appId), gameSettingsStore.stageNotice(appId), gameSettingsStore.observe(appId)) { mapping, fallback, own -> Triple(mapping, fallback && own.recenter == app.gameport.core.model.RecenterMode.AUTO, own) },
         combine(playHistory.favorites, playHistory.hidden) { starred, hidden -> starred to hidden },
     ) { game, install, (issues, saveMode), (controllers, compatNotice), (favorites, hidden) ->
         if (game !is GameUiState.Content) return@combine game
@@ -150,6 +153,14 @@ class GameViewModel @Inject constructor(
     /** The account's achievements for the game: what was kept at once, then what Steam says. Null while unknown. */
     val achievements: StateFlow<app.gameport.core.model.AchievementList?> = achievementsRepository.observe(appId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    /** The screenshots and trailers of the game, as its page in the shop shows them, once the device has the file that holds them. */
+    val media: StateFlow<app.gameport.core.model.AppMedia?> = mediaRepository.observe(appId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    /** The extra content chosen for the install that is going, shown from its start. */
+    val extras: StateFlow<List<app.gameport.core.model.ExtraPlanItem>> = installer.observeExtras(appId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     private val savesNotSynced: Flow<Boolean> = saves.observe(appId).map { it.files.isNotEmpty() && !it.inSync }
 
@@ -273,6 +284,9 @@ class GameViewModel @Inject constructor(
     fun onSetHidden(hide: Boolean) = playHistory.setHidden(appId, hide)
 
     fun onToggleFavorite() = playHistory.toggleFavorite(appId)
+
+    /** The player opened the options the mark on the actions was about: the mark goes (until the game is adapted again). */
+    fun onCompatNoticeSeen() = gameSettingsStore.setStageNoticeSeen(appId)
 
     /** Permissions are granted outside GamePort: check the game's issues again when the page is shown. */
     fun refreshIssues() = issuesRepository.refresh()

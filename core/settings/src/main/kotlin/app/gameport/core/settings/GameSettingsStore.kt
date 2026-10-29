@@ -55,7 +55,18 @@ class GameSettingsStore @Inject constructor(
 
     fun setStageFallback(appId: Int, fallback: Boolean) {
         if (prefs.getBoolean("stagefallback_$appId", false) == fallback) return
-        prefs.edit().putBoolean("stagefallback_$appId", fallback).apply()
+        // A new situation (the layer adapted the game again, or no longer does) is news again: what the player had seen is forgotten.
+        prefs.edit().putBoolean("stagefallback_$appId", fallback).remove("stagefallbackseen_$appId").apply()
+        changes.value += 1
+    }
+
+    /** True while the game is adapted by the layer and the player has not looked at it yet: the page of the game marks it until it is opened. */
+    fun stageNotice(appId: Int): Flow<Boolean> = changes.map { prefs.getBoolean("stagefallback_$appId", false) && !prefs.getBoolean("stagefallbackseen_$appId", false) }
+
+    /** The player opened what the mark was about: it goes, until the layer adapts the game again. */
+    fun setStageNoticeSeen(appId: Int) {
+        if (prefs.getBoolean("stagefallbackseen_$appId", false)) return
+        prefs.edit().putBoolean("stagefallbackseen_$appId", true).apply()
         changes.value += 1
     }
 

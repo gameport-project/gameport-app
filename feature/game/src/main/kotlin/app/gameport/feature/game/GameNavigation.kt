@@ -41,15 +41,29 @@ fun NavController.navigateToGameCompat(appId: Int) = navigate(GameCompatRoute(ap
 
 fun NavController.navigateToGameWorkshop(appId: Int) = navigate(GameWorkshopRoute(appId))
 
-fun NavGraphBuilder.gameScreen(onBack: () -> Unit, onOpenSettings: (Int) -> Unit, onOpenSaves: (Int) -> Unit, onOpenControllers: (Int) -> Unit, onOpenCompat: (Int) -> Unit, onOpenAchievements: (Int) -> Unit, onOpenSteamSettings: () -> Unit, onOpenWorkshop: (Int) -> Unit) {
+/** A mock-up of a game's page with fixed data, to try a layout (see [GameMockupScreen]). */
+@Serializable
+data object GameMockupRoute
+
+fun NavGraphBuilder.gameMockupScreen(onBack: () -> Unit) {
+    composable<GameMockupRoute> { GameMockupScreen(onBack = onBack) }
+}
+
+fun NavGraphBuilder.gameScreen(onBack: () -> Unit, onOpenSettings: (Int) -> Unit, onOpenSaves: (Int) -> Unit, onOpenControllers: (Int) -> Unit, onOpenCompat: (Int) -> Unit, onOpenAchievements: (Int) -> Unit, onOpenSteamSettings: () -> Unit, onOpenWorkshop: (Int) -> Unit, onOpenStore: (Int) -> Unit) {
     composable<GameRoute> { entry ->
         val appId = entry.toRoute<GameRoute>().appId
-        GameScreen(onBack = onBack, onOpenSettings = { onOpenSettings(appId) }, onOpenSaves = { onOpenSaves(appId) }, onOpenControllers = { onOpenControllers(appId) }, onOpenCompat = { onOpenCompat(appId) }, onOpenAchievements = { onOpenAchievements(appId) }, onOpenSteamSettings = onOpenSteamSettings, onOpenWorkshop = { onOpenWorkshop(appId) })
+        GameScreen(onBack = onBack, onOpenSettings = { onOpenSettings(appId) }, onOpenSaves = { onOpenSaves(appId) }, onOpenControllers = { onOpenControllers(appId) }, onOpenCompat = { onOpenCompat(appId) }, onOpenAchievements = { onOpenAchievements(appId) }, onOpenSteamSettings = onOpenSteamSettings, onOpenWorkshop = { onOpenWorkshop(appId) }, onOpenStore = { onOpenStore(appId) })
     }
 }
 
 fun NavGraphBuilder.gameWorkshopScreen(onBack: () -> Unit) {
     composable<GameWorkshopRoute> { WorkshopScreen(onBack = onBack) }
+}
+
+fun NavController.navigateToSteamPage(url: String, title: String) = navigate(SteamPageRoute(url, title))
+
+fun NavGraphBuilder.steamPageScreen(onBack: () -> Unit) {
+    composable<SteamPageRoute> { SteamPageScreen(onBack = onBack) }
 }
 
 fun NavGraphBuilder.gameSettingsScreen(onBack: () -> Unit) {

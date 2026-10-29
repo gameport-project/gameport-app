@@ -51,6 +51,9 @@ import app.gameport.feature.game.gameControllersScreen
 import app.gameport.feature.game.navigateToGameCompat
 import app.gameport.feature.game.gameAchievementsScreen
 import app.gameport.feature.game.gameWorkshopScreen
+import app.gameport.feature.game.gameMockupScreen
+import app.gameport.feature.game.navigateToSteamPage
+import app.gameport.feature.game.steamPageScreen
 import app.gameport.feature.game.navigateToGameWorkshop
 import app.gameport.feature.game.navigateToGameAchievements
 import app.gameport.feature.game.gameSavesScreen
@@ -64,13 +67,13 @@ import app.gameport.feature.settings.settingsScreen
 import app.gameport.feature.library.libraryScreen
 
 @Composable
-fun GamePortApp(viewModel: AppViewModel = hiltViewModel(), openWorkshop: Int? = null, onWorkshopOpened: () -> Unit = {}) {
+fun GamePortApp(viewModel: AppViewModel = hiltViewModel(), openWorkshop: Int? = null, onWorkshopOpened: () -> Unit = {}, openMockup: Boolean = false, onMockupOpened: () -> Unit = {}) {
     // The height of the app's window is known to the dialogs, which keep to about 70 % of it.
-    app.gameport.core.designsystem.ProvideAppWindowHeight { GamePortContent(viewModel, openWorkshop, onWorkshopOpened) }
+    app.gameport.core.designsystem.ProvideAppWindowHeight { GamePortContent(viewModel, openWorkshop, onWorkshopOpened, openMockup, onMockupOpened) }
 }
 
 @Composable
-private fun GamePortContent(viewModel: AppViewModel, openWorkshop: Int?, onWorkshopOpened: () -> Unit) {
+private fun GamePortContent(viewModel: AppViewModel, openWorkshop: Int?, onWorkshopOpened: () -> Unit, openMockup: Boolean, onMockupOpened: () -> Unit) {
     val authState by viewModel.authState.collectAsStateWithLifecycle()
     val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
     val window = (LocalContext.current as? Activity)?.window
@@ -102,6 +105,15 @@ private fun GamePortContent(viewModel: AppViewModel, openWorkshop: Int?, onWorks
         onWorkshopOpened()
     }
 
+    // The page of a game with made-up data (the one of the tour), asked for by a debug build only (see MainActivity): it needs no account, so a phone or an emulator can show it.
+    LaunchedEffect(openMockup) {
+        if (!openMockup) return@LaunchedEffect
+        // After the start-up navigation (sign-in or library), which would otherwise take the page back.
+        kotlinx.coroutines.delay(800)
+        navController.navigate(app.gameport.feature.game.GameDemoRoute)
+        onMockupOpened()
+    }
+
     if (signedIn) app.gameport.feature.settings.AgeAsk()
     val targets = remember { TourTargets() }
     CompositionLocalProvider(LocalTourTargets provides targets, app.gameport.core.designsystem.LocalTourStarter provides { kind -> viewModel.tour.start(kind) }) {
@@ -120,11 +132,14 @@ private fun GamePortContent(viewModel: AppViewModel, openWorkshop: Int?, onWorks
         )
         compatScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame, onUnownedClick = { navController.navigate(StoreGameRoute(it)) })
         storeScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame, onStoreGame = { navController.navigate(StoreGameRoute(it)) })
-        storeGameScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame)
+        // A link to Steam opens in the browser GamePort has for its pages, so everything stays inside.
+        storeGameScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame, onOpenSteam = navController::navigateToSteamPage)
+        steamPageScreen(onBack = navController::goBack)
         settingsScreen(onBack = navController::goBack, onOpenGame = navController::navigateToGame)
         downloadsScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame)
-        gameScreen(onBack = navController::goBack, onOpenSettings = navController::navigateToGameSettings, onOpenSaves = navController::navigateToGameSaves, onOpenControllers = navController::navigateToGameControllers, onOpenCompat = navController::navigateToGameCompat, onOpenAchievements = navController::navigateToGameAchievements, onOpenSteamSettings = { navController.navigate(SettingsRoute(account = true)) }, onOpenWorkshop = navController::navigateToGameWorkshop)
+        gameScreen(onBack = navController::goBack, onOpenSettings = navController::navigateToGameSettings, onOpenSaves = navController::navigateToGameSaves, onOpenControllers = navController::navigateToGameControllers, onOpenCompat = navController::navigateToGameCompat, onOpenAchievements = navController::navigateToGameAchievements, onOpenSteamSettings = { navController.navigate(SettingsRoute(account = true)) }, onOpenWorkshop = navController::navigateToGameWorkshop, onOpenStore = { navController.navigate(StoreGameRoute(it)) })
         gameWorkshopScreen(onBack = navController::goBack)
+        gameMockupScreen(onBack = navController::goBack)
         gameControllersScreen(onBack = navController::goBack)
         gameCompatScreen(onBack = navController::goBack)
         gameAchievementsScreen(onBack = navController::goBack)

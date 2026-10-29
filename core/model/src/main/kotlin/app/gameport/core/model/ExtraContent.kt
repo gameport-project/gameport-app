@@ -9,6 +9,12 @@ data class DlcWork(
     val error: String? = null,
 )
 
+/**
+ * One extra content chosen for the game that is being installed. [withGame]: its files are in the game's own download, so it is in place when the game is; otherwise it is fetched
+ * on its own once the game is installed, one after the other, in the order of the list.
+ */
+data class ExtraPlanItem(val appId: Int, val name: String, val withGame: Boolean)
+
 /** One extra content of a game the account has: [installed] when it is on the device, [removable] when GamePort can take it off alone. */
 data class ExtraContentItem(
     val appId: Int,

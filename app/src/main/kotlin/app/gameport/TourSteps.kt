@@ -67,10 +67,8 @@ internal fun tourSteps(kind: TourKind): List<TourStep> = when (kind) {
     TourKind.GAME -> listOf(
         TourStep(TourIds.GAME_LABELS, R.string.tour_game_labels_title, R.string.tour_game_labels_text),
         TourStep(TourIds.GAME_ACTIONS, R.string.tour_game_actions_title, R.string.tour_game_actions_text),
-        TourStep(TourIds.GAME_SAVES, R.string.tour_game_saves_title, R.string.tour_game_saves_text),
-        TourStep(TourIds.GAME_REPORT, R.string.tour_game_report_title, R.string.tour_game_report_text),
-        TourStep(TourIds.GAME_COMPAT, R.string.tour_game_compat_title, R.string.tour_game_compat_text),
-        TourStep(TourIds.GAME_CONTROLLERS, R.string.tour_game_controllers_title, R.string.tour_game_controllers_text),
+        TourStep(TourIds.GAME_NOTES, R.string.tour_game_notes_title, R.string.tour_game_notes_text),
+        TourStep(TourIds.GAME_MENU, R.string.tour_game_menu_title, R.string.tour_game_menu_text),
         TourStep(TourIds.GAME_SETTINGS, R.string.tour_game_settings_title, R.string.tour_game_settings_text),
         TourStep(TourIds.GAME_ISSUES, R.string.tour_game_issues_title, R.string.tour_game_issues_text),
         TourStep(TourIds.GAME_INFO, R.string.tour_game_info_title, R.string.tour_game_info_text),

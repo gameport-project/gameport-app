@@ -3,6 +3,11 @@
     <string name="speed_megabytes">%1$s MB/s</string>
     <string name="speed_megabits">%1$s Mb/s</string>
     <string name="back">Back</string>
+    <string name="storemedia_trailer">Trailer</string>
+    <string name="storemedia_close">Close</string>
+    <string name="storemedia_previous">Previous</string>
+    <string name="storemedia_next">Next</string>
+    <string name="storemedia_unplayable">This trailer cannot be played here.</string>
     <string name="clear">Clear</string>
     <string name="game_error_space">Not enough free space: about %1$s needed, %2$s available.</string>
     <string name="game_error_signed_out">Steam sign-in required.</string>

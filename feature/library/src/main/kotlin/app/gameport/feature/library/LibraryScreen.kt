@@ -521,7 +521,8 @@ private fun Header(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        // The spacing and the size of the buttons are the ones of the shop's header: 12 dp apart, 48 dp each.
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             GamePortLogo(Modifier.size(40.dp))
             GlassSearchField(
                 value = state.query,
@@ -531,7 +532,7 @@ private fun Header(
             )
             // The number of filters narrowing the list sits on the button, so a filter left on is never a mystery.
             Box(Modifier.tourTarget(TourIds.HOME_FILTERS)) {
-                GlassIconButton(onClick = onOpenFilters) {
+                GlassIconButton(onClick = onOpenFilters, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Filled.FilterList, contentDescription = stringResource(R.string.library_filters))
                 }
                 val active = state.filters.activeCount
@@ -550,7 +551,7 @@ private fun Header(
             }
             // How many games are being installed sits on the button, as the filters do.
             Box(Modifier.tourTarget(TourIds.HOME_DOWNLOADS)) {
-                GlassIconButton(onClick = onOpenDownloads) {
+                GlassIconButton(onClick = onOpenDownloads, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Filled.Download, contentDescription = stringResource(R.string.library_downloads))
                 }
                 if (state.installing > 0) {
@@ -567,14 +568,14 @@ private fun Header(
                 }
             }
             // The shop and the table of compatibility each have their own button.
-            GlassIconButton(onClick = onOpenStore, modifier = Modifier.tourTarget(TourIds.HOME_STORE)) {
+            GlassIconButton(onClick = onOpenStore, modifier = Modifier.size(48.dp).tourTarget(TourIds.HOME_STORE)) {
                 Icon(Icons.Filled.Storefront, contentDescription = stringResource(R.string.library_store), tint = Color(0xFF4FC3F7))
             }
             // The table of compatibility: a big wrench with a list, the same mark as the header of the table.
-            GlassIconButton(onClick = onOpenCompat, modifier = Modifier.tourTarget(TourIds.HOME_COMPAT)) {
+            GlassIconButton(onClick = onOpenCompat, modifier = Modifier.size(48.dp).tourTarget(TourIds.HOME_COMPAT)) {
                 app.gameport.core.designsystem.CompatToolsIcon(size = 32.dp, contentDescription = stringResource(R.string.library_compat))
             }
-            GlassIconButton(onClick = onOpenSettings, modifier = Modifier.tourTarget(TourIds.HOME_SETTINGS)) {
+            GlassIconButton(onClick = onOpenSettings, modifier = Modifier.size(48.dp).tourTarget(TourIds.HOME_SETTINGS)) {
                 Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.library_settings))
             }
         }

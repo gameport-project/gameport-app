@@ -2,6 +2,8 @@ package app.gameport.core.designsystem
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,15 +30,26 @@ fun InstallStepper(stage: InstallStage, modifier: Modifier = Modifier) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         InstallStage.entries.forEach { entry ->
             val done = entry.ordinal < stage.ordinal
-            Text(
-                text = (if (done) "✓ " else "${entry.ordinal + 1}. ") + stringResource(entry.label()),
-                style = MaterialTheme.typography.labelLarge,
-                color = when {
-                    entry == stage -> MaterialTheme.colorScheme.primary
-                    done -> MaterialTheme.colorScheme.onSurface
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
+            val color = when {
+                entry == stage -> MaterialTheme.colorScheme.primary
+                done -> MaterialTheme.colorScheme.onSurface
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            // Only the tick of a finished step is green; its words keep the usual colour. The tick is an icon, not a character: a character from another font makes the line taller and the
+            // words move down when it arrives.
+            androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (done) {
+                    androidx.compose.material3.Icon(
+                        androidx.compose.material.icons.Icons.Filled.Check,
+                        contentDescription = null,
+                        tint = androidx.compose.ui.graphics.Color(0xFF4CAF50),
+                        modifier = Modifier.size(16.dp),
+                    )
+                } else {
+                    Text("${entry.ordinal + 1}.", style = MaterialTheme.typography.labelLarge, color = color)
+                }
+                Text(stringResource(entry.label()), style = MaterialTheme.typography.labelLarge, color = color)
+            }
         }
     }
 }

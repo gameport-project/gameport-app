@@ -72,7 +72,11 @@
     <string name="tour_game_issues_title">Avis</string>
     <string name="tour_game_issues_text">Quand un jeu installé a besoin de quelque chose, un avis apparaît ici avec son action : une nouvelle version, un patch plus récent, une permission manquante, des sauvegardes différentes, des manettes à remapper. Rien ne s\'affiche quand tout va bien.</string>
     <string name="tour_game_actions_title">Installer et jouer</string>
-    <string name="tour_game_actions_text">Le bouton principal installe le jeu, puis le lance. Pendant le téléchargement, il peut être mis en pause ou annulé. La désinstallation est à côté.</string>
+    <string name="tour_game_actions_text">Le bouton principal installe le jeu, puis le lance. Pendant le téléchargement, une carte montre les étapes et les contenus supplémentaires, et il peut être mis en pause ou annulé. Quand une nouvelle version ou un patch plus récent attend, le bouton demande quoi faire d\'abord.</string>
+    <string name="tour_game_notes_title">Notifications</string>
+    <string name="tour_game_notes_text">Ce qui demande un coup d\'œil : une nouvelle version, un patch plus récent, des sauvegardes qui ne correspondent pas à Steam, un jeu adapté par GamePort. La cloche porte leur nombre et ouvre ou ferme la carte ; chaque ligne mène à ce qu\'elle concerne.</string>
+    <string name="tour_game_menu_title">Menu</string>
+    <string name="tour_game_menu_text">Tout le reste du jeu dans un seul panneau : ses sauvegardes, son Workshop, ses manettes, ses options de compatibilité, le signalement d\'un problème, sa page dans le magasin, les favoris, le masquer, et le désinstaller.</string>
     <string name="tour_game_saves_title">Sauvegardes</string>
     <string name="tour_game_saves_text">Les sauvegardes restent synchronisées avec le Steam Cloud. Un point orange indique que celles de cet appareil et celles de Steam ne concordent pas, et la page explique laquelle est la plus récente.</string>
     <string name="tour_game_report_title">Signaler un problème</string>

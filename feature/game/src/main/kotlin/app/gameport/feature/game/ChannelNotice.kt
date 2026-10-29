@@ -27,7 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import app.gameport.core.designsystem.AlertNote
 import app.gameport.core.designsystem.BackdropDialog
 import app.gameport.core.designsystem.BackdropMenu
 import app.gameport.core.designsystem.GlassButton
@@ -36,23 +35,6 @@ import app.gameport.core.model.Game
 import app.gameport.core.model.UpdateChannel
 import app.gameport.core.model.UpdateChannels
 import java.util.Date
-
-/**
- * What the page of a game says when its Android version is on a channel (a branch of Steam) other than the normal one: that it is only there (the normal channel has nothing), or that the
- * game is installed and updated from such a channel. A test version may be unfinished, and the page says so in the same orange as the other alerts. Nothing for a game on the normal channel.
- */
-@Composable
-internal fun ChannelNotice(game: Game, channelInUse: String) {
-    val build = game.androidBuild ?: return
-    val followed = channelInUse != UpdateChannels.NORMAL && build.channels.any { it.name == channelInUse }
-    when {
-        build.onlyOnOtherChannels -> {
-            val names = if (followed) channelInUse else build.channels.filter { !it.passwordRequired }.joinToString(", ") { it.name }
-            AlertNote(stringResource(R.string.game_channel_only_title), stringResource(R.string.game_channel_only_text, names), Modifier.padding(bottom = 8.dp))
-        }
-        followed -> AlertNote(stringResource(R.string.game_channel_followed_title, channelInUse), stringResource(R.string.game_channel_followed_text, channelInUse), Modifier.padding(bottom = 8.dp))
-    }
-}
 
 /**
  * Asked when a game with nothing on the normal channel is installed: there is no Android version on it, there is one on these channels, and the player picks which to install. The most

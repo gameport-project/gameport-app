@@ -52,6 +52,7 @@ import app.gameport.core.designsystem.Glyph
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -84,7 +85,35 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.foundation.layout.IntrinsicSize
+import app.gameport.core.designsystem.GlassBorder
+import app.gameport.core.designsystem.GlassFill
+import app.gameport.core.designsystem.LocalBackdropColors
+import app.gameport.core.model.ExtraPlanItem
+import app.gameport.core.model.InstallStage
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import kotlinx.coroutines.delay
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.runtime.getValue
@@ -151,7 +180,7 @@ import app.gameport.core.model.Ownership
 import app.gameport.core.install.ExpansionStorageAccess
 
 @Composable
-fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -> Unit, onOpenControllers: () -> Unit, onOpenCompat: () -> Unit, onOpenAchievements: () -> Unit, onOpenSteamSettings: () -> Unit, onOpenWorkshop: () -> Unit = {}, viewModel: GameViewModel = hiltViewModel()) {
+fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -> Unit, onOpenControllers: () -> Unit, onOpenCompat: () -> Unit, onOpenAchievements: () -> Unit, onOpenSteamSettings: () -> Unit, onOpenWorkshop: () -> Unit = {}, onOpenStore: () -> Unit = {}, viewModel: GameViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val speedUnit by viewModel.speedUnit.collectAsStateWithLifecycle()
@@ -214,7 +243,11 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         achievements = achievements,
         onOpenAchievements = onOpenAchievements,
         onOpenWorkshop = onOpenWorkshop,
+        onOpenStore = onOpenStore,
         artworkHeight = artworkHeight,
+        extras = viewModel.extras.collectAsStateWithLifecycle().value,
+        media = viewModel.media.collectAsStateWithLifecycle().value,
+        onCompatNoticeSeen = viewModel::onCompatNoticeSeen,
         onToggleFavorite = viewModel::onToggleFavorite,
         onSetHidden = viewModel::onSetHidden,
         onBack = onBack,
@@ -276,6 +309,10 @@ internal fun GameContent(
     onOpenAchievements: () -> Unit = {},
     onOpenWorkshop: () -> Unit = {},
     artworkHeight: Int = DisplaySettings.DEFAULT_GAME_ARTWORK_HEIGHT,
+    extras: List<ExtraPlanItem> = emptyList(),
+    media: app.gameport.core.model.AppMedia? = null,
+    onCompatNoticeSeen: () -> Unit = {},
+    onOpenStore: () -> Unit = {},
 ) {
     Scaffold { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
@@ -287,7 +324,7 @@ internal fun GameContent(
                 )
                 is GameUiState.Content -> GameDetails(
                     game = uiState.game,
-                    install = uiState.install,
+                    installReal = uiState.install,
                     issues = uiState.issues,
                     repatch = uiState.repatch,
                     onRepatch = onRepatch,
@@ -332,10 +369,15 @@ internal fun GameContent(
                     onOpenAchievements = onOpenAchievements,
                     onOpenWorkshop = onOpenWorkshop,
                     artworkHeight = artworkHeight,
+                    extras = extras,
+                    media = media,
+                    onCompatNoticeSeen = onCompatNoticeSeen,
+                    onOpenStore = onOpenStore,
                 )
             }
             Row(
-                Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 32.dp, top = 16.dp),
+                // (The status bar is already left free by the page's scaffold: it is not counted twice.)
+                Modifier.align(Alignment.TopStart).padding(start = 32.dp, top = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -350,7 +392,8 @@ internal fun GameContent(
 @Composable
 private fun GameDetails(
     game: Game,
-    install: InstallState,
+    // The state the page really has; a debug build can play another one to look at the install (see [LayoutTrial]).
+    installReal: InstallState,
     issues: List<GameIssue>,
     repatch: Repatch,
     onRepatch: () -> Unit,
@@ -398,7 +441,40 @@ private fun GameDetails(
     onOpenAchievements: () -> Unit = {},
     onOpenWorkshop: () -> Unit = {},
     artworkHeight: Int = DisplaySettings.DEFAULT_GAME_ARTWORK_HEIGHT,
+    /** The extra content chosen for the install that is going, shown in its card. */
+    extras: List<ExtraPlanItem> = emptyList(),
+    media: app.gameport.core.model.AppMedia? = null,
+    onCompatNoticeSeen: () -> Unit = {},
+    onOpenStore: () -> Unit = {},
 ) {
+    var actionsOpen by rememberSaveable { mutableStateOf(false) }
+    // The card of the notifications: open when the page opens, closed from its cross or from the bell, opened again from the bell. Where the bell is says where its arrow points.
+    var notesShown by rememberSaveable { mutableStateOf(true) }
+    val pageScroll = rememberScrollState()
+    var topRowWidthPx by remember { mutableFloatStateOf(0f) }
+    var bellCenterPx by remember { mutableFloatStateOf(0f) }
+    val install = installReal
+    // The two questions the notifications can lead to: start the game over from scratch, and check its extra files.
+    var confirmingReinstall by remember { mutableStateOf(false) }
+    if (confirmingReinstall) {
+        BackdropDialog(
+            onDismissRequest = { confirmingReinstall = false },
+            title = { Text(stringResource(R.string.reinstall_title)) },
+            text = { Text(stringResource(R.string.reinstall_text)) },
+            confirmButton = { Button(onClick = { confirmingReinstall = false; onReinstallFromScratch() }) { Text(stringResource(R.string.reinstall_confirm)) } },
+            dismissButton = { GlassButton(onClick = { confirmingReinstall = false }) { Text(stringResource(R.string.repair_cancel)) } },
+        )
+    }
+    var confirmingRepair by remember { mutableStateOf(false) }
+    if (confirmingRepair) {
+        BackdropDialog(
+            onDismissRequest = { confirmingRepair = false },
+            title = { Text(stringResource(R.string.repair_title)) },
+            text = { Text(stringResource(R.string.repair_text)) },
+            confirmButton = { Button(onClick = { confirmingRepair = false; onRepair() }) { Text(stringResource(R.string.repair_confirm)) } },
+            dismissButton = { GlassButton(onClick = { confirmingRepair = false }) { Text(stringResource(R.string.repair_cancel)) } },
+        )
+    }
     var reporting by remember { mutableStateOf(false) }
     var confirmingHide by remember { mutableStateOf(false) }
     if (confirmingHide) {
@@ -427,6 +503,52 @@ private fun GameDetails(
     // Owned extra content is offered when installing; what the account lacks cannot be installed.
     val ownedDlc = game.androidBuild?.dlc.orEmpty().filter { it.owned }
     var choosingDlc by remember { mutableStateOf(false) }
+    // What waits for the game when Play is pressed: a new version, a newer patch (not while one of them is going on).
+    val updatePending = GameIssue.UpdateAvailable in issues && repatch == Repatch.None
+    val patchPending = GameIssue.PatchOutdated in issues && repatch == Repatch.None
+    var choosingPlay by remember { mutableStateOf(false) }
+    if (choosingPlay) {
+        BackdropDialog(
+            onDismissRequest = { choosingPlay = false },
+            // Half as wide as a usual dialog: a few words and three buttons one under the other.
+            minWidth = 260.dp,
+            maxWidth = 280.dp,
+            title = { Text(stringResource(R.string.game_play_pending_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // One sentence for what is waiting: a new version and a newer patch, or one of them.
+                    Text(stringResource(when {
+                        updatePending && patchPending -> R.string.game_play_pending_both
+                        updatePending -> R.string.issue_update_available
+                        else -> R.string.issue_patch_outdated
+                    }))
+                    // The words start at the left, under one another, as in the actions panel; every button is as wide as the dialog.
+                    Button(onClick = { choosingPlay = false; onPlay() }, modifier = Modifier.fillMaxWidth().height(ACTION_ROW_HEIGHT)) {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text(stringResource(R.string.game_play), Modifier.weight(1f))
+                    }
+                    if (updatePending) GlassButton(onClick = { choosingPlay = false; onUpdate() }, modifier = Modifier.fillMaxWidth().height(ACTION_ROW_HEIGHT)) {
+                        // Green, as the new version is in the notifications.
+                        Icon(Icons.Filled.Download, contentDescription = null, tint = NoteColors.Green, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text(stringResource(R.string.issue_update_action), Modifier.weight(1f))
+                    }
+                    if (patchPending) GlassButton(onClick = { choosingPlay = false; onRepatch() }, modifier = Modifier.fillMaxWidth().height(ACTION_ROW_HEIGHT)) {
+                        // Orange, as the newer patch is in the notifications.
+                        Icon(Icons.Filled.Build, contentDescription = null, tint = NoteColors.Orange, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text(stringResource(R.string.issue_patch_outdated_action), Modifier.weight(1f))
+                    }
+                    GlassButton(onClick = { choosingPlay = false }, modifier = Modifier.fillMaxWidth().height(ACTION_ROW_HEIGHT)) {
+                        Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text(stringResource(R.string.repair_cancel), Modifier.weight(1f))
+                    }
+                }
+            },
+        )
+    }
     // A game that most players could not run is installed only after the player has been told.
     var warning by remember { mutableStateOf(false) }
     val afterChannel = { if (ownedDlc.isEmpty()) onInstall(emptySet()) else choosingDlc = true }
@@ -466,7 +588,8 @@ private fun GameDetails(
             },
         )
     }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+    Box(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().verticalScroll(pageScroll).padding(bottom = 24.dp)) {
         // The artwork fades out into the backdrop rather than into a colour.
         // The page's layout does not depend on the setting: the artwork only fills more or less of what lies behind it. It covers
         // [artworkHeight] percent of the screen's height and fades out at its bottom edge, going down behind the content when it is taller than the slot kept for it.
@@ -491,10 +614,106 @@ private fun GameDetails(
                     )
                 }
             }
+            // What concerns the game as a whole sits at the top right, level with the back button, as small as the buttons of the shop's header.
+            // On a darker, more solid ground than the glass: over the artwork the buttons are hard to see otherwise.
+            // The buttons keep the size they are given, without the 48 dp touch minimum, so the group is as low as asked.
+            CompositionLocalProvider(androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp) {
+            Column(Modifier.align(Alignment.TopEnd).padding(end = 32.dp, top = 16.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            // Each button has the page's colour behind its glass (no ground around the group): they read over the artwork without a patch under them.
+            val buttonFill = Brush.linearGradient(LocalBackdropColors.current.toList())
+            // A new version is a notification too (green): its line has the button that starts the update. While an update or a patch goes on, its progress is in the page's own panel instead.
+            val updateNote = install is InstallState.Installed && GameIssue.UpdateAvailable in issues && repatch == Repatch.None
+            // A newer patch is a notification as well, next to the new version when there is one.
+            val patchNote = install is InstallState.Installed && GameIssue.PatchOutdated in issues && repatch == Repatch.None
+            // Every notification of the game, in one list: the new version, the newer patch, what the issues of the game say, then the saves and the adaptation. Only an installed game has them.
+            val notes = if (install !is InstallState.Installed) emptyList() else
+                listOfNotNull(
+                    if (updateNote) NoteItem(stringResource(R.string.issue_update_available), NoteColors.Green, NoteColors.GreenText, onUpdate, stringResource(R.string.issue_update_action)) else null,
+                    if (patchNote) NoteItem(stringResource(R.string.issue_patch_outdated), NoteColors.Orange, NoteColors.OrangeText, onRepatch, stringResource(R.string.issue_patch_outdated_action)) else null,
+                ) + issueNotes(
+                    issues = issues,
+                    busy = repatch is Repatch.Running,
+                    onPermissions = onOpenPermissions,
+                    onConflict = onResolveConflict,
+                    onSaves = onOpenSaves,
+                    onControllers = onOpenControllers,
+                    onActivateFrame = onActivateFrame,
+                    onAskRepair = { confirmingRepair = true },
+                    onAskReinstall = { confirmingReinstall = true },
+                    onReinstallWorks = onReinstallWorks,
+                ) + listOfNotNull(
+                    if (savesNotSynced) NoteItem(stringResource(R.string.game_attention_saves), NoteColors.Orange, NoteColors.OrangeText, onOpenSaves) else null,
+                    // Opening the options is looking at what was said: the line goes, and with it its part of the number on the bell.
+                    if (compatNotice) NoteItem(stringResource(R.string.game_attention_compat), NoteColors.Orange, NoteColors.OrangeText, { onCompatNoticeSeen(); onOpenCompat() }) else null,
+                )
+            val hasNotes = notes.isNotEmpty()
+            Row(
+                Modifier.onGloballyPositioned { topRowWidthPx = it.size.width.toFloat() },
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // The bell: the notifications of the game, what wants a look. It carries their number, and the card below points at it.
+                if (hasNotes) {
+                    Box(Modifier.tourTarget(TourIds.GAME_NOTES).onGloballyPositioned { bellCenterPx = it.positionInParent().x + it.size.width / 2f }) {
+                        GlassIconButton(onClick = { notesShown = !notesShown }, modifier = Modifier.size(40.dp).background(buttonFill, CircleShape)) {
+                            Icon(Icons.Filled.Notifications, contentDescription = stringResource(R.string.game_notifications_title))
+                        }
+                        Box(Modifier.align(Alignment.TopEnd).size(16.dp).clip(CircleShape).background(Color(0xFFFF9800)), contentAlignment = Alignment.Center) {
+                            Text(notes.size.toString(), style = MaterialTheme.typography.labelSmall, color = Color(0xFF1B1B1B))
+                        }
+                    }
+                }
+                // Opens the actions of the game. The steps of the tour that point at the buttons inside it point here.
+                Box(Modifier.tourTarget(TourIds.GAME_MENU)) {
+                    GlassButton(onClick = { actionsOpen = true }, modifier = Modifier.height(40.dp).background(buttonFill, RoundedCornerShape(50)), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 0.dp)) {
+                        Icon(Icons.Filled.Menu, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.game_actions))
+                    }
+                }
+                GlassIconButton(onClick = onOpenSettings, enabled = repatch !is Repatch.Running, modifier = Modifier.size(40.dp).background(buttonFill, CircleShape).tourTarget(TourIds.GAME_SETTINGS)) {
+                    Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.game_settings_title))
+                }
+                app.gameport.core.designsystem.TourHelpButton(app.gameport.core.model.TourKind.GAME, Modifier.size(40.dp).background(buttonFill, CircleShape))
+            }
+            if (hasNotes && notesShown) {
+                val card: @Composable () -> Unit = {
+                    NotificationCard(
+                        notes = notes,
+                        title = stringResource(R.string.game_notifications_title),
+                        closeLabel = stringResource(R.string.game_actions_close),
+                        arrowFromRightPx = (topRowWidthPx - bellCenterPx).coerceAtLeast(0f),
+                        onClose = { notesShown = false },
+                    )
+                }
+                if (LocalConfiguration.current.screenWidthDp.dp < COMPACT_WIDTH) {
+                    // On a phone the cover sits under this corner: the card is a popover, above the cover, under the buttons, its right edge on theirs. It is a window of its own, which
+                    // would stay over the page while the page scrolls under it: it is only there while the page is at its top.
+                    val gap = with(LocalDensity.current) { 6.dp.roundToPx() }
+                    val margin = with(LocalDensity.current) { 8.dp.roundToPx() }
+                    if (!actionsOpen && pageScroll.value < with(LocalDensity.current) { 24.dp.roundToPx() }) androidx.compose.ui.window.Popup(
+                        popupPositionProvider = remember(gap, margin) {
+                            object : androidx.compose.ui.window.PopupPositionProvider {
+                                override fun calculatePosition(
+                                    anchorBounds: androidx.compose.ui.unit.IntRect,
+                                    windowSize: androidx.compose.ui.unit.IntSize,
+                                    layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+                                    popupContentSize: androidx.compose.ui.unit.IntSize,
+                                ) = androidx.compose.ui.unit.IntOffset((anchorBounds.right - popupContentSize.width).coerceAtLeast(margin), anchorBounds.bottom + gap)
+                            }
+                        },
+                    ) { card() }
+                } else {
+                    card()
+                }
+            }
+            }
+            }
         }
         // The cover straddles the hero: half of it sits on the artwork, half below. On a narrow screen it is
         // centred above the details instead of beside them.
-        BoxWithConstraints(Modifier.fillMaxWidth().pullUp(CONTENT_OVERLAP)) {
+        // On a phone the cover is centred and would sit over the buttons at the top right: the content starts lower there, under them.
+        BoxWithConstraints(Modifier.fillMaxWidth().pullUp(if (LocalConfiguration.current.screenWidthDp.dp < COMPACT_WIDTH) CONTENT_OVERLAP - 60.dp else CONTENT_OVERLAP)) {
             val compact = maxWidth < COMPACT_WIDTH
             // Wide layout: the bottom of the cover is lined up with the bottom of the action buttons. The size card under the cover
             // then starts level with the first card beside it (patch panel or achievements), as far from the cover as that card is from the buttons.
@@ -551,9 +770,9 @@ private fun GameDetails(
                     CompatChips(compat, incompatible)
                 }
                 CompatDetails(compat, incompatible)
-                ChannelNotice(game, channelInUse)
                 FlowRow(
-                    modifier = Modifier.onGloballyPositioned { alignment.actionsPlaced(it) },
+                    // While an install goes on, the card is taller than the buttons: the cover keeps the place it has with the buttons (one row high), it does not follow the card.
+                    modifier = Modifier.onGloballyPositioned { alignment.actionsPlaced(it, if (install.stage != null) with(density) { ACTION_HEIGHT.toPx() } else null) },
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -568,100 +787,36 @@ private fun GameDetails(
                     onDuplicateChosen = onDuplicateChosen,
                         onDiscard = onDiscard,
                         onUninstall = onUninstall,
-                        onPlay = onPlay,
+                        // Play plays. When a new version or a newer patch is waiting, the player is asked first what to do: play as it is, update, patch again.
+                        onPlay = { if (updatePending || patchPending) choosingPlay = true else onPlay() },
                         onPatchAndPlay = onPatchAndPlay,
-                        patchOutdated = GameIssue.PatchOutdated in issues,
+                        patchOutdated = false,
+                        channel = channelInUse.takeIf { name -> name != UpdateChannels.NORMAL && game.androidBuild?.channels?.any { it.name == name } == true },
                         busy = repatch is Repatch.Running,
                         onReport = { reporting = true },
+                        extras = extras,
                     ) }
-                    if (install is InstallState.Installed) {
-                        Box(Modifier.tourTarget(TourIds.GAME_SAVES)) {
-                            GlassIconButton(onClick = onOpenSaves, enabled = repatch !is Repatch.Running) {
-                                Icon(Icons.Filled.CloudSync, contentDescription = stringResource(R.string.saves_title))
-                            }
-                            // The saves on this device and on Steam do not agree: the page of the saves says which.
-                            if (savesNotSynced) {
-                                Box(Modifier.align(Alignment.TopEnd).size(12.dp).clip(CircleShape).background(Color(0xFFFF9800)))
-                            }
-                        }
-                    }
-                    // A game that has a Workshop on Steam: its page opens here, with the account already signed in, and subscribing downloads the item for the game.
-                    if (install is InstallState.Installed && game.androidBuild?.hasWorkshop == true) {
-                        GlassIconButton(onClick = onOpenWorkshop, enabled = repatch !is Repatch.Running) {
-                            Icon(Icons.Filled.Extension, contentDescription = stringResource(R.string.workshop_button))
-                        }
-                    }
-                    if (install is InstallState.Installed) {
-                        GlassIconButton(onClick = { reporting = true }, modifier = Modifier.tourTarget(TourIds.GAME_REPORT)) {
-                            Icon(Icons.Filled.BugReport, contentDescription = stringResource(R.string.report_open))
-                        }
-                    }
-                    if (install is InstallState.Installed && vrDevice && game.androidBuild?.isVr != false) {
-                        // The options that make a game work: orange as the compatibility labels, with a small mark when GamePort adapted the game by itself.
-                        Box(Modifier.tourTarget(TourIds.GAME_COMPAT)) {
-                            GlassIconButton(onClick = onOpenCompat, enabled = repatch !is Repatch.Running) {
-                                Icon(Icons.Filled.Build, contentDescription = stringResource(R.string.gamecompat_button), tint = CompatOrange)
-                            }
-                            if (compatNotice) {
-                                Box(Modifier.align(Alignment.TopEnd).size(12.dp).clip(CircleShape).background(CompatOrange))
-                            }
-                        }
-                    }
-                    if (install is InstallState.Installed && controllerProfile) {
-                        GlassIconButton(onClick = onOpenControllers, enabled = repatch !is Repatch.Running, modifier = Modifier.tourTarget(TourIds.GAME_CONTROLLERS)) {
-                            Icon(
-                                Icons.Filled.SportsEsports,
-                                contentDescription = stringResource(R.string.controllers_title),
-                                tint = when {
-                                    controllerFrame -> ControllerForcedColor
-                                    controllerAutomatic -> KindBlue
-                                    else -> LocalContentColor.current
-                                },
-                            )
-                        }
-                    }
-                    GlassIconButton(onClick = onToggleFavorite) {
-                        Icon(
-                            Icons.Filled.Favorite,
-                            contentDescription = stringResource(if (favorite) R.string.game_unfavorite else R.string.game_favorite),
-                            tint = if (favorite) Color(0xFFE53935) else LocalContentColor.current,
-                        )
-                    }
-                    GlassIconButton(onClick = { if (hidden) onSetHidden(false) else confirmingHide = true }) {
-                        Icon(
-                            if (hidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                            contentDescription = stringResource(if (hidden) R.string.game_show_again else R.string.game_hide),
-                            // Hiding has the colour it has in the menu of a cover; showing again keeps the usual one.
-                            tint = if (hidden) LocalContentColor.current else HideRed,
-                        )
-                    }
-                    GlassIconButton(onClick = onOpenSettings, enabled = repatch !is Repatch.Running, modifier = Modifier.tourTarget(TourIds.GAME_SETTINGS)) {
-                        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.game_settings_title))
-                    }
-                    app.gameport.core.designsystem.TourHelpButton(app.gameport.core.model.TourKind.GAME)
                 }
-                if (install is InstallState.Installed && (issues.isNotEmpty() || repatch != Repatch.None)) {
+                // A patch or an update of the installed game goes through the steps of an install, in the same card.
+                (repatch as? Repatch.Running)?.let { Progress(state = it.asInstallState(), speedUnit = speedUnit, extras = emptyList(), onCancel = null) }
+                // The notifications are in the card of the bell, the progress of a patch in the card of the install; what stays here is the report that can be sent, and a patch that failed.
+                val suspected = issues.filterIsInstance<GameIssue.ProblemSuspected>().firstOrNull()
+                if (install is InstallState.Installed && (suspected != null || repatch is Repatch.Failed)) {
                     Box(Modifier.tourTarget(TourIds.GAME_ISSUES)) { IssuesPanel(
-                        issues = issues,
+                        problem = suspected,
                         repatch = repatch,
-                        speedUnit = speedUnit,
+                        updateAvailable = GameIssue.UpdateAvailable in issues,
                         onRepatch = onRepatch,
                         onUpdate = onUpdate,
                         onDismissRepatchError = onDiscard,
-                        onPermissions = onOpenPermissions,
-                        onConflict = onResolveConflict,
-                        onSaves = onOpenSaves,
-                        onControllers = onOpenControllers,
-                        onActivateFrame = onActivateFrame,
-                        onRepair = onRepair,
-                        onReinstallWorks = onReinstallWorks,
-                        onReinstallFromScratch = onReinstallFromScratch,
                         onReport = { reporting = true },
                         onDismissProblem = report.onDismissProblem,
                     ) }
                 }
                 // A game without achievements, or one Steam has not answered for yet, shows nothing here.
                 achievements?.takeIf { it.items.isNotEmpty() }?.let { AchievementsCard(it, onOpenAchievements) }
+                // The pictures and the trailer of the game, as its page in the shop shows them, in a card like the one above.
+                media?.takeIf { !it.isEmpty }?.let { MediaCard(game.appId, it) }
             }
             val installed = install is InstallState.Installed
             if (compact) {
@@ -698,6 +853,37 @@ private fun GameDetails(
             }
         }
     }
+    // The actions of the game: opened from the button at the top right, over the page, as the filters are on the home.
+    GameActionsOverlay(
+        open = actionsOpen,
+        onClose = { actionsOpen = false },
+        usable = install is InstallState.Installed && repatch !is Repatch.Running,
+        canReport = install is InstallState.Installed,
+        // A game that is not there yet has no saves, controls or options to open, and nothing to uninstall: only what concerns the game in the list remains.
+        showGameActions = install is InstallState.Installed || install.stage != null,
+        favorite = favorite,
+        hidden = hidden,
+        onToggleFavorite = onToggleFavorite,
+        onToggleHidden = { if (hidden) onSetHidden(false) else confirmingHide = true },
+        savesNotSynced = savesNotSynced,
+        hasWorkshop = game.androidBuild?.hasWorkshop == true,
+        controllerProfile = controllerProfile,
+        controllerTint = when {
+            controllerFrame -> ControllerForcedColor
+            controllerAutomatic -> KindBlue
+            else -> LocalContentColor.current
+        },
+        compat = vrDevice && game.androidBuild?.isVr != false,
+        compatNotice = compatNotice,
+        onOpenSaves = onOpenSaves,
+        onOpenWorkshop = onOpenWorkshop,
+        onOpenStore = onOpenStore,
+        onOpenControllers = onOpenControllers,
+        onOpenCompat = { onCompatNoticeSeen(); onOpenCompat() },
+        onReport = { reporting = true },
+        onUninstall = onUninstall,
+    )
+    }
 }
 
 /** Below this width the details sit under the cover instead of beside it. */
@@ -730,6 +916,9 @@ private fun InstallActions(
     patchOutdated: Boolean = false,
     busy: Boolean = false,
     onReport: () -> Unit = {},
+    extras: List<ExtraPlanItem> = emptyList(),
+    /** The channel (branch) of Steam the installed game follows when it is not the normal one: the play button names it. */
+    channel: String? = null,
 ) {
     val installContext = LocalContext.current
     when (install) {
@@ -740,10 +929,10 @@ private fun InstallActions(
             Button(onClick = onResume) { Text(stringResource(R.string.game_resume)) }
             DangerButton(onClick = onDiscard) { Text(stringResource(R.string.game_discard)) }
         }
-        InstallState.Queued -> Progress(state = install, speedUnit = speedUnit, onCancel = onCancel)
+        InstallState.Queued -> Progress(state = install, speedUnit = speedUnit, extras = extras, onCancel = onCancel)
         // The game is installed and its extra content is being put in place: the same place and the same steps, the game not offered to play yet.
-        is InstallState.ExtraContent -> Progress(state = install, speedUnit = speedUnit, onCancel = onCancel)
-        is InstallState.Downloading -> Progress(state = install, speedUnit = speedUnit, onCancel = onCancel, onPause = onPause)
+        is InstallState.ExtraContent -> Progress(state = install, speedUnit = speedUnit, extras = extras, onCancel = onCancel)
+        is InstallState.Downloading -> Progress(state = install, speedUnit = speedUnit, extras = extras, onCancel = onCancel, onPause = onPause)
         is InstallState.ChoosingVersion -> {
             VersionDialog(install.options, onChosen = onVersionChosen)
             Text(stringResource(R.string.game_choose_version_waiting), style = MaterialTheme.typography.bodyMedium)
@@ -752,19 +941,18 @@ private fun InstallActions(
             DuplicateDialog(otherGamePort = install.otherGamePort, onChosen = onDuplicateChosen)
             Text(stringResource(R.string.game_choose_version_waiting), style = MaterialTheme.typography.bodyMedium)
         }
-        InstallState.Patching, InstallState.Installing, InstallState.Finishing -> Progress(state = install, speedUnit = speedUnit, onCancel = null)
+        InstallState.Patching, InstallState.Installing, InstallState.Finishing -> Progress(state = install, speedUnit = speedUnit, extras = extras, onCancel = null)
         is InstallState.Installed -> if (install.otherGamePort != null) {
             // The game was patched by another GamePort of this device: it starts and updates it, this one leaves it alone.
             Text(stringResource(R.string.game_other_gameport, install.otherGamePort!!), color = Color(0xFFFF9800), style = MaterialTheme.typography.bodyMedium)
         } else FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = if (patchOutdated) onPatchAndPlay else onPlay, enabled = !busy, modifier = Modifier.height(ACTION_HEIGHT)) {
-                if (patchOutdated) {
-                    Icon(Icons.Filled.Build, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                }
-                Text(stringResource(if (patchOutdated) R.string.game_patch_and_play else R.string.game_play))
+                Icon(if (patchOutdated) Icons.Filled.Build else Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                // On a channel other than the normal one, the button says which.
+                Text(if (channel != null && !patchOutdated) stringResource(R.string.game_play_channel, channel) else stringResource(if (patchOutdated) R.string.game_patch_and_play else R.string.game_play))
             }
-            DangerTrashButton(onClick = onUninstall, contentDescription = stringResource(R.string.game_uninstall), enabled = !busy)
+            // Uninstalling is in the actions (the red button at the bottom of the panel).
         }
         is InstallState.Failed -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
@@ -785,19 +973,320 @@ private fun InstallActions(
     }
 }
 
-/** The steps an install goes through, with the current one highlighted, what it is doing, and its progress: the same as on the downloads page. */
+private val CardShape = RoundedCornerShape(16.dp)
+
+/** The height of the buttons of the actions panel: finer than the round buttons of the page, so the list stays short. */
+private val ACTION_ROW_HEIGHT = 40.dp
+
+/**
+ * The actions of the game, in a panel that slides in from the right over the page, as the filters do on the home: the buttons all one size, the red one at the bottom. Tapping outside
+ * the panel, or back, closes it. Greyed while an install goes on (the buttons are there, they cannot be used yet).
+ */
 @Composable
-private fun Progress(state: InstallState, speedUnit: SpeedUnit, onCancel: (() -> Unit)?, onPause: (() -> Unit)? = null) {
+private fun GameActionsOverlay(
+    open: Boolean,
+    onClose: () -> Unit,
+    usable: Boolean,
+    canReport: Boolean,
+    showGameActions: Boolean,
+    favorite: Boolean,
+    hidden: Boolean,
+    onToggleFavorite: () -> Unit,
+    onToggleHidden: () -> Unit,
+    savesNotSynced: Boolean,
+    hasWorkshop: Boolean,
+    controllerProfile: Boolean,
+    controllerTint: Color,
+    compat: Boolean,
+    compatNotice: Boolean,
+    onOpenSaves: () -> Unit,
+    onOpenWorkshop: () -> Unit,
+    onOpenStore: () -> Unit,
+    onOpenControllers: () -> Unit,
+    onOpenCompat: () -> Unit,
+    onReport: () -> Unit,
+    onUninstall: () -> Unit,
+) {
+    BackHandler(enabled = open, onBack = onClose)
+    Box(Modifier.fillMaxSize()) {
+        AnimatedVisibility(visible = open, enter = fadeIn(), exit = fadeOut()) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClose),
+            )
+        }
+        AnimatedVisibility(
+            visible = open,
+            enter = slideInHorizontally { it } + fadeIn(),
+            exit = slideOutHorizontally { it } + fadeOut(),
+            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 24.dp, top = 24.dp, bottom = 24.dp),
+        ) {
+            val shape = RoundedCornerShape(28.dp)
+            Column(
+                Modifier
+                    .fillMaxHeight()
+                    .widthIn(max = 360.dp)
+                    .fillMaxWidth(0.92f)
+                    .shadow(24.dp, shape)
+                    // The same gradient as every page (as the player chose it), not a colour of its own.
+                    .background(Brush.linearGradient(LocalBackdropColors.current.toList()), shape)
+                    .border(1.dp, GlassBorder, shape)
+                    // A tap on the panel must not reach the dimmed area behind it, which closes it.
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+                    .padding(24.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.game_actions), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+                    GlassIconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.game_actions_close)) }
+                }
+                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (showGameActions) {
+                        // The saves on this device and on Steam do not agree: the page of the saves says which. The same mark sits on the button that opens this panel.
+                        ActionRow(Icons.Filled.CloudSync, stringResource(R.string.saves_title), usable, { onClose(); onOpenSaves() }, badge = Color(0xFFFF9800).takeIf { savesNotSynced })
+                        // A game that has a Workshop on Steam: its page opens here, with the account already signed in, and subscribing downloads the item for the game.
+                        if (hasWorkshop) ActionRow(Icons.Filled.Extension, stringResource(R.string.workshop_button), usable, { onClose(); onOpenWorkshop() })
+                        if (controllerProfile) ActionRow(Icons.Filled.SportsEsports, stringResource(R.string.controllers_title), usable, { onClose(); onOpenControllers() }, tint = controllerTint)
+                        // The options that make a game work: orange as the compatibility labels, with a small mark when GamePort adapted the game by itself.
+                        if (compat) ActionRow(Icons.Filled.Build, stringResource(R.string.gamecompat_button), usable, { onClose(); onOpenCompat() }, tint = CompatOrange, badge = CompatOrange.takeIf { compatNotice })
+                        ActionRow(Icons.Filled.BugReport, stringResource(R.string.report_open), canReport, { onClose(); onReport() })
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    // The page of the game in the shop of the application (its pictures, its extra content, its link on Steam): for any game, installed or not.
+                    ActionRow(Icons.Filled.Storefront, stringResource(R.string.game_open_store), true, { onClose(); onOpenStore() })
+                    ActionRow(
+                        Icons.Filled.Favorite,
+                        stringResource(if (favorite) R.string.game_unfavorite else R.string.game_favorite),
+                        true,
+                        { onToggleFavorite() },
+                        tint = if (favorite) Color(0xFFE53935) else LocalContentColor.current,
+                    )
+                    // Hiding has the colour it has in the menu of a cover; showing again keeps the usual one.
+                    ActionRow(
+                        if (hidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                        stringResource(if (hidden) R.string.game_show_again else R.string.game_hide),
+                        true,
+                        { onClose(); onToggleHidden() },
+                        tint = if (hidden) LocalContentColor.current else HideRed,
+                    )
+                }
+                if (showGameActions) {
+                    DangerButton(onClick = { onClose(); onUninstall() }, enabled = usable, modifier = Modifier.fillMaxWidth().height(ACTION_ROW_HEIGHT)) {
+                        Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.game_uninstall), Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The notifications of the game in one card under the bell, an arrow on its top edge pointing at the bell ([arrowFromRightPx] is how far from the right edge the bell's centre is).
+ * One line for each, as wide as the card, its words from the left; tapping a line opens the page it is about. The cross closes the card, the bell opens it again.
+ */
+@Composable
+private fun NotificationCard(notes: List<NoteItem>, title: String, closeLabel: String, arrowFromRightPx: Float, onClose: () -> Unit) {
+    val colors = LocalBackdropColors.current.toList()
+    val arrowHeight = 11.dp
+    val fromRight = with(LocalDensity.current) { arrowFromRightPx.toDp() }
+    // One shape for the card and its arrow: the edge is drawn once, all around, so nothing separates the arrow from the card.
+    val bubble = remember(fromRight) { BubbleShape(corner = 16.dp, arrowWidth = 22.dp, arrowHeight = arrowHeight, arrowFromRight = fromRight) }
+    Column(
+        // At least as wide as the arrow's place needs: the arrow stands on the straight part of the top edge, never on the rounded corner.
+        Modifier
+            .widthIn(min = fromRight + 36.dp)
+            .width(IntrinsicSize.Max)
+            .background(Brush.linearGradient(colors), bubble)
+            .background(GlassFill, bubble)
+            .border(1.dp, GlassBorder, bubble)
+            .padding(start = 12.dp, end = 12.dp, top = arrowHeight + 8.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+            GlassIconButton(onClick = onClose, modifier = Modifier.size(28.dp)) { Icon(Icons.Filled.Close, contentDescription = closeLabel, modifier = Modifier.size(16.dp)) }
+        }
+        notes.forEach { note ->
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).let { base -> note.onClick?.let { base.clickable(onClick = it) } ?: base }.padding(horizontal = 4.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(note.dot))
+                    Text(note.text, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = note.textColor)
+                    // A note that leads somewhere has a chevron, one that does something has its button; one with two buttons has them under its words.
+                    if (note.secondAction == null) {
+                        if (note.action != null) NoteButton(note.action, note.actionEnabled, note.onClick ?: {})
+                        else if (note.onClick != null) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(16.dp))
+                    }
+                }
+                if (note.secondAction != null) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+                        NoteButton(note.secondAction, true, note.onSecond)
+                        note.action?.let { NoteButton(it, note.actionEnabled, note.onClick ?: {}) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A small button of a notification: fine, with its words in the small size. */
+@Composable
+private fun NoteButton(label: String, enabled: Boolean, onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick, enabled = enabled, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp), modifier = Modifier.height(28.dp)) {
+        Text(label, style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+/** The screenshots and trailers of the game in a card of the same kind as the achievements': a title, then the thumbnails in a row, which open the viewer. */
+@Composable
+private fun MediaCard(appId: Int, media: app.gameport.core.model.AppMedia) {
+    Column(Modifier.fillMaxWidth().glass(CardShape).padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(Icons.Filled.PhotoLibrary, contentDescription = null, modifier = Modifier.size(26.dp))
+            Text(stringResource(R.string.game_media_title), style = MaterialTheme.typography.titleMedium)
+        }
+        app.gameport.core.designsystem.MediaGallery(appId, media)
+    }
+}
+
+/** A rounded card with a small arrow on its top edge, [arrowFromRight] from the right edge to the arrow's centre, as one outline. */
+private class BubbleShape(private val corner: Dp, private val arrowWidth: Dp, private val arrowHeight: Dp, private val arrowFromRight: Dp) : androidx.compose.ui.graphics.Shape {
+    override fun createOutline(size: Size, layoutDirection: androidx.compose.ui.unit.LayoutDirection, density: androidx.compose.ui.unit.Density): androidx.compose.ui.graphics.Outline {
+        val r = with(density) { corner.toPx() }
+        val aw = with(density) { arrowWidth.toPx() }
+        val ah = with(density) { arrowHeight.toPx() }
+        val centre = size.width - with(density) { arrowFromRight.toPx() }
+        val top = ah
+        val path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(r, top)
+            lineTo(centre - aw / 2f, top)
+            lineTo(centre, 0f)
+            lineTo(centre + aw / 2f, top)
+            lineTo(size.width - r, top)
+            arcTo(androidx.compose.ui.geometry.Rect(size.width - 2 * r, top, size.width, top + 2 * r), -90f, 90f, false)
+            lineTo(size.width, size.height - r)
+            arcTo(androidx.compose.ui.geometry.Rect(size.width - 2 * r, size.height - 2 * r, size.width, size.height), 0f, 90f, false)
+            lineTo(r, size.height)
+            arcTo(androidx.compose.ui.geometry.Rect(0f, size.height - 2 * r, 2 * r, size.height), 90f, 90f, false)
+            lineTo(0f, top + r)
+            arcTo(androidx.compose.ui.geometry.Rect(0f, top, 2 * r, top + 2 * r), 180f, 90f, false)
+            close()
+        }
+        return androidx.compose.ui.graphics.Outline.Generic(path)
+    }
+}
+
+/** A button of the actions panel: the same size as the others, its icon and its words, and a small mark on its corner when [badge] is given. */
+@Composable
+private fun ActionRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, enabled: Boolean, onClick: () -> Unit, tint: Color = LocalContentColor.current, badge: Color? = null) {
+    Box(Modifier.fillMaxWidth()) {
+        GlassButton(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth().height(ACTION_ROW_HEIGHT)) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(12.dp))
+            // The words start at the left, under one another.
+            Text(label, Modifier.weight(1f))
+        }
+        if (badge != null) Box(Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 2.dp).size(12.dp).clip(CircleShape).background(badge))
+    }
+}
+
+/** The steps an install goes through, with the current one highlighted, what it is doing, and its progress: the same as on the downloads page, in a card of its own. */
+@Composable
+private fun Progress(state: InstallState, speedUnit: SpeedUnit, extras: List<ExtraPlanItem>, onCancel: (() -> Unit)?, onPause: (() -> Unit)? = null) {
     val stage = state.stage ?: return
-    Column(Modifier.widthIn(max = 460.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        InstallStepper(stage)
-        if (state is InstallState.Downloading) LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
-        else if (state is InstallState.ExtraContent) LinearProgressIndicator(progress = { state.progress }, modifier = Modifier.fillMaxWidth())
-        else LinearProgressIndicator(Modifier.fillMaxWidth())
-        app.gameport.core.designsystem.InstallStatusLine(state, speedUnit, style = MaterialTheme.typography.bodyMedium)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            onPause?.let { androidx.compose.material3.OutlinedButton(onClick = it) { Text(stringResource(R.string.game_pause)) } }
-            onCancel?.let { DangerButton(onClick = it) { Text(stringResource(R.string.game_cancel)) } }
+    // Where each extra content stands: the ones in the game's download are in place when the game is downloaded, the others are fetched one after the other once it is installed.
+    val rows = extraStands(extras, stage, (state as? InstallState.ExtraContent)?.index)
+    val inPlace = rows.count { it.second == Stand.DONE }
+    val pending = rows.filter { it.second != Stand.DONE }
+    val shown = pending.take(EXTRAS_SHOWN)
+    val gameInPlace = state is InstallState.ExtraContent
+    Column(Modifier.fillMaxWidth().glass(CardShape).padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            InstallStepper(stage, Modifier.weight(1f))
+            // Both stay where they are for the whole install, greyed when they cannot be used in this step: the card keeps its height from one step to the next.
+            val small = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 0.dp)
+            androidx.compose.material3.OutlinedButton(onClick = { onPause?.invoke() }, enabled = onPause != null, contentPadding = small, modifier = Modifier.height(32.dp)) {
+                Text(stringResource(R.string.game_pause), style = MaterialTheme.typography.labelLarge)
+            }
+            DangerButton(onClick = { onCancel?.invoke() }, enabled = onCancel != null, contentPadding = small, modifier = Modifier.height(32.dp)) {
+                Text(stringResource(R.string.game_cancel), style = MaterialTheme.typography.labelLarge)
+            }
+        }
+        // The game, then the extra content: the one being put in place has its bar, the game is greyed once it is in place.
+        InstallRow(
+            name = stringResource(R.string.install_game),
+            stand = if (gameInPlace) Stand.DONE else Stand.ACTIVE,
+            progress = (state as? InstallState.Downloading)?.progress,
+            status = if (gameInPlace) null else app.gameport.core.designsystem.installStatusText(state, speedUnit),
+            dimmed = gameInPlace,
+        )
+        shown.forEach { (item, stand) ->
+            InstallRow(
+                name = item.name,
+                stand = stand,
+                progress = if (stand == Stand.ACTIVE) (state as? InstallState.ExtraContent)?.progress else null,
+                status = when {
+                    stand == Stand.ACTIVE -> "${(((state as? InstallState.ExtraContent)?.progress ?: 0f) * 100).toInt()}%"
+                    item.withGame -> stringResource(R.string.install_extra_with_game)
+                    else -> null
+                },
+                dimmed = false,
+            )
+        }
+        val more = pending.size - shown.size
+        if (inPlace > 0 || more > 0) {
+            Text(
+                listOfNotNull(
+                    if (inPlace > 0) stringResource(R.string.install_extras_in_place, inPlace) else null,
+                    if (more > 0) stringResource(R.string.install_extras_more, more) else null,
+                ).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** How many of the extra content still to come are named in the card; the rest are counted. */
+private const val EXTRAS_SHOWN = 2
+
+private val InstallGreen = Color(0xFF4CAF50)
+
+/** One line of the card of an install: the mark of where it stands, its name, and its bar and words when it is going on. */
+@Composable
+private fun InstallRow(name: String, stand: Stand, progress: Float?, status: String?, dimmed: Boolean) {
+    // Its name on the first line; when it is going on, its bar and, under the bar, what it is doing in thin letters. Nothing sits at the right, so nothing has to line up.
+    val thin = MaterialTheme.typography.bodySmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Light)
+    Column(Modifier.fillMaxWidth().alpha(if (dimmed) 0.55f else 1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+                when (stand) {
+                    // Green with a white tick once in place.
+                    Stand.DONE -> Box(Modifier.size(20.dp).clip(CircleShape).background(InstallGreen), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                    }
+                    Stand.ACTIVE -> Box(Modifier.size(20.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)), contentAlignment = Alignment.Center) {
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
+                    }
+                    Stand.WAITING -> Box(Modifier.size(20.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)))
+                }
+            }
+            Text(name, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            // Not started: what it is waiting for, right after its name.
+            if (stand != Stand.ACTIVE && status != null) Text(status, style = thin, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        }
+        if (stand == Stand.ACTIVE) {
+            Column(Modifier.padding(start = 30.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (progress != null) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth()) else LinearProgressIndicator(Modifier.fillMaxWidth())
+                if (status != null) Text(status, style = thin, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            }
+        } else if (stand == Stand.DONE && dimmed) {
+            LinearProgressIndicator(progress = { 1f }, modifier = Modifier.fillMaxWidth().padding(start = 30.dp))
         }
     }
 }
@@ -902,61 +1391,18 @@ private fun DlcDialog(game: Game, dlc: List<DlcContent>, onDismiss: () -> Unit, 
  */
 @Composable
 private fun IssuesPanel(
-    issues: List<GameIssue>,
+    problem: GameIssue.ProblemSuspected?,
     repatch: Repatch,
-    speedUnit: SpeedUnit,
+    updateAvailable: Boolean,
     onRepatch: () -> Unit,
     onUpdate: () -> Unit,
     onDismissRepatchError: () -> Unit,
-    onPermissions: () -> Unit,
-    onConflict: () -> Unit,
-    onSaves: () -> Unit,
-    onControllers: () -> Unit,
-    onActivateFrame: () -> Unit,
-    onRepair: () -> Unit,
-    onReinstallWorks: () -> Unit = {},
-    onReinstallFromScratch: () -> Unit = {},
     onReport: () -> Unit,
     onDismissProblem: () -> Unit,
 ) {
-    var confirmingReinstall by remember { mutableStateOf(false) }
-    if (confirmingReinstall) {
-        BackdropDialog(
-            onDismissRequest = { confirmingReinstall = false },
-            title = { Text(stringResource(R.string.reinstall_title)) },
-            text = { Text(stringResource(R.string.reinstall_text)) },
-            confirmButton = { Button(onClick = { confirmingReinstall = false; onReinstallFromScratch() }) { Text(stringResource(R.string.reinstall_confirm)) } },
-            dismissButton = { GlassButton(onClick = { confirmingReinstall = false }) { Text(stringResource(R.string.repair_cancel)) } },
-        )
-    }
-    var confirmingRepair by remember { mutableStateOf(false) }
-    if (confirmingRepair) {
-        BackdropDialog(
-            onDismissRequest = { confirmingRepair = false },
-            title = { Text(stringResource(R.string.repair_title)) },
-            text = { Text(stringResource(R.string.repair_text)) },
-            confirmButton = { Button(onClick = { confirmingRepair = false; onRepair() }) { Text(stringResource(R.string.repair_confirm)) } },
-            dismissButton = { GlassButton(onClick = { confirmingRepair = false }) { Text(stringResource(R.string.repair_cancel)) } },
-        )
-    }
-    val busy = repatch is Repatch.Running
-    val updateAvailable = GameIssue.UpdateAvailable in issues
     // As wide as the achievements card beside it in the column.
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (repatch is Repatch.Running) {
-            val percent = ((repatch.fraction ?: 0f) * 100).toInt()
-            IssueRow(
-                message = when (repatch.stage) {
-                    RepatchStage.QUEUED -> stringResource(R.string.issue_stage_queued)
-                    RepatchStage.DOWNLOADING -> stringResource(R.string.issue_stage_downloading, percent) +
-                        if (repatch.bytesPerSecond > 0) " · " + speedText(repatch.bytesPerSecond, speedUnit) else ""
-                    RepatchStage.PATCHING -> stringResource(R.string.issue_patch_running)
-                    RepatchStage.INSTALLING -> stringResource(R.string.issue_patch_installing)
-                },
-                progress = true,
-                progressFraction = repatch.fraction.takeIf { repatch.stage == RepatchStage.DOWNLOADING },
-            )
-        }
+        // (The progress of a patch is in the card of the install, above.)
         if (repatch is Repatch.Failed) {
             IssueRow(
                 message = stringResource(R.string.issue_patch_failed, installErrorText(repatch.error)),
@@ -966,46 +1412,15 @@ private fun IssuesPanel(
                 onSecondAction = onDismissRepatchError,
             )
         }
-        issues.forEach { issue ->
-            when (issue) {
-                GameIssue.UpdateAvailable ->
-                    if (repatch == Repatch.None) IssueRow(stringResource(R.string.issue_update_available), stringResource(R.string.issue_update_action), onUpdate, update = true)
-                GameIssue.PatchOutdated ->
-                    // An update patches the game again, so the two are not offered together.
-                    if (repatch == Repatch.None && !updateAvailable) IssueRow(stringResource(R.string.issue_patch_outdated), stringResource(R.string.issue_patch_outdated_action), onRepatch)
-                is GameIssue.ProblemSuspected ->
-                    IssueRow(
-                        stringResource(if (issue.crash) R.string.issue_problem_crash else R.string.issue_problem_short),
-                        stringResource(R.string.issue_problem_action),
-                        onReport,
-                        secondAction = stringResource(R.string.issue_dismiss),
-                        onSecondAction = onDismissProblem,
-                    )
-                GameIssue.ReinstallMayHelp -> IssueRow(
-                    stringResource(R.string.issue_reinstall_may_help),
-                    stringResource(R.string.issue_reinstall_not_working),
-                    { confirmingReinstall = true },
-                    enabled = !busy,
-                    question = true,
-                    secondAction = stringResource(R.string.issue_reinstall_working),
-                    onSecondAction = onReinstallWorks,
-                )
-                is GameIssue.ExpansionMissing -> IssueRow(pluralStringResource(R.plurals.issue_expansion_missing, issue.missing, issue.missing), stringResource(R.string.issue_expansion_unchecked_action), { confirmingRepair = true }, enabled = !busy)
-                GameIssue.ExpansionMayBeMissing -> IssueRow(stringResource(R.string.issue_expansion_unchecked), stringResource(R.string.issue_expansion_unchecked_action), { confirmingRepair = true }, enabled = !busy, info = true)
-                GameIssue.StoragePermissionMissing ->
-                    IssueRow(stringResource(R.string.issue_storage_permission), stringResource(R.string.game_storage_open), onPermissions, enabled = !busy)
-                GameIssue.SaveConflict ->
-                    IssueRow(stringResource(R.string.issue_save_conflict), stringResource(R.string.issue_save_conflict_action), onConflict, enabled = !busy)
-                GameIssue.SavesApart ->
-                    IssueRow(stringResource(R.string.issue_saves_apart), stringResource(R.string.issue_saves_apart_action), onSaves, enabled = !busy, info = true)
-                is GameIssue.SaveSyncFailed ->
-                    IssueRow(stringResource(if (issue.offline) R.string.issue_sync_offline else R.string.issue_sync_failed))
-                is GameIssue.ControllerSilent ->
-                    if (issue.activated) IssueRow(stringResource(R.string.issue_controllers_silent_done), stringResource(R.string.issue_controllers_silent_open), onControllers, enabled = !busy, info = true)
-                    else IssueRow(stringResource(R.string.issue_controllers_silent), stringResource(R.string.issue_controllers_silent_action), onActivateFrame, enabled = !busy, info = true)
-                is GameIssue.ControllerMappingAvailable ->
-                    IssueRow(stringResource(R.string.issue_controllers, sourceFamilyName(issue.source)), stringResource(R.string.issue_controllers_action), onControllers, enabled = !busy, info = true)
-            }
+        // A problem the game seems to have had: the report that can be sent is offered here, on the page (the rest of what is said about the game is in the notifications).
+        problem?.let {
+            IssueRow(
+                stringResource(if (it.crash) R.string.issue_problem_crash else R.string.issue_problem_short),
+                stringResource(R.string.issue_problem_action),
+                onReport,
+                secondAction = stringResource(R.string.issue_dismiss),
+                onSecondAction = onDismissProblem,
+            )
         }
     }
 }
@@ -1028,16 +1443,37 @@ private fun IssueRow(
     onSecondAction: () -> Unit = {},
 ) {
     Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(16.dp)).padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            when {
-                info -> Icon(Icons.Filled.SportsEsports, contentDescription = null, tint = Color(0xFF90CAF9))
-                question -> QuestionBadge()
-                update -> UpdateBadge()
-                else -> AttentionBadge()
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val badge: @Composable () -> Unit = {
+                when {
+                    info -> Icon(Icons.Filled.SportsEsports, contentDescription = null, tint = Color(0xFF90CAF9))
+                    question -> QuestionBadge()
+                    update -> UpdateBadge()
+                    else -> AttentionBadge()
+                }
             }
-            Text(message, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-            if (secondAction != null) GlassButton(onClick = onSecondAction) { Text(secondAction) }
-            if (action != null) GlassButton(onClick = onAction, enabled = enabled) { Text(action) }
+            val buttons: @Composable () -> Unit = {
+                if (secondAction != null) GlassButton(onClick = onSecondAction) { Text(secondAction) }
+                if (action != null) GlassButton(onClick = onAction, enabled = enabled) { Text(action) }
+            }
+            if (maxWidth < 520.dp) {
+                // On a narrow screen (a phone) the buttons go under the message, instead of squeezing it into a thin column.
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        badge()
+                        Text(message, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    }
+                    if (secondAction != null || action != null) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) { buttons() }
+                    }
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    badge()
+                    Text(message, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    buttons()
+                }
+            }
         }
         if (progress) {
             if (progressFraction != null) LinearProgressIndicator(progress = { progressFraction }, modifier = Modifier.fillMaxWidth())
@@ -1065,12 +1501,15 @@ private class CoverAlignment(private val halfCoverPx: Float) {
 
     fun rowPlaced(coordinates: LayoutCoordinates) { row = coordinates; update() }
 
-    fun actionsPlaced(coordinates: LayoutCoordinates) { actions = coordinates; update() }
+    /** [nominalHeightPx]: the height the buttons are taken to have, when what is there is taller for a while (the card of an install): the cover then stays where it is. */
+    fun actionsPlaced(coordinates: LayoutCoordinates, nominalHeightPx: Float? = null) { actions = coordinates; actionsHeight = nominalHeightPx; update() }
+
+    private var actionsHeight: Float? = null
 
     private fun update() {
         val inRow = row?.takeIf { it.isAttached } ?: return
         val buttons = actions?.takeIf { it.isAttached } ?: return
-        val bottom = inRow.localPositionOf(buttons, Offset(0f, buttons.size.height.toFloat())).y
+        val bottom = inRow.localPositionOf(buttons, Offset(0f, actionsHeight ?: buttons.size.height.toFloat())).y
         // Only ever lowered: when the buttons end above the cover's bottom the cover stays where it is.
         val wanted = (bottom - halfCoverPx).coerceAtLeast(0f)
         if (abs(wanted - shift) > 1f) shift = wanted
@@ -1121,12 +1560,12 @@ private fun InfoCard(game: Game, installed: Boolean, playtime: Playtime, modifie
     val build = game.androidBuild
     val none = stringResource(R.string.game_info_unknown)
     Column(modifier.glass(RoundedCornerShape(16.dp)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        InfoGroup(stringResource(R.string.game_info_size)) {
+        InfoGroup(stringResource(R.string.game_info_size), Icons.Filled.Storage) {
             InfoItem(stringResource(R.string.game_info_download), build?.downloadBytes?.let { Formatter.formatFileSize(context, it) } ?: none)
             InfoItem(stringResource(R.string.game_info_installed), build?.installBytes?.let { Formatter.formatFileSize(context, it) } ?: none)
         }
         if (installed) {
-            InfoGroup(stringResource(R.string.game_info_playtime)) {
+            InfoGroup(stringResource(R.string.game_info_playtime), Icons.Filled.Schedule) {
                 InfoItem(stringResource(R.string.game_info_played_device), durationText((playtime.deviceMillis / 60_000L).toInt()))
                 playtime.steamMinutes?.let { InfoItem(stringResource(R.string.game_info_played_steam), durationText(it)) }
             }
@@ -1135,9 +1574,12 @@ private fun InfoCard(game: Game, installed: Boolean, playtime: Playtime, modifie
 }
 
 @Composable
-private fun InfoGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
+private fun InfoGroup(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, content: @Composable ColumnScope.() -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+            Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        }
         content()
     }
 }
@@ -1196,7 +1638,7 @@ private fun CompatDetails(compat: app.gameport.core.model.Compat?, incompatible:
     when {
         incompatible != null -> IncompatibleNote(incompatible.title.pick(language), incompatible.text.pick(language))
         compat != null && compat.offlineTested -> Text(stringResource(R.string.game_compat_offline), style = style, color = muted)
-        compat != null && compat.unreliable -> app.gameport.core.designsystem.FewAnswersNote(stringResource(R.string.game_compat_unreliable))
+        // (A result with few answers is not told here: it is not taken into account.)
     }
 }
 

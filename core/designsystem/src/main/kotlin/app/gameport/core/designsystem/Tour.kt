@@ -327,6 +327,8 @@ object TourIds {
     const val GAME_SETTINGS = "game_settings"
     const val GAME_ISSUES = "game_issues"
     const val GAME_INFO = "game_info"
+    const val GAME_MENU = "game_menu"
+    const val GAME_NOTES = "game_notes"
 
     const val STORE_TABS = "store_tabs"
     const val STORE_SEARCH = "store_search"

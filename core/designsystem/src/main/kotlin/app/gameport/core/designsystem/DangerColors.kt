@@ -28,12 +28,19 @@ val HideRed = Color(0xFFE57373)
 
 /** Deleting or discarding something: a solid red button. */
 @Composable
-fun DangerButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, content: @Composable RowScope.() -> Unit) {
+fun DangerButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    contentPadding: androidx.compose.foundation.layout.PaddingValues = ButtonDefaults.ContentPadding,
+    content: @Composable RowScope.() -> Unit,
+) {
     Button(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
         colors = ButtonDefaults.buttonColors(containerColor = DangerRed, contentColor = OnDangerRed),
+        contentPadding = contentPadding,
         content = content,
     )
 }

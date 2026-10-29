@@ -90,6 +90,8 @@ class GameInstallRepository @Inject constructor(
     /** What is being done with an extra content (DLC) of an installed game, by game: one at a time. */
     private val dlcWork = MutableStateFlow<Map<Int, app.gameport.core.model.DlcWork>>(emptyMap())
     private val jobs = HashMap<Int, Job>()
+    /** The extra content chosen for the game being installed, by game: what the page shows from the start of the install. Gone when the install is over. */
+    private val extrasPlan = MutableStateFlow<Map<Int, List<app.gameport.core.model.ExtraPlanItem>>>(emptyMap())
     /** The games whose installation goes on with the extra content chosen with them: they are not offered to play yet, nor taken for installed, until it is in place. */
     private val installingExtra: MutableSet<Int> = java.util.concurrent.ConcurrentHashMap.newKeySet()
     private val paused = java.util.Collections.synchronizedSet(HashSet<Int>())
@@ -122,6 +124,9 @@ class GameInstallRepository @Inject constructor(
 
     fun observe(appId: Int): Flow<InstallState> =
         combine(operations, packages.packageChanges()) { ops, _ -> stateOf(appId, ops) }
+
+    /** The extra content chosen for the install of [appId], in the order it is put in place; empty when none or when no install is going. */
+    fun observeExtras(appId: Int): Flow<List<app.gameport.core.model.ExtraPlanItem>> = extrasPlan.map { it[appId].orEmpty() }.distinctUntilChanged()
 
     /**
      * The installed games whose update is going on, or was cut short and is about to go on: a spinner shows on their cover instead of the
@@ -184,6 +189,12 @@ class GameInstallRepository @Inject constructor(
         // that app, so it is fetched on its own once the game is installed.
         val separately = game.androidBuild?.dlc.orEmpty().filter { it.appId in chosen && it.owned && it.depots.any { depot -> depot.declaredBy != null } }
         val depots = game.androidBuild?.depotsFor(chosen).orEmpty().filter { it.declaredBy == null }
+        // What the page shows of the extra content from the start: the ones in the game's download first, then the ones fetched one after the other.
+        val owned = game.androidBuild?.dlc.orEmpty().filter { it.appId in chosen && it.owned && it.depots.isNotEmpty() }
+        extrasPlan.update {
+            it + (game.appId to (owned.filter { dlc -> dlc !in separately }.map { dlc -> app.gameport.core.model.ExtraPlanItem(dlc.appId, dlc.name, withGame = true) } +
+                separately.map { dlc -> app.gameport.core.model.ExtraPlanItem(dlc.appId, dlc.name, withGame = false) }))
+        }
         notEnoughSpace(game.appId, depots)?.let { return fail(game.appId, it) }
         directory.mkdirs()
         // The player asks for it: it is not paused nor failed any more.
@@ -1274,7 +1285,10 @@ class GameInstallRepository @Inject constructor(
 
     private fun setState(appId: Int, state: InstallState) = operations.update { it + (appId to state) }
 
-    private fun clearState(appId: Int) = operations.update { it - appId }
+    private fun clearState(appId: Int) {
+        operations.update { it - appId }
+        extrasPlan.update { it - appId }
+    }
 
     private fun fail(appId: Int, error: InstallError): Unit {
         events.note(appId, "failed: $error")

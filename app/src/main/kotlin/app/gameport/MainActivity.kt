@@ -31,6 +31,12 @@ class MainActivity : ComponentActivity() {
     /** The game whose Workshop page was asked for from outside (a game's "browse" button), until the screen has opened it. */
     private val workshopRequest = androidx.compose.runtime.mutableStateOf<Int?>(null)
 
+    /** The mock-up of a game's page, asked for with `--ez mockup true` and only by a debug build. */
+    private val mockupRequest = androidx.compose.runtime.mutableStateOf(false)
+
+    private fun wantsMockup(intent: android.content.Intent?) =
+        intent?.getBooleanExtra("mockup", false) == true && applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+
     override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLocale.wrap(newBase))
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,6 +44,8 @@ class MainActivity : ComponentActivity() {
         acknowledgeAchievement(intent)
         // A turn of the screen starts the activity again with the same intent: the page is not opened a second time.
         if (savedInstanceState == null) workshopRequest.value = workshopAppId(intent)
+        // (Read every time: a phone turns the screen at start-up, which starts the activity again, and the page asked for must survive it.)
+        mockupRequest.value = wantsMockup(intent)
         // Looks for a newer GamePort when the last look is old enough (and the player has not turned it off).
         appUpdater.checkIfDue()
         // Logs kept for problem reports: a week at most, and not for a game that was uninstalled.
@@ -49,7 +57,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             val display by settings.display.collectAsState()
             GamePortTheme(accent = Color(display.accent), gradientStart = Color(display.gradientStart), gradientEnd = Color(display.gradientEnd)) {
-                GamePortApp(openWorkshop = workshopRequest.value, onWorkshopOpened = { workshopRequest.value = null })
+                GamePortApp(
+                    openWorkshop = workshopRequest.value, onWorkshopOpened = { workshopRequest.value = null },
+                    openMockup = mockupRequest.value, onMockupOpened = { mockupRequest.value = false },
+                )
             }
         }
     }
@@ -58,6 +69,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         acknowledgeAchievement(intent)
         workshopAppId(intent)?.let { workshopRequest.value = it }
+        if (wantsMockup(intent)) mockupRequest.value = true
     }
 
     /** GamePort was opened from the notification of an achievement: it is not brought back any more. */

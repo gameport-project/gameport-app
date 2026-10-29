@@ -3,6 +3,11 @@
     <string name="speed_megabytes">%1$s Mo/s</string>
     <string name="speed_megabits">%1$s Mb/s</string>
     <string name="back">Retour</string>
+    <string name="storemedia_trailer">Bande-annonce</string>
+    <string name="storemedia_close">Fermer</string>
+    <string name="storemedia_previous">Précédent</string>
+    <string name="storemedia_next">Suivant</string>
+    <string name="storemedia_unplayable">Cette bande-annonce ne peut pas être lue ici.</string>
     <string name="clear">Effacer</string>
     <string name="game_error_space">Pas assez d\'espace libre : environ %1$s nécessaires, %2$s disponibles.</string>
     <string name="game_error_signed_out">Connexion à Steam requise.</string>

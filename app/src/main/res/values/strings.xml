@@ -71,7 +71,11 @@
     <string name="tour_game_issues_title">Notices</string>
     <string name="tour_game_issues_text">When an installed game needs something, a notice appears here with its action: a new version, a newer patch, a missing permission, saves that differ, controllers to remap. Nothing is shown when all is well.</string>
     <string name="tour_game_actions_title">Install and play</string>
-    <string name="tour_game_actions_text">The main button installs the game, then starts it. While it downloads, it can be paused or cancelled. Uninstalling is next to it.</string>
+    <string name="tour_game_actions_text">The main button installs the game, then starts it. While it downloads, a card shows the steps and the extra content, and it can be paused or cancelled. When a new version or a newer patch is waiting, the button asks what to do first.</string>
+    <string name="tour_game_notes_title">Notifications</string>
+    <string name="tour_game_notes_text">What wants a look: a new version, a newer patch, saves that do not agree with Steam, a game adapted by GamePort. The bell carries their number and opens or closes the card; each line leads to what it is about.</string>
+    <string name="tour_game_menu_title">Menu</string>
+    <string name="tour_game_menu_text">Everything else about the game in one panel: its saves, its Workshop, its controllers, its compatibility options, reporting a problem, its page in the shop, favorites, hiding it, and uninstalling it.</string>
     <string name="tour_game_saves_title">Saves</string>
     <string name="tour_game_saves_text">Saves are kept in sync with Steam Cloud. An orange dot says the saves on this device and on Steam do not agree, and the page explains which one is newer.</string>
     <string name="tour_game_report_title">Report a problem</string>
