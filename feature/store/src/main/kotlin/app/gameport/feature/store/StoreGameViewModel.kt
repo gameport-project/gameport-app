@@ -30,7 +30,9 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -67,12 +69,13 @@ class StoreGameViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val catalog: AndroidCatalogRepository,
     private val texts: CatalogTextsRepository,
-    library: SteamLibraryRepository,
+    private val library: SteamLibraryRepository,
     compat: CompatRepository,
     private val priceRepository: PriceRepository,
     private val accountRegion: AccountRegion,
     private val freeLicenses: FreeLicenseRepository,
     private val mediaRepository: app.gameport.core.sync.MediaRepository,
+    private val dlcRepository: app.gameport.core.sync.StoreDlcRepository,
 ) : ViewModel() {
     private val appId = savedStateHandle.toRoute<StoreGameRoute>().appId
     private val language = CatalogLanguages.of(Locale.getDefault())
@@ -139,7 +142,38 @@ class StoreGameViewModel @Inject constructor(
     val media: StateFlow<app.gameport.core.model.AppMedia?> = mediaRepository.observe(appId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /** The extra content of the game as Steam's shop lists it, asked for in the background when the page opens: nothing is shown until it is there. */
+    data class DlcState(val items: List<app.gameport.core.sync.StoreDlc> = emptyList(), val loading: Boolean = true, val owned: Set<Int> = emptySet())
+
+    private val _dlc = MutableStateFlow(DlcState())
+    /** The extra content, with which of it the account already has (read from what Steam says the account can use, so a free one already added shows no button). */
+    val dlc: StateFlow<DlcState> = combine(_dlc, library.observeLibrary().map { it.ownedAppIds }.distinctUntilChanged()) { state, owned -> state.copy(owned = owned) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, DlcState())
+
+    /** The request to add a free extra content to the library: running, and what it ended with. */
+    data class DlcAdd(val running: Boolean = false, val outcome: FreeLicenseOutcome? = null)
+
+    private val _dlcAdds = MutableStateFlow<Map<Int, DlcAdd>>(emptyMap())
+    val dlcAdds: StateFlow<Map<Int, DlcAdd>> = _dlcAdds.asStateFlow()
+
+    /** Asks Steam to add a free extra content to the account, one request at a time for each. Only for what the shop says is free. */
+    fun onAddDlc(dlcId: Int) {
+        val item = _dlc.value.items.firstOrNull { it.appId == dlcId } ?: return
+        if (!item.free || _dlcAdds.value[dlcId]?.running == true) return
+        _dlcAdds.value = _dlcAdds.value + (dlcId to DlcAdd(running = true))
+        viewModelScope.launch {
+            val outcome = freeLicenses.add(dlcId)
+            _dlcAdds.value = _dlcAdds.value + (dlcId to DlcAdd(outcome = outcome))
+        }
+    }
+
     init {
+        viewModelScope.launch {
+            // The country of the prices: the one of the account when it is known soon, else the device's.
+            val place = kotlinx.coroutines.withTimeoutOrNull(DLC_COUNTRY_WAIT_MS) { country.first { it != null } } ?: Locale.getDefault().country.ifEmpty { "US" }
+            val items = runCatching { dlcRepository.of(appId, place, language) }.getOrDefault(emptyList())
+            _dlc.value = DlcState(items, loading = false)
+        }
         viewModelScope.launch { runCatching { mediaRepository.refreshIfStale() } }
         viewModelScope.launch { runCatching { catalog.refreshIfStale() } }
         // The history is read from the device at once, so the page has it without waiting; then the network is asked, and the page takes what it brings.
@@ -156,5 +190,6 @@ class StoreGameViewModel @Inject constructor(
     private companion object {
         const val ENGLISH = "en"
         const val STOP_TIMEOUT_MS = 5_000L
+        const val DLC_COUNTRY_WAIT_MS = 2_000L
     }
 }

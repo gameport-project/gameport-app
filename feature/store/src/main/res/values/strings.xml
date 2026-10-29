@@ -43,7 +43,12 @@
     <string name="storegame_players_fails">Problems, say players</string>
     <string name="storegame_metacritic">Metacritic %1$d</string>
     <string name="storegame_open_steam">See on Steam</string>
-    <string name="storegame_open_library">Open its page in my library</string>
+    <string name="storegame_open_library">See in library</string>
+    <string name="storegame_dlc_title">Extra content</string>
+    <string name="storegame_dlc_owned">In the library</string>
+    <string name="storegame_dlc_free">Free</string>
+    <string name="storegame_dlc_open">Open on Steam</string>
+    <string name="storegame_dlc_added">Added to the library.</string>
     <string name="storegame_multi_warning">Has a multiplayer part: it works in several games, and a few rare ones are blocked, for example by an APK protection.</string>
     <string name="storegame_multi_warning_detail">The online part of a game, its servers and its matchmaking, works in several games. A few rare games will not work, because of an APK protection or another block.</string>
     <string name="storegame_add">Add to the library</string>
@@ -91,11 +96,6 @@
     <string name="store_price_paid">Paid</string>
     <string name="store_group_adult">Adult content</string>
     <string name="storemedia_title">Pictures and trailer</string>
-    <string name="storemedia_trailer">Trailer</string>
-    <string name="storemedia_close">Close</string>
-    <string name="storemedia_previous">Previous</string>
-    <string name="storemedia_next">Next</string>
-    <string name="storemedia_unplayable">This trailer cannot be played here.</string>
     <string name="store_adult_only">Only</string>
     <string name="store_adult_hidden">Hidden</string>
     <string name="store_group_types">Type</string>

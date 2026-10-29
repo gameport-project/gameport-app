@@ -17,6 +17,6 @@ fun NavGraphBuilder.storeScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, 
     composable<StoreRoute> { StoreScreen(onBack = onBack, onGameClick = onGameClick, onStoreGame = onStoreGame) }
 }
 
-fun NavGraphBuilder.storeGameScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit) {
-    composable<StoreGameRoute> { StoreGameScreen(onBack = onBack, onGameClick = onGameClick) }
+fun NavGraphBuilder.storeGameScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, onOpenSteam: (url: String, title: String) -> Unit) {
+    composable<StoreGameRoute> { StoreGameScreen(onBack = onBack, onGameClick = onGameClick, onOpenSteam = onOpenSteam) }
 }

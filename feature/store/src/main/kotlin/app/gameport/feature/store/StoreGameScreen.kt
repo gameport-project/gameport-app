@@ -72,7 +72,9 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.gameport.core.designsystem.GameImage
+import app.gameport.core.designsystem.MediaGallery
 import app.gameport.core.designsystem.GlassButton
+import app.gameport.core.designsystem.GlassIconButton
 import app.gameport.core.designsystem.GlassChip
 import app.gameport.core.designsystem.KindBlue
 import app.gameport.core.designsystem.PageHeader
@@ -105,29 +107,56 @@ private val COVER_OVER_PICTURE: Dp get() = COVER_WIDTH * 1.5f - (BUTTON_BLOCK_HE
  * game: nothing here installs, plays or patches.
  */
 @Composable
-fun StoreGameScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, viewModel: StoreGameViewModel = hiltViewModel()) {
+fun StoreGameScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, onOpenSteam: (url: String, title: String) -> Unit, viewModel: StoreGameViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val media by viewModel.media.collectAsStateWithLifecycle()
-    StoreGameContent(state, onBack, onGameClick, viewModel::onAddToLibrary, media)
+    val dlc by viewModel.dlc.collectAsStateWithLifecycle()
+    val dlcAdds by viewModel.dlcAdds.collectAsStateWithLifecycle()
+    StoreGameContent(state, onBack, onGameClick, viewModel::onAddToLibrary, media, dlc, dlcAdds, viewModel::onAddDlc, onOpenSteam)
 }
+
+/** The page of a game on Steam's shop, which the buttons of this page open inside GamePort. */
+internal fun steamStoreUrl(appId: Int) = "https://store.steampowered.com/app/$appId"
 
 /** The page from what it shows: the screen feeds it from the catalog, the tour of the page feeds it a made-up game. */
 @Composable
-internal fun StoreGameContent(state: StoreGameUiState, onBack: () -> Unit, onGameClick: (Int) -> Unit, onAddToLibrary: () -> Unit, media: app.gameport.core.model.AppMedia? = null) {
+internal fun StoreGameContent(
+    state: StoreGameUiState,
+    onBack: () -> Unit,
+    onGameClick: (Int) -> Unit,
+    onAddToLibrary: () -> Unit,
+    media: app.gameport.core.model.AppMedia? = null,
+    dlc: StoreGameViewModel.DlcState = StoreGameViewModel.DlcState(),
+    dlcAdds: Map<Int, StoreGameViewModel.DlcAdd> = emptyMap(),
+    onAddDlc: (Int) -> Unit = {},
+    onOpenSteam: (url: String, title: String) -> Unit = { _, _ -> },
+) {
     val context = LocalContext.current
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp)) {
             val content = state as? StoreGameUiState.Content
-            PageHeader(onBack, content?.app?.name ?: stringResource(R.string.store_title), content?.app?.let { (it.developer + it.publisher).distinct().joinToString(" · ") }.orEmpty(), trailing = content?.app?.let { app -> { Rating(app) } }, tour = app.gameport.core.model.TourKind.STORE_GAME) {
+            PageHeader(onBack, content?.app?.name ?: stringResource(R.string.store_title), content?.app?.let { (it.developer + it.publisher).distinct().joinToString(" · ") }.orEmpty(), trailing = content?.app?.let { app -> { Rating(app) } }, tour = app.gameport.core.model.TourKind.STORE_GAME,
+                // A game of the library: its page there, at the top, next to the help.
+                action = content?.takeIf { it.owned && it.app != null }?.let { owned -> {
+                    // Filled white, like the Play button of a game: it is the way to the page of the game in the library, and must be seen.
+                    androidx.compose.material3.Button(
+                        onClick = { onGameClick(owned.appId) }, modifier = Modifier.height(ROW_HEIGHT), contentPadding = BUTTON_PADDING,
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF1B1F2A)),
+                    ) {
+                        Icon(Icons.Filled.VideogameAsset, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.storegame_open_library))
+                    }
+                } }) {
                 Icon(Icons.Filled.Storefront, contentDescription = null, tint = KindBlue, modifier = Modifier.size(52.dp))
             }
             when {
                 content == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 content.app == null -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(stringResource(R.string.storegame_not_listed), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    SteamButton(null) { openOnSteam(context, content.appId) }
+                    SteamButton(null) { onOpenSteam(steamStoreUrl(content.appId), content.app?.name ?: "Steam") }
                 }
-                else -> Details(content, content.app, onGameClick, onAddToLibrary, context, media)
+                else -> Details(content, content.app, onGameClick, onAddToLibrary, context, media, dlc, dlcAdds, onAddDlc, onOpenSteam)
             }
         }
     }
@@ -142,7 +171,18 @@ private fun Modifier.pullUp(amount: Dp): Modifier = layout { measurable, constra
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Details(content: StoreGameUiState.Content, app: AndroidApp, onGameClick: (Int) -> Unit, onAdd: () -> Unit, context: Context, media: app.gameport.core.model.AppMedia?) {
+private fun Details(
+    content: StoreGameUiState.Content,
+    app: AndroidApp,
+    onGameClick: (Int) -> Unit,
+    onAdd: () -> Unit,
+    context: Context,
+    media: app.gameport.core.model.AppMedia?,
+    dlc: StoreGameViewModel.DlcState,
+    dlcAdds: Map<Int, StoreGameViewModel.DlcAdd>,
+    onAddDlc: (Int) -> Unit,
+    onOpenSteam: (url: String, title: String) -> Unit,
+) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.fillMaxWidth().widthIn(max = CONTENT_WIDTH)) {
             Box {
@@ -167,7 +207,7 @@ private fun Details(content: StoreGameUiState.Content, app: AndroidApp, onGameCl
                 )
                 Column(Modifier.weight(1f).height(COVER_WIDTH * 1.5f), verticalArrangement = Arrangement.Bottom) {
                     FlowRow(Modifier.tourTarget(TourIds.STOREGAME_BUTTONS), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
-                        Buttons(content, app, onGameClick, onAdd, context)
+                        Buttons(content, app, onAdd, onOpenSteam)
                     }
                 }
             }
@@ -193,6 +233,11 @@ private fun Details(content: StoreGameUiState.Content, app: AndroidApp, onGameCl
         if (media != null && !media.isEmpty) {
             Section(stringResource(R.string.storemedia_title)) { MediaGallery(app.appid, media) }
         }
+        // The extra content of the game, as Steam's shop lists it; it comes in the background, so the page is there before it.
+        // While it is asked for, pale blocks hold its place; when the game has none, the section is not there at all.
+        if (dlc.loading || dlc.items.isNotEmpty()) {
+            Section(stringResource(R.string.storegame_dlc_title)) { if (dlc.loading) DlcSkeleton() else DlcList(dlc.items, dlc.owned, dlcAdds, onAddDlc, onOpenSteam) }
+        }
         Box(Modifier.tourTarget(TourIds.STOREGAME_DETAILS)) { Section(stringResource(R.string.storegame_details)) {
             // Two halves side by side where there is room: the facts, and the languages as a table. One under the other on a narrow screen.
             BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -213,21 +258,99 @@ private fun Details(content: StoreGameUiState.Content, app: AndroidApp, onGameCl
 }
 
 @Composable
-private fun Buttons(content: StoreGameUiState.Content, app: AndroidApp, onGameClick: (Int) -> Unit, onAdd: () -> Unit, context: Context) {
+private fun Buttons(content: StoreGameUiState.Content, app: AndroidApp, onAdd: () -> Unit, onOpenSteam: (url: String, title: String) -> Unit) {
     // The button with its note under it, then the figures of the history, each as high as the button and centred on it.
     Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            SteamButton(content.price) { openOnSteam(context, app.appid) }
+            // The page of the game on Steam opens inside GamePort, with the account signed in. (The way to the game's page in the library is at the top of the page.)
+            SteamButton(content.price) { onOpenSteam(steamStoreUrl(app.appid), app.name) }
             PriceNote(content.price, content.story?.verdict(content.price))
         }
         if (content.storyLoading) StatsSkeleton() else content.story?.let { PriceStats(it) }
     }
-    if (content.owned) {
-        GlassButton(onClick = { onGameClick(app.appid) }, modifier = Modifier.height(ROW_HEIGHT), contentPadding = BUTTON_PADDING) { Text(stringResource(R.string.storegame_open_library)) }
-    } else if (content.price == StorePrice.Free) {
+    if (!content.owned && content.price == StorePrice.Free) {
         AddToLibrary(content, app, onAdd)
     }
 }
+
+/**
+ * The extra content of the game as Steam's shop lists it, one line each: its picture when it has one, its name, what it costs or that it is free, a button to add it to the library
+ * when it is free (the account is only written to after the player confirms, as for a game), and its page on Steam, which opens inside GamePort.
+ */
+@Composable
+private fun DlcList(items: List<app.gameport.core.sync.StoreDlc>, owned: Set<Int>, adds: Map<Int, StoreGameViewModel.DlcAdd>, onAdd: (Int) -> Unit, onOpenSteam: (url: String, title: String) -> Unit) {
+    var asking by rememberSaveable { mutableStateOf<Int?>(null) }
+    items.firstOrNull { it.appId == asking }?.let { item ->
+        BackdropDialog(
+            onDismissRequest = { asking = null },
+            title = { Text(stringResource(R.string.storegame_add_title)) },
+            text = { Text(stringResource(R.string.storegame_add_text, item.name)) },
+            confirmButton = { GlassButton(onClick = { asking = null; onAdd(item.appId) }) { Text(stringResource(R.string.storegame_add_confirm)) } },
+            dismissButton = { GlassButton(onClick = { asking = null }) { Text(stringResource(R.string.storegame_add_cancel)) } },
+        )
+    }
+    Card(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            items.forEach { item ->
+                val add = adds[item.appId]
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    item.image?.let { GameImage(art = app.gameport.core.model.Art(it), contentDescription = null, modifier = Modifier.width(DLC_IMAGE_WIDTH).height(DLC_IMAGE_HEIGHT).clip(RoundedCornerShape(8.dp))) }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(item.name, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        // What came of the request, said under the name: the page does not claim more than Steam said.
+                        val note = when (add?.outcome) {
+                            FreeLicenseOutcome.Added -> R.string.storegame_dlc_added
+                            FreeLicenseOutcome.NotFree -> R.string.storegame_add_not_free
+                            FreeLicenseOutcome.NotConnected -> R.string.storegame_add_not_connected
+                            FreeLicenseOutcome.Failed -> R.string.storegame_add_failed
+                            FreeLicenseOutcome.AlreadyOwned -> R.string.storegame_add_already
+                            null -> null
+                        }
+                        note?.let { Text(stringResource(it), style = MaterialTheme.typography.labelMedium, color = StoreOrange) }
+                    }
+                    // Cost nothing more: the account already has it, said in green where the button to add it would be.
+                    if (item.appId in owned || add?.outcome == FreeLicenseOutcome.Added || add?.outcome == FreeLicenseOutcome.AlreadyOwned) {
+                        Row(
+                            Modifier.height(ROW_HEIGHT).clip(RoundedCornerShape(50)).background(StoreGreen.copy(alpha = 0.22f)).border(1.dp, StoreGreen, RoundedCornerShape(50)).padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Filled.Check, contentDescription = null, tint = StoreGreen, modifier = Modifier.size(20.dp))
+                            Text(stringResource(R.string.storegame_dlc_owned), color = Color.White, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        }
+                    }
+                    if (item.free && item.appId !in owned && add?.outcome != FreeLicenseOutcome.Added && add?.outcome != FreeLicenseOutcome.AlreadyOwned) {
+                        GlassButton(onClick = { asking = item.appId }, enabled = add?.running != true, contentPadding = BUTTON_PADDING) {
+                            if (add?.running == true) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Icon(Icons.Filled.LibraryAdd, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(if (add?.running == true) R.string.storegame_adding else R.string.storegame_add))
+                        }
+                    }
+                    // Its page on Steam, in the same blue as the one of the game, with its price (or "Free"); it opens inside GamePort.
+                    SteamLabelButton(if (item.free) stringResource(R.string.storegame_free) else item.price) { onOpenSteam(steamStoreUrl(item.appId), item.name) }
+                }
+            }
+        }
+    }
+}
+
+/** Where the extra content will be, while the shop is asked: three pale lines, a picture and a name each. */
+@Composable
+private fun DlcSkeleton() {
+    Card(Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            repeat(3) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.width(DLC_IMAGE_WIDTH).height(DLC_IMAGE_HEIGHT).background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp)))
+                    Box(Modifier.width(180.dp).height(16.dp).background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(6.dp)))
+                }
+            }
+        }
+    }
+}
+
+private val DLC_IMAGE_WIDTH = 120.dp
+private val DLC_IMAGE_HEIGHT = 56.dp
 
 /**
  * The button that adds a free game or demo to the library, and what came of it. The account is only written to after the player confirms, in a window that
@@ -502,7 +625,18 @@ private val BUTTON_PADDING = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
  * arrow. The words stay for the screen readers.
  */
 @Composable
-private fun SteamButton(price: StorePrice?, onClick: () -> Unit) {
+private fun SteamButton(price: StorePrice?, onClick: () -> Unit) = SteamLabelButton(
+    when (price) {
+        StorePrice.Free -> stringResource(R.string.storegame_free)
+        is StorePrice.Paid -> price.finalText()
+        null -> null
+    },
+    onClick,
+)
+
+/** The same blue capsule with the words given: the price of a game, of an extra content, or "Free". */
+@Composable
+private fun SteamLabelButton(label: String?, onClick: () -> Unit) {
     val words = stringResource(R.string.storegame_open_steam)
     Row(
         Modifier.height(ROW_HEIGHT).clip(RoundedCornerShape(50)).background(SteamBlue).clickable(onClick = onClick).padding(horizontal = 16.dp),
@@ -510,11 +644,7 @@ private fun SteamButton(price: StorePrice?, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(painterResource(DesignR.drawable.ic_steam), contentDescription = words, tint = Color.White, modifier = Modifier.size(22.dp))
-        when (price) {
-            StorePrice.Free -> Text(stringResource(R.string.storegame_free), color = Color.White, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
-            is StorePrice.Paid -> Text(price.finalText(), color = Color.White, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
-            null -> Unit
-        }
+        if (label != null) Text(label, color = Color.White, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1)
         Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(15.dp))
     }
 }
@@ -564,9 +694,3 @@ private fun platformName(code: String) = when (code) {
     else -> code
 }
 
-/** Opens the page of the game on Steam, where it is bought. Nothing happens on a device that has no browser. */
-private fun openOnSteam(context: Context, appId: Int) = openLink(context, "https://store.steampowered.com/app/$appId")
-
-private fun openLink(context: Context, url: String) {
-    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-}
