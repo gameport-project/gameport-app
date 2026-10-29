@@ -5,6 +5,7 @@ import app.gameport.core.designsystem.tourTarget
 import app.gameport.core.model.BackdropPresets
 import app.gameport.core.designsystem.DangerTextButton
 import app.gameport.core.designsystem.GameImage
+import androidx.compose.material.icons.filled.Refresh
 import app.gameport.core.designsystem.GlassButton
 import app.gameport.core.model.Game
 import androidx.compose.foundation.layout.aspectRatio
@@ -180,7 +181,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenGame: (Int) -> Unit = {}, startOnUp
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
                         when (category) {
-                            Category.ACCOUNT -> AccountSection(accountName, offline, viewModel::onOfflineModeChanged, countPlaytime, viewModel::onCountPlaytimeOnSteamChanged, sendAchievements, viewModel::onSendAchievementsToSteamChanged, shareVerdicts, viewModel::onShareVerdictsChanged, returnMode, viewModel::onReturnModeChanged, viewModel::onSignOut)
+                            Category.ACCOUNT -> AccountSection(accountName, offline, viewModel::onOfflineModeChanged, countPlaytime, viewModel::onCountPlaytimeOnSteamChanged, sendAchievements, viewModel::onSendAchievementsToSteamChanged, shareVerdicts, viewModel::onShareVerdictsChanged, returnMode, viewModel::onReturnModeChanged, viewModel::onRefreshLibrary, viewModel::onSignOut)
                             Category.DOWNLOADS -> DownloadsSection(speedUnit, viewModel::onSpeedUnitSelected, viewModel.downloadRegionId.collectAsStateWithLifecycle().value, viewModel::onDownloadRegionSelected)
                             Category.APPEARANCE -> AppearanceSection(display, viewModel::onDisplayChanged)
                             Category.HOME -> HomeSection(display, viewModel.isHeadset, viewModel::onDisplayChanged)
@@ -268,6 +269,7 @@ private fun AccountSection(
     onShareVerdictsChanged: (Boolean) -> Unit,
     returnMode: ReturnMode,
     onReturnModeChanged: (ReturnMode) -> Unit,
+    onRefreshLibrary: () -> Unit,
     onSignOut: () -> Unit,
 ) {
     var confirming by rememberSaveable { mutableStateOf(false) }
@@ -340,6 +342,20 @@ private fun AccountSection(
                     )
                 }
             }
+        }
+    }
+    // Reads the library again in the background: nothing is emptied, the games shown stay while it goes on.
+    var refreshAsked by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().widthIn(max = 720.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.settings_refresh_library), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_refresh_library_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (refreshAsked) Text(stringResource(R.string.settings_refresh_library_asked), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+        }
+        GlassButton(onClick = { refreshAsked = true; onRefreshLibrary() }) {
+            Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.settings_refresh_library_button))
         }
     }
     Button(

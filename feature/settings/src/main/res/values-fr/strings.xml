@@ -6,6 +6,10 @@
     <string name="settings_account_description">Le compte Steam utilisé par GamePort pour la bibliothèque, les téléchargements et l\'identité dans les jeux.</string>
     <string name="settings_signed_in_as">Connecté en tant que %1$s</string>
     <string name="settings_sign_out">Se déconnecter de Steam</string>
+    <string name="settings_refresh_library">Vérifier la bibliothèque</string>
+    <string name="settings_refresh_library_description">GamePort demande tout seul à Steam, quand il est ouvert, s\'il y a de nouveaux jeux ou une version Android pour un jeu déjà possédé. Ce bouton lance la vérification tout de suite. Rien n\'est vidé : les jeux déjà connus restent affichés pendant la vérification.</string>
+    <string name="settings_refresh_library_button">Vérifier maintenant</string>
+    <string name="settings_refresh_library_asked">Vérification lancée. Les nouveautés apparaissent dans la bibliothèque dès que Steam répond.</string>
     <string name="settings_cancel">Annuler</string>
     <string name="settings_sign_out_confirm_title">Se déconnecter de Steam ?</string>
     <string name="settings_sign_out_confirm_message">Cela supprime tout ce que GamePort garde pour ce compte : la session enregistrée, la liste des jeux et les téléchargements non terminés. Les jeux déjà installés restent sur cet appareil jusqu\'à leur désinstallation. Un nouveau scan du QR code sera nécessaire pour se reconnecter.</string>

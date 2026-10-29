@@ -1,6 +1,17 @@
 package app.gameport.core.steam
 
+import android.util.Log
+import app.gameport.core.steam.session.SteamSession
+import app.gameport.core.steam.session.changesSince
 import app.gameport.core.steam.session.offlineLibrary
+import app.gameport.core.steam.session.planLibraryChanges
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.combine
 import app.gameport.core.model.AuthState
@@ -63,6 +74,72 @@ class JavaSteamLibraryRepository @Inject constructor(
 
     override fun observeGame(appId: Int): Flow<Game?> = visible.map { lib -> lib.games.firstOrNull { it.appId == appId } }
 
+    /** Held while Steam is asked what changed, so that two checks never run together. */
+    private val checking = Mutex()
+    private var lastCheckAt = 0L
+
+    init {
+        watchLicenses()
+        checkWhileOpen()
+    }
+
+    /**
+     * A game added to the account (bought, claimed, shared by the family) makes Steam send the new list of licenses on the open connection. The first list of a session is what the
+     * first scan reads; a later one, with other packages, asks for a scan, which only asks about what it does not know.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun watchLicenses() {
+        scope.launch {
+            sessions.current.flatMapLatest { session ->
+                session?.licenses?.filterNotNull()?.map { list -> list.map { it.packageID }.toSet() }?.distinctUntilChanged()?.drop(1) ?: emptyFlow()
+            }.collect { rescan() }
+        }
+    }
+
+    /** While there is a connection to Steam (GamePort is open, see ConnectionKeeper), Steam is asked what changed: soon after it is made, then every ten minutes. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun checkWhileOpen() {
+        scope.launch {
+            sessions.current.flatMapLatest { session ->
+                if (session == null) emptyFlow() else flow { delay(FIRST_CHECK_DELAY_MS); while (true) { emit(Unit); delay(CHECK_EVERY_MS) } }
+            }.collect { checkForChanges(manual = false) }
+        }
+    }
+
+    override fun refreshLibrary(manual: Boolean) {
+        scope.launch { checkForChanges(manual) }
+    }
+
+    /**
+     * Asks Steam which apps changed since the last check, as its own client does, and reads again only those of the library: a game the account already had that got an Android
+     * build, a new build, a changed way to save. When Steam says it is too long ago to tell, everything is read again. Nothing is emptied, the games shown stay while it goes on.
+     */
+    private suspend fun checkForChanges(manual: Boolean) = checking.withLock {
+        val session = sessions.current.value ?: return@withLock
+        val now = System.currentTimeMillis()
+        if (!manual && now - lastCheckAt < MIN_BETWEEN_CHECKS_MS) return@withLock
+        lastCheckAt = now
+        val account = session.accountId
+        val last = cacheStore.changeNumber(account)
+        val answer = runCatching { session.changesSince(last) }.onFailure { Log.w(TAG, "asking Steam what changed failed", it) }.getOrNull()
+        if (answer == null) {
+            if (manual) rescan()
+            return@withLock
+        }
+        val plan = planLibraryChanges(ownedApps(session, account), answer, last)
+        cacheStore.saveChangeNumber(account, plan.number)
+        if (plan.forgetAll) cacheStore.forgetAllChecked(account) else if (plan.forget.isNotEmpty()) cacheStore.forgetChecked(account, plan.forget)
+        Log.i(TAG, "changes since $last: " + if (plan.forgetAll) "too long ago, everything is read again" else "${plan.forget.size} app(s) of the library changed")
+        if (plan.needsScan || manual) rescan()
+    }
+
+    /** The apps the account has a license for, as the last scan knew them. */
+    private fun ownedApps(session: SteamSession, account: Long): Set<Int> {
+        val cached = cacheStore.load(account) ?: return emptySet()
+        val packages = session.licenses.value.orEmpty().map { it.packageID }.toSet()
+        return cached.packageApps.filterKeys { it in packages }.values.flatten().toSet()
+    }
+
     override fun refreshGame(appId: Int) {
         val account = sessions.current.value?.accountId ?: return
         cacheStore.forgetChecked(account, appId)
@@ -73,6 +150,10 @@ class JavaSteamLibraryRepository @Inject constructor(
     private data class Scan(val session: app.gameport.core.steam.session.SteamSession?, val offline: Boolean, val state: AuthState, val round: Int)
 
     private companion object {
+        const val TAG = "GPLibrary"
         const val STOP_TIMEOUT_MS = 30_000L
+        const val FIRST_CHECK_DELAY_MS = 30_000L
+        const val CHECK_EVERY_MS = 10L * 60 * 1000
+        const val MIN_BETWEEN_CHECKS_MS = 60_000L
     }
 }

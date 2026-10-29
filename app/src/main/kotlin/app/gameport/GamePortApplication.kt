@@ -16,6 +16,7 @@ class GamePortApplication : Application() {
     @Inject lateinit var gameDefaults: app.gameport.core.settings.GameDefaults
     @Inject lateinit var verdictAsker: app.gameport.core.sync.VerdictAsker
     @Inject lateinit var expansionVerifier: app.gameport.core.sync.ExpansionVerifier
+    @Inject lateinit var library: app.gameport.core.steam.SteamLibraryRepository
 
     override fun onCreate() {
         super.onCreate()
@@ -44,6 +45,8 @@ class GamePortApplication : Application() {
             override fun onActivityStarted(activity: android.app.Activity) {
                 connectionKeeper.screenShown()
                 verdictAsker.checkRuns()
+                // Back in front: Steam is asked what changed in the library (new games, a game that got an Android build). At most once a minute.
+                library.refreshLibrary(manual = false)
             }
             override fun onActivityStopped(activity: android.app.Activity) {}
             override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) = connectionKeeper.screenOpened()

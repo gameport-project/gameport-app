@@ -163,6 +163,9 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { auth.reconnect() }
     }
 
+    /** Reads the account's library again in the background to see whether there are new games; nothing is emptied. */
+    fun onRefreshLibrary() = library.refreshLibrary()
+
     /** Forgets the account and every unfinished download. Installed games stay. */
     fun onSignOut() {
         viewModelScope.launch {

@@ -6,6 +6,10 @@
     <string name="settings_account_description">The Steam account GamePort uses for the library, downloads and game identity.</string>
     <string name="settings_signed_in_as">Signed in as %1$s</string>
     <string name="settings_sign_out">Sign out of Steam</string>
+    <string name="settings_refresh_library">Check the library</string>
+    <string name="settings_refresh_library_description">While it is open, GamePort asks Steam by itself whether there are new games, or an Android version for a game already owned. This button starts the check right now. Nothing is emptied: the games already known stay shown during the check.</string>
+    <string name="settings_refresh_library_button">Check now</string>
+    <string name="settings_refresh_library_asked">Check started. What is new appears in the library as soon as Steam answers.</string>
     <string name="settings_cancel">Cancel</string>
     <string name="settings_sign_out_confirm_title">Sign out of Steam?</string>
     <string name="settings_sign_out_confirm_message">This deletes everything GamePort keeps for this account: the saved session, the game list and any unfinished downloads. Games already installed stay on this device until they are uninstalled. A new QR code scan is needed to sign back in.</string>
