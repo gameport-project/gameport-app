@@ -16,10 +16,10 @@ import java.util.zip.CRC32
  *   to 0 when [GENERATION] is raised).
  */
 object PatchVersioning {
-    const val GENERATION = 9
+    const val GENERATION = 10
 
     /** Raised during development when the patches' logic changes; back to 0 at each release. A release build counts it too, so an alpha carries it. */
-    const val DEV_REVISION = 8
+    const val DEV_REVISION = 0
 
     private const val STEP = 1_000
     private val injected = listOf(
