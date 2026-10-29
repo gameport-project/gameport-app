@@ -37,6 +37,8 @@ fun PillTabs(
     /** A lower bar, with a smaller text, where the page has little room. */
     height: androidx.compose.ui.unit.Dp = TAB_HEIGHT,
     textStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.labelLarge,
+    /** Each tab takes the share of the width its label needs, instead of the same as the others: for labels of very different lengths, so the longest is not squeezed. */
+    fitLabels: Boolean = false,
 ) {
     val shape = RoundedCornerShape(50)
     BoxWithConstraints(
@@ -46,12 +48,17 @@ fun PillTabs(
             .background(Color.White.copy(alpha = 0.10f))
             .border(1.dp, Color.White.copy(alpha = 0.14f), shape),
     ) {
-        val tabWidth = maxWidth / labels.size
-        val indicatorOffset by animateDpAsState(tabWidth * selectedIndex, label = "tab indicator")
+        // A label counts for its letters and a margin; with equal tabs each counts for one.
+        val weights = labels.map { if (fitLabels) (it.length + 6).toFloat() else 1f }
+        val totalWeight = weights.sum()
+        val tabWidths = weights.map { maxWidth * (it / totalWeight) }
+        val tabStarts = tabWidths.runningFold(0.dp) { start, width -> start + width }
+        val indicatorOffset by animateDpAsState(tabStarts[selectedIndex], label = "tab indicator")
+        val indicatorWidth by animateDpAsState(tabWidths[selectedIndex], label = "tab indicator width")
         Box(
             Modifier
                 .offset(x = indicatorOffset)
-                .width(tabWidth)
+                .width(indicatorWidth)
                 .fillMaxHeight()
                 .padding(if (height < TAB_HEIGHT) 3.dp else 4.dp)
                 .clip(shape)
@@ -64,7 +71,7 @@ fun PillTabs(
                     label = "tab text",
                 )
                 Box(
-                    Modifier.width(tabWidth).fillMaxHeight().clip(shape).clickable { onSelect(index) },
+                    Modifier.width(tabWidths[index]).fillMaxHeight().clip(shape).clickable { onSelect(index) },
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(text = label, color = color, style = textStyle, maxLines = 1)

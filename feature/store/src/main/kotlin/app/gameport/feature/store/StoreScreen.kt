@@ -57,6 +57,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import app.gameport.core.designsystem.AlertNote
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.FilterList
@@ -234,12 +235,7 @@ fun StoreScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, onStoreGame: (In
                         } else {
                             // The compatibility filter lists only the games the players reported on: the others are not hidden for being incompatible, and the list says so.
                             if (compatOn && current.withoutReports > 0) {
-                                Text(
-                                    pluralStringResource(R.plurals.store_compat_hidden, current.withoutReports, current.withoutReports),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(bottom = 8.dp),
-                                )
+                                CompatNotice(null, pluralStringResource(R.plurals.store_compat_hidden, current.withoutReports, current.withoutReports), Modifier.padding(bottom = 12.dp))
                             }
                             val covers = current.viewMode == StoreViewMode.COVERS
                             // Whatever narrows or orders the list, quick filter, panel, sort or search, sends it back to its top. The first composition, and the return from a
@@ -334,6 +330,10 @@ private fun sortValueOf(app: AndroidApp, sort: StoreSort): String? = when (sort)
 }
 
 /** Three three-way switches on one low row: what can be installed, what the account has, and what works on this device. "All" is each one's first position, and it lists the games nobody rated too. */
+/** A notice about the compatibility filter, as an alert: a card of glass with an orange outline and a mark, the title (when there is one) over the words. */
+@Composable
+private fun CompatNotice(title: String?, text: String, modifier: Modifier = Modifier) = AlertNote(title, text, modifier)
+
 /**
  * What an empty list says when a compatibility filter is on. The filter keeps only the games that players reported on for this device, so an empty list does not mean that
  * nothing is compatible: when games were left out for want of a report, the text says so, with how many, and the filter can be removed from there.
@@ -342,14 +342,12 @@ private fun sortValueOf(app: AndroidApp, sort: StoreSort): String? = when (sort)
 private fun CompatEmpty(withoutReports: Int, wanted: Boolean, onRemove: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 24.dp)) {
         if (withoutReports > 0) {
-            Text(stringResource(R.string.store_compat_empty_title), style = MaterialTheme.typography.titleMedium)
-            Text(stringResource(R.string.store_compat_empty_text), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(pluralStringResource(R.plurals.store_compat_hidden, withoutReports, withoutReports), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else {
-            Text(
-                stringResource(if (wanted) R.string.store_compat_none_works else R.string.store_compat_none_fails),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            CompatNotice(
+                stringResource(R.string.store_compat_empty_title),
+                stringResource(R.string.store_compat_empty_text) + "\n" + pluralStringResource(R.plurals.store_compat_hidden, withoutReports, withoutReports),
             )
+        } else {
+            CompatNotice(null, stringResource(if (wanted) R.string.store_compat_none_works else R.string.store_compat_none_fails))
         }
         GlassButton(onClick = onRemove, contentPadding = PaddingValues(horizontal = 16.dp)) {
             Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -359,13 +357,16 @@ private fun CompatEmpty(withoutReports: Int, wanted: Boolean, onRemove: () -> Un
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun StateFilters(state: StoreUiState.Content, viewModel: StoreViewModel) {
     val quick = state.filters.quick
     val availability = setOf(StoreFilter.INSTALLABLE, StoreFilter.FUTURE)
     val library = setOf(StoreFilter.OWNED, StoreFilter.NOT_OWNED)
     val compat = COMPAT_FILTERS
-    Row(Modifier.fillMaxWidth().padding(bottom = 12.dp).tourTarget(TourIds.STORE_STATE), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+    // The three switches have the width their labels need. When the window is too narrow for all of them on one line, the last goes to the next line, instead of being squeezed until
+    // its labels are cut and run together.
+    FlowRow(Modifier.fillMaxWidth().padding(bottom = 12.dp).tourTarget(TourIds.STORE_STATE), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         PillTabs(
             labels = listOf(stringResource(R.string.store_all), stringResource(R.string.store_avail_installable), stringResource(R.string.store_avail_future)),
             selectedIndex = when {
@@ -402,6 +403,8 @@ private fun StateFilters(state: StoreUiState.Content, viewModel: StoreViewModel)
             modifier = Modifier.width(440.dp),
             height = 34.dp,
             textStyle = MaterialTheme.typography.labelMedium,
+            // The four labels are of very different lengths ("Tous", "Pas encore testé (N)"): each tab takes what its label needs.
+            fitLabels = true,
         )
     }
 }
