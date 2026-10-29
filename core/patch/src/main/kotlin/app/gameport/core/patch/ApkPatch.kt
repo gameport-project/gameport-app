@@ -24,6 +24,19 @@ data class PatchContext(
     val vrGameActivity: Boolean = true,
     /** The player did not turn off the stand-in for Meta's OVRPlugin ([app.gameport.core.patch.patches.OvrPluginStandInPatch]). */
     val ovrPluginStandIn: Boolean = true,
+    /**
+     * The Android version to lower the game's demand to, when the player asked for it to be installed on a headset older than it says it
+     * needs ([app.gameport.core.patch.patches.MinSdkFloorPatch]). Null leaves what the game asks for alone, which is the usual case.
+     */
+    val lowerMinSdkTo: Int? = null,
+    /**
+     * The package name to give the game instead of its own. Null, which is the usual case, leaves it alone.
+     *
+     * It is applied before any patch reads the manifest, so everything derived from the package name follows it — the hook's provider
+     * authority above all. A game under another name is a different app to Android and to the headset: it keeps none of the original's
+     * data and can never update it. Experimental, and used so far only to find out what a headset's licence check is keyed on.
+     */
+    val renamePackageTo: String? = null,
     /** The player turned on the declaration of the passthrough feature for this game ([app.gameport.core.patch.patches.PassthroughFeaturePatch]). */
     val allowPassthrough: Boolean = false,
     /** The patch version to record in the game ([PatchVersioning.current]). */

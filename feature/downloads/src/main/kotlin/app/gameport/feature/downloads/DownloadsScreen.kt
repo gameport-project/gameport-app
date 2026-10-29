@@ -60,6 +60,7 @@ import app.gameport.core.model.InstallState
 import app.gameport.core.model.SpeedUnit
 import app.gameport.core.model.InstallError
 import app.gameport.core.install.ExpansionStorageAccess
+import app.gameport.core.install.InstallSourceAccess
 
 @Composable
 fun DownloadsScreen(
@@ -210,7 +211,17 @@ private fun EntryRow(
                 is InstallState.ChoosingVersion -> Text(stringResource(R.string.downloads_choose_version))
                 is InstallState.ChoosingDuplicate -> Text(stringResource(R.string.downloads_choose_duplicate))
                 InstallState.Interrupted -> Text(stringResource(R.string.downloads_interrupted))
-                is InstallState.Failed -> Text(installErrorText(state.error), color = MaterialTheme.colorScheme.error)
+                is InstallState.Failed -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(installErrorText(state.error), color = MaterialTheme.colorScheme.error)
+                    // Where the report saved by itself went, so it can be copied off over USB without GamePort being asked for it.
+                    entry.savedReportFile?.let {
+                        Text(
+                            stringResource(app.gameport.core.designsystem.R.string.game_error_log_saved, it),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 is InstallState.Installed ->
                     if (updateAvailable) GlassChip(stringResource(R.string.downloads_update_available), accent = Color(0xFF66BB6A))
                     else Text(stringResource(R.string.downloads_installed))
@@ -223,10 +234,18 @@ private fun EntryRow(
                     if (entry.state is InstallState.Downloading) GlassButton(onClick = onPause) { Text(stringResource(R.string.downloads_pause)) }
                     DangerButton(onClick = onCancel) { Text(stringResource(R.string.downloads_cancel)) }
                 }
+                // Patching and installing can both wait on something that never comes: this page is where a player goes looking for a way out.
+                InstallState.Patching, InstallState.Installing -> DangerButton(onClick = onCancel) { Text(stringResource(R.string.downloads_cancel)) }
                 InstallState.Interrupted, is InstallState.Failed -> {
-                    if ((entry.state as? InstallState.Failed)?.error.let { it == InstallError.ExpansionStoragePermission || it == InstallError.ExpansionFiles }) {
+                    val failure = (entry.state as? InstallState.Failed)?.error
+                    if (failure == InstallError.ExpansionStoragePermission || failure == InstallError.ExpansionFiles) {
                         OutlinedButton(onClick = { ExpansionStorageAccess.openSettings(entryContext) }) {
                             Text(stringResource(app.gameport.core.designsystem.R.string.game_error_expansion_storage_open))
+                        }
+                    }
+                    if (failure == InstallError.InstallPermission) {
+                        OutlinedButton(onClick = { InstallSourceAccess.openSettings(entryContext) }) {
+                            Text(stringResource(app.gameport.core.designsystem.R.string.game_error_install_permission_open))
                         }
                     }
                     if (entry.game != null) Button(onClick = onResume) { Text(stringResource(R.string.downloads_resume)) }

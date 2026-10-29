@@ -146,8 +146,10 @@ class AppUpdater @Inject constructor(
             _state.value = AppUpdateState.Installing(release)
             _state.value = when (val outcome = packages.install(listOf(file))) {
                 PackageGateway.Outcome.Success -> AppUpdateState.UpToDate(System.currentTimeMillis())
-                PackageGateway.Outcome.Cancelled -> AppUpdateState.Available(release, prefs.getLong(KEY_CHECKED, 0L))
+                // Nothing was installed either way, and the release is still there to try again: a confirmation nobody answered is not a failure.
+                PackageGateway.Outcome.Cancelled, PackageGateway.Outcome.NotConfirmed -> AppUpdateState.Available(release, prefs.getLong(KEY_CHECKED, 0L))
                 PackageGateway.Outcome.Conflict -> AppUpdateState.Failed(release, AppUpdateFailure.REFUSED)
+                is PackageGateway.Outcome.Blocked -> AppUpdateState.Failed(release, AppUpdateFailure.REFUSED).also { android.util.Log.w(TAG, "update refused by the device: ${outcome.reason}") }
                 is PackageGateway.Outcome.Failure -> AppUpdateState.Failed(release, AppUpdateFailure.OTHER).also { android.util.Log.w(TAG, "update not installed: ${outcome.reason}") }
             }
         } catch (e: UpdateFailure) {

@@ -18,8 +18,11 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** One line of the page: a game and where its install stands. [game] is null if the library lacks it. */
-data class DownloadEntry(val appId: Int, val game: Game?, val state: InstallState, val installedAt: Long? = null)
+/**
+ * One line of the page: a game and where its install stands. [game] is null if the library lacks it. [savedReportFile] is the report saved by
+ * itself when the install failed, by file name.
+ */
+data class DownloadEntry(val appId: Int, val game: Game?, val state: InstallState, val installedAt: Long? = null, val savedReportFile: String? = null)
 
 /** Work in progress first, then the games with an update, then what needs attention, then what is installed; the latest installed or updated first in each. */
 internal fun downloadsOrder(withUpdate: Set<Int>): Comparator<DownloadEntry> = compareBy<DownloadEntry> {
@@ -38,6 +41,7 @@ class DownloadsViewModel @Inject constructor(
     private val updatesRepository: GameUpdatesRepository,
     settings: UserSettings,
     private val adult: app.gameport.core.settings.AdultApps,
+    installReports: app.gameport.core.install.InstallReportStore,
 ) : ViewModel() {
     val speedUnit: StateFlow<SpeedUnit> = settings.speedUnit
 
@@ -46,10 +50,18 @@ class DownloadsViewModel @Inject constructor(
         .map { list -> list.map { it.appId }.toSet() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptySet())
 
-    val entries: StateFlow<List<DownloadEntry>> = combine(library.observeLibrary(), installer.observeAll(), updatable, adult.hidden) { lib, states, withUpdate, leftOut ->
+    val entries: StateFlow<List<DownloadEntry>> = combine(
+        library.observeLibrary(),
+        installer.observeAll(),
+        updatable,
+        adult.hidden,
+        installReports.saved,
+    ) { lib, states, withUpdate, leftOut, reportFiles ->
         val games = lib.games.associateBy { it.appId }
         // An adult game the player may not see is not listed, not even by its number while its name is looked for.
-        states.filterKeys { it !in leftOut }.map { (appId, state) -> DownloadEntry(appId, games[appId], state, installer.installedAt(appId)) }.sortedWith(downloadsOrder(withUpdate))
+        states.filterKeys { it !in leftOut }
+            .map { (appId, state) -> DownloadEntry(appId, games[appId], state, installer.installedAt(appId), reportFiles[appId]) }
+            .sortedWith(downloadsOrder(withUpdate))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     init {

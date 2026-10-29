@@ -16,11 +16,14 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.resume
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Talks to Android's package installer. Both install and uninstall may ask the user to confirm. */
 @Singleton
@@ -36,9 +39,25 @@ class PackageGateway @Inject constructor(
     /** The headset family of this device (`meta`, `pico`, `openxr`), null when it is not a headset. */
     val vrFamily: String? get() = device.vrPlatform?.id
 
+    /**
+     * Whether the system lets GamePort install anything at all. Without it, Android still takes a session and still asks, but it sends the player
+     * to its own "install unknown apps" page instead of a confirmation, and that page answers nothing: the install would wait for ever.
+     */
+    fun canInstallPackages(): Boolean =
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) true else runCatching { packageManager.canRequestPackageInstalls() }.getOrDefault(true)
+
     fun packageNameOf(apk: File): String? = runCatching {
         packageManager.getPackageArchiveInfo(apk.absolutePath, 0)?.packageName
     }.getOrNull()
+
+    /**
+     * What the system says when it is asked to read [apk], for the log when [packageNameOf] gives nothing: the reason is otherwise
+     * thrown away, and "the APK could not be read" alone says nothing about why.
+     */
+    fun unreadableReason(apk: File): String = runCatching {
+        val info = packageManager.getPackageArchiveInfo(apk.absolutePath, 0)
+        if (info == null) "the system read the file but found no package in it" else "read fine: ${info.packageName}"
+    }.getOrElse { "${it.javaClass.simpleName}: ${it.message}" }
 
     /** The APK files of an installed package: the base and its splits. */
     fun apkFilesOf(packageName: String): List<File> = runCatching {
@@ -141,8 +160,12 @@ class PackageGateway @Inject constructor(
     /**
      * Installs one APK, or a base APK with its splits, in a single session. [note] is told the steps (the files handed to the system, the confirmation it asks for),
      * so that a report says where an installation that seems stuck is.
+     *
+     * The system is given as long as it needs to do its own work, but once it has put a confirmation in front of the player the answer is waited for
+     * only [confirmTimeoutMs]: a window the player never saw, or dismissed without the system noticing, would otherwise leave the install waiting
+     * for ever with nothing on screen to get out of it.
      */
-    suspend fun install(apks: List<File>, note: (String) -> Unit = {}): Outcome {
+    suspend fun install(apks: List<File>, confirmTimeoutMs: Long = CONFIRM_TIMEOUT_MS, note: (String) -> Unit = {}): Outcome {
         val installer = packageManager.packageInstaller
         val sessionId = withContext(Dispatchers.IO) {
             val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
@@ -163,8 +186,22 @@ class PackageGateway @Inject constructor(
             }
             id
         }
-        note("install: ${apks.sumOf { it.length() } / (1024 * 1024)} MB handed to the system's installer, committing")
-        return awaitStatus(sessionId, note) { intentSender -> installer.openSession(sessionId).use { it.commit(intentSender) } }
+        note("install: ${apks.sumOf { it.length() } / (1024 * 1024)} MB handed to the system's installer, committing (the player may install unknown apps: ${canInstallPackages()})")
+        val outcome = try {
+            awaitStatus(sessionId, note, confirmTimeoutMs) { intentSender -> installer.openSession(sessionId).use { it.commit(intentSender) } }
+        } catch (e: CancellationException) {
+            note("install: given up on, the system is told to forget its session")
+            abandon(sessionId)
+            throw e
+        }
+        // A session the system still holds keeps the room of the whole game, and makes the next try fail; one that went through is already gone.
+        if (outcome != Outcome.Success) abandon(sessionId)
+        return outcome
+    }
+
+    /** Tells the system to forget a session it was not able to finish. Harmless on one it already closed. */
+    private suspend fun abandon(sessionId: Int) {
+        withContext(NonCancellable) { runCatching { packageManager.packageInstaller.abandonSession(sessionId) } }
     }
 
     /** What an APK says about itself, enough to tell the builds of one game apart. Null when it cannot be read. */
@@ -181,56 +218,90 @@ class PackageGateway @Inject constructor(
         )
     }
 
-    suspend fun uninstall(packageName: String): Outcome =
-        awaitStatus(packageName.hashCode()) { intentSender -> packageManager.packageInstaller.uninstall(packageName, intentSender) }
+    suspend fun uninstall(packageName: String, note: (String) -> Unit = {}): Outcome =
+        awaitStatus(packageName.hashCode(), note, CONFIRM_TIMEOUT_MS) { intentSender -> packageManager.packageInstaller.uninstall(packageName, intentSender) }
 
-    private suspend fun awaitStatus(token: Int, note: (String) -> Unit = {}, start: (android.content.IntentSender) -> Unit): Outcome =
-        suspendCancellableCoroutine { continuation ->
-            val action = "${context.packageName}.PACKAGE_RESULT.$token"
-            val receiver = object : BroadcastReceiver() {
-                override fun onReceive(receiverContext: Context, intent: Intent) {
-                    when (val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
-                        PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                            @Suppress("DEPRECATION")
-                            val confirmation = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
-                            if (confirmation == null) note("install: the system asks for a confirmation but gave no window to open")
-                            else {
-                                note("install: the system asks for a confirmation, its window is opened")
-                                runCatching { context.startActivity(confirmation.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                                    .onFailure { note("install: the confirmation window could not be opened (${it.javaClass.simpleName}: ${it.message})") }
-                            }
-                        }
-                        else -> {
-                            context.unregisterReceiver(this)
-                            val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
-                            if (continuation.isActive) {
-                                continuation.resume(
-                                    when (status) {
-                                        PackageInstaller.STATUS_SUCCESS -> Outcome.Success
-                                        PackageInstaller.STATUS_FAILURE_ABORTED -> Outcome.Cancelled
-                                        PackageInstaller.STATUS_FAILURE_CONFLICT -> Outcome.Conflict
-                                        else -> Outcome.Failure(message)
-                                    },
-                                )
-                            }
-                        }
+    /**
+     * Hands the work to the system and reads its answers as they come: it may first ask the player to confirm, and only then say how it went.
+     * Null [confirmTimeoutMs] waits for the answer as long as it takes.
+     */
+    private suspend fun awaitStatus(
+        token: Int,
+        note: (String) -> Unit = {},
+        confirmTimeoutMs: Long? = null,
+        start: (android.content.IntentSender) -> Unit,
+    ): Outcome {
+        val action = "${context.packageName}.PACKAGE_RESULT.$token"
+        val signals = Channel<Signal>(Channel.UNLIMITED)
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(receiverContext: Context, intent: Intent) {
+                val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+                val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
+                if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+                    @Suppress("DEPRECATION")
+                    val confirmation = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+                    if (confirmation == null) note("install: the system asks for a confirmation but gave no window to open")
+                    else {
+                        // Which window it is matters: a system that sends the player to its "install unknown apps" page instead of a
+                        // confirmation never answers, and the action is what tells the two apart in a report.
+                        note("install: the system asks for a confirmation, its window is opened (${confirmation.action ?: confirmation.component?.flattenToShortString()})")
+                        runCatching { context.startActivity(confirmation.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                            .onFailure { note("install: the confirmation window could not be opened (${it.javaClass.simpleName}: ${it.message})") }
                     }
+                    signals.trySend(Signal.Asked)
+                    return
                 }
-            }
-            ContextCompat.registerReceiver(context, receiver, IntentFilter(action), ContextCompat.RECEIVER_NOT_EXPORTED)
-            continuation.invokeOnCancellation { runCatching { context.unregisterReceiver(receiver) } }
-
-            val pending = PendingIntent.getBroadcast(
-                context,
-                token,
-                Intent(action).setPackage(context.packageName),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
-            )
-            runCatching { start(pending.intentSender) }.onFailure {
-                runCatching { context.unregisterReceiver(receiver) }
-                if (continuation.isActive) continuation.resume(Outcome.Failure(it.message))
+                // The system's own number goes down as it is: it is what tells a refusal by the device apart from a file it would not take.
+                note("install: the system answers with status $status" + (message?.let { " ($it)" } ?: ""))
+                signals.trySend(Signal.Done(outcomeOf(status, message)))
             }
         }
+        ContextCompat.registerReceiver(context, receiver, IntentFilter(action), ContextCompat.RECEIVER_NOT_EXPORTED)
+        val pending = PendingIntent.getBroadcast(
+            context,
+            token,
+            Intent(action).setPackage(context.packageName),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+        )
+        return try {
+            runCatching { start(pending.intentSender) }.getOrElse { return Outcome.Failure(it.message) }
+            collect(signals, confirmTimeoutMs, note)
+        } finally {
+            runCatching { context.unregisterReceiver(receiver) }
+        }
+    }
+
+    /** Waits for the system to say how it went: as long as it takes while it works, and only [confirmTimeoutMs] once it has asked the player. */
+    private suspend fun collect(signals: ReceiveChannel<Signal>, confirmTimeoutMs: Long?, note: (String) -> Unit): Outcome {
+        var waitMs: Long? = null
+        while (true) {
+            val signal = if (waitMs == null) signals.receive() else withTimeoutOrNull(waitMs) { signals.receive() }
+            when (signal) {
+                null -> {
+                    note("install: the confirmation got no answer in ${waitMs?.div(1000)} s: given up on")
+                    return Outcome.NotConfirmed
+                }
+                Signal.Asked -> waitMs = confirmTimeoutMs
+                is Signal.Done -> return signal.outcome
+            }
+        }
+    }
+
+    private fun outcomeOf(status: Int, message: String?): Outcome = when (status) {
+        PackageInstaller.STATUS_SUCCESS -> Outcome.Success
+        PackageInstaller.STATUS_FAILURE_ABORTED -> Outcome.Cancelled
+        PackageInstaller.STATUS_FAILURE_CONFLICT -> Outcome.Conflict
+        PackageInstaller.STATUS_FAILURE_BLOCKED -> Outcome.Blocked(message)
+        else -> Outcome.Failure(message)
+    }
+
+    /** What the system says while it works on a session, in the order it says it. */
+    private sealed interface Signal {
+        /** It has put a confirmation in front of the player and waits for the answer. */
+        data object Asked : Signal
+
+        data class Done(val outcome: Outcome) : Signal
+    }
 
     sealed interface Outcome {
         data object Success : Outcome
@@ -240,6 +311,18 @@ class PackageGateway @Inject constructor(
 
         /** Another version signed with a different key is installed. */
         data object Conflict : Outcome
+
+        /**
+         * The system asked the player to confirm and nothing came back in time: the window was never seen, or it was dismissed without
+         * the system saying so. Told apart from a refusal, as there is nothing wrong with the game or the device.
+         */
+        data object NotConfirmed : Outcome
+
+        /**
+         * The device itself would not have it ([PackageInstaller.STATUS_FAILURE_BLOCKED]): a rule of the headset, or its own store holding
+         * the game. Nothing about the download changes that, so it is not a failure of the file.
+         */
+        data class Blocked(val reason: String?) : Outcome
 
         data class Failure(val reason: String?) : Outcome
     }
@@ -271,3 +354,9 @@ data class ApkInfo(
     val forWatch: Boolean,
     val forHeadset: Boolean,
 )
+
+/**
+ * How long the answer to a confirmation the system asked for is waited for. Long enough to put a headset back on and read it, short enough
+ * that an install nobody is going to answer gives up by itself instead of sitting on the screen for ever.
+ */
+private const val CONFIRM_TIMEOUT_MS = 5 * 60_000L

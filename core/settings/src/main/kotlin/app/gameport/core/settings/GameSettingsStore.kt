@@ -43,6 +43,8 @@ class GameSettingsStore @Inject constructor(
         eyeFoveation = eyeFoveationOf(appId),
         openInVr = prefs.getBoolean("open_in_vr_$appId", true),
         ovrPluginStandIn = prefs.getBoolean("ovrplugin_stand_in_$appId", true),
+        lowerMinSdk = prefs.getBoolean("lower_min_sdk_$appId", false),
+        renamePackage = prefs.getBoolean("rename_package_$appId", false),
         passthrough = passthroughOf(appId),
         launchArguments = if (prefs.contains("launchargs_$appId")) prefs.getStringSet("launchargs_$appId", emptySet()).orEmpty().toSet() else null,
     )
@@ -81,6 +83,9 @@ class GameSettingsStore @Inject constructor(
         // Automatic is the absence of a choice: only a no is written.
         if (settings.openInVr) editor.remove("open_in_vr_$appId") else editor.putBoolean("open_in_vr_$appId", false)
         if (settings.ovrPluginStandIn) editor.remove("ovrplugin_stand_in_$appId") else editor.putBoolean("ovrplugin_stand_in_$appId", false)
+        // Never asked for is the absence of a choice: only a yes is written.
+        if (settings.lowerMinSdk) editor.putBoolean("lower_min_sdk_$appId", true) else editor.remove("lower_min_sdk_$appId")
+        if (settings.renamePackage) editor.putBoolean("rename_package_$appId", true) else editor.remove("rename_package_$appId")
         // Automatic is the absence of a choice.
         when (settings.passthrough) {
             PassthroughMode.AUTO -> editor.remove("passthrough_$appId")

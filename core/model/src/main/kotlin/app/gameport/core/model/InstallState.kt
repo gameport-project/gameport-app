@@ -47,6 +47,9 @@ sealed interface InstallState {
     data class Failed(val error: InstallError) : InstallState
 }
 
+/** An install that just failed, announced as it happens so a report of it can be saved while what explains it is still there. */
+data class InstallFailure(val appId: Int, val error: InstallError)
+
 /** Why an install stopped; the UI turns these into messages in the user's language. */
 sealed interface InstallError {
     data class NotEnoughSpace(val neededBytes: Long, val freeBytes: Long) : InstallError
@@ -64,8 +67,37 @@ sealed interface InstallError {
 
     data object UnreadableApk : InstallError
 
+    /**
+     * The game asks for a newer Android than this device runs ([requiredSdk] against [deviceSdk]). Android's own parser answers nothing
+     * for such an APK, which GamePort reported as a file it could not read: the file is fine, the device is older than it asks for.
+     */
+    data class NeedsNewerAndroid(
+        val requiredSdk: Int,
+        val deviceSdk: Int,
+        /**
+         * Whether lowering what the game asks for could help. False for a game started through a class that needs the newer version
+         * whatever its manifest says: lowering it then only turns a refusal into a crash, so it is not offered.
+         */
+        val canLower: Boolean = true,
+    ) : InstallError
+
     /** Another version of the game, signed differently, is already installed. */
     data object VersionConflict : InstallError
+
+    /**
+     * The system does not let GamePort install apps: the player has not allowed it to install unknown apps, or took the
+     * permission back. Nothing can be installed until it is given, so it is looked at before anything is downloaded.
+     */
+    data object InstallPermission : InstallError
+
+    /**
+     * Android asked the player to confirm the install and nothing came back: the window was never seen (a headset shows it
+     * outside the game), or it was dismissed. The download is kept, so saying yes to a new try costs nothing.
+     */
+    data object NotConfirmed : InstallError
+
+    /** The device itself refused the install: a rule of the headset, or its own store holding the game. [reason] is what the system said. */
+    data class Blocked(val reason: String?) : InstallError
 
     /** The player has to give GamePort access to all files before it can place a game's expansion files. */
     data object ExpansionStoragePermission : InstallError
@@ -85,7 +117,17 @@ data class VersionOption(val id: String, val versionName: String?, val versionCo
  */
 val InstallError.reportable: Boolean
     get() = this !is InstallError.NotEnoughSpace && this !is InstallError.NotSignedIn && this !is InstallError.Offline &&
-        this !is InstallError.AppUpdating && this !is InstallError.ExpansionStoragePermission
+        this !is InstallError.AppUpdating && this !is InstallError.ExpansionStoragePermission &&
+        this !is InstallError.InstallPermission && this !is InstallError.NotConfirmed &&
+        this !is InstallError.NeedsNewerAndroid
+
+/**
+ * Whether the install waits on the player before a new try can get any further: a permission to give, a confirmation to say yes to.
+ * Such a download is kept as it is and never started again by itself, or it would ask again at every start.
+ */
+val InstallError.needsPlayer: Boolean
+    get() = this is InstallError.ExpansionStoragePermission || this is InstallError.InstallPermission || this is InstallError.NotConfirmed ||
+        this is InstallError.NeedsNewerAndroid
 
 /**
  * True while a game is on its way to being installed: waiting its turn, downloading, patching, installing, or waiting for the player's

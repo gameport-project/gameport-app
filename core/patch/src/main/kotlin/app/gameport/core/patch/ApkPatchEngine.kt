@@ -24,6 +24,8 @@ class ApkPatchEngine(private val signingKeys: SigningKeyStore) {
         try {
             val archive = ArchiveFile(ZipFileInput(input))
             val apk = ApkModule("base", archive.createZipEntryMap()).apply { setCloseable(archive) }
+            // Before anything reads the manifest, so that a patch deriving a name from the package (the hook's authority) sees the new one.
+            context.renamePackageTo?.let { apk.androidManifest.packageName = it }
             val session = PatchSession(apk, findHookDex(input))
             val manifest: ByteArray?
             try {

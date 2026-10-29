@@ -26,6 +26,49 @@ Three pieces are native or generated and checked in as assets of `core/patch`; r
 
 `scripts/capture_logs.sh` dumps the device's logcat to a file for reading.
 
+## Looking into an install
+
+An install problem on a headset is hard to see: the confirmation Android asks for opens outside the game, the useful
+log lines scroll away, and putting the headset on between every try is slow. Three things help.
+
+**A report saves itself.** When an install fails for a reason worth reporting, GamePort writes the whole report
+(the game's event log, the system's log, the device's facts, what the download holds) into `Download/` at that moment,
+and the failure on the game's page says the file name. Pull it with
+`adb pull /sdcard/Download/<name>.zip`, or copy it over USB from the device. The event log inside is the one to read
+first: it carries every step of the install, the number the system answered with, and why an APK could not be read.
+
+**A test build answers from a cable.** A debug build carries a receiver (`DebugBridgeReceiver`, `app/src/debug/`) that
+reports what GamePort knows and drives an install without the headset being worn:
+
+| Command | What it answers |
+|---|---|
+| `scripts/install_debug.sh state` | Where every install stands, with the package of each installed game |
+| `scripts/install_debug.sh perm` | Whether the system lets GamePort install apps and write all files, and how it stands with Steam |
+| `scripts/install_debug.sh storage` | Tries, from inside the app, to create and write a game's expansion folder, and says what the system answered |
+| `scripts/install_debug.sh log <appId>` | Everything GamePort did with that game |
+| `scripts/install_debug.sh files <appId>` | What its download holds, and what each APK says about itself |
+| `scripts/install_debug.sh install <appId>` | Starts the install |
+| `scripts/install_debug.sh cancel <appId>` | Stops the one running |
+| `scripts/install_debug.sh discard <appId>` | Throws its download away |
+
+It is in the test build only, and its package name (`app.gameport.dev`) is its own: a release has no such receiver,
+which `./gradlew :app:processReleaseMainManifest` can be checked against.
+
+**The rest is plain `adb`.** Much of what matters needs nothing added to the app:
+
+```sh
+adb logcat -s GamePortDebug:I PackageInstaller:* PackageManager:*  # what the installer itself says
+adb shell dumpsys package app.gameport.dev | grep -A3 'requested permissions' # what GamePort was granted
+adb shell appops get app.gameport.dev REQUEST_INSTALL_PACKAGES                # whether it may install unknown apps
+adb shell pm list packages -3                                                 # the games on the device
+adb shell run-as app.gameport.dev cat files/game-events.log                   # the event log, test build only
+adb shell ls -l /sdcard/Android/obb/<game package>                            # the game's large files
+```
+
+What `adb` cannot do well on a headset is drive the screen: `uiautomator dump` does not see an immersive surface, and
+`input tap` lands on coordinates that do not map to what the player sees. That is why the receiver above acts on the
+install rather than on the UI.
+
 ## Patch versioning
 
 Games record which patch generation patched them, so GamePort can offer to patch again when its own is newer.

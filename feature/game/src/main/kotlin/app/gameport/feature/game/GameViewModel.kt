@@ -59,6 +59,8 @@ sealed interface GameUiState {
         val compat: app.gameport.core.model.Compat? = null,
         /** Why the game is known not to run, when it is on the list of incompatible games. */
         val incompatible: app.gameport.core.model.IncompatibleReason? = null,
+        /** The report saved by itself when the install failed, by file name: the failure then says where to find it. */
+        val savedReportFile: String? = null,
     ) : GameUiState
 }
 
@@ -90,6 +92,7 @@ class GameViewModel @Inject constructor(
     private val playtimeTracker: app.gameport.core.sync.PlaytimeTracker,
     auth: app.gameport.core.steam.SteamAuthRepository,
     private val reports: app.gameport.core.sync.ReportStore,
+    installReports: app.gameport.core.install.InstallReportStore,
     private val reporter: app.gameport.core.sync.ProblemReporter,
     private val reportSender: app.gameport.core.sync.ReportSender,
     achievementsRepository: app.gameport.core.steam.AchievementsRepository,
@@ -162,13 +165,15 @@ class GameViewModel @Inject constructor(
         baseState,
         combine(playtimeStore.observe(appId), steamMinutes, savesNotSynced) { deviceMillis, steam, notSynced -> Triple(deviceMillis, steam, notSynced) },
         opinion,
-    ) { state, (deviceMillis, steam, notSynced), opinion ->
+        installReports.saved.map { it[appId] },
+    ) { state, (deviceMillis, steam, notSynced), opinion, reportFile ->
         if (state is GameUiState.Content) {
             state.copy(
                 playtime = app.gameport.core.model.Playtime(deviceMillis, steam),
                 savesNotSynced = notSynced,
                 compat = opinion.compat,
                 incompatible = opinion.incompatible,
+                savedReportFile = reportFile,
             )
         } else state
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), GameUiState.Loading)
@@ -202,6 +207,16 @@ class GameViewModel @Inject constructor(
     }
 
     fun onCancel() = installer.cancel(appId)
+
+    /**
+     * The player accepts that the game asks for a newer Android than this headset runs: what it asks for is lowered and the install goes
+     * on at once, since asking for it is the same as asking to try again.
+     */
+    fun onAllowOlderAndroid() {
+        val game = (uiState.value as? GameUiState.Content)?.game ?: return
+        installer.allowOlderAndroid(appId)
+        installer.install(game, null)
+    }
 
     /** Whether this game looks like it had a problem (it closed at once, or crashed). */
     val suspicion: StateFlow<app.gameport.core.sync.Suspicion?> = reports.suspected

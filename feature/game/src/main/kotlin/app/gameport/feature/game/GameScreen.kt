@@ -147,6 +147,7 @@ import app.gameport.core.model.InstallState
 import app.gameport.core.model.SpeedUnit
 import app.gameport.core.model.Ownership
 import app.gameport.core.install.ExpansionStorageAccess
+import app.gameport.core.install.InstallSourceAccess
 
 @Composable
 fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -> Unit, onOpenControllers: () -> Unit, onOpenCompat: () -> Unit, onOpenAchievements: () -> Unit, onOpenSteamSettings: () -> Unit, viewModel: GameViewModel = hiltViewModel()) {
@@ -217,6 +218,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onBack = onBack,
         onInstall = viewModel::onInstall,
         onCancel = viewModel::onCancel,
+        onAllowOlderAndroid = viewModel::onAllowOlderAndroid,
         onPause = viewModel::onPause,
         onVersionChosen = viewModel::onVersionChosen,
         onDuplicateChosen = viewModel::onDuplicateChosen,
@@ -252,6 +254,7 @@ internal fun GameContent(
     onBack: () -> Unit,
     onInstall: (Game, Set<Int>?) -> Unit,
     onCancel: () -> Unit,
+    onAllowOlderAndroid: () -> Unit = {},
     onPause: () -> Unit,
     onVersionChosen: (String?) -> Unit,
     onDuplicateChosen: (Boolean) -> Unit,
@@ -279,6 +282,7 @@ internal fun GameContent(
                 is GameUiState.Content -> GameDetails(
                     game = uiState.game,
                     install = uiState.install,
+                    savedReportFile = uiState.savedReportFile,
                     issues = uiState.issues,
                     repatch = uiState.repatch,
                     onRepatch = onRepatch,
@@ -286,6 +290,7 @@ internal fun GameContent(
                     speedUnit = speedUnit,
                     onInstall = { dlc -> onInstall(uiState.game, dlc) },
                     onCancel = onCancel,
+                    onAllowOlderAndroid = onAllowOlderAndroid,
                     onPause = onPause,
                     onVersionChosen = onVersionChosen,
                     onDuplicateChosen = onDuplicateChosen,
@@ -339,6 +344,7 @@ internal fun GameContent(
 private fun GameDetails(
     game: Game,
     install: InstallState,
+    savedReportFile: String? = null,
     issues: List<GameIssue>,
     repatch: Repatch,
     onRepatch: () -> Unit,
@@ -346,6 +352,7 @@ private fun GameDetails(
     speedUnit: SpeedUnit,
     onInstall: (Set<Int>?) -> Unit,
     onCancel: () -> Unit,
+    onAllowOlderAndroid: () -> Unit = {},
     onPause: () -> Unit,
     onVersionChosen: (String?) -> Unit,
     onDuplicateChosen: (Boolean) -> Unit,
@@ -527,10 +534,12 @@ private fun GameDetails(
                 ) {
                     Box(Modifier.tourTarget(TourIds.GAME_ACTIONS)) { InstallActions(
                         install = install,
+                        savedReportFile = savedReportFile,
                         speedUnit = speedUnit,
                         onInstall = { if (compat?.level == app.gameport.core.model.CompatLevel.FAILS) warning = true else startInstall() },
                         onResume = { onInstall(null) },
                         onCancel = onCancel,
+                        onAllowOlderAndroid = onAllowOlderAndroid,
                     onPause = onPause,
                     onVersionChosen = onVersionChosen,
                     onDuplicateChosen = onDuplicateChosen,
@@ -678,10 +687,12 @@ private val COVER_HEIGHT = 285.dp
 @Composable
 private fun InstallActions(
     install: InstallState,
+    savedReportFile: String?,
     speedUnit: SpeedUnit,
     onInstall: () -> Unit,
     onResume: () -> Unit,
     onCancel: () -> Unit,
+    onAllowOlderAndroid: () -> Unit = {},
     onPause: () -> Unit,
     onVersionChosen: (String?) -> Unit,
     onDuplicateChosen: (Boolean) -> Unit,
@@ -714,7 +725,11 @@ private fun InstallActions(
             DuplicateDialog(otherGamePort = install.otherGamePort, onChosen = onDuplicateChosen)
             Text(stringResource(R.string.game_choose_version_waiting), style = MaterialTheme.typography.bodyMedium)
         }
-        InstallState.Patching, InstallState.Installing, InstallState.Finishing -> Progress(state = install, speedUnit = speedUnit, onCancel = null)
+        // Patching and installing can both wait on something that never comes (a confirmation the player never saw, above all): there is
+        // always a way out of them. Finishing only moves files about and is short, and giving up there would leave the game on the
+        // device with nothing to put it right.
+        InstallState.Patching, InstallState.Installing -> Progress(state = install, speedUnit = speedUnit, onCancel = onCancel)
+        InstallState.Finishing -> Progress(state = install, speedUnit = speedUnit, onCancel = null)
         is InstallState.Installed -> if (install.otherGamePort != null) {
             // The game was patched by another GamePort of this device: it starts and updates it, this one leaves it alone.
             Text(stringResource(R.string.game_other_gameport, install.otherGamePort!!), color = Color(0xFFFF9800), style = MaterialTheme.typography.bodyMedium)
@@ -729,13 +744,47 @@ private fun InstallActions(
             DangerTrashButton(onClick = onUninstall, contentDescription = stringResource(R.string.game_uninstall), enabled = !busy)
         }
         is InstallState.Failed -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Held in a name rather than tested in place: the error belongs to another module, so Kotlin will not narrow it for us.
+            val tooNew = install.error as? InstallError.NeedsNewerAndroid
             Text(
                 text = installErrorText(install.error),
                 color = MaterialTheme.colorScheme.error,
             )
+            // A report of the failure was saved by itself: where it went, so it can be copied off over USB without GamePort being asked for it.
+            savedReportFile?.let {
+                Text(
+                    text = stringResource(app.gameport.core.designsystem.R.string.game_error_log_saved, it),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            // What lowering what the game asks for would and would not buy, next to the button that does it; or, for a game started
+            // through a class that needs the newer Android for real, that there is nothing to lower and why.
+            tooNew?.let { needs ->
+                Text(
+                    text = stringResource(
+                        if (needs.canLower) app.gameport.core.designsystem.R.string.game_error_needs_newer_android_offer
+                        else app.gameport.core.designsystem.R.string.game_error_needs_newer_android_hopeless,
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (install.error == InstallError.ExpansionStoragePermission || install.error == InstallError.ExpansionFiles) {
                     OutlinedButton(onClick = { ExpansionStorageAccess.openSettings(installContext) }) { Text(stringResource(app.gameport.core.designsystem.R.string.game_error_expansion_storage_open)) }
+                }
+                // The game asks for a newer Android than this device runs. GamePort can lower what it asks for, which often works and
+                // sometimes does not, so it is offered rather than done, and what it costs is said plainly above the button. For a game
+                // whose entry point needs the newer version whatever the manifest says, there is nothing to offer.
+                if (tooNew?.canLower == true) {
+                    OutlinedButton(onClick = onAllowOlderAndroid) {
+                        Text(stringResource(app.gameport.core.designsystem.R.string.game_error_needs_newer_android_try))
+                    }
+                }
+                // The permission is given on a page of the system: without a way to reach it from here the install cannot be got going again.
+                if (install.error == InstallError.InstallPermission) {
+                    OutlinedButton(onClick = { InstallSourceAccess.openSettings(installContext) }) { Text(stringResource(app.gameport.core.designsystem.R.string.game_error_install_permission_open)) }
                 }
                 Button(onClick = onInstall) { Text(stringResource(R.string.game_retry)) }
                 // Removes whatever was downloaded, so a failed attempt never has to keep gigabytes.

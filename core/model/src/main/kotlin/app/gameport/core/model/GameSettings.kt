@@ -64,6 +64,17 @@ data class GameSettings(
      * gives it a stand-in that answers "not initialized"; off keeps it from doing so. A change needs the game to be patched again.
      */
     val ovrPluginStandIn: Boolean = true,
+    /**
+     * The player asked for this game to be installed on a headset older than the Android version it says it needs: the patch lowers what
+     * it asks for. Off by default, as the game may then not run at all. A change needs the game to be patched again.
+     */
+    val lowerMinSdk: Boolean = false,
+    /**
+     * Install the game under a package name of GamePort's making rather than its own. A headset whose store sells the same game may
+     * refuse to start a copy it did not sell; under another name it does not recognise it. Off by default, experimental, and not offered
+     * on any screen: the game keeps none of its data, can never update the original, and the headset's own library will not know it.
+     */
+    val renamePackage: Boolean = false,
     /** The game declares that it uses the headset's passthrough, so the headset lets it show the real world behind it. A change needs the game to be patched again. */
     val passthrough: PassthroughMode = PassthroughMode.AUTO,
 ) {

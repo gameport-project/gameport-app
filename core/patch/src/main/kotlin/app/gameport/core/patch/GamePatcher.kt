@@ -9,6 +9,7 @@ import app.gameport.core.patch.patches.SteamShimPatch
 import app.gameport.core.patch.patches.XrLayerPatch
 import app.gameport.core.patch.patches.StorageTargetPatch
 import app.gameport.core.patch.patches.MetaLoaderStubPatch
+import app.gameport.core.patch.patches.MinSdkFloorPatch
 import app.gameport.core.patch.patches.XrLoaderPatch
 import app.gameport.core.patch.patches.OvrPluginStandInPatch
 import app.gameport.core.patch.patches.PassthroughFeaturePatch
@@ -60,7 +61,7 @@ class GamePatcher @Inject constructor(
 
 /** Every patch GamePort knows, in the order they are applied. */
 object PatchCatalog {
-    val all: List<ApkPatch> = listOf(VrLauncherPatch, VrGameActivityPatch, OvrPluginStandInPatch, PassthroughFeaturePatch, SteamShimPatch, CloudHookPatch, XrLayerPatch, XrLoaderPatch, MetaLoaderStubPatch, StorageTargetPatch, AppLabelPatch, VersionCodePatch, PatchVersionPatch)
+    val all: List<ApkPatch> = listOf(VrLauncherPatch, VrGameActivityPatch, OvrPluginStandInPatch, PassthroughFeaturePatch, SteamShimPatch, CloudHookPatch, XrLayerPatch, XrLoaderPatch, MetaLoaderStubPatch, StorageTargetPatch, MinSdkFloorPatch, AppLabelPatch, VersionCodePatch, PatchVersionPatch)
 
     val recommended: List<ApkPatch> get() = all.filter { it.recommended }
 }

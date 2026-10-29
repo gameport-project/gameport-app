@@ -10,11 +10,13 @@ import app.gameport.core.model.InstallError
 import app.gameport.core.model.ExpansionCheck
 import app.gameport.core.model.InstallState
 import app.gameport.core.model.LaunchOptions
+import app.gameport.core.model.needsPlayer
 import app.gameport.core.model.reportable
 import app.gameport.core.model.ObbNames
 import app.gameport.core.model.VersionOption
 import app.gameport.core.model.AuthState
 import app.gameport.core.settings.GameDefaults
+import app.gameport.core.patch.ApkFacts
 import app.gameport.core.patch.GamePatcher
 import app.gameport.core.patch.ApkPatch
 import app.gameport.core.patch.PatchCatalog
@@ -44,6 +46,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -83,6 +86,7 @@ class GameInstallRepository @Inject constructor(
     private val reinstallNotice: app.gameport.core.settings.ReinstallNoticeStore,
     private val userSettings: app.gameport.core.settings.UserSettings,
     private val memoryNotice: MemoryNotice,
+    private val reportStore: InstallReportStore,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val operations = MutableStateFlow<Map<Int, InstallState>>(emptyMap())
@@ -102,6 +106,13 @@ class GameInstallRepository @Inject constructor(
 
     /** The package name of each game that was just uninstalled, for what is kept about it elsewhere. */
     val uninstalled: kotlinx.coroutines.flow.SharedFlow<String> = _uninstalled
+    private val _failures = kotlinx.coroutines.flow.MutableSharedFlow<app.gameport.core.model.InstallFailure>(extraBufferCapacity = 8)
+
+    /**
+     * Each install that failed, as it happens. A report of it is saved then and there, while the download and the device still hold what
+     * explains it: see `InstallReports`.
+     */
+    val failures: kotlinx.coroutines.flow.SharedFlow<app.gameport.core.model.InstallFailure> = _failures
     init {
         // Closing GamePort stops "patch all": nobody is looking at it any more.
         InstallForegroundService.onClosed = ::cancelPatchAll
@@ -176,7 +187,15 @@ class GameInstallRepository @Inject constructor(
         if (jobs[game.appId]?.isActive == true) return
         if (gate.updating.value) return fail(game.appId, InstallError.AppUpdating)
         if (auth.offline.value) return fail(game.appId, InstallError.Offline)
+        // Looked at here, not at the install: without it the system never answers, and the player would have waited through the whole
+        // download to find out. A download already on the device is kept as it is.
+        if (!packages.canInstallPackages()) {
+            events.note(game.appId, "GamePort is not allowed to install apps on this device: nothing is downloaded")
+            return fail(game.appId, InstallError.InstallPermission)
+        }
         events.note(game.appId, "install requested for ${game.name} (dlc: ${dlc ?: "same as before"})")
+        // The report of the try before is no longer what to point the player at.
+        reportStore.forget(game.appId)
         val directory = downloadDirectory(game.appId)
         val chosen = dlc ?: readChosenDlc(directory)
         // What the game declares goes in its download. An extra content that its own app declares (a game that sells its content as DLC) cannot: Steam gives its files only to
@@ -286,6 +305,10 @@ class GameInstallRepository @Inject constructor(
                     events.note(game.appId, "build chosen: ${downloaded.joinToString { it.name }}")
                     val account = (auth.authState.value as? AuthState.SignedIn)?.account
                         ?: return@launch fail(game.appId, InstallError.NotSignedIn)
+                    // Looked at before the patch: Android refuses an APK that asks for a newer version than the device runs, and finding
+                    // that out after rewriting a multi-gigabyte file wastes the work and tells the player nothing useful.
+                    tooNewForThisDevice(game.appId, downloaded)?.let { return@launch fail(game.appId, it) }
+                    renameFor(game.appId, downloaded)?.let { events.note(game.appId, "it will be installed as $it, not under its own name") }
                     notEnoughSpaceToPatch(directory, downloaded)?.let { return@launch fail(game.appId, it) }
                     setState(game.appId, InstallState.Patching)
                     events.note(game.appId, "patching ${downloaded.size} file(s)")
@@ -300,14 +323,20 @@ class GameInstallRepository @Inject constructor(
                         // Written under another name and renamed when complete, so an interrupted
                         // patch is never mistaken for a finished one.
                         val partial = File(patched.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || installed.all()[game.appId]?.let(::deviceHasExpansion) == true, vrGameActivity = gameSettings.get(game.appId).openInVr, ovrPluginStandIn = gameSettings.get(game.appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(game.appId).passthrough, game.appId, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlcOf(game), missingDlc = missingDlcOf(game), familyShared = game.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = downloadHasExpansion(directory), deviceFamily = packages.vrFamily, owner = context.packageName))
+                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || installed.all()[game.appId]?.let(::deviceHasExpansion) == true, vrGameActivity = gameSettings.get(game.appId).openInVr, ovrPluginStandIn = gameSettings.get(game.appId).ovrPluginStandIn, lowerMinSdkTo = lowerMinSdkFor(game.appId), renamePackageTo = renameFor(game.appId, downloaded), allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(game.appId).passthrough, game.appId, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlcOf(game), missingDlc = missingDlcOf(game), familyShared = game.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = downloadHasExpansion(directory), deviceFamily = packages.vrFamily, owner = context.packageName))
                         check(partial.renameTo(patched)) { "Could not finish the patched APK." }
                         // Keep only one copy of a multi-gigabyte game on disk.
                         original.delete()
                         patched
                     } }
                 }
-                val packageName = packages.packageNameOf(apks.first()) ?: return@launch fail(game.appId, InstallError.UnreadableApk)
+                val packageName = packages.packageNameOf(apks.first()) ?: run {
+                    // The reason the system gives is otherwise thrown away, and "the APK could not be read" alone says nothing about why.
+                    events.note(game.appId, "the patched APK could not be read: " + apks.joinToString { "${it.name} (${it.length()} bytes) ${packages.unreadableReason(it)}" })
+                    // The commonest reason the system will not read a perfectly good APK, looked at again here for a download that came
+                    // from an earlier run and never went through the check above.
+                    return@launch fail(game.appId, tooNewForThisDevice(game.appId, apks) ?: InstallError.UnreadableApk)
+                }
                 if (!settleDuplicate(game.appId, packageName)) {
                     directory.deleteRecursively()
                     return@launch clearState(game.appId)
@@ -361,7 +390,10 @@ class GameInstallRepository @Inject constructor(
                         }
                     }
                     PackageGateway.Outcome.Cancelled -> clearState(game.appId)
+                    // The confirmation was never answered. The download stays as it is, so saying yes to a new try costs nothing.
+                    PackageGateway.Outcome.NotConfirmed -> fail(game.appId, InstallError.NotConfirmed)
                     PackageGateway.Outcome.Conflict -> fail(game.appId, InstallError.VersionConflict)
+                    is PackageGateway.Outcome.Blocked -> fail(game.appId, InstallError.Blocked(outcome.reason))
                     is PackageGateway.Outcome.Failure -> fail(game.appId, InstallError.Other(outcome.reason))
                 }
             } catch (e: CancellationException) {
@@ -694,11 +726,17 @@ class GameInstallRepository @Inject constructor(
         if (jobs[appId]?.isActive == true) return
         if (gate.updating.value) return fail(appId, InstallError.AppUpdating)
         val packageName = installed.all()[appId]?.takeIf(packages::isInstalled) ?: return
+        if (!packages.canInstallPackages()) {
+            events.note(appId, "GamePort is not allowed to install apps on this device: the patch again is not started")
+            return fail(appId, InstallError.InstallPermission)
+        }
         events.note(appId, "re-patch requested for $packageName (${patches.joinToString { it.id }})")
         val account = (auth.authState.value as? AuthState.SignedIn)?.account ?: return fail(appId, InstallError.NotSignedIn)
         val sources = packages.apkFilesOf(packageName).filter { it.isFile }
         if (sources.isEmpty()) return fail(appId, InstallError.UnreadableApk)
-        val directory = downloadDirectory(appId).apply { mkdirs() }
+        // A place of its own, not the game's download: this is thrown away when the patch again ends, and a download kept for a retry
+        // used to go with it. What a patch again needs to know about expansion files comes from the device, where the game already is.
+        val directory = repatchDirectory(appId).apply { mkdirs() }
         val needed = sources.sumOf { it.length() }
         if (needed > directory.usableSpace) {
             directory.deleteRecursively()
@@ -719,7 +757,7 @@ class GameInstallRepository @Inject constructor(
                         val result = File(patchedDirectory(directory), original.name)
                         result.parentFile?.mkdirs()
                         val partial = File(result.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || deviceHasExpansion(packageName) || atOriginalCode(packageName), vrGameActivity = gameSettings.get(appId).openInVr, ovrPluginStandIn = gameSettings.get(appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(appId).passthrough, appId, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = game?.let(::ownedDlcOf), missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = deviceHasExpansion(packageName), deviceFamily = packages.vrFamily, owner = context.packageName), patches)
+                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || deviceHasExpansion(packageName) || atOriginalCode(packageName), vrGameActivity = gameSettings.get(appId).openInVr, ovrPluginStandIn = gameSettings.get(appId).ovrPluginStandIn, lowerMinSdkTo = lowerMinSdkFor(appId), allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(appId).passthrough, appId, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = game?.let(::ownedDlcOf), missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = deviceHasExpansion(packageName), deviceFamily = packages.vrFamily, owner = context.packageName), patches)
                         check(partial.renameTo(result)) { "Could not finish the patched APK." }
                         result
                     }
@@ -727,16 +765,21 @@ class GameInstallRepository @Inject constructor(
                 setState(appId, InstallState.Installing)
                 // Installing over the game can leave its expansion folder empty: the files wait aside, and come back whatever the outcome.
                 val keptAside = stashExpansionFiles(appId, packageName)
-                val outcome = try { if (confirmTimeoutMs == null) packages.install(patched) { events.note(appId, it) } else kotlinx.coroutines.withTimeoutOrNull(confirmTimeoutMs) { packages.install(patched) { events.note(appId, it) } }
-                    ?: PackageGateway.Outcome.Cancelled.also { events.note(appId, "the update was not confirmed in time: given up") }
+                // The wait on the confirmation belongs to the session, which is let go of with it: a timeout around the call would leave the
+                // system holding the room of the whole game.
+                val outcome = try {
+                    if (confirmTimeoutMs == null) packages.install(patched) { events.note(appId, it) }
+                    else packages.install(patched, confirmTimeoutMs) { events.note(appId, it) }
                 } finally {
                     if (keptAside > 0) withContext(NonCancellable) { restoreExpansionFiles(appId, packageName) }
                 }
                 events.note(appId, "re-patch install outcome: $outcome")
                 if (outcome == PackageGateway.Outcome.Success) alignObbVersion(packageName)
                 when (outcome) {
-                    PackageGateway.Outcome.Success, PackageGateway.Outcome.Cancelled -> clearState(appId)
+                    // The game on the device is untouched either way: a patch again that was not confirmed leaves nothing to put right.
+                    PackageGateway.Outcome.Success, PackageGateway.Outcome.Cancelled, PackageGateway.Outcome.NotConfirmed -> clearState(appId)
                     PackageGateway.Outcome.Conflict -> fail(appId, InstallError.VersionConflict)
+                    is PackageGateway.Outcome.Blocked -> fail(appId, InstallError.Blocked(outcome.reason))
                     is PackageGateway.Outcome.Failure -> fail(appId, InstallError.Other(outcome.reason))
                 }
             } catch (e: CancellationException) {
@@ -756,8 +799,21 @@ class GameInstallRepository @Inject constructor(
         job.start()
     }
 
+    /**
+     * Stops the work on a game. What was fetched is thrown away while it is still being fetched, and kept once it is all there and
+     * patched: a player who gives up on a confirmation they never saw should not have to fetch gigabytes again, and the files are no
+     * worse for it. The game then shows as interrupted, to go on with or to throw away.
+     */
     fun cancel(appId: Int) {
-        jobs[appId]?.cancel()
+        val job = jobs[appId]?.takeIf { it.isActive } ?: return
+        val state = operations.value[appId]
+        if (state == InstallState.Patching || state == InstallState.Installing) {
+            paused.add(appId)
+            // Remembered on disk, as for a pause: the player gave up on it, so it does not start again by itself.
+            runCatching { File(downloadDirectory(appId), PAUSED_FILE).createNewFile() }
+            events.note(appId, "given up on at the install: the download is kept, so going on with it costs nothing")
+        }
+        job.cancel()
     }
 
     /** Stops a download but keeps the files, so it can be resumed later (it then shows as interrupted). */
@@ -798,12 +854,18 @@ class GameInstallRepository @Inject constructor(
         scope.launch {
             val leftOnDevice = incomplete.all()[appId]
             if (leftOnDevice != null && packages.isInstalled(leftOnDevice)) {
-                if (packages.uninstall(leftOnDevice) != PackageGateway.Outcome.Success) return@launch
+                // Nothing is thrown away while the half-installed game is still on the device: its download is what puts it right.
+                val outcome = packages.uninstall(leftOnDevice) { events.note(appId, it) }
+                if (outcome != PackageGateway.Outcome.Success) {
+                    events.note(appId, "the game left incomplete could not be removed ($outcome): its download is kept")
+                    return@launch
+                }
                 _uninstalled.tryEmit(leftOnDevice)
             }
             leftOnDevice?.let(handoff::clear)
             incomplete.remove(appId)
             downloadDirectory(appId).deleteRecursively()
+            reportStore.forget(appId)
             clearState(appId)
         }
     }
@@ -987,6 +1049,72 @@ class GameInstallRepository @Inject constructor(
     private fun missingDlcOf(game: Game): List<Int> = game.androidBuild?.dlc?.filter { !it.owned }?.map { it.appId }.orEmpty()
 
     /** Checked once the download is there: the patched copy of the APKs is written next to them. */
+    /**
+     * The game asks for a newer Android than this device runs, read from its own manifest: the system's parser says nothing at all about
+     * such an APK, so asking it is what made a good download look like a broken one. Null when the device is new enough, or when the
+     * manifest does not say.
+     */
+    private fun tooNewForThisDevice(appId: Int, apks: List<File>): InstallError? {
+        val required = apks.firstNotNullOfOrNull(ApkFacts::minSdkOf) ?: return null
+        val device = android.os.Build.VERSION.SDK_INT
+        if (required <= device) return null
+        if (gameSettings.get(appId).lowerMinSdk) {
+            events.note(appId, "the game asks for Android API $required and this device runs API $device: the player asked for that to be lowered, so it goes on")
+            return null
+        }
+        // A game started through Google's GameActivity needs the newer version for real, so lowering what it asks for is not offered.
+        val entry = apks.firstNotNullOfOrNull(ApkFacts::mainActivityOf)
+        val canLower = apks.none(ApkFacts::needsAndroid11Entry)
+        events.note(
+            appId,
+            "the game asks for Android API $required and this device runs API $device: it cannot be installed as it is" +
+                if (canLower) " (started through $entry, so lowering what it asks for may help)"
+                else " (started through $entry, which needs the newer version whatever the manifest says: lowering it would not help)",
+        )
+        return InstallError.NeedsNewerAndroid(required, device, canLower = canLower)
+    }
+
+    /** The Android version to lower a game's demand to, or null when the player never asked for it. */
+    private fun lowerMinSdkFor(appId: Int): Int? =
+        android.os.Build.VERSION.SDK_INT.takeIf { gameSettings.get(appId).lowerMinSdk }
+
+    /**
+     * The package name to install the game under instead of its own, or null when it keeps its own. Derived from the one it carries, so a
+     * game patched again lands on the same name and updates itself rather than installing twice.
+     */
+    private fun renameFor(appId: Int, apks: List<File>): String? {
+        if (!gameSettings.get(appId).renamePackage) return null
+        val own = apks.firstNotNullOfOrNull(ApkFacts::packageNameOf) ?: return null
+        return if (own.endsWith(RENAME_SUFFIX)) own else own + RENAME_SUFFIX
+    }
+
+    /**
+     * Installs the game under a name of GamePort's making from now on, to find out what a headset's licence check is keyed on. The APK a
+     * previous run patched goes, so the next one is built under the new name; what was fetched beside it stays.
+     */
+    fun renamePackage(appId: Int) {
+        gameSettings.set(appId, gameSettings.get(appId).copy(renamePackage = true))
+        events.note(appId, "the game will be installed under a name of GamePort's making from now on")
+        val directory = downloadDirectory(appId)
+        patchedDirectory(directory).deleteRecursively()
+        runCatching { File(directory, FAILED_FILE).delete() }
+        clearState(appId)
+    }
+
+    /**
+     * The player accepts that the game asks for a newer Android than this headset runs. The choice is kept for the game, and the APK a
+     * previous run patched is thrown away so the next one patches a version that asks for this device's: what was fetched beside it (the
+     * expansion files, which for some games are nearly the whole download) stays and is not fetched again.
+     */
+    fun allowOlderAndroid(appId: Int) {
+        gameSettings.set(appId, gameSettings.get(appId).copy(lowerMinSdk = true))
+        events.note(appId, "the player asked for the Android version the game demands to be lowered to this device's")
+        val directory = downloadDirectory(appId)
+        patchedDirectory(directory).deleteRecursively()
+        runCatching { File(directory, FAILED_FILE).delete() }
+        clearState(appId)
+    }
+
     private fun notEnoughSpaceToPatch(directory: File, apks: List<File>): InstallError? {
         val needed = SpaceNeeds.toPatch(apks.sumOf { it.length() })
         val free = directory.usableSpace
@@ -1009,7 +1137,13 @@ class GameInstallRepository @Inject constructor(
                 running = jobs[appId]?.isActive == true,
             )
             if (action == InterruptedWork.Resume.NO) continue
-            val game = kotlinx.coroutines.withTimeoutOrNull(RESUME_LOOKUP_MS) { library.observeGame(appId).first() } ?: continue
+            // The library says null for a game while it is still loading, and a resume runs just after the sign-in, when it usually still is.
+            // Taking that first answer dropped the game for good, and said nothing: the game itself is waited for, and a miss is written down.
+            val game = kotlinx.coroutines.withTimeoutOrNull(RESUME_LOOKUP_MS) { library.observeGame(appId).filterNotNull().first() }
+            if (game == null) {
+                events.note(appId, "left half done, but the library did not say which game this is within ${RESUME_LOOKUP_MS / 1000} s: left as it is, to go on with later")
+                continue
+            }
             events.note(appId, if (action == InterruptedWork.Resume.UPDATE) "update left half done: going on with it" else "download left half done: going on with it")
             if (action == InterruptedWork.Resume.UPDATE) update(game) else install(game, null)
         }
@@ -1026,6 +1160,9 @@ class GameInstallRepository @Inject constructor(
     private fun downloadsRoot(): File = context.getExternalFilesDir("downloads") ?: File(context.filesDir, "downloads")
 
     internal fun downloadDirectory(appId: Int): File = File(downloadsRoot(), appId.toString())
+
+    /** Where a patch again does its work: never the game's download, which it would throw away with its own leftovers. */
+    private fun repatchDirectory(appId: Int): File = File(downloadsRoot().parentFile ?: context.filesDir, "repatch/$appId")
 
     /** What is in the game's download folder and what its APKs say about themselves, for a problem report. */
     fun downloadReport(appId: Int): String = buildString {
@@ -1261,16 +1398,26 @@ class GameInstallRepository @Inject constructor(
     private fun fail(appId: Int, error: InstallError): Unit {
         events.note(appId, "failed: $error")
         // Failures needing a report, and ones waiting for a player action, are not tried again by themselves at the next start.
-        if (error.reportable || error == InstallError.ExpansionStoragePermission) {
+        if (error.reportable || error.needsPlayer) {
             runCatching { downloadDirectory(appId).takeIf { it.exists() }?.let { File(it, FAILED_FILE).createNewFile() } }
         }
         setState(appId, InstallState.Failed(error))
+        _failures.tryEmit(app.gameport.core.model.InstallFailure(appId, error))
     }
 
-    /** True when GamePort has the special access to all files (Android 11 and later), which a game's expansion files may need. */
+    /**
+     * True when GamePort may write a game's expansion files into shared storage. Android 11 and later go by the special access to all
+     * files; Android 10 has no such thing and goes by the storage permission, which may well not be granted. Taking the version alone
+     * for an answer (below Android 11, always yes) made GamePort sure of an access it did not have on a PICO 4: the expansion files
+     * then failed with nothing offered to put it right, since it believed there was nothing to put right.
+     */
     private fun hasAllFilesAccess(): Boolean =
-        android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R || Environment.isExternalStorageManager()
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) Environment.isExternalStorageManager()
+        else context.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
 }
+
+/** What is put after a game's own package name when it is installed under a name of GamePort's making. */
+private const val RENAME_SUFFIX = ".gameport"
 
 private const val PATCHED_DIR = "patched"
 

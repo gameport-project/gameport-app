@@ -2,53 +2,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application>
-        <!-- Development only: lets adb ask the running app what Steam Cloud holds for a game. -->
+        <!-- A test build only (see DebugBridgeReceiver): it is reachable from a cable, which is the whole point, so it never
+             goes into a release. Nothing it does is beyond what the player can do from the screen. -->
         <receiver
-            android:name="app.gameport.debug.CloudDebugReceiver"
-            android:exported="true" />
-        <!-- Development only: does what the button that clears this device's saves does, for a game, and logs the outcome. -->
-        <receiver
-            android:name="app.gameport.debug.ClearSavesDebugReceiver"
-            android:exported="true" />
-        <receiver
-            android:name="app.gameport.debug.PatchDebugReceiver"
-            android:exported="true" />
-        <!-- Development only: shows the news window of a version, with made-up games. -->
-        <receiver
-            android:name="app.gameport.debug.WhatsNewPreviewReceiver"
-            android:exported="true" />
-        <!-- Development only: asks the catalog repository for the catalog, the texts and the prices now, and logs what the device holds. -->
-        <receiver
-            android:name="app.gameport.debug.CatalogRefreshDebugReceiver"
-            android:exported="true" />
-        <!-- Development only: reads what Steam publishes for a game (depots, branches, files of a depot). -->
-        <receiver
-            android:name="app.gameport.debug.SteamInspectReceiver"
-            android:exported="true" />
-        <!-- Development only: tests whose files a game's expansion folder holds, by copying them anew. -->
-        <receiver
-            android:name="app.gameport.debug.ObbRepairReceiver"
-            android:exported="true" />
-        <!-- Development only: installs a game, adds or takes off its extra content, and says what the library and the device hold for it, without the screen. -->
-        <receiver
-            android:name="app.gameport.debug.GameDebugReceiver"
-            android:exported="true" />
-        <!-- Development only: puts the question "did it work?" for a game, without playing it. -->
-        <receiver
-            android:name="app.gameport.debug.VerdictAskReceiver"
-            android:exported="true" />
-        <!-- Development only: puts the question about another device that plays, without one. -->
-        <receiver
-            android:name="app.gameport.debug.PlaySimulationReceiver"
-            android:exported="true" />
-        <!-- Development only: downloads a game as Steam sells it, without patching or installing it. -->
-        <receiver
-            android:name="app.gameport.debug.OriginalDownloadReceiver"
-            android:exported="true" />
-        <!-- Development only: works out (and, when asked, really does) the adding of achievements to the Steam account. -->
-        <receiver
-            android:name="app.gameport.debug.AchievementDebugReceiver"
-            android:exported="true" />
+            android:name=".debug.DebugBridgeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="app.gameport.DEBUG" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

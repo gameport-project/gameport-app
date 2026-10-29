@@ -16,6 +16,7 @@ class GamePortApplication : Application() {
     @Inject lateinit var gameDefaults: app.gameport.core.settings.GameDefaults
     @Inject lateinit var verdictAsker: app.gameport.core.sync.VerdictAsker
     @Inject lateinit var expansionVerifier: app.gameport.core.sync.ExpansionVerifier
+    @Inject lateinit var installReports: app.gameport.core.sync.InstallReports
 
     override fun onCreate() {
         super.onCreate()
@@ -40,6 +41,8 @@ class GamePortApplication : Application() {
         verdictAsker.checkRuns()
         // The games that may be missing their large files are asked whether they are, once Steam can be reached.
         expansionVerifier.start()
+        // An install that fails has a report of it saved at once: what explains it is written over soon after.
+        installReports.start()
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: android.app.Activity) {
                 connectionKeeper.screenShown()
