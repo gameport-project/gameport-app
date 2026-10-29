@@ -30,6 +30,38 @@
         }
       },
       {
+        "id": "workshop-page",
+        "icon": "download",
+        "text": {
+          "en": "The Steam Workshop of a game opens inside GamePort, already signed in with the account, and the game's own \"Browse\" button opens it there.",
+          "fr": "L'atelier Steam d'un jeu s'ouvre dans GamePort, déjà connecté avec le compte, et le bouton « Parcourir » du jeu l'ouvre à cet endroit."
+        }
+      },
+      {
+        "id": "game-page",
+        "icon": "info",
+        "text": {
+          "en": "A new page for each game: its actions in one menu, a bell for what wants a look, an install that shows its steps and its extra content, the pictures and trailer, and a layout that fits a phone.",
+          "fr": "Une nouvelle page pour chaque jeu : ses actions dans un seul menu, une cloche pour ce qui demande un coup d'œil, une installation qui montre ses étapes et ses contenus additionnels, les images et la bande-annonce, et une mise en page qui convient à un téléphone."
+        }
+      },
+      {
+        "id": "store-dlc",
+        "icon": "info",
+        "text": {
+          "en": "The store page of a game lists its extra content with each price. The free ones can be added to the library, and the ones the account already has are marked.",
+          "fr": "La page d'un jeu dans le store liste ses contenus additionnels avec leur prix. Les gratuits peuvent être ajoutés à la bibliothèque, et ceux que le compte possède déjà sont indiqués."
+        }
+      },
+      {
+        "id": "store-link",
+        "icon": "info",
+        "text": {
+          "en": "The menu of a game links to its store page, and every Steam button of the store opens inside GamePort.",
+          "fr": "Le menu d'un jeu renvoie vers sa page du store, et chaque bouton Steam du store s'ouvre dans GamePort."
+        }
+      },
+      {
         "id": "pc-saves",
         "icon": "check",
         "text": {
@@ -82,8 +114,8 @@
         {
           "id": "item-0-0",
           "text": {
-            "en": "**Update channels.** A game's settings list the channels of Steam that hold an Android version, and the game can follow one. A game that is only on a test channel is listed too, with an alert on its page.",
-            "fr": "**Canaux de mise à jour.** Les réglages d'un jeu listent les canaux de Steam qui ont une version Android, et le jeu peut en suivre un. Un jeu qui n'est que sur un canal de test est listé aussi, avec une alerte sur sa page."
+            "en": "**Update channels.** A game's settings list the channels of Steam that hold an Android version, and the game can follow one. A game that is only on a test channel is listed too, and its play button names the channel.",
+            "fr": "**Canaux de mise à jour.** Les réglages d'un jeu listent les canaux de Steam qui ont une version Android, et le jeu peut en suivre un. Un jeu qui n'est que sur un canal de test est listé aussi, et son bouton jouer nomme le canal."
           }
         },
         {
@@ -98,6 +130,80 @@
           "text": {
             "en": "**Workshop and extra content.** GamePort downloads the account's Workshop items and extra content, and hands them to the game.",
             "fr": "**Atelier et contenus additionnels.** GamePort télécharge les objets de l'atelier et les contenus additionnels du compte, et les remet au jeu."
+          }
+        },
+        {
+          "id": "item-0-2a",
+          "text": {
+            "en": "**The Steam Workshop inside GamePort.** The Workshop of a game opens in the application, already signed in with the account: no new sign-in. A button at the top leads back to the game without leaving GamePort, and the game's own \"Browse\" button opens the Workshop there instead of the browser. What the account subscribes to is downloaded for the game.",
+            "fr": "**L'atelier Steam dans GamePort.** L'atelier d'un jeu s'ouvre dans l'application, déjà connecté avec le compte : pas de nouvelle connexion. Un bouton en haut ramène au jeu sans quitter GamePort, et le bouton « Parcourir » du jeu ouvre l'atelier à cet endroit au lieu du navigateur. Ce à quoi le compte s'abonne est téléchargé pour le jeu."
+          },
+          "image": {
+            "src": "screenshots/workshop.png",
+            "alt": {
+              "en": "The Steam Workshop of a game, inside GamePort",
+              "fr": "L'atelier Steam d'un jeu, dans GamePort"
+            },
+            "width": 360
+          }
+        },
+        {
+          "id": "item-0-2b",
+          "text": {
+            "en": "**A new page for each game.** A bell gathers what wants a look (a new version, a newer patch, saves that do not match Steam, a game GamePort adapted), each with its button. An install is one card with its steps, the game and every extra content it will fetch, and the same card shows a patch. The pictures and the trailer of the game are on its page. Play just plays, and asks what to do first when a new version or a newer patch is waiting. The page fits a phone too.",
+            "fr": "**Une nouvelle page pour chaque jeu.** Une cloche réunit ce qui demande un coup d'œil (une nouvelle version, un patch plus récent, des sauvegardes qui ne correspondent pas à Steam, un jeu que GamePort a adapté), chacun avec son bouton. Une installation tient dans une seule carte avec ses étapes, le jeu et chaque contenu additionnel qu'elle va chercher, et la même carte montre un patch. Les images et la bande-annonce du jeu sont sur sa page. Jouer lance simplement le jeu, et demande quoi faire d'abord quand une nouvelle version ou un patch plus récent attend. La page convient aussi à un téléphone."
+          },
+          "image": {
+            "src": "screenshots/game-page.png",
+            "alt": {
+              "en": "The page of a game, with its notifications",
+              "fr": "La page d'un jeu, avec ses notifications"
+            },
+            "width": 360
+          }
+        },
+        {
+          "id": "item-0-2d",
+          "text": {
+            "en": "**Extra content in the store.** The page of a game lists its extra content with its picture and its price. A free one can be added to the library with a button, the ones the account already has say so, and each Steam button opens inside GamePort.",
+            "fr": "**Les contenus additionnels dans le store.** La page d'un jeu liste ses contenus additionnels avec leur image et leur prix. Un contenu gratuit s'ajoute à la bibliothèque avec un bouton, ceux que le compte possède déjà le disent, et chaque bouton Steam s'ouvre dans GamePort."
+          },
+          "image": {
+            "src": "screenshots/store-dlc.png",
+            "alt": {
+              "en": "The extra content of a game in the store, with the ones already in the library marked",
+              "fr": "Les contenus additionnels d'un jeu dans le store, avec ceux déjà dans la bibliothèque indiqués"
+            },
+            "width": 360
+          }
+        },
+        {
+          "id": "item-0-2e",
+          "text": {
+            "en": "**Pictures and trailer on a game's page.** The screenshots and the trailer of a game are on its page, in the library as in the store.",
+            "fr": "**Les images et la bande-annonce sur la page d'un jeu.** Les captures et la bande-annonce d'un jeu sont sur sa page, dans la bibliothèque comme dans le store."
+          }
+        },
+        {
+          "id": "item-0-2f",
+          "text": {
+            "en": "**A link to the store page.** The menu of a game opens its page in the store, and the Steam buttons of the store open inside GamePort.",
+            "fr": "**Un lien vers la page du store.** Le menu d'un jeu ouvre sa page dans le store, et les boutons Steam du store s'ouvrent dans GamePort."
+          }
+        },
+        {
+          "id": "item-0-2c",
+          "text": {
+            "en": "**Every action of a game in one menu.** Saves, Workshop, controllers, compatibility options, reporting a problem, the game's page in the store, favorite, hide, and uninstall are in the Menu, which opens like the filters.",
+            "fr": "**Toutes les actions d'un jeu dans un seul menu.** Sauvegardes, atelier, manettes, options de compatibilité, signalement d'un problème, page du jeu dans le magasin, favori, masquer et désinstaller sont dans le Menu, qui s'ouvre comme les filtres."
+          },
+          "image": {
+            "src": "screenshots/game-actions.png",
+            "alt": {
+              "en": "The Menu of a game",
+              "fr": "Le Menu d'un jeu"
+            },
+            "width": 360
           }
         },
         {

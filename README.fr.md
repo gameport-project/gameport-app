@@ -19,7 +19,7 @@ GamePort est une appli gratuite et open source. Elle se connecte à ton compte S
 ## Un aperçu
 
 <table>
-<tr><td width="50%"><img src="docs/screenshots/home.png" alt="L'accueil : les nouvelles versions Android avec leur prix, puis tes jeux" width="100%"></td><td width="50%"><img src="docs/screenshots/game.png" alt="Un jeu de ta bibliothèque : la jaquette détachée de l'illustration, les succès, la taille et le temps de jeu, et les actions" width="100%"></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/home.png" alt="L'accueil : les nouvelles versions Android avec leur prix, puis tes jeux" width="100%"></td><td width="50%"><img src="docs/screenshots/game.png" alt="La page d'un jeu de ta bibliothèque : ses notifications, son menu, sa taille et son temps de jeu, et ses images et sa bande-annonce" width="100%"></td></tr>
 <tr><td align="center"><sub>L'accueil : les nouvelles versions Android avec leur prix, puis tes jeux</sub></td><td align="center"><sub>Un jeu de ta bibliothèque</sub></td></tr>
 </table>
 
@@ -27,10 +27,11 @@ GamePort est une appli gratuite et open source. Elle se connecte à ton compte S
 
 Tous les jeux Steam qui ont une version Android, au même endroit, avec ce qu'il faut pour se décider.
 
-- **Le prix, dans ta monnaie.** Celle dans laquelle ton compte Steam est facturé, avec le pourcentage de remise en promotion. Le bouton ouvre la page Steam : GamePort ne vend rien.
+- **Le prix, dans ta monnaie.** Celle dans laquelle ton compte Steam est facturé, avec le pourcentage de remise en promotion. Le bouton ouvre la page Steam dans GamePort : GamePort ne vend rien.
 - **Son historique de prix.** Le prix le plus bas relevé, la dernière promotion et un verdict simple, de « Au plus bas » à « Mieux vaut attendre », pour savoir si ça vaut le coup maintenant.
 - **Ce que disent les joueurs sur ton appareil**, et les verdicts de Valve pour la Steam Frame et le Steam Deck, à côté des langues (texte, voix, sous-titres) comme Steam les montre.
 - **Des filtres qui tiennent sur deux lignes.** VR ou plat, installable ou à venir, possédé ou non, compatible ou non ; puis les langues et les genres, et huit façons de trier : nom, note, sortie, prix, remise.
+- **Ses contenus additionnels.** Les DLC d'un jeu, chacun avec son image et son prix, un bouton **Ajouter à la bibliothèque** pour les gratuits, et sa page Steam, qui s'ouvre dans GamePort.
 - **Une rangée des jeux en promotion que tu ne possèdes pas**, et les nouvelles versions Android de la semaine sur l'accueil.
 
 La liste de ces jeux est aussi sur le site, à consulter depuis n'importe quel ordinateur ou téléphone : [tous les jeux qui ont une version Android, avec ce que les joueurs rapportent pour chaque type d'appareil](https://gameport-project.github.io/).
@@ -38,6 +39,8 @@ La liste de ces jeux est aussi sur le site, à consulter depuis n'importe quel o
 <table>
 <tr><td width="50%"><img src="docs/screenshots/store.png" alt="La liste des jeux Android : les filtres, une rangée des jeux en promotion, et les jeux avec leur prix" width="100%"></td><td width="50%"><img src="docs/screenshots/store-game.png" alt="La page d'un jeu dans le store : son prix, le plus bas relevé, la dernière promotion, et si ça vaut le coup" width="100%"></td></tr>
 <tr><td align="center"><sub>La liste, avec les jeux en promotion</sub></td><td align="center"><sub>Un jeu : prix, historique et verdict</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/store-dlc.png" alt="Les contenus additionnels d'un jeu dans le store : leur prix, une pastille Dans la bibliothèque pour ceux du compte, et un bouton Steam" width="100%"></td><td></td></tr>
+<tr><td align="center"><sub>Les contenus additionnels d'un jeu</sub></td><td></td></tr>
 </table>
 
 ## Compatibilité, rapportée par les joueurs
@@ -48,6 +51,14 @@ Les joueurs disent si chaque jeu marche sur leur type d'appareil (marche, hors l
 <tr><td width="50%"><img src="docs/screenshots/store-covers.png" alt="La même liste en jaquettes, avec le prix sur chacune" width="100%"></td><td width="50%"><img src="docs/screenshots/compatibility.png" alt="Compatibilité : ce que les joueurs rapportent pour chaque jeu, appareil par appareil" width="100%"></td></tr>
 <tr><td align="center"><sub>La liste en jaquettes</sub></td><td align="center"><sub>Le tableau de compatibilité</sub></td></tr>
 </table>
+
+## Le Workshop Steam
+
+Le Workshop d'un jeu s'ouvre dans GamePort, déjà connecté avec ton compte, et le bouton « Parcourir » du jeu y mène. Les éléments auxquels tu t'abonnes sont téléchargés par GamePort et remis au jeu, avec les contenus additionnels de ton compte.
+
+<p align="center">
+  <img src="docs/screenshots/workshop.png" alt="Le Workshop Steam d'un jeu, dans GamePort, déjà connecté" width="70%">
+</p>
 
 <details>
 <summary>Plus d'écrans</summary>
@@ -71,13 +82,18 @@ Les joueurs disent si chaque jeu marche sur leur type d'appareil (marche, hors l
   <img src="docs/screenshots/saves.png" alt="Sauvegardes : cet appareil et le cloud Steam côte à côte" width="49%">
   <img src="docs/screenshots/controllers.png" alt="Le mappage des manettes d'un jeu" width="49%">
 </p>
+<p align="center">
+  <img src="docs/screenshots/game-actions.png" alt="Le menu d'une page de jeu : sauvegardes, Workshop, manettes, page du store et plus" width="49%">
+</p>
 </details>
 
 ## Ce qu'elle fait
 
 - **Ta bibliothèque, bien rangée.** Jeux VR et plats, démos et bêtas, recherche, filtres, favoris, une rangée « Continuer » avec les derniers jeux lancés, et une apparence à ton goût : taille des covers, couleurs, fond, langue.
 - **Un store pour les versions Android.** Tous les jeux Steam qui en ont une, avec leur prix, l'historique de leur prix et ce que les joueurs en disent sur ton appareil. Voir [le store](#le-store--les-versions-android-des-jeux-steam).
-- **Une pression pour installer.** GamePort télécharge le jeu, le prépare pour qu'il tourne sur ton appareil et l'installe. Elle te prévient quand un jeu a une nouvelle version.
+- **Une pression pour installer.** GamePort télécharge le jeu, le prépare pour qu'il tourne sur ton appareil et l'installe, avec les contenus additionnels que tu choisis. Une seule carte montre les étapes, puis chaque contenu additionnel au fur et à mesure. Elle te prévient quand un jeu a une nouvelle version.
+- **L'atelier Steam, dans GamePort.** L'atelier d'un jeu s'ouvre dans l'application, déjà connecté avec ton compte, et le bouton « Parcourir » du jeu y mène au lieu d'un navigateur. Ce à quoi tu t'abonnes est téléchargé et remis au jeu, avec les contenus additionnels de ton compte.
+- **Une page par jeu.** Une cloche réunit ce qui demande un coup d'œil (une nouvelle version, un patch plus récent, des sauvegardes qui ne correspondent pas à Steam), chacun avec son bouton. Un menu réunit toutes les actions : sauvegardes, atelier, manettes, options de compatibilité, signalement d'un problème, page du magasin, favori, masquer, désinstaller. Les images et la bande-annonce du jeu sont sur sa page.
 - **Ton compte Steam, tes sauvegardes.** Les jeux tournent sous ton propre compte. Les sauvegardes restent synchronisées avec le cloud Steam, et une page par jeu permet de choisir quoi restaurer ou envoyer.
 - **Un temps de jeu qui compte.** Le temps passé s'ajoute à ton compte Steam, et seulement quand le jeu est réellement à l'écran : pas quand l'appareil est en veille.
 - **Tes manettes, à ta façon.** Les jeux conçus pour les manettes de la Steam Frame sont traduits sur les tiennes, et le mappage se change jeu par jeu.

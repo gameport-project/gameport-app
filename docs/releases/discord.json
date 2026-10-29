@@ -29,7 +29,7 @@
     "intro": "Online play works: a game that signs in through Steam can log in to its own online services, and lobbies work in the games tested. Plus a real download progress with a time left, passthrough and VR choices for each game, a report that says what goes wrong, and a game that was just updated no longer asks for the same update."
   },
   "0.9.2": {
-    "images": [],
-    "intro": "A game can follow an update channel of Steam, and a game that is only on a test channel is listed. The library updates itself while GamePort is open, the Workshop items and extra content are handed to the game, and saves can be shared with the PC. Plus a better Pico, a store filter for games not tested yet, a setting that frees memory before a game, and a problem report that says more."
+    "images": ["docs/screenshots/game-page.png", "docs/screenshots/workshop.png", "docs/screenshots/game-actions.png", "docs/screenshots/store-dlc.png"],
+    "intro": "The Steam Workshop of a game opens inside GamePort, already signed in, and the page of every game is redone: its pictures and trailer, its actions in one menu with a link to its store page, a bell for what wants a look, and an install that shows its steps and extra content. The store lists the extra content of a game. A game can follow an update channel of Steam, the library updates itself while GamePort is open, and saves can be shared with the PC. Plus a better Pico, a store filter for games not tested yet, a setting that frees memory before a game, and a problem report that says more."
   }
 }

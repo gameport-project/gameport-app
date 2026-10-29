@@ -19,7 +19,7 @@ GamePort is a free, open-source app that signs in to your Steam account, shows t
 ## A look
 
 <table>
-<tr><td width="50%"><img src="docs/screenshots/home.png" alt="The home: the new Android versions with their price, then your games" width="100%"></td><td width="50%"><img src="docs/screenshots/game.png" alt="A game of your library: the cover lifted off the artwork, the achievements, size and play time, and the actions" width="100%"></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/home.png" alt="The home: the new Android versions with their price, then your games" width="100%"></td><td width="50%"><img src="docs/screenshots/game.png" alt="The page of a game of your library: its notifications, its menu, its size and play time, and its pictures and trailer" width="100%"></td></tr>
 <tr><td align="center"><sub>The home: new Android versions with their price, then your games</sub></td><td align="center"><sub>A game of your library</sub></td></tr>
 </table>
 
@@ -27,10 +27,11 @@ GamePort is a free, open-source app that signs in to your Steam account, shows t
 
 Every Steam game that has an Android version, in one place, with what you need to decide.
 
-- **The price, in your currency.** The one your Steam account is billed in, with the share off when it is on sale. The button opens the Steam page: GamePort sells nothing.
+- **The price, in your currency.** The one your Steam account is billed in, with the share off when it is on sale. The button opens the Steam page inside GamePort: GamePort sells nothing.
 - **Its price history.** The lowest price seen, the last sale and a plain verdict, from "Lowest ever seen" to "Better to wait", so you know if it is worth it now.
 - **What players say of it on your device**, and Valve's own verdicts for Steam Frame and Steam Deck, next to the languages (text, voices, subtitles) as Steam shows them.
 - **Filters that fit on two lines.** VR or flat, installable or coming, owned or not, compatible or not; then languages and genres, and eight ways to sort: by name, rating, release, price, discount.
+- **Its extra content.** The DLC of a game, each with its picture and its price, an **Add to the library** button for the free ones, and its Steam page, which opens inside GamePort.
 - **A row of the games on sale that you do not own**, and the new Android versions of the week on the home.
 
 The list of these games is also on the website, to browse from any computer or phone: [every game that has an Android version, with what players report for each kind of device](https://gameport-project.github.io/).
@@ -38,6 +39,8 @@ The list of these games is also on the website, to browse from any computer or p
 <table>
 <tr><td width="50%"><img src="docs/screenshots/store.png" alt="The list of the Android games: filters, a row of the games on sale, and the games with their price" width="100%"></td><td width="50%"><img src="docs/screenshots/store-game.png" alt="The page of a game in the store: its price, the lowest price seen, the last sale, and whether it is worth it" width="100%"></td></tr>
 <tr><td align="center"><sub>The list, with the games on sale</sub></td><td align="center"><sub>A game: price, history and verdict</sub></td></tr>
+<tr><td width="50%"><img src="docs/screenshots/store-dlc.png" alt="The extra content of a game in the store: its price, an In the library mark for what the account has, and a Steam button" width="100%"></td><td></td></tr>
+<tr><td align="center"><sub>The extra content of a game</sub></td><td></td></tr>
 </table>
 
 ## Compatibility, reported by players
@@ -48,6 +51,14 @@ Players say whether each game works on their kind of device (works, offline only
 <tr><td width="50%"><img src="docs/screenshots/store-covers.png" alt="The same list as covers, with the price on each" width="100%"></td><td width="50%"><img src="docs/screenshots/compatibility.png" alt="Compatibility: what players report for each game, device by device" width="100%"></td></tr>
 <tr><td align="center"><sub>The list as covers</sub></td><td align="center"><sub>The compatibility table</sub></td></tr>
 </table>
+
+## The Steam Workshop
+
+The Workshop of a game opens inside GamePort, already signed in with your account, and the game's own "Browse" button leads there. What you subscribe to is downloaded by GamePort and handed to the game, with the extra content of your account.
+
+<p align="center">
+  <img src="docs/screenshots/workshop.png" alt="The Steam Workshop of a game, inside GamePort, already signed in" width="70%">
+</p>
 
 <details>
 <summary>More screens</summary>
@@ -71,13 +82,18 @@ Players say whether each game works on their kind of device (works, offline only
   <img src="docs/screenshots/saves.png" alt="Saves: this device and Steam Cloud side by side" width="49%">
   <img src="docs/screenshots/controllers.png" alt="Controller mapping for a game" width="49%">
 </p>
+<p align="center">
+  <img src="docs/screenshots/game-actions.png" alt="The menu of a game page: saves, Workshop, controllers, store page and more" width="49%">
+</p>
 </details>
 
 ## What it does
 
 - **Your library, nicely laid out.** VR and flat games, demos and betas, search, filters, favorites, a "Continue" row with what you played last, and a look you can make yours: cover size, colours, background, language.
 - **A store for the Android versions.** Every Steam game that has one, with its price, its price history and what players say of it on your device. See [the store](#the-store-the-android-versions-of-steam-games).
-- **One tap to install.** GamePort downloads the game, prepares it so it runs on your device, and installs it. It tells you when a game has a new version.
+- **One tap to install.** GamePort downloads the game, prepares it so it runs on your device, and installs it, with the extra content you pick. One card shows the steps, then each extra content as it goes. It tells you when a game has a new version.
+- **The Steam Workshop, inside GamePort.** A game's Workshop opens in the app, already signed in with your account, and the game's own "Browse" button leads there instead of a browser. What you subscribe to is downloaded and handed to the game, with the extra content of your account.
+- **One page per game.** A bell gathers what wants a look (a new version, a newer patch, saves that do not match Steam), each with its button. A menu holds every action: saves, Workshop, controllers, compatibility options, reporting a problem, the store page, favorite, hide, uninstall. The pictures and the trailer of the game are on its page.
 - **Your Steam account, your saves.** Games run under your own account. Saves are kept in sync with Steam Cloud, and a page per game lets you choose what to restore or send.
 - **Play time that counts.** The time you play is added to your Steam account, and only while the game is really on screen: not while the device sleeps.
 - **Your controllers, your way.** Games made for the Steam Frame controllers get translated onto yours. You can change the mapping game by game.
