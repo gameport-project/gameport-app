@@ -46,6 +46,8 @@ data class CachedGame(
     val parent: Int? = null,
     /** The channels of the game that hold an Android build, the normal one included (see [ChannelsParser]). */
     val channels: List<CachedChannel> = emptyList(),
+    /** Steam files the game under "Steam Workshop" (category 30): its Workshop can be browsed. */
+    val workshop: Boolean = false,
 )
 
 /** A channel of a game on Steam with an Android build: [updated] is Steam's date for it in seconds, [androidKey] says which build it is (the same text, the same build). */
@@ -132,8 +134,8 @@ interface LibraryCacheStore {
     fun saveChangeNumber(accountId: Long, number: Int) {}
 }
 
-/** Version 4 adds the save rules used for the cloud sync, version 6 the build id of each depot, version 8 the artwork names and the parent app, version 10 the Windows copy of the saves, version 11 the DLC apps with an Android depot of their own, and the private data root, version 12 the folder of the saves of a game whose path is written from Android/data, version 13 the order of the two cloud names of such a game, version 14 the channels of a game, version 15 the games whose Android build is only on a test channel (they are read again). */
-const val CACHE_VERSION = 15
+/** Version 4 adds the save rules used for the cloud sync, version 6 the build id of each depot, version 8 the artwork names and the parent app, version 10 the Windows copy of the saves, version 11 the DLC apps with an Android depot of their own, and the private data root, version 12 the folder of the saves of a game whose path is written from Android/data, version 13 the order of the two cloud names of such a game, version 14 the channels of a game, version 15 the games whose Android build is only on a test channel (they are read again), version 16 whether the game has a Workshop. */
+const val CACHE_VERSION = 16
 
 @Singleton
 class FileLibraryCacheStore @Inject constructor(

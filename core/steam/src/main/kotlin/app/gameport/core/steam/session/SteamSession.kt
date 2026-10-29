@@ -252,6 +252,21 @@ class SteamSession(private val cellId: Int = 0, private val onAccountRegion: (cu
     @Volatile var accountId: Long = 0L
         private set
 
+    /** What the session was opened with, kept to make the cookies of the web pages of Steam without asking for a password again (see [webCookies]). */
+    @Volatile private var openedWith: String? = null
+    @Volatile private var steamId64: Long = 0L
+
+    /**
+     * What steamcommunity.com needs to see the signed-in account: an access token made from the refresh token the session was opened with, as Steam's own apps do for their web pages.
+     * No password and no Steam Guard code is asked for. Null when the session was not opened by [logOn].
+     */
+    suspend fun webCookies(): WebCookies? {
+        val token = openedWith ?: return null
+        if (steamId64 == 0L) return null
+        val result = client.authentication.generateAccessTokenForApp(SteamID(steamId64), token, false).await()
+        return result.accessToken.takeIf { it.isNotEmpty() }?.let { WebCookies(steamId64, it) }
+    }
+
     /** Set once Steam dropped the connection: the session is then dead and cannot be used again. */
     @Volatile private var lost = false
 
@@ -376,6 +391,8 @@ class SteamSession(private val cellId: Int = 0, private val onAccountRegion: (cu
         val displayName = runCatching { withTimeout(ACCOUNT_INFO_TIMEOUT_MS) { name.await() } }.getOrDefault("")
         val steamId = logon.clientSteamID!!
         accountId = steamId.accountID
+        openedWith = refreshToken
+        steamId64 = steamId.convertToUInt64()
         return SessionIdentity(steamId.convertToUInt64(), displayName)
     }
 

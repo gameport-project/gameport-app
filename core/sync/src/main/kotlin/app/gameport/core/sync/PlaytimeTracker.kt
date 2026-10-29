@@ -111,6 +111,10 @@ class PlaytimeTracker @Inject constructor(
 
     private fun gameCalledRecently() = lastGameCall != 0L && now() - lastGameCall < GAME_CALL_WINDOW_MS
 
+    /** True while the game is there to go back to: on screen, still held on Steam, or only just left (a game that stopped is not). */
+    @Synchronized
+    fun isActive(packageName: String): Boolean = games[packageName]?.let { it.meter.running || it.steamHeld || it.release?.isActive == true } == true
+
     /** True while the game is on screen. */
     @Synchronized
     fun isOnScreen(packageName: String): Boolean = games[packageName]?.meter?.running == true

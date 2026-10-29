@@ -50,6 +50,8 @@ import app.gameport.feature.game.gameCompatScreen
 import app.gameport.feature.game.gameControllersScreen
 import app.gameport.feature.game.navigateToGameCompat
 import app.gameport.feature.game.gameAchievementsScreen
+import app.gameport.feature.game.gameWorkshopScreen
+import app.gameport.feature.game.navigateToGameWorkshop
 import app.gameport.feature.game.navigateToGameAchievements
 import app.gameport.feature.game.gameSavesScreen
 import app.gameport.feature.game.gameSettingsScreen
@@ -62,13 +64,13 @@ import app.gameport.feature.settings.settingsScreen
 import app.gameport.feature.library.libraryScreen
 
 @Composable
-fun GamePortApp(viewModel: AppViewModel = hiltViewModel()) {
+fun GamePortApp(viewModel: AppViewModel = hiltViewModel(), openWorkshop: Int? = null, onWorkshopOpened: () -> Unit = {}) {
     // The height of the app's window is known to the dialogs, which keep to about 70 % of it.
-    app.gameport.core.designsystem.ProvideAppWindowHeight { GamePortContent(viewModel) }
+    app.gameport.core.designsystem.ProvideAppWindowHeight { GamePortContent(viewModel, openWorkshop, onWorkshopOpened) }
 }
 
 @Composable
-private fun GamePortContent(viewModel: AppViewModel) {
+private fun GamePortContent(viewModel: AppViewModel, openWorkshop: Int?, onWorkshopOpened: () -> Unit) {
     val authState by viewModel.authState.collectAsStateWithLifecycle()
     val keepScreenOn by viewModel.keepScreenOn.collectAsStateWithLifecycle()
     val window = (LocalContext.current as? Activity)?.window
@@ -93,6 +95,13 @@ private fun GamePortContent(viewModel: AppViewModel) {
         }
     }
 
+    // The Workshop of a game asked for from outside opens once the account is signed in, on top of the library.
+    LaunchedEffect(signedIn, openWorkshop) {
+        if (!signedIn || openWorkshop == null) return@LaunchedEffect
+        navController.navigateToGameWorkshop(openWorkshop)
+        onWorkshopOpened()
+    }
+
     if (signedIn) app.gameport.feature.settings.AgeAsk()
     val targets = remember { TourTargets() }
     CompositionLocalProvider(LocalTourTargets provides targets, app.gameport.core.designsystem.LocalTourStarter provides { kind -> viewModel.tour.start(kind) }) {
@@ -114,7 +123,8 @@ private fun GamePortContent(viewModel: AppViewModel) {
         storeGameScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame)
         settingsScreen(onBack = navController::goBack, onOpenGame = navController::navigateToGame)
         downloadsScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame)
-        gameScreen(onBack = navController::goBack, onOpenSettings = navController::navigateToGameSettings, onOpenSaves = navController::navigateToGameSaves, onOpenControllers = navController::navigateToGameControllers, onOpenCompat = navController::navigateToGameCompat, onOpenAchievements = navController::navigateToGameAchievements, onOpenSteamSettings = { navController.navigate(SettingsRoute(account = true)) })
+        gameScreen(onBack = navController::goBack, onOpenSettings = navController::navigateToGameSettings, onOpenSaves = navController::navigateToGameSaves, onOpenControllers = navController::navigateToGameControllers, onOpenCompat = navController::navigateToGameCompat, onOpenAchievements = navController::navigateToGameAchievements, onOpenSteamSettings = { navController.navigate(SettingsRoute(account = true)) }, onOpenWorkshop = navController::navigateToGameWorkshop)
+        gameWorkshopScreen(onBack = navController::goBack)
         gameControllersScreen(onBack = navController::goBack)
         gameCompatScreen(onBack = navController::goBack)
         gameAchievementsScreen(onBack = navController::goBack)

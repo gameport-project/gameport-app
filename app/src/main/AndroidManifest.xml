@@ -27,6 +27,17 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- The Workshop page of a game, as a game's own "browse" button asks for it: it opens here, in the application. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:scheme="http" />
+                <data android:host="steamcommunity.com" />
+                <data android:host="www.steamcommunity.com" />
+                <data android:pathPattern="/app/.*/workshop.*" />
+            </intent-filter>
         </activity>
     </application>
 

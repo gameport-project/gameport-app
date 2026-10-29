@@ -192,6 +192,7 @@ internal fun libraryOf(
                 baseDepots = depots.filter { it.dlcAppId == null },
                 saveRules = game.saveRules.map { SaveRule(it.localDir, it.pattern, it.recursive, it.cloudPrefix, it.pcCloudPrefix) },
                 channels = channelsOf(game.channels),
+                hasWorkshop = game.workshop,
                 // The DLC the game's own depots name, and the DLC apps that carry their depots themselves (a game that sells its content as DLC).
                 dlc = (
                     depots.filter { it.dlcAppId != null }.groupBy { it.dlcAppId!! }.map { (dlcAppId, dlcDepots) ->
@@ -295,6 +296,7 @@ internal fun KeyValue.toAndroidGame(appId: Int): CachedGame? {
         depots = depots,
         saveRules = SaveRulesParser.parse(this["ufs"]),
         channels = channels,
+        workshop = "category_30" in common["category"].children.mapNotNull { it.name },
         kind = kind,
         capsule = common["library_assets_full"]["library_capsule"]["image"]["english"].value?.takeIf { it.isNotBlank() },
         hero = common["library_assets_full"]["library_hero"]["image"]["english"].value?.takeIf { it.isNotBlank() },

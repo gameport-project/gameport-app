@@ -28,11 +28,16 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var achievements: app.gameport.core.sync.AchievementNotifier
 
+    /** The game whose Workshop page was asked for from outside (a game's "browse" button), until the screen has opened it. */
+    private val workshopRequest = androidx.compose.runtime.mutableStateOf<Int?>(null)
+
     override fun attachBaseContext(newBase: Context) = super.attachBaseContext(AppLocale.wrap(newBase))
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         acknowledgeAchievement(intent)
+        // A turn of the screen starts the activity again with the same intent: the page is not opened a second time.
+        if (savedInstanceState == null) workshopRequest.value = workshopAppId(intent)
         // Looks for a newer GamePort when the last look is old enough (and the player has not turned it off).
         appUpdater.checkIfDue()
         // Logs kept for problem reports: a week at most, and not for a game that was uninstalled.
@@ -44,7 +49,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val display by settings.display.collectAsState()
             GamePortTheme(accent = Color(display.accent), gradientStart = Color(display.gradientStart), gradientEnd = Color(display.gradientEnd)) {
-                GamePortApp()
+                GamePortApp(openWorkshop = workshopRequest.value, onWorkshopOpened = { workshopRequest.value = null })
             }
         }
     }
@@ -52,6 +57,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         acknowledgeAchievement(intent)
+        workshopAppId(intent)?.let { workshopRequest.value = it }
     }
 
     /** GamePort was opened from the notification of an achievement: it is not brought back any more. */

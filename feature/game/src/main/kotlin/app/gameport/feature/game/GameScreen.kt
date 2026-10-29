@@ -52,6 +52,7 @@ import app.gameport.core.designsystem.Glyph
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Warning
@@ -150,7 +151,7 @@ import app.gameport.core.model.Ownership
 import app.gameport.core.install.ExpansionStorageAccess
 
 @Composable
-fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -> Unit, onOpenControllers: () -> Unit, onOpenCompat: () -> Unit, onOpenAchievements: () -> Unit, onOpenSteamSettings: () -> Unit, viewModel: GameViewModel = hiltViewModel()) {
+fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -> Unit, onOpenControllers: () -> Unit, onOpenCompat: () -> Unit, onOpenAchievements: () -> Unit, onOpenSteamSettings: () -> Unit, onOpenWorkshop: () -> Unit = {}, viewModel: GameViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val speedUnit by viewModel.speedUnit.collectAsStateWithLifecycle()
@@ -212,6 +213,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onReinstallFromScratch = viewModel::onReinstallFromScratch,
         achievements = achievements,
         onOpenAchievements = onOpenAchievements,
+        onOpenWorkshop = onOpenWorkshop,
         artworkHeight = artworkHeight,
         onToggleFavorite = viewModel::onToggleFavorite,
         onSetHidden = viewModel::onSetHidden,
@@ -272,6 +274,7 @@ internal fun GameContent(
     onUpdate: () -> Unit,
     achievements: AchievementList? = null,
     onOpenAchievements: () -> Unit = {},
+    onOpenWorkshop: () -> Unit = {},
     artworkHeight: Int = DisplaySettings.DEFAULT_GAME_ARTWORK_HEIGHT,
 ) {
     Scaffold { padding ->
@@ -327,6 +330,7 @@ internal fun GameContent(
                     report = report,
                     achievements = achievements,
                     onOpenAchievements = onOpenAchievements,
+                    onOpenWorkshop = onOpenWorkshop,
                     artworkHeight = artworkHeight,
                 )
             }
@@ -392,6 +396,7 @@ private fun GameDetails(
     report: ReportActions,
     achievements: AchievementList? = null,
     onOpenAchievements: () -> Unit = {},
+    onOpenWorkshop: () -> Unit = {},
     artworkHeight: Int = DisplaySettings.DEFAULT_GAME_ARTWORK_HEIGHT,
 ) {
     var reporting by remember { mutableStateOf(false) }
@@ -578,6 +583,12 @@ private fun GameDetails(
                             if (savesNotSynced) {
                                 Box(Modifier.align(Alignment.TopEnd).size(12.dp).clip(CircleShape).background(Color(0xFFFF9800)))
                             }
+                        }
+                    }
+                    // A game that has a Workshop on Steam: its page opens here, with the account already signed in, and subscribing downloads the item for the game.
+                    if (install is InstallState.Installed && game.androidBuild?.hasWorkshop == true) {
+                        GlassIconButton(onClick = onOpenWorkshop, enabled = repatch !is Repatch.Running) {
+                            Icon(Icons.Filled.Extension, contentDescription = stringResource(R.string.workshop_button))
                         }
                     }
                     if (install is InstallState.Installed) {

@@ -73,6 +73,15 @@
     <string name="game_channel_dialog_title">No Android version on the public channel</string>
     <string name="game_channel_dialog_text">This game has no Android version on the public channel, but it has one on other channels, test versions that can be unfinished. The channel to install is picked here.</string>
     <string name="game_channel_dialog_pick">Channel: %1$s</string>
+    <string name="workshop_button">Steam Workshop</string>
+    <string name="workshop_title">Steam Workshop</string>
+    <string name="workshop_back_to_game">Back to the game</string>
+    <string name="workshop_launch_game">Launch the game</string>
+    <string name="workshop_previous_page">Previous page</string>
+    <string name="workshop_next_page">Next page</string>
+    <string name="workshop_hint">Subscribing to an item downloads it for the game, which takes it the next time it asks. GamePort stays open meanwhile.</string>
+    <string name="workshop_unavailable">The Workshop needs a connection to Steam, which is not available right now.</string>
+    <string name="workshop_retry">Try again</string>
     <string name="game_settings_channel_use">Use this channel</string>
     <string name="game_settings_channel_use_title">Use the channel %1$s</string>
     <string name="game_settings_channel_use_confirm">The game is fetched from this channel from now on. An installed game is installed again from it over the current one, and its saves stay. A channel can hold an unfinished version.</string>

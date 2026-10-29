@@ -52,6 +52,8 @@ public final class GamePortHookProvider extends ContentProvider {
     public boolean onCreate() {
         Context context = getContext();
         if (context == null) return false;
+        // The Workshop page the game opens from its own button is handed to GamePort instead of the browser.
+        WorkshopRedirect.install(context);
         // Where the APK is, for the Steamworks shim, which reads its config out of it. Asking the system is surer than finding the APK among
         // the memory mappings of the process, which the shim used to do alone.
         try {
@@ -704,8 +706,20 @@ public final class GamePortHookProvider extends ContentProvider {
                             if (url != null && (url.startsWith("https://steamcommunity.com/") || url.startsWith("https://store.steampowered.com/"))) {
                                 android.content.Intent view = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url));
                                 view.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-                                context.startActivity(view);
-                                Log.i(TAG, "opened a Steam page in the browser");
+                                // The Workshop page of a game opens in GamePort, where the account is already signed in; any other page, or a GamePort
+                                // that does not answer, leaves it to the browser.
+                                boolean inGamePort = false;
+                                if (WorkshopRedirect.workshopApp(android.net.Uri.parse(url)) != 0) {
+                                    try {
+                                        android.content.Intent own = new android.content.Intent(view).setPackage(Owner.packageName(context));
+                                        context.startActivity(own);
+                                        inGamePort = true;
+                                    } catch (Throwable t) {
+                                        Log.w(TAG, "GamePort did not take the Workshop page", t);
+                                    }
+                                }
+                                if (!inGamePort) context.startActivity(view);
+                                Log.i(TAG, inGamePort ? "opened a Workshop page in GamePort" : "opened a Steam page in the browser");
                             }
                         }
                         Thread.sleep(700);

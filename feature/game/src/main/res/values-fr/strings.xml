@@ -72,6 +72,15 @@
     <string name="game_channel_dialog_title">Pas de version Android sur le canal public</string>
     <string name="game_channel_dialog_text">Ce jeu n\'a pas de version Android sur le canal public, mais il en a sur d\'autres canaux, des versions de test qui peuvent être inachevées. Le canal à installer se choisit ici.</string>
     <string name="game_channel_dialog_pick">Canal : %1$s</string>
+    <string name="workshop_button">Atelier Steam</string>
+    <string name="workshop_title">Atelier Steam</string>
+    <string name="workshop_back_to_game">Retour au jeu</string>
+    <string name="workshop_launch_game">Lancer le jeu</string>
+    <string name="workshop_previous_page">Page précédente</string>
+    <string name="workshop_next_page">Page suivante</string>
+    <string name="workshop_hint">S\'abonner à un objet le télécharge pour le jeu, qui le prend à sa prochaine demande. GamePort reste ouvert pendant ce temps.</string>
+    <string name="workshop_unavailable">L\'atelier demande une connexion à Steam, qui n\'est pas disponible pour le moment.</string>
+    <string name="workshop_retry">Réessayer</string>
     <string name="game_settings_channel_use">Utiliser ce canal</string>
     <string name="game_settings_channel_use_title">Utiliser le canal %1$s</string>
     <string name="game_settings_channel_use_confirm">Le jeu est récupéré depuis ce canal à partir de maintenant. Un jeu installé est réinstallé depuis ce canal par-dessus l\'actuel, et ses sauvegardes restent. Un canal peut contenir une version inachevée.</string>

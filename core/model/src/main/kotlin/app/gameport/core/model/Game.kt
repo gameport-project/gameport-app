@@ -59,6 +59,8 @@ data class AndroidBuild(
     val dlc: List<DlcContent> = emptyList(),
     /** The channels of the game that hold an Android build, the normal one included, in the order to show them (see [UpdateChannels.ordered]). */
     val channels: List<UpdateChannel> = emptyList(),
+    /** Steam files the game under "Steam Workshop": its Workshop can be browsed from the game's page. */
+    val hasWorkshop: Boolean = false,
 ) {
     /**
      * True when no Android build is published on the normal channel and the Android version of the game is only on other channels (a test version): the game is listed with what

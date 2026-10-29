@@ -24,6 +24,9 @@ data class GameAchievementsRoute(val appId: Int)
 @Serializable
 data class GameCompatRoute(val appId: Int)
 
+@Serializable
+data class GameWorkshopRoute(val appId: Int)
+
 fun NavController.navigateToGame(appId: Int) = navigate(GameRoute(appId))
 
 fun NavController.navigateToGameSettings(appId: Int) = navigate(GameSettingsRoute(appId))
@@ -36,11 +39,17 @@ fun NavController.navigateToGameAchievements(appId: Int) = navigate(GameAchievem
 
 fun NavController.navigateToGameCompat(appId: Int) = navigate(GameCompatRoute(appId))
 
-fun NavGraphBuilder.gameScreen(onBack: () -> Unit, onOpenSettings: (Int) -> Unit, onOpenSaves: (Int) -> Unit, onOpenControllers: (Int) -> Unit, onOpenCompat: (Int) -> Unit, onOpenAchievements: (Int) -> Unit, onOpenSteamSettings: () -> Unit) {
+fun NavController.navigateToGameWorkshop(appId: Int) = navigate(GameWorkshopRoute(appId))
+
+fun NavGraphBuilder.gameScreen(onBack: () -> Unit, onOpenSettings: (Int) -> Unit, onOpenSaves: (Int) -> Unit, onOpenControllers: (Int) -> Unit, onOpenCompat: (Int) -> Unit, onOpenAchievements: (Int) -> Unit, onOpenSteamSettings: () -> Unit, onOpenWorkshop: (Int) -> Unit) {
     composable<GameRoute> { entry ->
         val appId = entry.toRoute<GameRoute>().appId
-        GameScreen(onBack = onBack, onOpenSettings = { onOpenSettings(appId) }, onOpenSaves = { onOpenSaves(appId) }, onOpenControllers = { onOpenControllers(appId) }, onOpenCompat = { onOpenCompat(appId) }, onOpenAchievements = { onOpenAchievements(appId) }, onOpenSteamSettings = onOpenSteamSettings)
+        GameScreen(onBack = onBack, onOpenSettings = { onOpenSettings(appId) }, onOpenSaves = { onOpenSaves(appId) }, onOpenControllers = { onOpenControllers(appId) }, onOpenCompat = { onOpenCompat(appId) }, onOpenAchievements = { onOpenAchievements(appId) }, onOpenSteamSettings = onOpenSteamSettings, onOpenWorkshop = { onOpenWorkshop(appId) })
     }
+}
+
+fun NavGraphBuilder.gameWorkshopScreen(onBack: () -> Unit) {
+    composable<GameWorkshopRoute> { WorkshopScreen(onBack = onBack) }
 }
 
 fun NavGraphBuilder.gameSettingsScreen(onBack: () -> Unit) {
