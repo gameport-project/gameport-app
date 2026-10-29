@@ -57,7 +57,15 @@ data class AndroidBuild(
     /** Depots of the base game: always installed. */
     val baseDepots: List<AndroidDepot> = emptyList(),
     val dlc: List<DlcContent> = emptyList(),
+    /** The channels of the game that hold an Android build, the normal one included, in the order to show them (see [UpdateChannels.ordered]). */
+    val channels: List<UpdateChannel> = emptyList(),
 ) {
+    /**
+     * True when no Android build is published on the normal channel and the Android version of the game is only on other channels (a test version): the game is listed with what
+     * one of them holds, and has to be installed from one of them.
+     */
+    val onlyOnOtherChannels: Boolean get() = channels.isNotEmpty() && channels.none { it.isNormal }
+
     /** Space the base game takes once installed, or null if Steam did not announce it. */
     val installBytes: Long? get() = baseDepots.sumOf { it.installBytes }.takeIf { it > 0 }
 

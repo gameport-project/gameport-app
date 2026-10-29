@@ -45,6 +45,7 @@ class GameSettingsStore @Inject constructor(
         ovrPluginStandIn = prefs.getBoolean("ovrplugin_stand_in_$appId", true),
         passthrough = passthroughOf(appId),
         launchArguments = if (prefs.contains("launchargs_$appId")) prefs.getStringSet("launchargs_$appId", emptySet()).orEmpty().toSet() else null,
+        channel = prefs.getString("channel_$appId", null)?.takeIf { it.isNotBlank() },
     )
 
     fun observe(appId: Int): Flow<GameSettings> = changes.map { get(appId) }
@@ -87,6 +88,8 @@ class GameSettingsStore @Inject constructor(
             PassthroughMode.ON -> editor.putString("passthrough_$appId", "on")
             PassthroughMode.OFF -> editor.putString("passthrough_$appId", "off")
         }
+        // The normal channel is the absence of a choice.
+        settings.channel?.let { editor.putString("channel_$appId", it) } ?: editor.remove("channel_$appId")
         if (height == null) editor.remove("height_$appId") else editor.putInt("height_$appId", height.coerceIn(PlayerDefaults.HEIGHT_RANGE_CM))
         editor.apply()
         changes.value += 1

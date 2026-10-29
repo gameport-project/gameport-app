@@ -138,6 +138,7 @@ import app.gameport.core.designsystem.GlassChip
 import app.gameport.core.designsystem.speedText
 import app.gameport.core.model.DlcContent
 import app.gameport.core.model.Game
+import app.gameport.core.model.UpdateChannels
 import app.gameport.core.model.GameIssue
 import app.gameport.core.model.needsAttention
 import app.gameport.core.model.DisplaySettings
@@ -216,6 +217,8 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onSetHidden = viewModel::onSetHidden,
         onBack = onBack,
         onInstall = viewModel::onInstall,
+        channelInUse = viewModel.channelInUse.collectAsStateWithLifecycle().value,
+        onChannelChosen = viewModel::onChannelChosen,
         onCancel = viewModel::onCancel,
         onPause = viewModel::onPause,
         onVersionChosen = viewModel::onVersionChosen,
@@ -251,6 +254,9 @@ internal fun GameContent(
     onSetHidden: (Boolean) -> Unit,
     onBack: () -> Unit,
     onInstall: (Game, Set<Int>?) -> Unit,
+    /** The channel (branch) of Steam the game is fetched from, and what picks another one. */
+    channelInUse: String = UpdateChannels.NORMAL,
+    onChannelChosen: (String) -> Unit = {},
     onCancel: () -> Unit,
     onPause: () -> Unit,
     onVersionChosen: (String?) -> Unit,
@@ -285,6 +291,8 @@ internal fun GameContent(
                     onUpdate = onUpdate,
                     speedUnit = speedUnit,
                     onInstall = { dlc -> onInstall(uiState.game, dlc) },
+                    channelInUse = channelInUse,
+                    onChannelChosen = onChannelChosen,
                     onCancel = onCancel,
                     onPause = onPause,
                     onVersionChosen = onVersionChosen,
@@ -345,6 +353,8 @@ private fun GameDetails(
     onUpdate: () -> Unit,
     speedUnit: SpeedUnit,
     onInstall: (Set<Int>?) -> Unit,
+    channelInUse: String,
+    onChannelChosen: (String) -> Unit,
     onCancel: () -> Unit,
     onPause: () -> Unit,
     onVersionChosen: (String?) -> Unit,
@@ -414,7 +424,23 @@ private fun GameDetails(
     var choosingDlc by remember { mutableStateOf(false) }
     // A game that most players could not run is installed only after the player has been told.
     var warning by remember { mutableStateOf(false) }
-    val startInstall = { if (ownedDlc.isEmpty()) onInstall(emptySet()) else choosingDlc = true }
+    val afterChannel = { if (ownedDlc.isEmpty()) onInstall(emptySet()) else choosingDlc = true }
+    // A game that has nothing on the normal channel is installed from another: the player picks one first, unless a channel that exists was already picked for this game.
+    var choosingChannel by remember { mutableStateOf(false) }
+    val channels = game.androidBuild?.channels.orEmpty()
+    val needsChannel = game.androidBuild?.onlyOnOtherChannels == true && channels.none { it.name == channelInUse }
+    val startInstall = { if (needsChannel) choosingChannel = true else afterChannel() }
+    if (choosingChannel) {
+        ChannelChoiceDialog(
+            channels = channels.filter { !it.passwordRequired },
+            onDismiss = { choosingChannel = false },
+            onConfirm = { name ->
+                choosingChannel = false
+                onChannelChosen(name)
+                afterChannel()
+            },
+        )
+    }
     if (warning && compat != null) {
         BackdropDialog(
             onDismissRequest = { warning = false },
@@ -520,6 +546,7 @@ private fun GameDetails(
                     CompatChips(compat, incompatible)
                 }
                 CompatDetails(compat, incompatible)
+                ChannelNotice(game, channelInUse)
                 FlowRow(
                     modifier = Modifier.onGloballyPositioned { alignment.actionsPlaced(it) },
                     horizontalArrangement = Arrangement.spacedBy(12.dp),

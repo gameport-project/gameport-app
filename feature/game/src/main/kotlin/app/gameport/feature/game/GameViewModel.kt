@@ -82,7 +82,7 @@ class GameViewModel @Inject constructor(
     private val issuesRepository: GameIssuesRepository,
     private val saveSpaces: app.gameport.core.sync.SaveSpaceStore,
     private val controllerMappings: ControllerMappingStore,
-    gameSettingsStore: app.gameport.core.settings.GameSettingsStore,
+    private val gameSettingsStore: app.gameport.core.settings.GameSettingsStore,
     device: DeviceProfile,
     settings: UserSettings,
     private val playHistory: app.gameport.core.settings.PlayHistoryStore,
@@ -180,6 +180,18 @@ class GameViewModel @Inject constructor(
 
     /** [dlc] is what the player chose; null resumes an interrupted install with its earlier choice. */
     fun onInstall(game: Game, dlc: Set<Int>?) = installer.install(game, dlc)
+
+    /** The channel (branch) of Steam this game is fetched from: the one picked, the normal one by default. */
+    val channelInUse: StateFlow<String> = gameSettingsStore.observe(appId)
+        .map { it.channelName }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), gameSettingsStore.get(appId).channelName)
+
+    /** The player picks the channel the game is fetched from, before installing it (a game that has nothing on the normal channel has to be installed from another). */
+    fun onChannelChosen(name: String) {
+        val picked = if (name == app.gameport.core.model.UpdateChannels.NORMAL) null else name
+        val current = gameSettingsStore.get(appId)
+        if (current.channel != picked) gameSettingsStore.set(appId, current.copy(channel = picked))
+    }
 
     fun onRepatch() = installer.repatch(appId)
 

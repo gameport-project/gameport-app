@@ -80,6 +80,30 @@ class GameSettingsViewModel @Inject constructor(
         app.gameport.core.model.ExtraContent.of(game?.androidBuild?.dlc.orEmpty(), installed, removable, work)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), app.gameport.core.model.ExtraContent())
 
+    /** The channels of the game on Steam that hold an Android build, the normal one included, in the order to show them. */
+    val channels: StateFlow<List<app.gameport.core.model.UpdateChannel>> = library.observeGame(appId)
+        .map { it?.androidBuild?.channels.orEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
+    /** The channel this game is fetched from: the one picked, the normal one by default. */
+    val channelInUse: StateFlow<String> = store.observe(appId)
+        .map { it.channelName }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), store.get(appId).channelName)
+
+    /**
+     * The player picks the channel the game is fetched from. An installed game is then installed again from it, over the one on the device (the saves stay, as in any update); a game that is
+     * not installed will be fetched from it when it is.
+     */
+    fun onUseChannel(name: String) {
+        val picked = if (name == app.gameport.core.model.UpdateChannels.NORMAL) null else name
+        if (store.get(appId).channel == picked) return
+        store.set(appId, store.get(appId).copy(channel = picked))
+        viewModelScope.launch {
+            val game = library.observeGame(appId).first() ?: return@launch
+            if (installer.installedPackage(appId) != null) installer.update(game)
+        }
+    }
+
     fun onInstallDlc(dlcAppId: Int) {
         viewModelScope.launch { library.observeGame(appId).first()?.let { installer.installDlc(it, dlcAppId) } }
     }

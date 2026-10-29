@@ -24,6 +24,7 @@ class GameUpdatesRepository @Inject constructor(
     private val builds: InstalledBuilds,
     private val sessions: SteamSessionHolder,
     private val library: app.gameport.core.steam.SteamLibraryRepository,
+    private val gameSettings: app.gameport.core.settings.GameSettingsStore,
 ) {
     private val _updates = MutableStateFlow<List<GameUpdate>>(emptyList())
     val updates: StateFlow<List<GameUpdate>> = _updates.asStateFlow()
@@ -36,7 +37,8 @@ class GameUpdatesRepository @Inject constructor(
             _updates.value = emptyList()
             return
         }
-        val current = runCatching { session.currentBuilds(appIds) }
+        // A game installed from another channel is compared with that channel, not the normal one.
+        val current = runCatching { session.currentBuilds(appIds) { appId -> gameSettings.get(appId).channelName } }
             .onFailure { Log.w(TAG, "update check failed", it) }
             .getOrNull() ?: return
         val before = _updates.value.map { it.appId }.toSet()

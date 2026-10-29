@@ -19,6 +19,8 @@ interface GameDownloader {
         depotIds: List<Int>,
         directory: File,
         depotBytes: Map<Int, Long> = emptyMap(),
+        /** The channel (branch) of Steam the build comes from: `public` is the normal one. A channel that asks a password is not downloadable. */
+        branch: String = "public",
         onProgress: (fraction: Float, bytesReceived: Long) -> Unit,
     )
 

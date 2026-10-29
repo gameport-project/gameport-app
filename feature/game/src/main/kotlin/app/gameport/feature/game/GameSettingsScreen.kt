@@ -61,6 +61,7 @@ import app.gameport.core.model.LaunchOption
 import app.gameport.core.model.LaunchOptions
 import app.gameport.core.model.InstallState
 import app.gameport.core.model.PlayerDefaults
+import app.gameport.core.model.UpdateChannels
 
 /** Settings of one game, opened from the gear on its page. */
 @Composable
@@ -74,6 +75,24 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
     val patchRemoved by viewModel.patchRemoved.collectAsStateWithLifecycle()
     val launchOptions by viewModel.launchOptions.collectAsStateWithLifecycle()
     val extraContent by viewModel.extraContent.collectAsStateWithLifecycle()
+    val channels by viewModel.channels.collectAsStateWithLifecycle()
+    val channelInUse by viewModel.channelInUse.collectAsStateWithLifecycle()
+    var pendingChannel by remember { mutableStateOf<String?>(null) }
+    pendingChannel?.let { name ->
+        BackdropDialog(
+            onDismissRequest = { pendingChannel = null },
+            title = { Text(stringResource(R.string.game_settings_channel_use_title, name)) },
+            text = { Text(stringResource(R.string.game_settings_channel_use_confirm)) },
+            confirmButton = {
+                GlassButton(onClick = { pendingChannel = null; viewModel.onUseChannel(name) }) {
+                    Icon(Icons.Filled.Refresh, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.game_settings_channel_use))
+                }
+            },
+            dismissButton = { GlassButton(onClick = { pendingChannel = null }) { Text(stringResource(R.string.game_settings_cancel)) } },
+        )
+    }
     var confirmingRemoval by remember { mutableStateOf(false) }
     if (confirmingRemoval) {
         BackdropDialog(
@@ -95,6 +114,8 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
         if (installedNow || installState is InstallState.Patching || installState is InstallState.Installing) add(GameCategory.PATCH)
         if (installedNow) add(GameCategory.PERMISSIONS)
         if (installedNow && !extraContent.isEmpty) add(GameCategory.EXTRA)
+        // Only when Steam has a channel other than the normal one with an Android build: otherwise there is nothing to tell.
+        if (UpdateChannels.hasOthers(channels)) add(GameCategory.CHANNELS)
         if (launchOptions.isNotEmpty()) add(GameCategory.LAUNCH)
         if (viewModel.isHeadset && isVrGame) add(GameCategory.VR)
     }
@@ -166,6 +187,7 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
                                     }
                                 }
                                 GameCategory.EXTRA -> ExtraContentSection(extraContent, viewModel::onInstallDlc, viewModel::onRemoveDlc, viewModel::onDismissDlcError)
+                                GameCategory.CHANNELS -> ChannelsSection(channels, inUse = channelInUse, onUse = { pendingChannel = it })
                                 GameCategory.LAUNCH -> LaunchArgumentsSection(
                                     options = launchOptions,
                                     picked = settings.launchArguments,
@@ -231,6 +253,7 @@ private enum class GameCategory(val title: Int) {
     PATCH(R.string.game_settings_patch),
     PERMISSIONS(R.string.game_settings_permissions),
     EXTRA(R.string.extra_title),
+    CHANNELS(R.string.game_settings_channels),
     LAUNCH(R.string.game_settings_launch),
     VR(R.string.game_settings_vr),
 }

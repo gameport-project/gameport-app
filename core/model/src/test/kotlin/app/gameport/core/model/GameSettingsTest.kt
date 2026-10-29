@@ -41,4 +41,10 @@ class GameSettingsTest {
     fun `following the recentering of the headset is left to GamePort until the player chooses`() {
         assertEquals(RecenterMode.AUTO, GameSettings().recenter)
     }
+
+    @Test
+    fun `a game is fetched from the normal channel until the player picks another`() {
+        assertEquals(UpdateChannels.NORMAL, GameSettings().channelName)
+        assertEquals("beta", GameSettings(channel = "beta").channelName)
+    }
 }

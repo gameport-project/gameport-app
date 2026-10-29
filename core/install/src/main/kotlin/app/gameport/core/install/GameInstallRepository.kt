@@ -10,6 +10,7 @@ import app.gameport.core.model.InstallError
 import app.gameport.core.model.ExpansionCheck
 import app.gameport.core.model.InstallState
 import app.gameport.core.model.LaunchOptions
+import app.gameport.core.model.UpdateChannels
 import app.gameport.core.model.reportable
 import app.gameport.core.model.ObbNames
 import app.gameport.core.model.VersionOption
@@ -219,7 +220,10 @@ class GameInstallRepository @Inject constructor(
                         var allocated = 0L
                         var correctedNoted = false
                         var followingDisk = false
-                        downloader.download(game.appId, depots.map { it.id }, directory, depots.associate { it.id to it.downloadBytes }) { progress, received ->
+                        // The channel the player picked for this game (the normal one unless said otherwise): its Android build is the one fetched.
+                        val channel = gameSettings.get(game.appId).channelName
+                        if (channel != UpdateChannels.NORMAL) events.note(game.appId, "downloading from the channel $channel")
+                        downloader.download(game.appId, depots.map { it.id }, directory, depots.associate { it.id to it.downloadBytes }, branch = channel) { progress, received ->
                             val verifying = check.update(received)
                             if (verifying) {
                                 // Checking what is on the device: the figure is how far the check has read, not the download.

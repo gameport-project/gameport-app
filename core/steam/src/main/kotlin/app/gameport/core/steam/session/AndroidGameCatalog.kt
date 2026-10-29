@@ -13,11 +13,14 @@ import app.gameport.core.model.SaveRule
 import app.gameport.core.model.Game
 import app.gameport.core.model.Library
 import app.gameport.core.model.Ownership
+import app.gameport.core.model.UpdateChannel
+import app.gameport.core.model.UpdateChannels
 import app.gameport.core.steam.cache.CACHE_VERSION
 import app.gameport.core.steam.cache.CachedDepot
 import app.gameport.core.steam.cache.CachedDlcApp
 import app.gameport.core.steam.cache.CachedGame
 import app.gameport.core.steam.cache.CachedLibrary
+import app.gameport.core.steam.cache.CachedChannel
 import app.gameport.core.steam.cache.CachedSaveRule
 import app.gameport.core.steam.cache.LibraryCacheStore
 import app.gameport.core.steam.cache.SaveRulesChange
@@ -188,6 +191,7 @@ internal fun libraryOf(
                 isVr = game.isVr,
                 baseDepots = depots.filter { it.dlcAppId == null },
                 saveRules = game.saveRules.map { SaveRule(it.localDir, it.pattern, it.recursive, it.cloudPrefix, it.pcCloudPrefix) },
+                channels = channelsOf(game.channels),
                 // The DLC the game's own depots name, and the DLC apps that carry their depots themselves (a game that sells its content as DLC).
                 dlc = (
                     depots.filter { it.dlcAppId != null }.groupBy { it.dlcAppId!! }.map { (dlcAppId, dlcDepots) ->
@@ -203,6 +207,23 @@ internal fun libraryOf(
         )
     }.sortedBy { it.name.lowercase() }
     return Library(list, scanning, ownedAppIds = visible)
+}
+
+/** The channels of a game as the screens see them: whether each one carries the very Android build of the normal channel is told by the text that names the build. */
+internal fun channelsOf(cached: List<CachedChannel>): List<UpdateChannel> {
+    val normalKey = cached.firstOrNull { it.name == UpdateChannels.NORMAL }?.androidKey
+    return UpdateChannels.ordered(
+        cached.map { channel ->
+            UpdateChannel(
+                name = channel.name,
+                description = channel.description,
+                updatedSeconds = channel.updated,
+                androidBytes = channel.androidBytes,
+                sameAsNormal = channel.name != UpdateChannels.NORMAL && normalKey != null && channel.androidKey == normalKey,
+                passwordRequired = channel.passwordRequired,
+            )
+        },
+    )
 }
 
 /** The library from the last scan, for when Steam is not reachable: every cached game counts as owned. */
@@ -238,13 +259,13 @@ internal fun KeyValue.toAndroidDlc(appId: Int): CachedDlcApp? {
     return CachedDlcApp(appId, parent, common["name"].value ?: return null, depots)
 }
 
-private fun KeyValue.toAndroidGame(appId: Int): CachedGame? {
+internal fun KeyValue.toAndroidGame(appId: Int): CachedGame? {
     val common = this["common"]
     // Games, and also demos and betas (playtests): separate Steam apps that can carry an Android build of their own.
     val kind = common["type"].value?.lowercase()?.takeIf { it in LISTED_TYPES } ?: return null
     // A depot tagged Android is only usable once a build is published on the public branch;
     // Steam lists some ahead of release, and those have nothing to download yet.
-    val depots = this["depots"].children.filter { depot ->
+    val publicDepots = this["depots"].children.filter { depot ->
         depot.name?.toIntOrNull() != null &&
             depot["config"]["oslist"].value.orEmpty().split(',').any { it.trim() == "android" } &&
             depot["manifests"]["public"] != KeyValue.INVALID
@@ -257,8 +278,15 @@ private fun KeyValue.toAndroidGame(appId: Int): CachedGame? {
             manifestId = depot["manifests"]["public"]["gid"].asLong(),
         )
     }
-    // Without a base-game depot there is nothing to play, whatever DLC depots exist.
-    if (depots.none { it.dlcAppId == null }) return null
+    val channels = ChannelsParser.parse(this["depots"])
+    // Without a base-game depot there is nothing to play, whatever DLC depots exist. When the normal channel has none, a test channel that asks no password may have one (an Android
+    // version published for testing only): the game is listed with what that channel holds, and is installed from a channel (see AndroidBuild.onlyOnOtherChannels).
+    val depots = if (publicDepots.any { it.dlcAppId == null }) {
+        publicDepots
+    } else {
+        val fallback = ChannelsParser.fallbackChannel(channels) ?: return null
+        ChannelsParser.depotsOf(this["depots"], fallback.name).takeIf { list -> list.any { it.dlcAppId == null } } ?: return null
+    }
     return CachedGame(
         appId = appId,
         name = common["name"].value ?: return null,
@@ -266,6 +294,7 @@ private fun KeyValue.toAndroidGame(appId: Int): CachedGame? {
         adult = isAdult(),
         depots = depots,
         saveRules = SaveRulesParser.parse(this["ufs"]),
+        channels = channels,
         kind = kind,
         capsule = common["library_assets_full"]["library_capsule"]["image"]["english"].value?.takeIf { it.isNotBlank() },
         hero = common["library_assets_full"]["library_hero"]["image"]["english"].value?.takeIf { it.isNotBlank() },

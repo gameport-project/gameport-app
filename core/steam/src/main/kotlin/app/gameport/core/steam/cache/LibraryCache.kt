@@ -44,6 +44,19 @@ data class CachedGame(
     val header: String? = null,
     /** The full game a demo or playtest belongs to. */
     val parent: Int? = null,
+    /** The channels of the game that hold an Android build, the normal one included (see [ChannelsParser]). */
+    val channels: List<CachedChannel> = emptyList(),
+)
+
+/** A channel of a game on Steam with an Android build: [updated] is Steam's date for it in seconds, [androidKey] says which build it is (the same text, the same build). */
+@Serializable
+data class CachedChannel(
+    val name: String,
+    val description: String? = null,
+    val updated: Long = 0,
+    val androidBytes: Long = 0,
+    val androidKey: String = "",
+    val passwordRequired: Boolean = false,
 )
 
 /**
@@ -102,10 +115,25 @@ interface LibraryCacheStore {
     fun forgetChecked(accountId: Long, appId: Int) {
         load(accountId)?.let { save(accountId, it.copy(checkedApps = it.checkedApps - appId)) }
     }
+
+    /** The same for several apps at once, with one reading and one writing of the cache. */
+    fun forgetChecked(accountId: Long, appIds: Collection<Int>) {
+        load(accountId)?.let { save(accountId, it.copy(checkedApps = it.checkedApps - appIds.toSet())) }
+    }
+
+    /** Marks every app as not inspected yet: the next scan reads them all again. */
+    fun forgetAllChecked(accountId: Long) {
+        load(accountId)?.let { save(accountId, it.copy(checkedApps = emptySet())) }
+    }
+
+    /** The change number of Steam the library was last brought up to date from (see LibraryChanges), 0 when none was kept. */
+    fun changeNumber(accountId: Long): Int = 0
+
+    fun saveChangeNumber(accountId: Long, number: Int) {}
 }
 
-/** Version 4 adds the save rules used for the cloud sync, version 6 the build id of each depot, version 8 the artwork names and the parent app, version 10 the Windows copy of the saves, version 11 the DLC apps with an Android depot of their own, and the private data root, version 12 the folder of the saves of a game whose path is written from Android/data, version 13 the order of the two cloud names of such a game. */
-const val CACHE_VERSION = 13
+/** Version 4 adds the save rules used for the cloud sync, version 6 the build id of each depot, version 8 the artwork names and the parent app, version 10 the Windows copy of the saves, version 11 the DLC apps with an Android depot of their own, and the private data root, version 12 the folder of the saves of a game whose path is written from Android/data, version 13 the order of the two cloud names of such a game, version 14 the channels of a game, version 15 the games whose Android build is only on a test channel (they are read again). */
+const val CACHE_VERSION = 15
 
 @Singleton
 class FileLibraryCacheStore @Inject constructor(
@@ -131,5 +159,16 @@ class FileLibraryCacheStore @Inject constructor(
         directory.deleteRecursively()
     }
 
+    override fun changeNumber(accountId: Long): Int = runCatching { changesFile(accountId).readText().trim().toInt() }.getOrDefault(0)
+
+    override fun saveChangeNumber(accountId: Long, number: Int) {
+        runCatching {
+            directory.mkdirs()
+            changesFile(accountId).writeText(number.toString())
+        }
+    }
+
     private fun file(accountId: Long) = File(directory, "$accountId.json")
+
+    private fun changesFile(accountId: Long) = File(directory, "$accountId.changes")
 }

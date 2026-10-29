@@ -26,7 +26,7 @@ class JavaSteamGameDownloader @Inject constructor(
         app.gameport.core.steam.session.SteamInspector.manifestFiles(session, appId, depotId, manifestId)
     }
 
-    override suspend fun download(appId: Int, depotIds: List<Int>, directory: File, depotBytes: Map<Int, Long>, onProgress: (Float, Long) -> Unit) {
+    override suspend fun download(appId: Int, depotIds: List<Int>, directory: File, depotBytes: Map<Int, Long>, branch: String, onProgress: (Float, Long) -> Unit) {
         withContext(Dispatchers.IO) {
             // Right after GamePort starts, the connection to Steam may not be made yet (a download that goes on by itself starts as soon as the account is known): it is waited for.
             val session = sessions.current.value
@@ -71,7 +71,7 @@ class JavaSteamGameDownloader @Inject constructor(
                 // Named depots only. Filtering by operating system would also pick up untagged
                 // depots, which are the Windows build.
                 require(depotIds.isNotEmpty()) { "No Android depot to download." }
-                downloader.add(AppItem(appId, installDirectory = directory.absolutePath, depot = depotIds))
+                downloader.add(AppItem(appId, installDirectory = directory.absolutePath, depot = depotIds, branch = branch))
                 downloader.finishAdding()
                 // The worker threads run at background priority while this goes on, and only then (see [DownloadThreads]).
                 DownloadThreads.begin()

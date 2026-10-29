@@ -66,7 +66,12 @@ data class GameSettings(
     val ovrPluginStandIn: Boolean = true,
     /** The game declares that it uses the headset's passthrough, so the headset lets it show the real world behind it. A change needs the game to be patched again. */
     val passthrough: PassthroughMode = PassthroughMode.AUTO,
+    /** The channel (branch) of Steam this game is installed and updated from; null is the normal one ([UpdateChannels.NORMAL]). Its Android build is what an install or an update fetches. */
+    val channel: String? = null,
 ) {
+    /** The channel to fetch from: the one picked, or the normal one. */
+    val channelName: String get() = channel ?: UpdateChannels.NORMAL
+
     val followsDefaults: Boolean get() = heightCm == null
 
     fun effectiveHeightCm(defaults: PlayerDefaults): Int = heightCm ?: defaults.heightCm
