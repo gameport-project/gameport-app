@@ -47,8 +47,10 @@ sealed interface StoreGameUiState {
         val summary: String?,
         /** The names of its heaviest tags, in the language of the device. */
         val tags: List<String>,
-        /** The account has the game, so its page in the library exists. */
+        /** The account has the game in its Steam library, whether or not GamePort lists it (a game with no Android build yet is owned too). */
         val owned: Boolean,
+        /** GamePort lists the game in its library, so its page there exists. */
+        val inLibrary: Boolean = owned,
         /** What the players of this kind of device say of it, when enough of them did. */
         val players: Compat?,
         /** What Steam sells it for in the country of the device, from the history the catalog keeps; null when it has none. */
@@ -119,6 +121,15 @@ class StoreGameViewModel @Inject constructor(
         }
     }
 
+    init {
+        // The account may have this game while GamePort does not list it yet (its Android build came after the last scan): the page being opened reads that one app again,
+        // and the game joins the library at once if Steam has a build for it. Only when the account has it, and only once per page.
+        viewModelScope.launch {
+            val known = library.observeLibrary().first { it.ownedAppIds.isNotEmpty() }
+            if (appId in known.ownedAppIds && known.games.none { it.appId == appId }) library.refreshGame(appId)
+        }
+    }
+
     val uiState: StateFlow<StoreGameUiState> = combine(
         catalog.observe(), texts.observe(language), texts.observe(ENGLISH), library.observeLibrary(), combine(compat.observe(appId), pricing, adding) { players, priced, request -> Triple(players, priced, request) },
     ) { listed, mine, english, owned, (players, priced, request) ->
@@ -128,7 +139,8 @@ class StoreGameViewModel @Inject constructor(
             appId = appId,
             summary = mine?.summary(appId) ?: english?.summary(appId),
             tags = app?.tags.orEmpty().mapNotNull { mine?.tagName(it) ?: english?.tagName(it) },
-            owned = owned.games.any { it.appId == appId },
+            owned = owned.games.any { it.appId == appId } || appId in owned.ownedAppIds,
+            inLibrary = owned.games.any { it.appId == appId },
             players = players,
             price = priced.price,
             story = priced.story,

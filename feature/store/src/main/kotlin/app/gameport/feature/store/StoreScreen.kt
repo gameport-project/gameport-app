@@ -276,7 +276,7 @@ fun StoreScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, onStoreGame: (In
                                     val owned = app.appid in current.ownedIds
                                     val isNew = app.appid in current.newIds
                                     val onPointed = { on: Boolean -> if (on) pointed = app else if (pointed?.appid == app.appid) pointed = null }
-                                    val open = { if (owned) onGameClick(app.appid) else onStoreGame(app.appid) }
+                                    val open = { if (app.appid in current.libraryIds) onGameClick(app.appid) else onStoreGame(app.appid) }
                                     val level = current.levels[app.appid]
                                     val sortValue = sortValueOf(app, current.sort)
                                     Pointable(onPointed) { pointedNow ->

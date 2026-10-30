@@ -137,7 +137,7 @@ internal fun StoreGameContent(
             val content = state as? StoreGameUiState.Content
             PageHeader(onBack, content?.app?.name ?: stringResource(R.string.store_title), content?.app?.let { (it.developer + it.publisher).distinct().joinToString(" · ") }.orEmpty(), trailing = content?.app?.let { app -> { Rating(app) } }, tour = app.gameport.core.model.TourKind.STORE_GAME,
                 // A game of the library: its page there, at the top, next to the help.
-                action = content?.takeIf { it.owned && it.app != null }?.let { owned -> {
+                action = content?.takeIf { it.inLibrary && it.app != null }?.let { owned -> {
                     // Filled white, like the Play button of a game: it is the way to the page of the game in the library, and must be seen.
                     androidx.compose.material3.Button(
                         onClick = { onGameClick(owned.appId) }, modifier = Modifier.height(ROW_HEIGHT), contentPadding = BUTTON_PADDING,
@@ -594,7 +594,17 @@ private fun Fact(label: Int, value: String?) {
 @Composable
 private fun LanguageTable(app: AndroidApp) {
     val codes = (app.languages + app.audio + app.subtitles).distinct()
-    if (codes.isEmpty()) return
+    if (codes.isEmpty()) {
+        // Steam gave no languages for this game: the card says so, centred, instead of staying empty.
+        Text(
+            stringResource(R.string.storegame_languages_missing),
+            modifier = Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        return
+    }
     val column = 64.dp
     Row(verticalAlignment = Alignment.CenterVertically) {
         // The first column has no title: the languages say what it is.

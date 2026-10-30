@@ -87,6 +87,7 @@
     <string name="store_group_languages">Langues</string>
     <string name="store_group_genres">Genres</string>
     <string name="store_language_text">Texte</string>
+    <string name="storegame_languages_missing">Les langues n\'ont pas pu être récupérées pour ce jeu.</string>
     <string name="store_language_voice">Voix</string>
     <string name="store_language_subtitles">Sous-titres</string>
     <string name="store_pick_languages">Toutes les langues</string>

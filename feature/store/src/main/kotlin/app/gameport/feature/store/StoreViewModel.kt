@@ -46,7 +46,10 @@ sealed interface StoreUiState {
         val apps: List<AndroidApp>,
         /** How many games the catalog lists for this device, whatever the search and the filters. */
         val total: Int,
+        /** The apps of the account's Steam library, listed in GamePort or not. */
         val ownedIds: Set<Int>,
+        /** Those GamePort lists in its library: only these have a page to open there. */
+        val libraryIds: Set<Int> = emptySet(),
         /** The games whose Android version arrived this week. */
         val newIds: Set<Int>,
         val query: String,
@@ -136,12 +139,14 @@ class StoreViewModel @Inject constructor(
         val (columns, order) = shown[4] as Pair<Int, StoreSort>
         if (listed == null) return@combine StoreUiState.Unavailable
         val today = LocalDate.now()
-        val ids = owned.games.map { it.appId }.toSet()
+        val libraryIds = owned.games.map { it.appId }.toSet()
+        val ids = libraryIds + owned.ownedAppIds
         val forDevice = listed.apps.filter { device.isHeadset || !it.vr }
         StoreUiState.Content(
             apps = storeList(listed.apps, text, chosen, ids, today, device.isHeadset, prices, order, levels),
             total = forDevice.size,
             ownedIds = ids,
+            libraryIds = libraryIds,
             newIds = AndroidCatalog(apps = listed.apps).arrivals(today).map { it.appid }.toSet(),
             query = text,
             filters = chosen,
