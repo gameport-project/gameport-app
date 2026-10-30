@@ -131,6 +131,7 @@
     <string name="issue_patch_installing">Installation du jeu patché… une confirmation d\'Android peut être demandée.</string>
     <string name="issue_patch_failed">Le patch a échoué : %1$s</string>
     <string name="issue_dismiss">Fermer</string>
+    <string name="issue_mark_read">Marquer comme lu</string>
     <string name="saves_title">Sauvegardes</string>
     <string name="saves_refresh">Revérifier Steam Cloud</string>
     <string name="saves_empty">Aucune sauvegarde vue pour l\'instant</string>

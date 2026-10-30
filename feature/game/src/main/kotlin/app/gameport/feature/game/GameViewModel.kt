@@ -288,6 +288,9 @@ class GameViewModel @Inject constructor(
     /** The player opened the options the mark on the actions was about: the mark goes (until the game is adapted again). */
     fun onCompatNoticeSeen() = gameSettingsStore.setStageNoticeSeen(appId)
 
+    /** The player read the notice about the controllers: it goes and does not come back. */
+    fun onControllersNoticeRead() = controllerMappings.markNoticeSeen(appId)
+
     /** Permissions are granted outside GamePort: check the game's issues again when the page is shown. */
     fun refreshIssues() = issuesRepository.refresh()
 

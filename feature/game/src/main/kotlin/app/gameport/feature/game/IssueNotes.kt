@@ -8,7 +8,7 @@ import app.gameport.core.model.GameIssue
 
 /**
  * One line of the card of the notifications: its words, the colour of its dot and words, what tapping the line does (nothing when null), and up to two buttons: [action] (and
- * [secondAction], which sits before it). [actionEnabled] greys [action] while something else is going on.
+ * [secondAction], which sits before it). [actionEnabled] greys [action] while something else is going on. [onRead] puts a check at the right end of the line that marks it as read.
  */
 internal class NoteItem(
     val text: String,
@@ -19,6 +19,7 @@ internal class NoteItem(
     val actionEnabled: Boolean = true,
     val secondAction: String? = null,
     val onSecond: () -> Unit = {},
+    val onRead: (() -> Unit)? = null,
 )
 
 /** The colours of the notifications: orange for what needs attention, green for a new version, blue for a notice and for a question. */
@@ -48,6 +49,7 @@ internal fun issueNotes(
     onAskRepair: () -> Unit,
     onAskReinstall: () -> Unit,
     onReinstallWorks: () -> Unit,
+    onControllersRead: () -> Unit,
 ): List<NoteItem> = issues.mapNotNull { issue ->
     when (issue) {
         GameIssue.UpdateAvailable, GameIssue.PatchOutdated, is GameIssue.ProblemSuspected -> null
@@ -93,7 +95,7 @@ internal fun issueNotes(
             }
         is GameIssue.ControllerMappingAvailable -> NoteItem(
             stringResource(R.string.issue_controllers, sourceFamilyName(issue.source)), NoteColors.Info, NoteColors.InfoText,
-            onClick = onControllers, action = stringResource(R.string.issue_controllers_action), actionEnabled = !busy,
+            onClick = onControllers, action = stringResource(R.string.issue_controllers_action), actionEnabled = !busy, onRead = onControllersRead,
         )
     }
 }

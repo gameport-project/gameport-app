@@ -239,6 +239,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onActivateFrame = viewModel::onActivateFrame,
         onRepair = viewModel::onRepair,
         onReinstallWorks = viewModel::onReinstallWorks,
+        onControllersRead = viewModel::onControllersNoticeRead,
         onReinstallFromScratch = viewModel::onReinstallFromScratch,
         achievements = achievements,
         onOpenAchievements = onOpenAchievements,
@@ -284,6 +285,7 @@ internal fun GameContent(
     onActivateFrame: () -> Unit,
     onRepair: () -> Unit = {},
     onReinstallWorks: () -> Unit = {},
+    onControllersRead: () -> Unit = {},
     onReinstallFromScratch: () -> Unit = {},
     onToggleFavorite: () -> Unit,
     onSetHidden: (Boolean) -> Unit,
@@ -356,6 +358,7 @@ internal fun GameContent(
                     onActivateFrame = onActivateFrame,
                     onRepair = onRepair,
                     onReinstallWorks = onReinstallWorks,
+                    onControllersRead = onControllersRead,
                     onReinstallFromScratch = onReinstallFromScratch,
                     onToggleFavorite = onToggleFavorite,
                     onSetHidden = onSetHidden,
@@ -431,6 +434,7 @@ private fun GameDetails(
     onActivateFrame: () -> Unit,
     onRepair: () -> Unit,
     onReinstallWorks: () -> Unit = {},
+    onControllersRead: () -> Unit = {},
     onReinstallFromScratch: () -> Unit = {},
     onToggleFavorite: () -> Unit,
     onSetHidden: (Boolean) -> Unit,
@@ -641,10 +645,11 @@ private fun GameDetails(
                     onAskRepair = { confirmingRepair = true },
                     onAskReinstall = { confirmingReinstall = true },
                     onReinstallWorks = onReinstallWorks,
+                    onControllersRead = onControllersRead,
                 ) + listOfNotNull(
                     if (savesNotSynced) NoteItem(stringResource(R.string.game_attention_saves), NoteColors.Orange, NoteColors.OrangeText, onOpenSaves) else null,
                     // Opening the options is looking at what was said: the line goes, and with it its part of the number on the bell.
-                    if (compatNotice) NoteItem(stringResource(R.string.game_attention_compat), NoteColors.Orange, NoteColors.OrangeText, { onCompatNoticeSeen(); onOpenCompat() }) else null,
+                    if (compatNotice) NoteItem(stringResource(R.string.game_attention_compat), NoteColors.Orange, NoteColors.OrangeText, { onCompatNoticeSeen(); onOpenCompat() }, onRead = onCompatNoticeSeen) else null,
                 )
             val hasNotes = notes.isNotEmpty()
             Row(
@@ -682,6 +687,7 @@ private fun GameDetails(
                         notes = notes,
                         title = stringResource(R.string.game_notifications_title),
                         closeLabel = stringResource(R.string.game_actions_close),
+                        readLabel = stringResource(R.string.issue_mark_read),
                         arrowFromRightPx = (topRowWidthPx - bellCenterPx).coerceAtLeast(0f),
                         onClose = { notesShown = false },
                     )
@@ -888,6 +894,9 @@ private fun GameDetails(
 
 /** Below this width the details sit under the cover instead of beside it. */
 private val COMPACT_WIDTH = 600.dp
+
+/** The card of the notifications never gets wider than this: a long line wraps instead of stretching the card across a tall, narrow window. */
+private val NOTES_MAX_WIDTH = 420.dp
 /** How far the content starts over the artwork's bottom edge. */
 private val CONTENT_OVERLAP = 98.dp
 
@@ -1088,7 +1097,7 @@ private fun GameActionsOverlay(
  * One line for each, as wide as the card, its words from the left; tapping a line opens the page it is about. The cross closes the card, the bell opens it again.
  */
 @Composable
-private fun NotificationCard(notes: List<NoteItem>, title: String, closeLabel: String, arrowFromRightPx: Float, onClose: () -> Unit) {
+private fun NotificationCard(notes: List<NoteItem>, title: String, closeLabel: String, readLabel: String, arrowFromRightPx: Float, onClose: () -> Unit) {
     val colors = LocalBackdropColors.current.toList()
     val arrowHeight = 11.dp
     val fromRight = with(LocalDensity.current) { arrowFromRightPx.toDp() }
@@ -1097,7 +1106,7 @@ private fun NotificationCard(notes: List<NoteItem>, title: String, closeLabel: S
     Column(
         // At least as wide as the arrow's place needs: the arrow stands on the straight part of the top edge, never on the rounded corner.
         Modifier
-            .widthIn(min = fromRight + 36.dp)
+            .widthIn(min = fromRight + 36.dp, max = maxOf(NOTES_MAX_WIDTH, fromRight + 36.dp))
             .width(IntrinsicSize.Max)
             .background(Brush.linearGradient(colors), bubble)
             .background(GlassFill, bubble)
@@ -1122,6 +1131,8 @@ private fun NotificationCard(notes: List<NoteItem>, title: String, closeLabel: S
                         if (note.action != null) NoteButton(note.action, note.actionEnabled, note.onClick ?: {})
                         else if (note.onClick != null) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(16.dp))
                     }
+                    // A notice that only informs can be marked as read: the line goes and does not come back.
+                    note.onRead?.let { GlassIconButton(onClick = it, modifier = Modifier.size(28.dp)) { Icon(Icons.Filled.Check, contentDescription = readLabel, modifier = Modifier.size(16.dp)) } }
                 }
                 if (note.secondAction != null) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {

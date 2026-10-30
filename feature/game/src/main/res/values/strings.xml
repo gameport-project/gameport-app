@@ -132,6 +132,7 @@
     <string name="issue_patch_installing">Installing the patched game… Android may ask for a confirmation.</string>
     <string name="issue_patch_failed">The patch failed: %1$s</string>
     <string name="issue_dismiss">Dismiss</string>
+    <string name="issue_mark_read">Mark as read</string>
     <string name="saves_title">Saves</string>
     <string name="saves_refresh">Check Steam Cloud again</string>
     <string name="saves_empty">No saves seen yet</string>
