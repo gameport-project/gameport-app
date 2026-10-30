@@ -29,6 +29,8 @@ sealed interface LibraryUiState {
         /** Games after search and filters. */
         val games: List<Game>,
         val isScanning: Boolean,
+        /** How many apps of the account the scan has looked at out of how many, while it counts them. */
+        val scanProgress: app.gameport.core.model.ScanProgress? = null,
         val query: String,
         val tab: LibraryTab,
         /** The VR / Flat tabs are only offered on headsets. */
@@ -168,6 +170,7 @@ internal fun Library.toUiState(query: String, tab: LibraryTab, showTabs: Boolean
     return LibraryUiState.Content(
         games = visible,
         isScanning = isScanning,
+        scanProgress = scan,
         query = query,
         tab = tab,
         showTabs = showTabs,

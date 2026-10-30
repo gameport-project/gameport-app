@@ -8,6 +8,7 @@
     <string name="library_tab_flat">Plat</string>
     <string name="library_family_shared">Famille</string>
     <string name="library_scanning">Recherche des jeux Android…</string>
+    <string name="library_scan_progress">%1$d sur %2$d</string>
     <string name="library_empty">Aucun jeu Android trouvé dans la bibliothèque.</string>
     <string name="library_no_match">Aucun jeu ne correspond à la recherche ou aux filtres.</string>
     <string name="library_game_update_one">Mise à jour : %1$s</string>

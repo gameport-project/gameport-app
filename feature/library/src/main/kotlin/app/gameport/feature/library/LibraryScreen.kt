@@ -300,7 +300,18 @@ private fun Shelf(
 
         // Over the top edge, so showing or hiding it never moves the content below.
         if (state.isScanning) {
-            LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter))
+            val scan = state.scanProgress
+            Column(Modifier.fillMaxWidth().align(Alignment.TopCenter), horizontalAlignment = Alignment.CenterHorizontally) {
+                if (scan != null && scan.total > 0) LinearProgressIndicator(progress = { scan.done.toFloat() / scan.total }, modifier = Modifier.fillMaxWidth())
+                else LinearProgressIndicator(Modifier.fillMaxWidth())
+                // What the bar counts, so a long scan says where it is.
+                if (scan != null && scan.total > 0) Text(
+                    stringResource(R.string.library_scan_progress, scan.done, scan.total),
+                    modifier = Modifier.padding(top = 6.dp).background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 2.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                )
+            }
         }
 
         menuGame?.let { game ->

@@ -142,4 +142,9 @@ data class Library(
     val isScanning: Boolean,
     /** Every app the account can use (its own and the family's), games or not: what a game is told when it asks whether an extra content is owned. Empty until Steam has answered. */
     val ownedAppIds: Set<Int> = emptySet(),
+    /** How far the scan of the apps has come, while there is one to count: null when nothing is being counted. */
+    val scan: ScanProgress? = null,
 )
+
+/** [done] apps looked at out of [total] to look at. */
+data class ScanProgress(val done: Int, val total: Int)

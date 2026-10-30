@@ -13,6 +13,7 @@ import app.gameport.core.model.SaveRule
 import app.gameport.core.model.Game
 import app.gameport.core.model.Library
 import app.gameport.core.model.Ownership
+import app.gameport.core.model.ScanProgress
 import app.gameport.core.model.UpdateChannel
 import app.gameport.core.model.UpdateChannels
 import app.gameport.core.steam.cache.CACHE_VERSION
@@ -75,7 +76,7 @@ internal fun SteamSession.androidGames(
     val lock = Mutex()
 
     // Rebuilt from the licenses on every emission, so a lost family share disappears at once.
-    fun snapshot(scanning: Boolean): Library {
+    fun snapshot(scanning: Boolean, scan: ScanProgress? = null): Library {
         val owned = HashSet<Int>()
         val visible = HashSet<Int>()
         for (pkg in packageIds) {
@@ -83,7 +84,7 @@ internal fun SteamSession.androidGames(
             visible += apps
             if (pkg in ownedPackages) owned += apps
         }
-        return libraryOf(games.values.filter { it.appId in visible }, owned, visible, dlcNames, scanning, dlcApps.values)
+        return libraryOf(games.values.filter { it.appId in visible }, owned, visible, dlcNames, scanning, dlcApps.values, scan)
     }
 
     fun persist() = cacheStore.save(
@@ -119,6 +120,8 @@ internal fun SteamSession.androidGames(
     // 2. Apps we have not inspected yet: is there an Android depot?
     val toInspect = packageApps.entries.filter { it.key in packageIds }.flatMap { it.value }.distinct()
         .filter { it !in checkedApps }
+    var inspected = 0
+    if (toInspect.isNotEmpty()) send(snapshot(scanning = true, scan = ScanProgress(0, toInspect.size)))
     toInspect.chunked(PICS_CHUNK).map { chunk ->
         async {
             semaphore.withPermit {
@@ -137,7 +140,10 @@ internal fun SteamSession.androidGames(
                             app.keyValues.toAndroidDlc(app.id)?.let { dlc -> dlcApps[app.id] = dlc; dlcNames[app.id] = dlc.name }
                         }
                     }
-                    send(snapshot(scanning = true))
+                    inspected += chunk.size
+                    // Saved at each block, not only at the end: a scan that is cancelled (another one starts, the headset sleeps) resumes with what it already read.
+                    persist()
+                    send(snapshot(scanning = true, scan = ScanProgress(inspected, toInspect.size)))
                 }
             }
         }
@@ -171,6 +177,7 @@ internal fun libraryOf(
     dlcNames: Map<Int, String>,
     scanning: Boolean,
     dlcApps: Collection<CachedDlcApp> = emptyList(),
+    scan: ScanProgress? = null,
 ): Library {
     val list = shown.map { game ->
         val depots = game.depots.map { AndroidDepot(it.id, it.dlcAppId, it.installBytes, it.downloadBytes, it.manifestId) }
@@ -207,7 +214,7 @@ internal fun libraryOf(
             ),
         )
     }.sortedBy { it.name.lowercase() }
-    return Library(list, scanning, ownedAppIds = visible)
+    return Library(list, scanning, ownedAppIds = visible, scan = scan)
 }
 
 /** The channels of a game as the screens see them: whether each one carries the very Android build of the normal channel is told by the text that names the build. */
