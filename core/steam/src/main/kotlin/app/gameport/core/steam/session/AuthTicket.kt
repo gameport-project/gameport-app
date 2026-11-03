@@ -120,6 +120,31 @@ internal class GameConnectTokens : ClientMsgHandler() {
 }
 
 /**
+ * The tickets Steam was told of and still honours. A list sent to Steam replaces the one before it, so a ticket left out of the next list is forgotten: a
+ * game's server that asks Steam about it a moment later is answered that the ticket is invalid. Every list therefore holds all of them, the newest last.
+ */
+internal class ActiveTickets(private val limit: Int = LIMIT) {
+    /** One ticket as Steam is told of it: the CRC of [declared] (token and header), the service it is for, if any. */
+    class Entry(val appId: Int, val crc: Int, val declared: ByteArray, val serverSecret: ByteArray?)
+
+    private val entries = ArrayDeque<Entry>()
+
+    /** Adds [entry] (replacing one with the same CRC) and returns every ticket to put in the list, the oldest first. */
+    @Synchronized
+    fun add(entry: Entry): List<Entry> {
+        entries.removeAll { it.crc == entry.crc }
+        entries.addLast(entry)
+        while (entries.size > limit) entries.removeFirst()
+        return entries.toList()
+    }
+
+    companion object {
+        /** A game asks for a handful of tickets at start; the oldest ones are let go past this. */
+        const val LIMIT = 16
+    }
+}
+
+/**
  * Builds the ticket a game hands to its own servers to prove who is playing, the same one the
  * Steam client returns from `GetAuthSessionTicket`: the game connect token, a fixed-size session
  * header, and the app ownership ticket Steam signs. Every part is prefixed with its length, in
@@ -171,26 +196,32 @@ internal object AuthTicket {
     private fun activate(session: SteamSession, appId: Int, ticket: ByteArray, declared: ByteArray, serverSecret: ByteArray?) {
         val steamId = session.client.steamID?.convertToUInt64() ?: return
         val crc = CRC32().apply { update(declared) }.value.toInt()
-        val message = ClientMsgProtobuf<CMsgClientAuthList.Builder>(CMsgClientAuthList::class.java, EMsg.ClientAuthList)
-        message.body.setTokensLeft(session.connectTokens.available)
-        message.body.setLastRequestSeq(session.authSequence)
-        message.body.setLastRequestSeqFromServer(session.connectTokens.authSequenceFromServer)
-        message.body.addTickets(
-            CMsgAuthTicket.newBuilder()
-                .setEstate(0)
-                .setSteamid(steamId)
-                .setGameid(appId.toLong())
-                .setHSteamPipe(session.pipeHandle)
-                .setTicketCrc(crc)
-                .setTicket(ByteString.copyFrom(declared))
-                .also { if (serverSecret != null) it.setServerSecret(ByteString.copyFrom(serverSecret)) },
-        )
-        message.body.addAppIds(appId)
-        message.body.setMessageSequence(session.nextAuthSequence())
         // A game hands the ticket to its server at once, and the server asks Steam: the ticket is given back only when Steam has taken the list,
         // as JavaSteam and SteamKit do. Without the acknowledgement it goes on after a while, as the ticket may still be honoured.
         val acknowledged = session.connectTokens.expectAck(crc)
-        session.client.send(message)
+        // The list replaces the one Steam holds, so it carries the tickets given before as well, and lists reach Steam in the order they were made.
+        synchronized(session.activeTickets) {
+            val tickets = session.activeTickets.add(ActiveTickets.Entry(appId, crc, declared, serverSecret))
+            val message = ClientMsgProtobuf<CMsgClientAuthList.Builder>(CMsgClientAuthList::class.java, EMsg.ClientAuthList)
+            message.body.setTokensLeft(session.connectTokens.available)
+            message.body.setLastRequestSeq(session.authSequence)
+            message.body.setLastRequestSeqFromServer(session.connectTokens.authSequenceFromServer)
+            tickets.forEach { entry ->
+                message.body.addTickets(
+                    CMsgAuthTicket.newBuilder()
+                        .setEstate(0)
+                        .setSteamid(steamId)
+                        .setGameid(entry.appId.toLong())
+                        .setHSteamPipe(session.pipeHandle)
+                        .setTicketCrc(entry.crc)
+                        .setTicket(ByteString.copyFrom(entry.declared))
+                        .also { if (entry.serverSecret != null) it.setServerSecret(ByteString.copyFrom(entry.serverSecret)) },
+                )
+            }
+            tickets.map { it.appId }.distinct().forEach { message.body.addAppIds(it) }
+            message.body.setMessageSequence(session.nextAuthSequence())
+            session.client.send(message)
+        }
         val answered = acknowledged.await(ACK_WAIT_MS, TimeUnit.MILLISECONDS)
         if (!answered) session.connectTokens.forgetAck(crc)
         Log.i(TAG, "Steam ${if (answered) "took" else "did not acknowledge"} the ticket list for $appId")

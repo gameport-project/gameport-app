@@ -102,6 +102,9 @@ class SteamSession(private val cellId: Int = 0, private val onAccountRegion: (cu
     internal val authSequence: Int get() = authSequenceCounter.get()
     internal fun nextAuthSequence(): Int = authSequenceCounter.incrementAndGet()
 
+    /** The tickets Steam was told of on this connection: every list sent to Steam holds them all (see [ActiveTickets]). */
+    internal val activeTickets = ActiveTickets()
+
     /** An arbitrary Steam pipe handle, as the ticket list wants one per ticket. */
     internal val pipeHandle: Int = 1 + java.util.Random().nextInt(0x3fffffff)
 
