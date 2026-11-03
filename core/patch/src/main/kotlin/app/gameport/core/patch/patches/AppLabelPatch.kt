@@ -7,6 +7,7 @@ import app.gameport.core.patch.PatchSession
 import app.gameport.core.patch.json.elemEach
 import app.gameport.core.patch.json.named
 import app.gameport.core.patch.json.takeAttributes
+import app.gameport.core.patch.json.takeEach
 import app.gameport.core.patch.json.takeNodesEach
 import com.reandroid.json.JSONArray
 import com.reandroid.json.JSONObject
@@ -25,7 +26,11 @@ object AppLabelPatch : ApkPatch {
 
     override fun apply(session: PatchSession, context: PatchContext, assets: PatchAssets) {
         val name = context.gameName?.trim()?.takeIf { it.isNotEmpty() } ?: return
-        session.manifest.takeNodesEach({ named("manifest") }) {
+        patchManifest(session.manifest, name)
+    }
+
+    internal fun patchManifest(manifest: JSONObject, name: String) {
+        manifest.takeNodesEach({ named("manifest") }) {
             takeNodesEach({ named("application") }) {
                 takeAttributes {
                     // The label goes first, where the platform's own tools put the lowest resource id.
@@ -38,6 +43,10 @@ object AppLabelPatch : ApkPatch {
                         )
                         others.forEach { attributes.put(it) }
                     }
+                }
+                // A launcher shows the label of the activity that starts the game when it has one of its own, in place of the application's: they take the application's.
+                takeNodesEach({ named("activity") || named("activity-alias") }) {
+                    takeAttributes { this.also { it.takeEach<JSONObject>({ named("label") }) { null } } }
                 }
             }
         }
