@@ -49,7 +49,7 @@ fun GameCompatScreen(onBack: () -> Unit, viewModel: GameCompatViewModel = hiltVi
     val gameName by viewModel.gameName.collectAsStateWithLifecycle()
     val showOpenInVr by viewModel.showOpenInVr.collectAsStateWithLifecycle()
     val showOvrPluginStandIn by viewModel.showOvrPluginStandIn.collectAsStateWithLifecycle()
-    GameCompatContent(mapping, settings, stageFallback, gameName, onBack, viewModel::onUseFrameChanged, viewModel::onRecenterChosen, showOpenInVr, viewModel::onOpenInVrChosen, showOvrPluginStandIn, viewModel::onOvrPluginStandInChosen, viewModel::onPassthroughChosen, viewModel.passthroughListed, viewModel.showEyeFoveation, viewModel::onEyeFoveationChosen)
+    GameCompatContent(mapping, settings, stageFallback, gameName, onBack, viewModel::onUseFrameChanged, viewModel::onRecenterChosen, showOpenInVr, viewModel::onOpenInVrChosen, showOvrPluginStandIn, viewModel::onOvrPluginStandInChosen, viewModel::onPassthroughChosen, viewModel.passthroughListed, viewModel.showEyeFoveation, viewModel::onEyeFoveationChosen, viewModel.showHaptics, viewModel::onHapticsChosen)
 }
 
 /** The page of the options, from what it shows: the screen feeds it from the game, the tour of the page feeds it made-up values. */
@@ -70,6 +70,8 @@ internal fun GameCompatContent(
     passthroughListed: Boolean = false,
     showEyeFoveation: Boolean = false,
     onEyeFoveationChosen: (app.gameport.core.model.EyeFoveationMode) -> Unit = {},
+    showHaptics: Boolean = false,
+    onHapticsChosen: (Int) -> Unit = {},
 ) {
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp)) {
@@ -110,6 +112,13 @@ internal fun GameCompatContent(
                     labels = listOf(R.string.gamecompat_mode_auto, R.string.gamecompat_mode_on, R.string.gamecompat_mode_off).map { stringResource(it) },
                     selected = settings.eyeFoveation.ordinal,
                     onSelect = { onEyeFoveationChosen(app.gameport.core.model.EyeFoveationMode.entries[it]) },
+                )
+                if (showHaptics) ChoiceBox(
+                    title = stringResource(R.string.gamecompat_haptics),
+                    legend = stringResource(R.string.gamecompat_haptics_legend),
+                    labels = listOf(R.string.gamecompat_haptics_normal, R.string.gamecompat_haptics_light, R.string.gamecompat_haptics_strong, R.string.gamecompat_mode_off).map { stringResource(it) },
+                    selected = app.gameport.core.model.HapticsStrength.CHOICES.indexOf(settings.hapticsPercent).coerceAtLeast(0),
+                    onSelect = { onHapticsChosen(app.gameport.core.model.HapticsStrength.CHOICES[it]) },
                 )
                 if (showOpenInVr) ChoiceBox(
                     title = stringResource(R.string.gamecompat_open_in_vr),

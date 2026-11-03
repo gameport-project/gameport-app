@@ -319,6 +319,11 @@
     <string name="gamecompat_mode_auto">Automatique</string>
     <string name="gamecompat_mode_on">Activé</string>
     <string name="gamecompat_mode_off">Désactivé</string>
+    <string name="gamecompat_haptics">Intensité des vibrations des manettes</string>
+    <string name="gamecompat_haptics_legend">L\'intensité des vibrations des manettes dans ce jeu, par rapport à ce que demande le jeu. Légère la réduit de moitié, forte l\'augmente de moitié, désactivé supprime la vibration.</string>
+    <string name="gamecompat_haptics_normal">Normale</string>
+    <string name="gamecompat_haptics_light">Légère</string>
+    <string name="gamecompat_haptics_strong">Forte</string>
     <string name="report_send">Envoyer le rapport</string>
     <string name="report_description_label">Décrire le problème (facultatif)</string>
     <string name="report_description_why">Quelques mots aident beaucoup : le rapport montre comment le jeu a tourné, pas ce qui a été vu.</string>

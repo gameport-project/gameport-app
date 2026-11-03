@@ -65,6 +65,11 @@ class GameCompatViewModel @Inject constructor(
 
     fun onEyeFoveationChosen(mode: app.gameport.core.model.EyeFoveationMode) = settings.set(appId, gameSettings.value.copy(eyeFoveation = mode))
 
+    /** The strength of the controllers' vibration is offered on any headset: it applies to every game, and the game's own is the first choice. */
+    val showHaptics: Boolean = device.isHeadset
+
+    fun onHapticsChosen(percent: Int) = settings.set(appId, gameSettings.value.copy(hapticsPercent = percent))
+
     fun onUseFrameChanged(useFrame: Boolean) = controllers.setUseFrame(appId, useFrame)
 
     /** Automatic leaves it to GamePort; on and off are the player's choice, kept even where GamePort would have decided otherwise. */

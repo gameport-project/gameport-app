@@ -47,4 +47,18 @@ class GameSettingsTest {
         assertEquals(UpdateChannels.NORMAL, GameSettings().channelName)
         assertEquals("beta", GameSettings(channel = "beta").channelName)
     }
+
+    @Test
+    fun `the controllers vibrate as the game asks until the player picks another strength`() {
+        assertEquals(100, GameSettings().hapticsPercent)
+        assertEquals(HapticsStrength.NORMAL, HapticsStrength.CHOICES.first())
+    }
+
+    @Test
+    fun `a stored strength that is not one of the choices means no choice was made`() {
+        HapticsStrength.CHOICES.forEach { assertEquals(it, HapticsStrength.normalize(it)) }
+        assertEquals(HapticsStrength.NORMAL, HapticsStrength.normalize(75))
+        assertEquals(HapticsStrength.NORMAL, HapticsStrength.normalize(-1))
+        assertEquals(HapticsStrength.NORMAL, HapticsStrength.normalize(1000))
+    }
 }

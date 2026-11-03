@@ -19,6 +19,15 @@ enum class RecenterMode { AUTO, ON, OFF }
  */
 enum class EyeFoveationMode { AUTO, ON, OFF }
 
+/** The strengths offered for the controllers' vibration in a game, as a percentage of what the game asks for. The first is the game's own. */
+object HapticsStrength {
+    const val NORMAL = 100
+    val CHOICES = listOf(NORMAL, 50, 150, 0)
+
+    /** A stored value that is not one of the choices means no choice was made. */
+    fun normalize(value: Int): Int = if (value in CHOICES) value else NORMAL
+}
+
 /** Whether a game declares that it uses the headset's passthrough: by itself for the games known to need it, always, or never. */
 enum class PassthroughMode { AUTO, ON, OFF }
 
@@ -52,6 +61,8 @@ data class GameSettings(
     val recenter: RecenterMode = RecenterMode.AUTO,
     /** The foveation that follows the eyes: kept where the device can do it (automatic), always, or never. */
     val eyeFoveation: EyeFoveationMode = EyeFoveationMode.AUTO,
+    /** How strongly the controllers vibrate in this game, as a percentage of what the game asks for ([HapticsStrength]); 100 leaves it as it is. */
+    val hapticsPercent: Int = HapticsStrength.NORMAL,
     /** The arguments the player picked to start the game with; null means none was picked and the ones meant for VR are used (see [LaunchOptions.chosen]). */
     val launchArguments: Set<String>? = null,
     /**

@@ -320,6 +320,11 @@
     <string name="gamecompat_mode_auto">Automatic</string>
     <string name="gamecompat_mode_on">On</string>
     <string name="gamecompat_mode_off">Off</string>
+    <string name="gamecompat_haptics">Controller vibration strength</string>
+    <string name="gamecompat_haptics_legend">How strongly the controllers vibrate in this game, compared with what the game asks for. Light halves it, strong raises it by half, off removes the vibration.</string>
+    <string name="gamecompat_haptics_normal">Normal</string>
+    <string name="gamecompat_haptics_light">Light</string>
+    <string name="gamecompat_haptics_strong">Strong</string>
     <string name="report_send">Send the report</string>
     <string name="report_description_label">Describe the problem (optional)</string>
     <string name="report_description_why">A few words help a lot: the report shows how the game ran, not what was seen.</string>

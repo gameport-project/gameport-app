@@ -128,6 +128,8 @@ class CloudProvider : ContentProvider() {
                 // The foveation that follows the eyes: kept where the device can do it (auto), always (on) or never (off).
                 putString("xrEyeFoveation", (settings?.eyeFoveation ?: app.gameport.core.model.EyeFoveationMode.AUTO).name.lowercase())
                 putInt("eyeCm", appId?.let { entryPoint.gameSettings().eyeHeightCm(it) } ?: 0)
+                // How strongly the controllers vibrate in this game, as a percentage of what the game asks for (100 leaves it as it is).
+                putInt("xrHaptics", settings?.hapticsPercent ?: app.gameport.core.model.HapticsStrength.NORMAL)
                 // The player's controller mapping for the game, empty unless they customise it.
                 putString("xrMap", appId?.let { entryPoint.controllerMappings().layerConfig(it) }.orEmpty())
                 // The player chose the Steam Frame's controls for a game that also has its own (off by default).

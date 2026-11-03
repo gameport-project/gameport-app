@@ -36,6 +36,7 @@
 #include <openxr/openxr_platform.h>
 
 #include "controller_allocation.h"
+#include "haptic_scale.h"
 
 #define TAG "GPXR"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -100,6 +101,9 @@ PFN_xrWaitFrame g_waitFrame = nullptr;
 PFN_xrBeginSession g_beginSession = nullptr;
 PFN_xrCreateSwapchain g_createSwapchain = nullptr;
 PFN_xrSuggestInteractionProfileBindings g_suggestBindings = nullptr;
+PFN_xrApplyHapticFeedback g_applyHaptic = nullptr;
+// How strongly the controllers vibrate, as a percentage of what the game asks for (GAMEPORT_XR_HAPTICS, the player's choice): 100 leaves every call as it is.
+std::atomic<int> g_hapticPercent{100};
 PFN_xrDestroySwapchain g_destroySwapchain = nullptr;
 PFN_xrStringToPath g_stringToPath = nullptr;
 PFN_xrCreateAction g_createAction = nullptr;
@@ -119,6 +123,8 @@ PFN_xrGetActionStateBoolean g_getActionBoolean = nullptr;
 PFN_xrGetActionStateFloat g_getActionFloat = nullptr;
 PFN_xrGetInstanceProperties g_getInstanceProperties = nullptr;
 PFN_xrEnumerateViewConfigurationViews g_enumerateViews = nullptr;
+typedef XrResult (XRAPI_PTR *PFN_xrEnumerateSwapchainFormats)(XrSession, uint32_t, uint32_t*, int64_t*);
+PFN_xrEnumerateSwapchainFormats g_enumerateSwapchainFormats = nullptr;
 
 struct Size { uint32_t width, height; };
 std::unordered_map<XrSwapchain, Size> g_swapchainSize;  // what each swapchain really is (guarded by g_mutex)
@@ -126,6 +132,11 @@ std::atomic<int> g_endFrameFailures{0};
 // Once the runtime is seen to refuse the game's layers: 0 = submit as they are, 1 = without the
 // placeholder quads, 2 = without any quad (the projection layers only).
 std::atomic<int> g_dropMode{0};
+// What the compositor is given, counted for the check of the frames (see FrameCheck): frames ended, those without any layer, those the runtime said not to render, and where the head is
+// in the space the game located its views in.
+std::atomic<uint32_t> g_frameCount{0}, g_emptyFrames{0}, g_noRenderFrames{0};
+std::atomic<float> g_headX{0.0f}, g_headY{0.0f}, g_headZ{0.0f};
+std::atomic<int> g_headValid{-1}, g_headFloor{-1};
 
 std::mutex g_mutex;
 std::unordered_map<XrSpace, bool> g_floorBased;  // reference space handle -> uses the floor as origin
@@ -210,7 +221,9 @@ XrResult XRAPI_CALL Layer_xrCreateReferenceSpace(XrSession session, const XrRefe
     if (XR_SUCCEEDED(result) && info && space) {
         std::lock_guard<std::mutex> lock(g_mutex);
         g_floorBased[*space] = IsFloorBased(info->referenceSpaceType);
-        LOGI("reference space type %d created (floor based: %d)", (int)info->referenceSpaceType, (int)IsFloorBased(info->referenceSpaceType));
+        LOGI("reference space type %d created (floor based: %d), pose in it %.2f %.2f %.2f, turned %.2f %.2f %.2f %.2f", (int)info->referenceSpaceType, (int)IsFloorBased(info->referenceSpaceType),
+             info->poseInReferenceSpace.position.x, info->poseInReferenceSpace.position.y, info->poseInReferenceSpace.position.z, info->poseInReferenceSpace.orientation.x,
+             info->poseInReferenceSpace.orientation.y, info->poseInReferenceSpace.orientation.z, info->poseInReferenceSpace.orientation.w);
     }
     return result;
 }
@@ -249,6 +262,14 @@ XrResult XRAPI_CALL Layer_xrLocateViews(XrSession session, const XrViewLocateInf
     if (g_offset.load() != 0.0f && XR_SUCCEEDED(result) && info && views && countOut && FloorBased(info->space)) {
         for (uint32_t i = 0; i < *countOut; i++) AddOffset(views[i].pose, +1.0f);
     }
+    // Only a location in a floor based space is kept: in the view space the eyes are a few centimetres from the origin, whatever the head does.
+    if (XR_SUCCEEDED(result) && info && state && views && countOut && *countOut > 0 && FloorBased(info->space)) {
+        g_headX.store(views[0].pose.position.x);
+        g_headY.store(views[0].pose.position.y);
+        g_headZ.store(views[0].pose.position.z);
+        g_headValid.store((state->viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT) ? 1 : 0);
+        g_headFloor.store(1);
+    }
     return result;
 }
 
@@ -262,6 +283,68 @@ bool FixRect(XrSwapchain swapchain, XrSwapchainSubImage& sub) {
     sub.imageRect.offset = {0, 0};
     sub.imageRect.extent = {(int32_t)it->second.width, (int32_t)it->second.height};
     return true;
+}
+
+// The structures chained to another (depth, color scale and bias...), by number, with their values where they matter: a color scale of zero shows nothing, whatever the game draws.
+std::string ChainTypes(const void* next) {
+    std::string out;
+    int count = 0;
+    for (const XrBaseInStructure* link = reinterpret_cast<const XrBaseInStructure*>(next); link && count < 8; link = link->next, count++) {
+        char detail[160] = "";
+        if (link->type == XR_TYPE_COMPOSITION_LAYER_COLOR_SCALE_BIAS_KHR) {
+            const auto* color = reinterpret_cast<const XrCompositionLayerColorScaleBiasKHR*>(link);
+            snprintf(detail, sizeof(detail), " (color scale %.2f %.2f %.2f %.2f, bias %.2f %.2f %.2f %.2f)", color->colorScale.r, color->colorScale.g, color->colorScale.b, color->colorScale.a,
+                     color->colorBias.r, color->colorBias.g, color->colorBias.b, color->colorBias.a);
+        } else if (link->type == XR_TYPE_COMPOSITION_LAYER_DEPTH_TEST_FB) {
+            const auto* test = reinterpret_cast<const XrCompositionLayerDepthTestFB*>(link);
+            snprintf(detail, sizeof(detail), " (depth test: mask %u, compare %d)", (unsigned)test->depthMask, (int)test->compareOp);
+        } else if (link->type == XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR) {
+            const auto* depth = reinterpret_cast<const XrCompositionLayerDepthInfoKHR*>(link);
+            snprintf(detail, sizeof(detail), " (depth range %.2f to %.2f, near %.2f, far %.2f)", depth->minDepth, depth->maxDepth, depth->nearZ, depth->farZ);
+        }
+        out += " " + std::to_string((int)link->type) + detail;
+    }
+    return out.empty() ? " none" : out;
+}
+
+// What the game gives the compositor, said every two seconds for the first forty seconds of a session and then every half minute: how many frames, how many ended without a layer
+// or were told not to render, the layers of the last one, and where the head is. It tells a black screen from a game that draws nothing apart from one the headset does not show.
+void FrameCheck(const XrFrameEndInfo* info) {
+    using Clock = std::chrono::steady_clock;
+    static const Clock::time_point began = Clock::now();
+    static std::atomic<int64_t> lastSaid{-1000000};
+    g_frameCount.fetch_add(1);
+    if (!info || info->layerCount == 0) g_emptyFrames.fetch_add(1);
+    const int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - began).count();
+    int64_t last = lastSaid.load();
+    if (now - last < (now < 40000 ? 2000 : 30000) || !lastSaid.compare_exchange_strong(last, now)) return;
+    std::string layers;
+    for (uint32_t i = 0; info && info->layers && i < info->layerCount && i < 8; i++) {
+        const XrCompositionLayerBaseHeader* header = info->layers[i];
+        char piece[112];
+        if (!header) {
+            snprintf(piece, sizeof(piece), " null");
+        } else if (header->type == XR_TYPE_COMPOSITION_LAYER_PROJECTION) {
+            const auto* projection = reinterpret_cast<const XrCompositionLayerProjection*>(header);
+            snprintf(piece, sizeof(piece), " projection(%u views, flags 0x%llx, floor space %d)", projection->viewCount, (unsigned long long)header->layerFlags, (int)FloorBased(header->space));
+            LOGI("frame check, projection layer: structures chained to it:%s; frame time %lld ns", ChainTypes(header->next).c_str(), info ? (long long)info->displayTime : -1LL);
+            for (uint32_t viewIndex = 0; projection->views && viewIndex < projection->viewCount && viewIndex < 2; viewIndex++) {
+                const XrCompositionLayerProjectionView& v = projection->views[viewIndex];
+                LOGI("frame check, view %u: at %.2f %.2f %.2f, turned %.2f %.2f %.2f %.2f, field of view %.2f %.2f %.2f %.2f, image %dx%d at %d,%d (array index %u), structures chained to it:%s",
+                     viewIndex, v.pose.position.x, v.pose.position.y, v.pose.position.z, v.pose.orientation.x, v.pose.orientation.y, v.pose.orientation.z, v.pose.orientation.w,
+                     v.fov.angleLeft, v.fov.angleRight, v.fov.angleUp, v.fov.angleDown, v.subImage.imageRect.extent.width, v.subImage.imageRect.extent.height,
+                     v.subImage.imageRect.offset.x, v.subImage.imageRect.offset.y, v.subImage.imageArrayIndex, ChainTypes(v.next).c_str());
+            }
+        } else if (header->type == XR_TYPE_COMPOSITION_LAYER_QUAD) {
+            snprintf(piece, sizeof(piece), " quad(flags 0x%llx)", (unsigned long long)header->layerFlags);
+        } else {
+            snprintf(piece, sizeof(piece), " type %d", (int)header->type);
+        }
+        layers += piece;
+    }
+    LOGI("frame check at %.0f s: %u frames, %u without a layer, %u told not to render; the last has %u layer(s):%s; blend mode %d; head in the floor space at %.2f %.2f %.2f (position %s)",
+         now / 1000.0, g_frameCount.load(), g_emptyFrames.load(), g_noRenderFrames.load(), info ? info->layerCount : 0, layers.c_str(), info ? (int)info->environmentBlendMode : -1,
+         g_headX.load(), g_headY.load(), g_headZ.load(), g_headValid.load() < 0 ? "not located yet" : g_headValid.load() ? "valid" : "not valid");
 }
 
 void LogEndFrameFailure(XrResult result, const XrFrameEndInfo* info) {
@@ -365,6 +448,7 @@ XrResult XRAPI_CALL Layer_xrEndFrame(XrSession session, const XrFrameEndInfo* en
             LOGI("the game's environment blend mode is now %d (1 opaque, 2 additive, 3 alpha blend)", (int)endInfo->environmentBlendMode);
         }
     }
+    FrameCheck(endInfo);
     if (!endInfo || endInfo->layerCount == 0) return g_endFrame(session, endInfo);
     const bool shifting = g_offset.load() != 0.0f;
 
@@ -378,6 +462,21 @@ XrResult XRAPI_CALL Layer_xrEndFrame(XrSession session, const XrFrameEndInfo* en
     projectionViews.reserve(endInfo->layerCount);
     quads.reserve(endInfo->layerCount);
 
+    // Test aid: with "xr_hide_depth_test.txt" present (in the folder above), a depth test chained to the projection layer (telling the compositor how to
+    // test this layer's depth against other system layers) is left out of what the runtime is given, to see whether it has anything to do with the layer
+    // failing to show at all. Only the common case is handled, it being the first structure chained (the only order seen so far); a less usual chain is
+    // left untouched rather than risk breaking it.
+    auto stripDepthTestEnabled = []() {
+        static std::atomic<int> cached{-1};
+        int value = cached.load();
+        if (value < 0) {
+            FILE* marker = fopen((GamePortFolder() + "xr_hide_depth_test.txt").c_str(), "r");
+            value = marker ? 1 : 0;
+            if (marker) fclose(marker);
+            cached.store(value);
+        }
+        return value == 1;
+    };
     for (uint32_t i = 0; i < endInfo->layerCount; i++) {
         const XrCompositionLayerBaseHeader* header = endInfo->layers[i];
         layers[i] = header;
@@ -391,10 +490,17 @@ XrResult XRAPI_CALL Layer_xrEndFrame(XrSession session, const XrFrameEndInfo* en
                 if (FixRect(view.subImage.swapchain, view.subImage)) changed = true;
                 if (shift) { AddOffset(view.pose, -1.0f); changed = true; }
             }
-            if (!changed) continue;
+            const auto* firstLink = reinterpret_cast<const XrBaseInStructure*>(header->next);
+            const bool stripDepth = stripDepthTestEnabled() && firstLink && firstLink->type == XR_TYPE_COMPOSITION_LAYER_DEPTH_TEST_FB;
+            if (!changed && !stripDepth) continue;
             projectionViews.push_back(std::move(views));
             projections.push_back(*source);
             projections.back().views = projectionViews.back().data();
+            if (stripDepth) {
+                static std::atomic<bool> logged{false};
+                if (!logged.exchange(true)) LOGI("the depth test chained to the projection layer is not given to the runtime (test file present)");
+                projections.back().next = firstLink->next;
+            }
             layers[i] = reinterpret_cast<const XrCompositionLayerBaseHeader*>(&projections.back());
         } else if (header->type == XR_TYPE_COMPOSITION_LAYER_QUAD) {
             XrCompositionLayerQuad quad = *reinterpret_cast<const XrCompositionLayerQuad*>(header);
@@ -499,6 +605,7 @@ void Calibrate(XrTime time) {
 XrResult XRAPI_CALL Layer_xrWaitFrame(XrSession session, const XrFrameWaitInfo* info, XrFrameState* state) {
     XrResult result = g_waitFrame(session, info, state);
     if (XR_SUCCEEDED(result) && state) Calibrate(state->predictedDisplayTime);
+    if (XR_SUCCEEDED(result) && state && !state->shouldRender) g_noRenderFrames.fetch_add(1);
     return result;
 }
 
@@ -604,6 +711,42 @@ XrResult XRAPI_CALL Layer_xrEnumerateViewConfigurationViews(XrInstance instance,
     return result;
 }
 
+// Test aid: a game that writes an already gamma-corrected image into a swapchain the runtime made sRGB gets it gamma-corrected a second time by the
+// hardware, which can crush a dim scene to black with no error anywhere (the layer, the runtime and the game all do exactly what they were asked). With
+// "xr_hide_srgb_formats.txt" present (in the folder above, empty or not, only its presence matters) the sRGB formats are not offered, so the game is left
+// to pick a plain one instead.
+XrResult XRAPI_CALL Layer_xrEnumerateSwapchainFormats(XrSession session, uint32_t capacity, uint32_t* countOut, int64_t* formats) {
+    XrResult result = g_enumerateSwapchainFormats(session, capacity, countOut, formats);
+    if (!XR_SUCCEEDED(result) || !countOut) return result;
+    FILE* marker = fopen((GamePortFolder() + "xr_hide_srgb_formats.txt").c_str(), "r");
+    if (!marker) return result;
+    fclose(marker);
+    // Only R8G8B8A8_SRGB, the one the game actually picks on this device: hiding every sRGB format at once made it crash instead of falling back to a
+    // plain one, so the engine needs at least one of them; this leaves it the others (its own order of preference may still land on another sRGB format).
+    auto isSrgb = [](int64_t f) { return f == 43; };
+    // First call (capacity 0): report the count without the hidden ones. Second call: the runtime already wrote the full list into formats; compact it
+    // in place, dropping the hidden ones, and correct the count handed back.
+    if (capacity == 0 || !formats) {
+        uint32_t full = 0;
+        std::vector<int64_t> probe(*countOut);
+        if (*countOut > 0) g_enumerateSwapchainFormats(session, (uint32_t)probe.size(), &full, probe.data());
+        uint32_t kept = 0;
+        for (int64_t f : probe) if (!isSrgb(f)) kept++;
+        *countOut = kept;
+        return result;
+    }
+    uint32_t kept = 0;
+    std::string removed;
+    for (uint32_t i = 0; i < *countOut; i++) {
+        if (isSrgb(formats[i])) { removed += " " + std::to_string(formats[i]); continue; }
+        formats[kept++] = formats[i];
+    }
+    static std::atomic<bool> logged{false};
+    if (!removed.empty() && !logged.exchange(true)) LOGI("swapchain formats: sRGB ones not offered (test file present), the game is left with a plain one instead:%s", removed.c_str());
+    *countOut = kept;
+    return result;
+}
+
 // --- Controller emulation -----------------------------------------------------------------------
 //
 // A game may know no controller profile of the device it runs on: a Steam Frame build knows Valve's, a
@@ -706,6 +849,27 @@ std::string GamePortFolder() {
     fclose(in);
     cmd[n] = 0;
     return std::string("/storage/emulated/0/Android/data/") + cmd + "/files/gameport/";
+}
+
+// Test aid: the extensions named in "xr_hide_extensions.txt" (in the folder above, separated by commas or lines) are not passed on to the runtime, to find which optional extension a
+// game's black screen depends on.
+std::set<std::string> HiddenExtensions() {
+    std::set<std::string> names;
+    FILE* in = fopen((GamePortFolder() + "xr_hide_extensions.txt").c_str(), "r");
+    if (!in) return names;
+    std::string name;
+    int c;
+    while ((c = fgetc(in)) != EOF) {
+        if (c == ',' || c == '\n' || c == '\r' || c == ' ' || c == ';') {
+            if (!name.empty()) names.insert(name);
+            name.clear();
+        } else {
+            name += (char)c;
+        }
+    }
+    if (!name.empty()) names.insert(name);
+    fclose(in);
+    return names;
 }
 
 std::atomic<uint32_t> g_actionPolls{0};
@@ -1133,6 +1297,13 @@ XrResult XRAPI_CALL Layer_xrStringToPath(XrInstance instance, const char* pathSt
 // Only watches: the runtime announces a recentering with an event, and what the game does with it is the game's. The first ones are written in the log.
 XrResult XRAPI_CALL Layer_xrPollEvent(XrInstance instance, XrEventDataBuffer* data) {
     XrResult result = g_pollEvent(instance, data);
+    // Every kind of event the game is sent, the first three times it comes (the ones below say more about themselves).
+    if (result == XR_SUCCESS && data) {
+        static std::mutex seenMutex;
+        static std::unordered_map<int, int> seen;
+        std::lock_guard<std::mutex> lock(seenMutex);
+        if (++seen[(int)data->type] <= 3) LOGI("event of type %d received (time %d)", (int)data->type, seen[(int)data->type]);
+    }
     // The states of the session, in order: what the game was told, and when, tells where a game that quits or never shows an image stopped.
     if (result == XR_SUCCESS && data && data->type == XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED) {
         const auto* change = reinterpret_cast<const XrEventDataSessionStateChanged*>(data);
@@ -1174,6 +1345,16 @@ XrResult XRAPI_CALL Layer_xrGetCurrentInteractionProfile(XrSession session, XrPa
     return result;
 }
 
+// A vibration the game asks for, at the strength the player chose for this game. Only the amplitude of a plain vibration changes; any other kind of haptic goes through as it is.
+XrResult XRAPI_CALL Layer_xrApplyHapticFeedback(XrSession session, const XrHapticActionInfo* actionInfo, const XrHapticBaseHeader* haptic) {
+    if (!g_applyHaptic) return XR_ERROR_FUNCTION_UNSUPPORTED;
+    const int percent = g_hapticPercent.load();
+    if (percent == 100 || !haptic || haptic->type != XR_TYPE_HAPTIC_VIBRATION) return g_applyHaptic(session, actionInfo, haptic);
+    XrHapticVibration scaled = *reinterpret_cast<const XrHapticVibration*>(haptic);
+    scaled.amplitude = gp::ScaleHapticAmplitude(scaled.amplitude, percent);
+    return g_applyHaptic(session, actionInfo, reinterpret_cast<const XrHapticBaseHeader*>(&scaled));
+}
+
 XrResult XRAPI_CALL Layer_xrGetInstanceProcAddr(XrInstance instance, const char* name, PFN_xrVoidFunction* function) {
     // The loader can ask before the instance exists, or after the chain was rebuilt: nothing below us yet.
     if (!g_nextGetInstanceProcAddr) {
@@ -1194,6 +1375,7 @@ XrResult XRAPI_CALL Layer_xrGetInstanceProcAddr(XrInstance instance, const char*
         {"xrCreateSwapchain", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrCreateSwapchain)},
         {"xrDestroySwapchain", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrDestroySwapchain)},
         {"xrEnumerateViewConfigurationViews", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrEnumerateViewConfigurationViews)},
+        {"xrEnumerateSwapchainFormats", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrEnumerateSwapchainFormats)},
         {"xrGetCurrentInteractionProfile", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrGetCurrentInteractionProfile)},
         {"xrAttachSessionActionSets", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrAttachSessionActionSets)},
         {"xrSuggestInteractionProfileBindings", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrSuggestInteractionProfileBindings)},
@@ -1206,6 +1388,7 @@ XrResult XRAPI_CALL Layer_xrGetInstanceProcAddr(XrInstance instance, const char*
         {"xrStringToPath", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrStringToPath)},
         {"xrGetActionStateBoolean", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrGetActionStateBoolean)},
         {"xrGetActionStateFloat", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrGetActionStateFloat)},
+        {"xrApplyHapticFeedback", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrApplyHapticFeedback)},
     };
     if (name) {
         for (const Entry& entry : entries) {
@@ -1351,6 +1534,9 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
     const XrInstanceCreateInfo* toPass = info;
     if (info) {
         const bool dropEye = DropEyeFoveation(info, layerInfo, next);
+        const std::set<std::string> hidden = HiddenExtensions();
+        bool hideAny = false;
+        for (uint32_t i = 0; i < info->enabledExtensionCount; i++) if (hidden.count(info->enabledExtensionNames[i])) hideAny = true;
         const char* family = getenv("GAMEPORT_XR_FAMILY");
         bool hasPicoControllers = false;
         for (uint32_t i = 0; i < info->enabledExtensionCount; i++) if (strcmp(info->enabledExtensionNames[i], kPicoControllers) == 0) hasPicoControllers = true;
@@ -1363,8 +1549,12 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
         for (uint32_t i = 0; i < info->enabledExtensionCount; i++) if (strcmp(info->enabledExtensionNames[i], "XR_FB_swapchain_update_state") == 0) hasUpdateState = true;
         const bool addPassthrough = chosen && chosen[0] == '1' && hasUpdateState && !hasPassthrough && RuntimeOffers(next, kFbPassthrough);
         g_passthroughAdded.store(hasPassthrough || addPassthrough);
-        if (dropEye || addPicoControllers || addPassthrough) {
+        if (dropEye || hideAny || addPicoControllers || addPassthrough) {
             for (uint32_t i = 0; i < info->enabledExtensionCount; i++) {
+                if (hidden.count(info->enabledExtensionNames[i])) {
+                    LOGI("extension %s not passed on (test file)", info->enabledExtensionNames[i]);
+                    continue;
+                }
                 if (dropEye && strcmp(info->enabledExtensionNames[i], kEyeFoveation) == 0) {
                     LOGI("extension %s not passed on", kEyeFoveation);
                     continue;
@@ -1400,6 +1590,7 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
     Load("xrBeginSession", g_beginSession);
     Load("xrCreateSwapchain", g_createSwapchain);
     Load("xrSuggestInteractionProfileBindings", g_suggestBindings);
+    Load("xrApplyHapticFeedback", g_applyHaptic);
     Load("xrDestroySwapchain", g_destroySwapchain);
     Load("xrStringToPath", g_stringToPath);
     Load("xrCreateAction", g_createAction);
@@ -1410,6 +1601,7 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
     Load("xrPathToString", g_pathToString);
     Load("xrGetCurrentInteractionProfile", g_getCurrentProfile);
     Load("xrEnumerateViewConfigurationViews", g_enumerateViews);
+    Load("xrEnumerateSwapchainFormats", g_enumerateSwapchainFormats);
     Load("xrAttachSessionActionSets", g_attachActionSets);
     Load("xrPollEvent", g_pollEvent);
     Load("xrGetReferenceSpaceBoundsRect", g_getBounds);
@@ -1457,6 +1649,8 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
     g_recenterMode = floor && (strcmp(floor, "on") == 0 || strcmp(floor, "1") == 0) ? 1 : (floor && strcmp(floor, "off") == 0 ? 2 : 0);
     if (g_recenterMode.load() != 0) LOGI("recentering of the headset: %s, as the player chose", g_recenterMode.load() == 1 ? "followed" : "left to the game");
     if (g_preferFrame) LOGI("the player asked for the Steam Frame's controls where the game has them");
+    g_hapticPercent = gp::ParseHapticPercent(getenv("GAMEPORT_XR_HAPTICS"));
+    if (g_hapticPercent.load() != 100) LOGI("vibration strength: %d%%, as the player chose", g_hapticPercent.load());
 
     const char* seated = getenv("GAMEPORT_XR_SEATED");
     const char* eye = getenv("GAMEPORT_XR_EYE_CM");

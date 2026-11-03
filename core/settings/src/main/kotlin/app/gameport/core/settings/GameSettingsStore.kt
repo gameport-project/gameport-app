@@ -41,6 +41,7 @@ class GameSettingsStore @Inject constructor(
         heightCm = if (prefs.contains("height_$appId")) prefs.getInt("height_$appId", 0) else null,
         recenter = recenterOf(appId),
         eyeFoveation = eyeFoveationOf(appId),
+        hapticsPercent = app.gameport.core.model.HapticsStrength.normalize(prefs.getInt("haptics_$appId", app.gameport.core.model.HapticsStrength.NORMAL)),
         openInVr = prefs.getBoolean("open_in_vr_$appId", true),
         ovrPluginStandIn = prefs.getBoolean("ovrplugin_stand_in_$appId", true),
         passthrough = passthroughOf(appId),
@@ -88,6 +89,8 @@ class GameSettingsStore @Inject constructor(
             EyeFoveationMode.ON -> editor.putString("eye_foveation_$appId", "on")
             EyeFoveationMode.OFF -> editor.putString("eye_foveation_$appId", "off")
         }
+        // The game's own strength is the absence of a choice.
+        if (settings.hapticsPercent == app.gameport.core.model.HapticsStrength.NORMAL) editor.remove("haptics_$appId") else editor.putInt("haptics_$appId", settings.hapticsPercent)
         // No pick is the absence of a choice, an empty pick is a choice of none.
         settings.launchArguments?.let { editor.putStringSet("launchargs_$appId", it) } ?: editor.remove("launchargs_$appId")
         // Automatic is the absence of a choice: only a no is written.

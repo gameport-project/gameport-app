@@ -7,6 +7,10 @@ trap 'rm -rf "$out"' EXIT
 "${CXX:-c++}" -std=c++17 -Wall -Wextra -o "$out/controller_allocation_test" "$root/xrlayer/test/controller_allocation_test.cpp"
 "$out/controller_allocation_test"
 
+# How the layer scales a controller's vibration (xrlayer/haptic_scale.h).
+"${CXX:-c++}" -std=c++17 -Wall -Wextra -o "$out/haptic_scale_test" "$root/xrlayer/test/haptic_scale_test.cpp"
+"$out/haptic_scale_test"
+
 # The way the layer gives a game's bindings to the runtime, tried against a fake runtime. Needs the OpenXR headers (build_xr_layer.sh fetches them once); skipped without.
 headers="${XDG_CACHE_HOME:-$HOME/.cache}/gameport/openxr-release-1.1.63/include"
 if [[ -d "$headers" ]]; then
