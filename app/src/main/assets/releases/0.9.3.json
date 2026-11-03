@@ -1,0 +1,148 @@
+{
+  "version": "0.9.3",
+  "previous": "0.9.2",
+  "code": 903,
+  "patchNeeded": true,
+  "window": {
+    "items": [
+      {
+        "id": "comfort-option",
+        "icon": "info",
+        "text": {
+          "en": "Comfort option. Seated mode and height have their own category in a game's settings, with a shortcut in its Menu. A game can also be uninstalled from there.",
+          "fr": "Option de confort. Le mode assis et la taille ont leur catégorie dans les réglages d'un jeu, avec un raccourci dans son Menu. Le jeu peut aussi s'y désinstaller."
+        }
+      },
+      {
+        "id": "compat-details",
+        "icon": "info",
+        "text": {
+          "en": "Compatibility details. The label of a game opens what players say, by model and version of GamePort, to know if it works on a given device.",
+          "fr": "Détail de la compatibilité. L'étiquette d'un jeu ouvre ce que disent les joueurs, par modèle et version de GamePort, pour savoir s'il marche sur un appareil donné."
+        }
+      },
+      {
+        "id": "family-copy",
+        "icon": "info",
+        "text": {
+          "en": "Copy of a family member. When several people of the family have a game, the label picks the copy to play with, and the choice stays.",
+          "fr": "Copie d'un membre de la famille. Quand plusieurs personnes de la famille ont un jeu, l'étiquette permet de choisir la copie avec laquelle jouer, et le choix reste."
+        }
+      },
+      {
+        "id": "pico",
+        "icon": "build",
+        "text": {
+          "en": "Pico 4 on Android 10. Games made for a more recent Android can be installed on a Pico 4.",
+          "fr": "Pico 4 sous Android 10. Les jeux conçus pour un Android plus récent peuvent s'installer sur un Pico 4."
+        }
+      },
+      {
+        "id": "online-login",
+        "icon": "build",
+        "text": {
+          "en": "Online sign-in. Deadly Delivery signs in to its online service.",
+          "fr": "Connexion en ligne. Deadly Delivery se connecte à son service en ligne."
+        }
+      },
+      {
+        "id": "vibration",
+        "icon": "build",
+        "text": {
+          "en": "Vibration strength can be set for each game.",
+          "fr": "Force des vibrations réglable pour chaque jeu."
+        }
+      }
+    ]
+  },
+  "notes": [
+    {
+      "id": "section-0",
+      "title": {
+        "en": "New features",
+        "fr": "Nouvelles fonctionnalités"
+      },
+      "items": [
+        {
+          "id": "item-0-0",
+          "text": {
+            "en": "**Comfort option.** Seated mode and height have their own category in a game's settings, with a shortcut in its Menu. A game can also be uninstalled from there.",
+            "fr": "**Option de confort.** Le mode assis et la taille ont leur catégorie dans les réglages d'un jeu, avec un raccourci dans son Menu. Le jeu peut aussi s'y désinstaller."
+          }
+        },
+        {
+          "id": "item-0-1",
+          "text": {
+            "en": "**Compatibility details.** The label of a game opens what players say, by model and version of GamePort, to know if it works on a given device.",
+            "fr": "**Détail de la compatibilité.** L'étiquette d'un jeu ouvre ce que disent les joueurs, par modèle et version de GamePort, pour savoir s'il marche sur un appareil donné."
+          }
+        },
+        {
+          "id": "item-0-2",
+          "text": {
+            "en": "**Copy of a family member.** When several people of the family have a game, the label picks the copy to play with, and the choice stays.",
+            "fr": "**Copie d'un membre de la famille.** Quand plusieurs personnes de la famille ont un jeu, l'étiquette permet de choisir la copie avec laquelle jouer, et le choix reste."
+          }
+        },
+        {
+          "id": "item-0-3",
+          "text": {
+            "en": "**Pico 4 on Android 10.** Games made for a more recent Android can be installed on a Pico 4.",
+            "fr": "**Pico 4 sous Android 10.** Les jeux conçus pour un Android plus récent peuvent s'installer sur un Pico 4."
+          }
+        },
+        {
+          "id": "item-0-4",
+          "text": {
+            "en": "**Online sign-in.** Deadly Delivery signs in to its online service.",
+            "fr": "**Connexion en ligne.** Deadly Delivery se connecte à son service en ligne."
+          }
+        },
+        {
+          "id": "item-0-5",
+          "text": {
+            "en": "**Vibration strength** can be set for each game.",
+            "fr": "**Force des vibrations** réglable pour chaque jeu."
+          }
+        },
+        {
+          "id": "item-0-6",
+          "text": {
+            "en": "**Clearer notifications.** The card sits above the labels, scrolls when long, and an information can be marked as read.",
+            "fr": "**Notifications plus claires.** La carte passe au-dessus des étiquettes, défile quand elle est longue, et une information peut être marquée comme lue."
+          }
+        },
+        {
+          "id": "item-0-7",
+          "text": {
+            "en": "**A store that knows the library.** Games of the Steam library count as owned, and a page says when a game lacks a language.",
+            "fr": "**Un store qui connaît la bibliothèque.** Les jeux de la bibliothèque Steam comptent comme possédés, et une page dit quand une langue manque."
+          }
+        },
+        {
+          "id": "item-0-8",
+          "text": {
+            "en": "**Library progress.** A bar shows how many apps were read out of how many, and resumes where it stopped.",
+            "fr": "**Progression de la bibliothèque.** Une barre montre combien d'applications ont été lues sur combien, et reprend là où elle s'est arrêtée."
+          }
+        }
+      ]
+    },
+    {
+      "id": "section-1",
+      "title": {
+        "en": "Fixes",
+        "fr": "Corrections"
+      },
+      "items": [
+        {
+          "id": "item-1-0",
+          "text": {
+            "en": "The launcher shows the Steam name of a game.",
+            "fr": "Le lanceur affiche le nom Steam d'un jeu."
+          }
+        }
+      ]
+    }
+  ]
+}
