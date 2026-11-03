@@ -24,8 +24,13 @@
     <string name="game_compat_warning_text">Beaucoup de joueurs ont signalé que ce jeu ne fonctionne pas sur %1$s. Il peut quand même être installé.</string>
     <string name="game_compat_warning_install">Installer quand même</string>
     <string name="game_compat_warning_cancel">Annuler</string>
-    <string name="game_owned">Possédé</string>
-    <string name="game_family_shared">Partagé par la famille</string>
+    <string name="game_owned">Ma copie</string>
+    <string name="game_family_use_mine">Jouer avec ma copie</string>
+    <string name="game_family_use_of">Jouer avec la copie de %1$s</string>
+    <string name="game_family_repatch">La copie choisie change ce qui est dit au jeu. Un nouveau patch l\'applique.</string>
+    <string name="game_family_member">Jouer avec la copie d\'un membre de la famille</string>
+    <string name="game_family_shared_by">Copie de %1$s</string>
+    <string name="game_family_shared">Partage familial</string>
     <string name="game_kind_flat">Plat</string>
     <string name="extra_title">Contenu supplémentaire</string>
     <string name="extra_legend">Le contenu supplémentaire de ce jeu que le compte possède. Il s\'ajoute aux fichiers du jeu, et ce qui a été ajouté d\'ici peut être retiré.</string>

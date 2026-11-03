@@ -54,6 +54,23 @@ class GameSettingsStore @Inject constructor(
     /** The layer found, the last time the game ran, that the headset has no play area and gave the game a space that follows the recentering. */
     fun stageFallback(appId: Int): Flow<Boolean> = changes.map { prefs.getBoolean("stagefallback_$appId", false) }
 
+    /** The account of the family whose copy of the game is used, picked by the player; null while none was picked (the signed-in account's own copy is used when there is one). */
+    fun ownerChoice(appId: Int): Long? = if (prefs.contains("owner_$appId")) prefs.getLong("owner_$appId", 0L) else null
+
+    fun observeOwnerChoice(appId: Int): Flow<Long?> = changes.map { ownerChoice(appId) }
+
+    /** Whether the game was last patched as used through the family; null when it never was. What decides it is the copy picked (see [ownerChoice]). */
+    fun familyPatched(appId: Int): Boolean? = if (prefs.contains("family_patched_$appId")) prefs.getBoolean("family_patched_$appId", false) else null
+
+    fun setFamilyPatched(appId: Int, shared: Boolean) {
+        prefs.edit().putBoolean("family_patched_$appId", shared).apply()
+    }
+
+    fun setOwnerChoice(appId: Int, accountId: Long) {
+        prefs.edit().putLong("owner_$appId", accountId).apply()
+        changes.value += 1
+    }
+
     fun setStageFallback(appId: Int, fallback: Boolean) {
         if (prefs.getBoolean("stagefallback_$appId", false) == fallback) return
         // A new situation (the layer adapted the game again, or no longer does) is news again: what the player had seen is forgotten.

@@ -315,7 +315,7 @@ class GameInstallRepository @Inject constructor(
                         // Written under another name and renamed when complete, so an interrupted
                         // patch is never mistaken for a finished one.
                         val partial = File(patched.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || installed.all()[game.appId]?.let(::deviceHasExpansion) == true, vrGameActivity = gameSettings.get(game.appId).openInVr, ovrPluginStandIn = gameSettings.get(game.appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(game.appId).passthrough, game.appId, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlcOf(game), missingDlc = missingDlcOf(game), familyShared = game.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = downloadHasExpansion(directory), deviceFamily = packages.vrFamily, deviceSdk = packages.deviceSdk, owner = context.packageName))
+                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || installed.all()[game.appId]?.let(::deviceHasExpansion) == true, vrGameActivity = gameSettings.get(game.appId).openInVr, ovrPluginStandIn = gameSettings.get(game.appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(game.appId).passthrough, game.appId, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlcOf(game), missingDlc = missingDlcOf(game), familyShared = familySharedOf(game), hasExpansionFiles = downloadHasExpansion(directory), deviceFamily = packages.vrFamily, deviceSdk = packages.deviceSdk, owner = context.packageName))
                         check(partial.renameTo(patched)) { "Could not finish the patched APK." }
                         // Keep only one copy of a multi-gigabyte game on disk.
                         original.delete()
@@ -737,7 +737,7 @@ class GameInstallRepository @Inject constructor(
                         val result = File(patchedDirectory(directory), original.name)
                         result.parentFile?.mkdirs()
                         val partial = File(result.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || deviceHasExpansion(packageName) || atOriginalCode(packageName), vrGameActivity = gameSettings.get(appId).openInVr, ovrPluginStandIn = gameSettings.get(appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(appId).passthrough, appId, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = game?.let(::ownedDlcOf), missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED, hasExpansionFiles = deviceHasExpansion(packageName), deviceFamily = packages.vrFamily, deviceSdk = packages.deviceSdk, owner = context.packageName), patches)
+                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || deviceHasExpansion(packageName) || atOriginalCode(packageName), vrGameActivity = gameSettings.get(appId).openInVr, ovrPluginStandIn = gameSettings.get(appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(appId).passthrough, appId, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = game?.let(::ownedDlcOf), missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.let(::familySharedOf) == true, hasExpansionFiles = deviceHasExpansion(packageName), deviceFamily = packages.vrFamily, deviceSdk = packages.deviceSdk, owner = context.packageName), patches)
                         check(partial.renameTo(result)) { "Could not finish the patched APK." }
                         result
                     }
@@ -965,6 +965,23 @@ class GameInstallRepository @Inject constructor(
         File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName").list()?.isNotEmpty() == true
 
     /** The DLC of [game] the account has, or null when the library does not tell what DLC the game has. */
+    /** The game is used through the family when the copy picked for it (or the only one there is) is not the signed-in account's own. */
+    private fun familySharedNow(game: app.gameport.core.model.Game): Boolean {
+        val used = app.gameport.core.model.FamilyChoice.resolve(game.owners, library.accountId(), gameSettings.ownerChoice(game.appId))
+            ?: return game.ownership == app.gameport.core.model.Ownership.FAMILY_SHARED
+        return used != library.accountId()
+    }
+
+    /** What the patch is told about the family, kept so a later change of copy is known to need a new patch. */
+    private fun familySharedOf(game: app.gameport.core.model.Game): Boolean = familySharedNow(game).also { gameSettings.setFamilyPatched(game.appId, it) }
+
+    /** The copy picked now is not the kind the installed game was patched for (the shim was told another thing about the family). */
+    fun familyNeedsRepatch(game: app.gameport.core.model.Game): Boolean {
+        if (installed.all()[game.appId] == null || !app.gameport.core.model.FamilyChoice.hasChoice(game.owners)) return false
+        val patched = gameSettings.familyPatched(game.appId) ?: return false
+        return patched != familySharedNow(game)
+    }
+
     private fun ownedDlcOf(game: Game): List<Int>? = game.androidBuild?.dlc?.filter { it.owned }?.map { it.appId }
 
     /**

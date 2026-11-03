@@ -22,4 +22,10 @@ interface SteamLibraryRepository {
      * a scan follows whatever Steam says; otherwise it is the ordinary check, which waits a minute at least from the last one.
      */
     fun refreshLibrary(manual: Boolean = true) {}
+
+    /** The account id of the signed-in user, 0 when nobody is signed in. */
+    fun accountId(): Long = 0L
+
+    /** The names of the family accounts that have [owners], by account id: asked of Steam, so they come a moment after the page opens. */
+    fun observeOwnerNames(owners: List<Long>): Flow<Map<Long, String>> = kotlinx.coroutines.flow.flowOf(emptyMap())
 }

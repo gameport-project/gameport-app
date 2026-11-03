@@ -5,6 +5,19 @@ enum class Ownership {
     FAMILY_SHARED,
 }
 
+/** Whose copy of a game is used when several people of the family have it. */
+object FamilyChoice {
+    /** The account whose copy is used: the one picked while it still has the game, else the signed-in account's own, else the first one of the family. Null when nobody is known. */
+    fun resolve(owners: List<Long>, me: Long, picked: Long?): Long? = when {
+        picked != null && picked in owners -> picked
+        me in owners -> me
+        else -> owners.firstOrNull()
+    }
+
+    /** Only a game several accounts have can be chosen between. */
+    fun hasChoice(owners: List<Long>): Boolean = owners.distinct().size > 1
+}
+
 /** One Steam depot of the Android build, with the space it takes. */
 data class AndroidDepot(
     val id: Int,
@@ -98,6 +111,8 @@ data class Game(
     val parentAppId: Int? = null,
     /** Steam files the game as adult content: nudity, sexual content or an age of 18 or more. Hidden from anyone who is not an adult (see [AgePolicy]). */
     val isAdult: Boolean = false,
+    /** The accounts of the family that have this game, the signed-in one included when it does. Empty when Steam did not tell (offline). */
+    val owners: List<Long> = emptyList(),
 ) {
     /** Portrait capsule, used in grids. */
     val capsuleUrl: String get() = artwork.capsule?.let { SteamImages.asset(appId, it) } ?: SteamImages.asset(appId, "library_600x900.jpg")

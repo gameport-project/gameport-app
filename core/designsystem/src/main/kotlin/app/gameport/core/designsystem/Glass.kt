@@ -47,6 +47,8 @@ fun GlassChip(
     accent: Color? = null,
     /** An icon before the label. */
     leading: (@Composable () -> Unit)? = null,
+    /** An icon after the label, such as the arrow of a chip that opens a list. */
+    trailing: (@Composable () -> Unit)? = null,
     /** Room above and below the label; less makes a chip that fits in a line of text. */
     verticalPadding: androidx.compose.ui.unit.Dp = 6.dp,
     /** The size of the label; a smaller style makes a smaller chip. */
@@ -91,6 +93,7 @@ fun GlassChip(
                     lift = Math.round(middleOfCapitals - middleOfLine)
                 },
             )
+            if (trailing != null) trailing()
         }
     }
 }

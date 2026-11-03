@@ -248,6 +248,21 @@ class SteamSession(private val cellId: Int = 0, private val onAccountRegion: (cu
 
     private val _licenses = MutableStateFlow<List<License>?>(null)
 
+    private val _personaNames = MutableStateFlow<Map<Long, String>>(emptyMap())
+
+    /** The names Steam gave to accounts of the family, by account id, as they are asked for with [requestPersonaNames]. */
+    val personaNames: StateFlow<Map<Long, String>> = _personaNames.asStateFlow()
+
+    /** Asks Steam the names of these accounts (account ids); they arrive in [personaNames]. */
+    fun requestPersonaNames(accountIds: Collection<Long>) {
+        val missing = accountIds.filter { it !in _personaNames.value }
+        if (missing.isEmpty()) return
+        val friends = client.getHandler(`in`.dragonbra.javasteam.steam.handlers.steamfriends.SteamFriends::class.java) ?: return
+        runCatching {
+            friends.requestFriendInfo(missing.map { SteamID(it, `in`.dragonbra.javasteam.enums.EUniverse.Public, `in`.dragonbra.javasteam.enums.EAccountType.Individual) })
+        }
+    }
+
     /** Licenses of the signed-in account (own and family-shared); null until Steam sent them. */
     val licenses: StateFlow<List<License>?> = _licenses.asStateFlow()
 
@@ -315,6 +330,12 @@ class SteamSession(private val cellId: Int = 0, private val onAccountRegion: (cu
         // The wallet tells what the account is billed in, which decides the prices shown.
         callbacks.subscribe(WalletInfoCallback::class.java) { if (it.isHasWallet) onAccountRegion(it.currency?.name, null) }
         callbacks.subscribe(LicenseListCallback::class.java) { _licenses.value = it.licenseList }
+        callbacks.subscribe(`in`.dragonbra.javasteam.steam.handlers.steamfriends.callback.PersonaStateCallback::class.java) {
+            val name: String? = it.playerName
+            if (!name.isNullOrBlank() && it.friendId.accountType == `in`.dragonbra.javasteam.enums.EAccountType.Individual) {
+                _personaNames.value = _personaNames.value + (it.friendId.accountID to name)
+            }
+        }
         callbacks.subscribe(AccountInfoCallback::class.java) { accountName?.complete(it.personaName) }
         scope.launch {
             while (isActive) {

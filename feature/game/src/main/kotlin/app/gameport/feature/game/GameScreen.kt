@@ -57,6 +57,8 @@ import androidx.compose.material.icons.filled.EventSeat
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import app.gameport.core.designsystem.BackdropMenu
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Delete
@@ -239,6 +241,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onOpenControllers = onOpenControllers,
         onOpenCompat = onOpenCompat,
         onOpenComfort = onOpenComfort,
+        onFamilyChosen = viewModel::onFamilyChosen,
         onActivateFrame = viewModel::onActivateFrame,
         onRepair = viewModel::onRepair,
         onReinstallWorks = viewModel::onReinstallWorks,
@@ -288,6 +291,7 @@ internal fun GameContent(
     onOpenControllers: () -> Unit,
     onOpenCompat: () -> Unit,
     onOpenComfort: () -> Unit,
+    onFamilyChosen: (Long) -> Unit = {},
     onActivateFrame: () -> Unit,
     onRepair: () -> Unit = {},
     onReinstallWorks: () -> Unit = {},
@@ -358,6 +362,8 @@ internal fun GameContent(
                     controllerFrame = uiState.controllerFrame,
                     controllerAutomatic = uiState.controllerAutomatic,
                     compatNotice = uiState.compatNotice,
+                    family = uiState.family,
+                    onFamilyChosen = onFamilyChosen,
                     savesNotSynced = uiState.savesNotSynced,
                     compat = uiState.compat,
                     incompatible = uiState.incompatible,
@@ -445,6 +451,8 @@ private fun GameDetails(
     onOpenControllers: () -> Unit,
     onOpenCompat: () -> Unit,
     onOpenComfort: () -> Unit,
+    family: FamilyView?,
+    onFamilyChosen: (Long) -> Unit,
     onActivateFrame: () -> Unit,
     onRepair: () -> Unit,
     onReinstallWorks: () -> Unit = {},
@@ -671,6 +679,7 @@ private fun GameDetails(
             val notes = if (install !is InstallState.Installed) emptyList() else
                 listOfNotNull(
                     if (updateNote) NoteItem(stringResource(R.string.issue_update_available), NoteColors.Green, NoteColors.GreenText, onUpdate, stringResource(R.string.issue_update_action)) else null,
+                    if (family?.needsRepatch == true && repatch == Repatch.None) NoteItem(stringResource(R.string.game_family_repatch), NoteColors.Orange, NoteColors.OrangeText, onRepatch, stringResource(R.string.issue_patch_outdated_action)) else null,
                     if (patchNote) NoteItem(stringResource(R.string.issue_patch_outdated), NoteColors.Orange, NoteColors.OrangeText, onRepatch, stringResource(R.string.issue_patch_outdated_action)) else null,
                 ) + issueNotes(
                     issues = issues,
@@ -805,9 +814,46 @@ private fun GameDetails(
                     game.androidBuild?.isVr?.takeIf { vrDevice }?.let { vr ->
                         GlassChip(stringResource(if (vr) R.string.game_kind_vr else R.string.game_kind_flat))
                     }
-                    GlassChip(
-                        stringResource(if (game.ownership == Ownership.OWNED) R.string.game_owned else R.string.game_family_shared),
-                    )
+                    val ownedLabel = stringResource(if (game.ownership == Ownership.OWNED) R.string.game_owned else R.string.game_family_shared)
+                    if (family == null) {
+                        GlassChip(ownedLabel)
+                    } else {
+                        // Several people of the family have the game: the label opens the list of them, and the one picked stays picked.
+                        var picking by remember { mutableStateOf(false) }
+                        Box {
+                            GlassChip(
+                                family.used.let { used ->
+                                    when {
+                                        used?.isMe == true -> stringResource(R.string.game_owned)
+                                        used?.name != null -> stringResource(R.string.game_family_shared_by, used.name)
+                                        else -> stringResource(R.string.game_family_shared)
+                                    }
+                                },
+                                onClick = { picking = true },
+                                trailing = { Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            )
+                            BackdropMenu(expanded = picking, onDismissRequest = { picking = false }) {
+                                family.members.forEach { member ->
+                                    val on = member.accountId == family.usedId
+                                    Row(
+                                        Modifier.fillMaxWidth().clickable { picking = false; onFamilyChosen(member.accountId) }.padding(horizontal = 16.dp, vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Icon(Icons.Filled.Check, contentDescription = null, tint = if (on) KindBlue else Color.Transparent, modifier = Modifier.size(18.dp))
+                                        Text(
+                                            when {
+                                                member.isMe -> stringResource(R.string.game_family_use_mine)
+                                                member.name != null -> stringResource(R.string.game_family_use_of, member.name)
+                                                else -> stringResource(R.string.game_family_member)
+                                            },
+                                            color = if (on) KindBlue else MaterialTheme.colorScheme.onSurface,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                     when (game.kind) {
                         AppKind.DEMO -> GlassChip(stringResource(R.string.game_kind_demo), accent = KindBlue)
                         AppKind.BETA -> GlassChip(stringResource(R.string.game_kind_beta), accent = KindBlue)

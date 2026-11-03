@@ -24,8 +24,13 @@
     <string name="game_compat_warning_text">Many players reported that this game does not work on %1$s. It can still be installed.</string>
     <string name="game_compat_warning_install">Install anyway</string>
     <string name="game_compat_warning_cancel">Cancel</string>
-    <string name="game_owned">Owned</string>
-    <string name="game_family_shared">Shared by family</string>
+    <string name="game_owned">Own copy</string>
+    <string name="game_family_use_mine">Play with own copy</string>
+    <string name="game_family_use_of">Play with the copy of %1$s</string>
+    <string name="game_family_repatch">The copy picked changes what the game is told. A new patch applies it.</string>
+    <string name="game_family_member">Play with the copy of a family member</string>
+    <string name="game_family_shared_by">Copy of %1$s</string>
+    <string name="game_family_shared">Family sharing</string>
     <string name="game_kind_vr">VR</string>
     <string name="game_kind_flat">Flat</string>
     <string name="game_dlc_title">Add extra content?</string>

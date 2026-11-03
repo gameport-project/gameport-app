@@ -2,6 +2,9 @@ package app.gameport.feature.game
 
 import app.gameport.core.model.reportable
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -66,7 +69,17 @@ sealed interface GameUiState {
         val deviceName: String? = null,
         /** The version of GamePort, for the details behind the label. */
         val appVersion: String = "",
+        /** Whose copy of the game is used, when several people of the family have it; null when there is nothing to choose. */
+        val family: FamilyView? = null,
     ) : GameUiState
+}
+
+/** One person of the family who has the game: [name] is null until Steam has told it. */
+data class FamilyMember(val accountId: Long, val name: String?, val isMe: Boolean)
+
+/** The people of the family who have a game, and the one whose copy is used. */
+data class FamilyView(val members: List<FamilyMember>, val usedId: Long, val needsRepatch: Boolean = false) {
+    val used: FamilyMember? get() = members.firstOrNull { it.accountId == usedId }
 }
 
 /** Where a re-patch or an update of an installed game stands. */
@@ -190,13 +203,36 @@ class GameViewModel @Inject constructor(
         viewModelScope.launch { compat.reports(appId)?.let { _compatReports.value = it } }
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val family: Flow<FamilyView?> = repository.observeGame(appId)
+        .map { it?.owners.orEmpty().distinct() }
+        .distinctUntilChanged()
+        .flatMapLatest { owners ->
+            if (!app.gameport.core.model.FamilyChoice.hasChoice(owners)) {
+                flowOf(null)
+            } else {
+                // The package changes when the game is patched again: the need to do it is read again then.
+                combine(gameSettingsStore.observeOwnerChoice(appId), repository.observeOwnerNames(owners), installer.observePatchOutdated(appId)) { picked, names, _ ->
+                    val me = repository.accountId().takeIf { it != 0L } ?: return@combine null
+                    val used = app.gameport.core.model.FamilyChoice.resolve(owners, me, picked) ?: return@combine null
+                    val game = repository.observeGame(appId).first()
+                    FamilyView(owners.map { FamilyMember(it, names[it], it == me) }.sortedByDescending { it.isMe }, used, needsRepatch = game != null && installer.familyNeedsRepatch(game))
+                }
+            }
+        }
+
+    /** The player picks whose copy of the game is used; it stays picked. */
+    fun onFamilyChosen(accountId: Long) = gameSettingsStore.setOwnerChoice(appId, accountId)
+
     val uiState: StateFlow<GameUiState> = combine(
         baseState,
         combine(playtimeStore.observe(appId), steamMinutes, savesNotSynced) { deviceMillis, steam, notSynced -> Triple(deviceMillis, steam, notSynced) },
         opinion,
-    ) { state, (deviceMillis, steam, notSynced), opinion ->
+        family,
+    ) { state, (deviceMillis, steam, notSynced), opinion, family ->
         if (state is GameUiState.Content) {
             state.copy(
+                family = family,
                 playtime = app.gameport.core.model.Playtime(deviceMillis, steam),
                 savesNotSynced = notSynced,
                 compat = opinion.compat,

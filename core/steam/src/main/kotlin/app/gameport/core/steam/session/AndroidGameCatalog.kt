@@ -71,6 +71,7 @@ internal fun SteamSession.androidGames(
     val knownRules: Map<Int, List<CachedSaveRule>> = if (cached == null) cacheStore.loadPrevious(me)?.games?.associate { it.appId to it.saveRules }.orEmpty() else emptyMap()
     val rulesChanged = HashSet<Int>(cached?.rulesChanged.orEmpty())
 
+    val ownersOfPackage = licenses.groupBy({ it.packageID }, { it.ownerAccountID.toLong() })
     val ownedPackages = licenses.filter { it.ownerAccountID.toLong() == me }.map { it.packageID }.toSet()
     val packageIds = licenses.map { it.packageID }.toSet()
     val lock = Mutex()
@@ -79,12 +80,14 @@ internal fun SteamSession.androidGames(
     fun snapshot(scanning: Boolean, scan: ScanProgress? = null): Library {
         val owned = HashSet<Int>()
         val visible = HashSet<Int>()
+        val owners = HashMap<Int, MutableSet<Long>>()
         for (pkg in packageIds) {
             val apps = packageApps[pkg] ?: continue
             visible += apps
             if (pkg in ownedPackages) owned += apps
+            ownersOfPackage[pkg]?.let { who -> apps.forEach { owners.getOrPut(it) { linkedSetOf() } += who } }
         }
-        return libraryOf(games.values.filter { it.appId in visible }, owned, visible, dlcNames, scanning, dlcApps.values, scan)
+        return libraryOf(games.values.filter { it.appId in visible }, owned, visible, dlcNames, scanning, dlcApps.values, scan, owners)
     }
 
     fun persist() = cacheStore.save(
@@ -178,6 +181,7 @@ internal fun libraryOf(
     scanning: Boolean,
     dlcApps: Collection<CachedDlcApp> = emptyList(),
     scan: ScanProgress? = null,
+    owners: Map<Int, Set<Long>> = emptyMap(),
 ): Library {
     val list = shown.map { game ->
         val depots = game.depots.map { AndroidDepot(it.id, it.dlcAppId, it.installBytes, it.downloadBytes, it.manifestId) }
@@ -193,6 +197,7 @@ internal fun libraryOf(
             artwork = Artwork(game.capsule, game.hero, game.header),
             parentAppId = game.parent,
             isAdult = game.adult,
+            owners = owners[game.appId]?.toList().orEmpty(),
             androidBuild = AndroidBuild(
                 packageName = null,
                 isVr = game.isVr,

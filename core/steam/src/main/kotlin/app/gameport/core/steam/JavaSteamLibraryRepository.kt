@@ -29,6 +29,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.emptyFlow
@@ -71,6 +72,17 @@ class JavaSteamLibraryRepository @Inject constructor(
     private val visible: Flow<Library> = combine(library, age.canSeeAdult) { lib, canSeeAdult -> lib.visibleTo(canSeeAdult) }
 
     override fun observeLibrary(): Flow<Library> = visible
+
+    override fun accountId(): Long = sessions.current.value?.accountId ?: 0L
+
+    override fun observeOwnerNames(owners: List<Long>): Flow<Map<Long, String>> = sessions.current.flatMapLatest { session ->
+        if (session == null) {
+            flowOf(emptyMap())
+        } else {
+            session.requestPersonaNames(owners)
+            session.personaNames
+        }
+    }
 
     override fun observeGame(appId: Int): Flow<Game?> = visible.map { lib -> lib.games.firstOrNull { it.appId == appId } }
 
