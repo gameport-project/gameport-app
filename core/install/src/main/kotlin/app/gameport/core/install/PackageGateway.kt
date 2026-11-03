@@ -36,6 +36,9 @@ class PackageGateway @Inject constructor(
     /** The headset family of this device (`meta`, `pico`, `openxr`), null when it is not a headset. */
     val vrFamily: String? get() = device.vrPlatform?.id
 
+    /** The Android version of this device: a game that asks for a newer one is not installable here as it is ([app.gameport.core.patch.patches.MinSdkPatch]). */
+    val deviceSdk: Int get() = android.os.Build.VERSION.SDK_INT
+
     fun packageNameOf(apk: File): String? = runCatching {
         packageManager.getPackageArchiveInfo(apk.absolutePath, 0)?.packageName
     }.getOrNull()

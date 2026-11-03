@@ -45,6 +45,8 @@ data class PatchContext(
     val hasExpansionFiles: Boolean = false,
     /** The headset family of this device (`meta`, `pico`, `openxr`), null when unknown or not a headset ([app.gameport.core.patch.patches.MetaLoaderStubPatch]). */
     val deviceFamily: String? = null,
+    /** The Android version of this device (`Build.VERSION.SDK_INT`), null when unknown ([app.gameport.core.patch.patches.MinSdkPatch]). */
+    val deviceSdk: Int? = null,
     /** The GamePort that patches the game, by its package name: the game's hook talks to that one and to no other. */
     val owner: String = DEFAULT_OWNER,
 ) {
