@@ -20,6 +20,7 @@
     <string name="report_intro">Sorry it did not work. A small technical report goes with the answer: versions, files and logs of the game, never a name, an e-mail address or an account.</string>
     <string name="report_intro_offline">Thanks for the answer. A small technical report goes with it: versions, files and logs of the game, never a name, an e-mail address or an account.</string>
     <string name="report_status_working">Preparing the report…</string>
+    <string name="report_status_ready">The report is ready and goes with the answer.</string>
     <string name="report_status_sent">Report sent, thanks.</string>
     <string name="report_status_waiting">The report will be sent as soon as this device is online.</string>
     <string name="report_status_off">Automatic sending is off in Settings, so the report was not sent.</string>

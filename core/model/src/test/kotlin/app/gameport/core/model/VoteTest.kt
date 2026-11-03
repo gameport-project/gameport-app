@@ -368,4 +368,18 @@ class VoteTest {
         assertEquals(Verdict.FAILS.wire, book.games[7]?.verdict)
         assertEquals(emptyList<Answer>(), book.unsent())
     }
+
+    @Test
+    fun `an answer held for its report goes once, with what was ticked and what became of the report`() {
+        var book = VerdictBook().answered(7, Verdict.FAILS, "0.9.2", "2026-11-03", send = true, holdForReport = true)
+        // Nothing goes while the player says what went wrong: neither the answer, nor the answer again with what was ticked.
+        assertTrue(book.unsent().isEmpty())
+        book = book.withIssues(7, setOf(Symptom.NO_SOUND), send = true)
+        assertTrue(book.unsent().isEmpty())
+        // Once the report has gone, the answer leaves, one time, carrying both.
+        book = book.reportStated(7, ReportStates.SENT, send = true)
+        val answer = book.unsent().single()
+        assertEquals(listOf("no_sound"), answer.issues)
+        assertEquals(ReportStates.SENT, answer.report)
+    }
 }

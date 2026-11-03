@@ -65,7 +65,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.LocalDate
 import javax.inject.Inject
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -75,7 +74,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 /** The game the player is asked about, and whether the answer will be sent to the project. */
 data class VerdictQuestion(val appId: Int, val name: String, val shared: Boolean, val cover: app.gameport.core.model.Art)
@@ -84,7 +82,19 @@ data class VerdictQuestion(val appId: Int, val name: String, val shared: Boolean
  * The window that follows the answer "it did not work": what became of the technical report, and the two ways to take it. [status] is null while the
  * report is being made. [busy] is true while the player's own request is being dealt with.
  */
-data class ReportFollowUp(val appId: Int, val status: ReportStatus?, val busy: Boolean = false, val savedName: String? = null, val saveFailed: Boolean = false, val offlineOnly: Boolean = false, val describedAndSent: Boolean = false)
+data class ReportFollowUp(
+    val appId: Int,
+    val status: ReportStatus?,
+    val busy: Boolean = false,
+    val savedName: String? = null,
+    val saveFailed: Boolean = false,
+    val offlineOnly: Boolean = false,
+    val describedAndSent: Boolean = false,
+    /** The report is made and kept on the device, not sent yet: it goes with the answer when the player is done. */
+    val ready: Boolean = false,
+    /** The report and the answer have gone (or are kept for the next start): closing the window sends nothing more. */
+    val delivered: Boolean = false,
+)
 
 /**
  * Asks, once a game has closed, whether it worked. The game waits in [GameVerdicts] (see `VerdictAsker`) until GamePort is on screen and the
@@ -110,32 +120,29 @@ class VerdictAskViewModel @Inject constructor(
     private val _followUp = MutableStateFlow<ReportFollowUp?>(null)
     val followUp: StateFlow<ReportFollowUp?> = _followUp.asStateFlow()
 
-    private companion object {
-        /** How long the answer waits for its report to go before it leaves on its own, saying the report is still waiting. */
-        const val REPORT_WAIT_MS = 15_000L
-    }
-
     fun onAnswer(verdict: Verdict) {
         val asked = question.value ?: return
         // A game that did not work, or whose online part does not, leaves something to look at in the report: the report goes first, and the answer waits to say what became of it.
         val withReport = verdict == Verdict.FAILS || verdict == Verdict.OFFLINE_ONLY
         verdicts.answer(asked.appId, verdict, version, today, holdForReport = withReport)
-        if (withReport) startReport(asked.appId, offlineOnly = verdict == Verdict.OFFLINE_ONLY)
+        if (withReport) prepareReport(asked.appId, offlineOnly = verdict == Verdict.OFFLINE_ONLY)
     }
 
     /**
-     * "It did not work", or "works offline only": the report is made from the run that just ended and goes by itself when sending is on and the device has a network. The answer
-     * is held until the report has gone (or [REPORT_WAIT_MS] has passed, so a slow connection never keeps the answer back), then goes saying what became of the report. A report that is
-     * still on its way when the answer leaves is told as waiting, and the answer goes again with the end of it.
+     * "It did not work", or "works offline only": the report is made from the run that just ended and kept on the device. Nothing goes yet: the answer is held, and the player says what
+     * went wrong in the window that opens. The answer and the report leave together, once, when the player sends the report or closes the window ([onSendReport], [onCloseReport]),
+     * with what was ticked and written. When no report can be made, the answer is let go at once, saying so.
      */
-    private fun startReport(appId: Int, offlineOnly: Boolean) {
+    private fun prepareReport(appId: Int, offlineOnly: Boolean) {
         _followUp.value = ReportFollowUp(appId, status = null, offlineOnly = offlineOnly)
-        val sending = viewModelScope.async { gameOf(appId)?.let { reports.sendAfterFailure(it) } ?: ReportStatus.UNAVAILABLE }
         viewModelScope.launch {
-            val early = withTimeoutOrNull(REPORT_WAIT_MS) { sending.await() }
-            verdicts.reportStated(appId, (early ?: ReportStatus.WAITING).state())
-            val status = early ?: sending.await().also { verdicts.reportStated(appId, it.state()) }
-            _followUp.update { it?.copy(status = status) }
+            val kept = gameOf(appId)?.let { reports.prepareAfterFailure(it) } ?: false
+            if (kept) {
+                _followUp.update { it?.copy(ready = true) }
+            } else {
+                verdicts.reportStated(appId, ReportStatus.UNAVAILABLE.state())
+                _followUp.update { it?.copy(status = ReportStatus.UNAVAILABLE, delivered = true) }
+            }
         }
     }
 
@@ -154,9 +161,9 @@ class VerdictAskViewModel @Inject constructor(
         viewModelScope.launch {
             val status = if (!detailed) reports.sendNow(current.appId)
             else gameOf(current.appId)?.let { reports.sendByHand(it, description = description, symptoms = symptoms) } ?: ReportStatus.UNAVAILABLE
-            // The answer says what became of the report; it goes again when that changed.
+            // The answer, held until now, leaves with what became of the report: one answer, once.
             verdicts.reportStated(current.appId, status.state())
-            _followUp.update { it?.copy(status = status, busy = false, describedAndSent = it.describedAndSent || (detailed && (status == ReportStatus.SENT || status == ReportStatus.WAITING))) }
+            _followUp.update { it?.copy(status = status, busy = false, delivered = true, describedAndSent = it.describedAndSent || (detailed && (status == ReportStatus.SENT || status == ReportStatus.WAITING))) }
         }
     }
 
@@ -170,13 +177,24 @@ class VerdictAskViewModel @Inject constructor(
         }
     }
 
-    /** Closing with a description that has not gone yet sends it, when the player lets reports go by themselves: they wrote it to be read. */
+    /**
+     * Closing the window is how the player is done: when the report and the answer have not gone yet, they go now, once, with what was ticked and written (the report is made again
+     * with it). When the player lets nothing go (sending is off in Settings), the report stays on the device and the answer is let go without it.
+     */
     fun onCloseReport(description: String, symptoms: Set<Symptom>) {
         val current = _followUp.value
         _followUp.value = null
-        if (current != null) verdicts.setIssues(current.appId, symptoms)
-        if (current != null && !current.describedAndSent && (ReportDescription.of(description) != null || symptoms.isNotEmpty()) && verdicts.share.value) {
-            viewModelScope.launch { gameOf(current.appId)?.let { reports.sendByHand(it, description = description, symptoms = symptoms) } }
+        if (current == null || current.delivered) return
+        verdicts.setIssues(current.appId, symptoms)
+        val written = ReportDescription.of(description) != null || symptoms.isNotEmpty()
+        viewModelScope.launch {
+            val status = when {
+                !verdicts.share.value -> ReportStatus.OFF
+                written -> gameOf(current.appId)?.let { reports.sendByHand(it, description = description, symptoms = symptoms) } ?: ReportStatus.UNAVAILABLE
+                current.ready -> reports.sendNow(current.appId)
+                else -> ReportStatus.UNAVAILABLE
+            }
+            verdicts.reportStated(current.appId, status.state())
         }
     }
 
@@ -248,7 +266,7 @@ private fun ReportFollowUpDialog(state: ReportFollowUp, onDownload: (String, Set
     var codes by rememberSaveable { mutableStateOf(emptyList<String>()) }
     val symptoms = Symptom.parse(codes)
     val written = ReportDescription.of(description) != null || symptoms.isNotEmpty()
-    val ready = state.status != null && state.status != ReportStatus.UNAVAILABLE
+    val ready = state.ready || (state.status != null && state.status != ReportStatus.UNAVAILABLE)
     // The report is sent by itself when the window opens; only a send the player asked for closes the window, once the project has it (with the description, if one was written).
     var sentByHand by rememberSaveable { mutableStateOf(false) }
     val sentNow = sentByHand && !state.busy && state.status == ReportStatus.SENT && (!written || state.describedAndSent)
@@ -271,7 +289,7 @@ private fun ReportFollowUpDialog(state: ReportFollowUp, onDownload: (String, Set
             if (sentNow) app.gameport.core.designsystem.ReportSentMark() else Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(if (state.offlineOnly) R.string.report_intro_offline else R.string.report_intro))
                 val (message, color) = when (state.status) {
-                    null -> R.string.report_status_working to MaterialTheme.colorScheme.onSurfaceVariant
+                    null -> (if (state.ready) R.string.report_status_ready else R.string.report_status_working) to MaterialTheme.colorScheme.onSurfaceVariant
                     ReportStatus.SENT -> R.string.report_status_sent to WorksGreen
                     ReportStatus.WAITING -> R.string.report_status_waiting to MaterialTheme.colorScheme.onSurfaceVariant
                     ReportStatus.OFF -> R.string.report_status_off to MaterialTheme.colorScheme.onSurfaceVariant

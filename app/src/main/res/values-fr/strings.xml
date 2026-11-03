@@ -20,6 +20,7 @@
     <string name="report_intro">Dommage que ça n\'ait pas marché. Un petit rapport technique accompagne la réponse : versions, fichiers et journaux du jeu, jamais un nom, une adresse e-mail ou un compte.</string>
     <string name="report_intro_offline">Merci pour la réponse. Un petit rapport technique l\'accompagne : versions, fichiers et journaux du jeu, jamais un nom, une adresse e-mail ou un compte.</string>
     <string name="report_status_working">Préparation du rapport…</string>
+    <string name="report_status_ready">Le rapport est prêt, il part avec la réponse.</string>
     <string name="report_status_sent">Rapport envoyé, merci.</string>
     <string name="report_status_waiting">Le rapport sera envoyé dès que cet appareil sera connecté.</string>
     <string name="report_status_off">L\'envoi automatique est désactivé dans les Réglages, le rapport n\'a donc pas été envoyé.</string>

@@ -5,6 +5,7 @@ import android.content.pm.ApplicationInfo
 import android.util.Log
 import app.gameport.core.device.DeviceProfile
 import app.gameport.core.model.Game
+import app.gameport.core.model.Verdict
 import app.gameport.core.settings.GameVerdicts
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -49,7 +50,14 @@ fun ReportStatus.state(): String? = when (this) {
 }
 
 /** The facts that come with a report, never more: see the README of the relay. */
-data class ReportMeta(val appId: Int, val appVersion: String, val device: String, val voter: String)
+data class ReportMeta(
+    val appId: Int,
+    val appVersion: String,
+    val device: String,
+    val voter: String,
+    /** The answer the player gave with the report ("fails" or "offline_only"), so the relay can tell it: the answer itself reaches the relay just after the report. */
+    val answer: String? = null,
+)
 
 /** Sends one report to the relay. */
 fun interface ReportTransport {
@@ -60,7 +68,7 @@ fun interface ReportTransport {
 class HttpReportTransport(private val address: String) : ReportTransport {
     override suspend fun post(meta: ReportMeta, zip: ByteArray): Delivery = withContext(Dispatchers.IO) {
         fun q(text: String) = URLEncoder.encode(text, "UTF-8")
-        val url = "$address?appId=${meta.appId}&app=${q(meta.appVersion)}&device=${q(meta.device)}&voter=${q(meta.voter)}"
+        val url = "$address?appId=${meta.appId}&app=${q(meta.appVersion)}&device=${q(meta.device)}&voter=${q(meta.voter)}${meta.answer?.let { "&answer=${q(it)}" }.orEmpty()}"
         val connection = URL(url).openConnection() as HttpURLConnection
         try {
             connection.requestMethod = "POST"
@@ -153,7 +161,11 @@ class ReportSender @Inject constructor(
     private val outbox by lazy { ReportOutbox(File(context.filesDir, "report-outbox")) }
     private val appVersion: String by lazy { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
 
-    private fun meta(appId: Int) = ReportMeta(appId, appVersion, device.kind, verdicts.voterId)
+    private fun meta(appId: Int) = ReportMeta(
+        appId, appVersion, device.kind, verdicts.voterId,
+        // A report goes with an answer that says something went wrong; the answer that waits for it is the one told.
+        answer = verdicts.book.value.games[appId]?.verdict?.takeIf { it == Verdict.FAILS.wire || it == Verdict.OFFLINE_ONLY.wire },
+    )
 
     /** Sends what waited for a network, when GamePort starts. */
     fun start() {
@@ -163,22 +175,23 @@ class ReportSender @Inject constructor(
         }
     }
 
-    /** The player said the game did not work: the report is made now, from the run that just ended, and goes at once unless sending is off. */
-    suspend fun sendAfterFailure(game: Game): ReportStatus = lock.withLock {
+    /**
+     * The player said the game did not work: the report is made now, from the run that just ended, and kept on the device. It is NOT sent: it goes once, with the answer, when the
+     * player is done telling what went wrong ([sendNow], or [sendByHand] with what they wrote), so the project gets one answer and one report, not one before and one after. Returns
+     * false when there is no report to keep (the game is not installed, or the report is too large).
+     */
+    suspend fun prepareAfterFailure(game: Game): Boolean = lock.withLock {
         val zip = reporter.bytes(game)
         if (zip == null) {
-            Log.i(TAG, "${game.appId}: no report to send (the game is not installed, or the report is too large)")
-            return ReportStatus.UNAVAILABLE
+            Log.i(TAG, "${game.appId}: no report to keep (the game is not installed, or the report is too large)")
+            return false
         }
         runCatching { outbox.put(game.appId, zip) }.onFailure {
             Log.w(TAG, "${game.appId}: the report could not be kept", it)
-            return ReportStatus.UNAVAILABLE
+            return false
         }
-        if (!verdicts.share.value) {
-            Log.i(TAG, "${game.appId}: a ${zip.size}-byte report is kept, sending is off")
-            return ReportStatus.OFF
-        }
-        deliverReport(outbox, meta(game.appId), transport).also { Log.i(TAG, "${game.appId}: a ${zip.size}-byte report: $it") }
+        Log.i(TAG, "${game.appId}: a ${zip.size}-byte report is kept, it goes with the answer")
+        true
     }
 
     /** The player asked from the game's page: the report is made now and sent, even when the automatic sending is off. */
