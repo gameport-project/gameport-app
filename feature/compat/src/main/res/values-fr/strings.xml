@@ -39,4 +39,20 @@
     <string name="compat_filter_works">Fonctionne</string>
     <string name="compat_filter_fails">Ne fonctionne pas</string>
     <string name="compat_reported">Les joueurs signalent : %1$s</string>
+    <string name="compat_detail_device_line">Cet appareil : %1$s · GamePort %2$s</string>
+    <string name="compat_detail_players">Ce que signalent les joueurs</string>
+    <string name="compat_detail_nobody">Aucun joueur n\'a encore signalé ce jeu.</string>
+    <string name="compat_detail_close">Fermer</string>
+    <string name="compat_row_works">Compatible</string>
+    <string name="compat_row_offline_only">Hors ligne seulement</string>
+    <string name="compat_row_fails">Non compatible</string>
+    <string name="compat_row_version">GamePort %1$s</string>
+    <string name="compat_row_maybe_fixed">Peut-être réglé depuis %1$s</string>
+    <string name="compat_turn_fixed">Réglé en %1$s</string>
+    <string name="compat_turn_fixed_still">Réglé en %1$s · fonctionne encore en %2$s</string>
+    <string name="compat_turn_broke">Régression en %1$s</string>
+    <plurals name="compat_row_players">
+        <item quantity="one">%1$d joueur</item>
+        <item quantity="other">%1$d joueurs</item>
+    </plurals>
 </resources>

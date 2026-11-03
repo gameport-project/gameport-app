@@ -113,6 +113,22 @@ private fun GameDemoScreen(onBack: () -> Unit) {
             vrDevice = true,
             savesNotSynced = true,
             compat = Compat(CompatLevel.WORKS, "quest", works = 8, offlineOnly = 1, fails = 1, worksOffline = 0),
+            // What the details behind the label show: made-up players, by model and version of GamePort.
+            compatCounts = app.gameport.core.model.CompatCounts(
+                appId = DemoGames.main.appId, works = 8, fails = 1, offlineOnly = 1,
+                devices = mapOf(
+                    "quest" to app.gameport.core.model.DeviceCounts(
+                        works = 8, fails = 1, offlineOnly = 1,
+                        models = mapOf(
+                            "Quest 3" to app.gameport.core.model.ModelCounts(works = 6, offlineOnly = 1, fails = 1, name = "Meta Quest 3"),
+                            "Quest 3S" to app.gameport.core.model.ModelCounts(works = 2, name = "Meta Quest 3S"),
+                        ),
+                    ),
+                ),
+            ),
+            deviceKind = "quest",
+            deviceName = "Quest 3",
+            appVersion = "0.9.2",
         )
     }
     Box {
@@ -124,6 +140,19 @@ private fun GameDemoScreen(onBack: () -> Unit) {
             onInstall = { _, _ -> }, onCancel = {}, onPause = {}, onVersionChosen = {}, onDuplicateChosen = {},
             onDiscard = {}, onUninstall = {}, onPlay = {}, onPatchAndPlay = {}, onOpenPermissions = {},
             onResolveConflict = {}, onRepatch = {}, onUpdate = {},
+            compatReports = app.gameport.core.model.CompatReports(
+                v = 1,
+                reports = listOf(
+                    app.gameport.core.model.CompatReport(device = "quest", model = "Quest 3S", name = "Meta Quest 3S", verdict = "works", version = "0.9.2", n = 1),
+                    app.gameport.core.model.CompatReport(device = "quest", model = "Quest 3", name = "Meta Quest 3", verdict = "works", version = "0.8.2", n = 3),
+                    app.gameport.core.model.CompatReport(device = "quest", model = "Quest 3", name = "Meta Quest 3", verdict = "offline_only", version = "0.9.2", n = 1),
+                    app.gameport.core.model.CompatReport(
+                        device = "quest", model = "Quest 3", name = "Meta Quest 3", verdict = "fails", version = "0.7.0", n = 1,
+                        issues = mapOf("no_sound" to 1, "slow" to 1), fixedSince = "0.9.0",
+                    ),
+                ),
+                turns = mapOf("quest" to app.gameport.core.model.CompatTurn(fixedIn = "0.9.0", failedIn = "0.8.2", stillIn = "0.9.2")),
+            ),
         )
         DemoNotice(Modifier.align(Alignment.TopEnd))
     }

@@ -11,4 +11,5 @@ dependencies {
     implementation(project(":core:install"))
     implementation(project(":core:device"))
     implementation(project(":core:sync"))
+    implementation(project(":feature:compat"))
 }

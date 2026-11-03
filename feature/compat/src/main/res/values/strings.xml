@@ -39,4 +39,20 @@
     <string name="compat_filter_works">Works</string>
     <string name="compat_filter_fails">Does not work</string>
     <string name="compat_reported">Players report: %1$s</string>
+    <string name="compat_detail_device_line">This device: %1$s · GamePort %2$s</string>
+    <string name="compat_detail_players">What players report</string>
+    <string name="compat_detail_nobody">No player has reported this game yet.</string>
+    <string name="compat_detail_close">Close</string>
+    <string name="compat_row_works">Compatible</string>
+    <string name="compat_row_offline_only">Offline only</string>
+    <string name="compat_row_fails">Not compatible</string>
+    <string name="compat_row_version">GamePort %1$s</string>
+    <string name="compat_row_maybe_fixed">May be fixed since %1$s</string>
+    <string name="compat_turn_fixed">Fixed in %1$s</string>
+    <string name="compat_turn_fixed_still">Fixed in %1$s · still works in %2$s</string>
+    <string name="compat_turn_broke">Broke in %1$s</string>
+    <plurals name="compat_row_players">
+        <item quantity="one">%1$d player</item>
+        <item quantity="other">%1$d players</item>
+    </plurals>
 </resources>

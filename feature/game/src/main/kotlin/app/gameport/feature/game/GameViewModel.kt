@@ -59,6 +59,13 @@ sealed interface GameUiState {
         val compat: app.gameport.core.model.Compat? = null,
         /** Why the game is known not to run, when it is on the list of incompatible games. */
         val incompatible: app.gameport.core.model.IncompatibleReason? = null,
+        /** What the players of every kind of device said about the game, for the details behind its label. */
+        val compatCounts: app.gameport.core.model.CompatCounts? = null,
+        /** The kind of device in hand ("quest", "pico", "phone", "tablet", "other") and its name when that is known (Quest 3, Pico 4). */
+        val deviceKind: String = "other",
+        val deviceName: String? = null,
+        /** The version of GamePort, for the details behind the label. */
+        val appVersion: String = "",
     ) : GameUiState
 }
 
@@ -165,9 +172,23 @@ class GameViewModel @Inject constructor(
     private val savesNotSynced: Flow<Boolean> = saves.observe(appId).map { it.files.isNotEmpty() && !it.inSync }
 
     /** What is said about the game by the players, and by the list of incompatible games. */
-    private class Opinion(val compat: app.gameport.core.model.Compat?, val incompatible: app.gameport.core.model.IncompatibleReason?)
+    private class Opinion(val compat: app.gameport.core.model.Compat?, val counts: app.gameport.core.model.CompatCounts?, val incompatible: app.gameport.core.model.IncompatibleReason?)
 
-    private val opinion: Flow<Opinion> = combine(compat.observe(appId), incompatibleGames.lists) { community, confirmed -> Opinion(community, confirmed.reasonOf(appId)) }
+    private val opinion: Flow<Opinion> = combine(compat.observe(appId), compat.observeCounts(appId), incompatibleGames.lists) { community, counts, confirmed -> Opinion(community, counts, confirmed.reasonOf(appId)) }
+
+    private val deviceKind = device.kind
+    private val deviceName = device.friendlyName
+    private val appVersion = runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }.getOrDefault("")
+
+    private val _compatReports = MutableStateFlow<app.gameport.core.model.CompatReports?>(null)
+
+    /** What the relay lists for this game (model, answer, version of GamePort, how many players, what the history says), once the details behind its label were opened; null until then. */
+    val compatReports: StateFlow<app.gameport.core.model.CompatReports?> = _compatReports
+
+    /** The details behind the label were opened: the lines are asked of the relay, and the totals of the models show meanwhile. */
+    fun onCompatDetailsOpened() {
+        viewModelScope.launch { compat.reports(appId)?.let { _compatReports.value = it } }
+    }
 
     val uiState: StateFlow<GameUiState> = combine(
         baseState,
@@ -180,6 +201,10 @@ class GameViewModel @Inject constructor(
                 savesNotSynced = notSynced,
                 compat = opinion.compat,
                 incompatible = opinion.incompatible,
+                compatCounts = opinion.counts,
+                deviceKind = deviceKind,
+                deviceName = deviceName,
+                appVersion = appVersion,
             )
         } else state
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), GameUiState.Loading)

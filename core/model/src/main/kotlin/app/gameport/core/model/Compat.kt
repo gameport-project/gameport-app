@@ -12,9 +12,27 @@ data class DeviceCounts(
     val offlineOnly: Int = 0,
     /** What players ticked as going wrong, by code of [Symptom] (see the relay's README). Only what the relay counted. */
     val issues: Map<String, Int> = emptyMap(),
+    /** The same totals for each model of this kind of device, by what the device calls itself ("Quest 3"); empty when no vote came with its model. */
+    val models: Map<String, ModelCounts> = emptyMap(),
+    /** What the history of the answers says of this kind of device: from which version it works after it did not, and so on. Null when it says nothing. */
+    val turn: CompatTurn? = null,
 ) {
     /** The symptoms players reported, most reported first; a code this version does not know is left out. */
     fun reported(): List<Pair<Symptom, Int>> = issues.mapNotNull { (code, n) -> Symptom.parse(listOf(code)).firstOrNull()?.let { it to n } }.sortedWith(compareByDescending<Pair<Symptom, Int>> { it.second }.thenBy { it.first.ordinal })
+}
+
+/** What the players of one model of device said about a game: how many said it works, works offline only, or fails, and the name the relay knows the model by. */
+@Serializable
+data class ModelCounts(val works: Int = 0, val offlineOnly: Int = 0, val fails: Int = 0, val name: String? = null, val issues: Map<String, Int> = emptyMap())
+
+/**
+ * What the history of the answers says of a game for one kind of device (see the relay's README): [fixedIn] the oldest version of GamePort where a player said it works after saying it
+ * did not on an older one ([failedIn]), [stillIn] the newest version where it works, [brokeIn] the oldest version where a player said it did not work after saying it did.
+ */
+@Serializable
+data class CompatTurn(val fixedIn: String? = null, val failedIn: String? = null, val stillIn: String? = null, val brokeIn: String? = null) {
+    /** The last word of the history is that it broke: in a version newer than the one that fixed it, or it was never fixed. */
+    val regression: Boolean get() = brokeIn != null && (fixedIn == null || (VersionOrder.compare(brokeIn, fixedIn) ?: 0) > 0)
 }
 
 /**

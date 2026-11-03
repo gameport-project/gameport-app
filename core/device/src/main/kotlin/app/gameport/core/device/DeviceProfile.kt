@@ -47,6 +47,9 @@ class DeviceProfile @Inject constructor(
     /** The codename of the device (`Build.DEVICE`), same use as [model]. A debug build that takes itself for a Quest takes the codename of a Quest 3 too. */
     val codename: String by lazy { if (takesItselfForAQuest()) "eureka" else Build.DEVICE.orEmpty() }
 
+    /** The name a person knows this device by (Quest 3, Pico 4), or null when it is not one that is known: only what is certain is named. */
+    val friendlyName: String? by lazy { app.gameport.core.model.DeviceNames.friendly(info.model, codename) }
+
     /** The kind of device in the few words the project's totals use ("quest", "pico", "phone", "tablet", "other"): nothing finer than that leaves the device. */
     val kind: String by lazy { VoteDevice.of(vrPlatform?.id, context.resources.configuration.smallestScreenWidthDp >= TABLET_DP) }
 

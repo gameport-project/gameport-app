@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.zIndex
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -267,6 +268,8 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onRepatch = viewModel::onRepatch,
         onUpdate = viewModel::onUpdate,
         onResolveConflict = { viewModel.conflictIntent()?.let { runCatching { context.startActivity(it) } }; Unit },
+        compatReports = viewModel.compatReports.collectAsStateWithLifecycle().value,
+        onCompatDetailsOpened = viewModel::onCompatDetailsOpened,
     )
 }
 
@@ -315,6 +318,9 @@ internal fun GameContent(
     media: app.gameport.core.model.AppMedia? = null,
     onCompatNoticeSeen: () -> Unit = {},
     onOpenStore: () -> Unit = {},
+    /** What the relay lists for the game, line by line, and what asks for it when the details behind the compatibility label are opened. */
+    compatReports: app.gameport.core.model.CompatReports? = null,
+    onCompatDetailsOpened: () -> Unit = {},
 ) {
     Scaffold { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
@@ -352,6 +358,7 @@ internal fun GameContent(
                     savesNotSynced = uiState.savesNotSynced,
                     compat = uiState.compat,
                     incompatible = uiState.incompatible,
+                    compatDetail = CompatDetailInfo(uiState.compatCounts, uiState.deviceKind, uiState.deviceName, uiState.appVersion, compatReports, onCompatDetailsOpened),
                     vrDevice = uiState.vrDevice,
                     onOpenControllers = onOpenControllers,
                     onOpenCompat = onOpenCompat,
@@ -425,6 +432,8 @@ private fun GameDetails(
     savesNotSynced: Boolean,
     compat: app.gameport.core.model.Compat?,
     incompatible: app.gameport.core.model.IncompatibleReason?,
+    /** What the details behind the compatibility label show besides the verdict. */
+    compatDetail: CompatDetailInfo = CompatDetailInfo(),
     favorite: Boolean,
     hidden: Boolean,
     playtime: Playtime,
@@ -477,6 +486,26 @@ private fun GameDetails(
             text = { Text(stringResource(R.string.repair_text)) },
             confirmButton = { Button(onClick = { confirmingRepair = false; onRepair() }) { Text(stringResource(R.string.repair_confirm)) } },
             dismissButton = { GlassButton(onClick = { confirmingRepair = false }) { Text(stringResource(R.string.repair_cancel)) } },
+        )
+    }
+    // The details behind the compatibility label, opened by touching it.
+    var showingCompat by rememberSaveable { mutableStateOf(false) }
+    if (showingCompat) {
+        val language = LocalConfiguration.current.locales[0].language
+        // The lines of the relay are asked for when the details open (the totals of the models show meanwhile).
+        LaunchedEffect(Unit) { compatDetail.onOpened() }
+        app.gameport.feature.compat.CompatDetailDialog(
+            gameName = game.name,
+            level = compat?.level,
+            counts = compatDetail.counts,
+            reports = compatDetail.reports?.reports,
+            turn = compatDetail.reports?.turns?.get(compatDetail.deviceKind),
+            deviceKind = compatDetail.deviceKind,
+            deviceModel = compatDetail.deviceName,
+            appVersion = compatDetail.appVersion,
+            incompatibleTitle = incompatible?.title?.pick(language),
+            incompatibleText = incompatible?.text?.pick(language),
+            onDismiss = { showingCompat = false },
         )
     }
     var reporting by remember { mutableStateOf(false) }
@@ -618,6 +647,10 @@ private fun GameDetails(
                     )
                 }
             }
+        }
+        // The buttons and the notifications are a layer of their own, drawn above what follows (the labels, the cover): a card that opens over the page must not pass behind
+        // them. It takes no room in the page (no height of its own), is lifted back to the top, and measures its content without the height of the artwork, so a long list is not cut.
+        Box(Modifier.fillMaxWidth().offset(y = -HERO_HEIGHT).zIndex(1f).height(0.dp).wrapContentHeight(Alignment.Top, unbounded = true)) {
             // What concerns the game as a whole sits at the top right, level with the back button, as small as the buttons of the shop's header.
             // On a darker, more solid ground than the glass: over the artwork the buttons are hard to see otherwise.
             // The buttons keep the size they are given, without the 48 dp touch minimum, so the group is as low as asked.
@@ -690,6 +723,8 @@ private fun GameDetails(
                         readLabel = stringResource(R.string.issue_mark_read),
                         arrowFromRightPx = (topRowWidthPx - bellCenterPx).coerceAtLeast(0f),
                         onClose = { notesShown = false },
+                        // What the screen leaves under the buttons: a longer list scrolls inside the card instead of being cut.
+                        maxHeight = (LocalConfiguration.current.screenHeightDp - NOTES_MARGIN_DP).dp.coerceAtLeast(NOTES_MIN_HEIGHT),
                     )
                 }
                 if (LocalConfiguration.current.screenWidthDp.dp < COMPACT_WIDTH) {
@@ -773,7 +808,7 @@ private fun GameDetails(
                         AppKind.BETA -> GlassChip(stringResource(R.string.game_kind_beta), accent = KindBlue)
                         AppKind.GAME -> Unit
                     }
-                    CompatChips(compat, incompatible)
+                    CompatChips(compat, incompatible, onClick = { showingCompat = true })
                 }
                 CompatDetails(compat, incompatible)
                 FlowRow(
@@ -897,6 +932,10 @@ private val COMPACT_WIDTH = 600.dp
 
 /** The card of the notifications never gets wider than this: a long line wraps instead of stretching the card across a tall, narrow window. */
 private val NOTES_MAX_WIDTH = 420.dp
+
+/** What the screen keeps for the page above and below the card of notifications, and the least height the card is given. */
+private const val NOTES_MARGIN_DP = 110
+private val NOTES_MIN_HEIGHT = 160.dp
 /** How far the content starts over the artwork's bottom edge. */
 private val CONTENT_OVERLAP = 98.dp
 
@@ -1097,7 +1136,7 @@ private fun GameActionsOverlay(
  * One line for each, as wide as the card, its words from the left; tapping a line opens the page it is about. The cross closes the card, the bell opens it again.
  */
 @Composable
-private fun NotificationCard(notes: List<NoteItem>, title: String, closeLabel: String, readLabel: String, arrowFromRightPx: Float, onClose: () -> Unit) {
+private fun NotificationCard(notes: List<NoteItem>, title: String, closeLabel: String, readLabel: String, arrowFromRightPx: Float, onClose: () -> Unit, maxHeight: Dp = Dp.Unspecified) {
     val colors = LocalBackdropColors.current.toList()
     val arrowHeight = 11.dp
     val fromRight = with(LocalDensity.current) { arrowFromRightPx.toDp() }
@@ -1118,6 +1157,11 @@ private fun NotificationCard(notes: List<NoteItem>, title: String, closeLabel: S
             Text(title, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
             GlassIconButton(onClick = onClose, modifier = Modifier.size(28.dp)) { Icon(Icons.Filled.Close, contentDescription = closeLabel, modifier = Modifier.size(16.dp)) }
         }
+        // The title and its cross stay in view; the notes scroll under them when there are more than the card can show.
+        Column(
+            Modifier.heightIn(max = if (maxHeight == Dp.Unspecified) Dp.Infinity else maxHeight - arrowHeight - 52.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
         notes.forEach { note ->
             Column(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).let { base -> note.onClick?.let { base.clickable(onClick = it) } ?: base }.padding(horizontal = 4.dp, vertical = 6.dp),
@@ -1141,6 +1185,7 @@ private fun NotificationCard(notes: List<NoteItem>, title: String, closeLabel: S
                     }
                 }
             }
+        }
         }
     }
 }
@@ -1617,24 +1662,36 @@ private val CompatRed = Color(0xFFE57373)
 
 /** The label of what is known about the game, in colour. */
 @Composable
-private fun CompatChips(compat: app.gameport.core.model.Compat?, incompatible: app.gameport.core.model.IncompatibleReason?) {
+private fun CompatChips(compat: app.gameport.core.model.Compat?, incompatible: app.gameport.core.model.IncompatibleReason?, onClick: () -> Unit) {
     when {
         // A game known not to run says so, whatever the players said.
-        incompatible != null -> CompatChip(stringResource(R.string.game_compat_incompatible), CompatRed, Glyph.CROSS)
+        incompatible != null -> CompatChip(stringResource(R.string.game_compat_incompatible), CompatRed, Glyph.CROSS, onClick)
         compat != null -> when (compat.level) {
-            app.gameport.core.model.CompatLevel.WORKS -> CompatChip(stringResource(R.string.game_compat_works, deviceName(compat.device)), CompatGreen, Glyph.CHECK)
-            app.gameport.core.model.CompatLevel.OFFLINE_ONLY -> CompatChip(stringResource(R.string.game_compat_offline_only, deviceName(compat.device)), CompatOrange, Glyph.NO_NETWORK)
-            app.gameport.core.model.CompatLevel.MIXED -> CompatChip(stringResource(R.string.game_compat_mixed, deviceName(compat.device)), CompatOrange, Glyph.EXCLAMATION)
-            app.gameport.core.model.CompatLevel.FAILS -> CompatChip(stringResource(R.string.game_compat_fails, deviceName(compat.device)), CompatRed, Glyph.CROSS)
+            app.gameport.core.model.CompatLevel.WORKS -> CompatChip(stringResource(R.string.game_compat_works, deviceName(compat.device)), CompatGreen, Glyph.CHECK, onClick)
+            app.gameport.core.model.CompatLevel.OFFLINE_ONLY -> CompatChip(stringResource(R.string.game_compat_offline_only, deviceName(compat.device)), CompatOrange, Glyph.NO_NETWORK, onClick)
+            app.gameport.core.model.CompatLevel.MIXED -> CompatChip(stringResource(R.string.game_compat_mixed, deviceName(compat.device)), CompatOrange, Glyph.EXCLAMATION, onClick)
+            app.gameport.core.model.CompatLevel.FAILS -> CompatChip(stringResource(R.string.game_compat_fails, deviceName(compat.device)), CompatRed, Glyph.CROSS, onClick)
         }
     }
 }
 
-/** A label of what is known about the game: its colour, and before the words the mark of the same colour, as tall as the capitals of the text. */
+/** What the details behind the compatibility label show besides the verdict: the totals of every kind of device, the device in hand, and the versions. */
+internal data class CompatDetailInfo(
+    val counts: app.gameport.core.model.CompatCounts? = null,
+    val deviceKind: String = "other",
+    val deviceName: String? = null,
+    val appVersion: String = "",
+    /** What the relay lists for the game (the lines, and what the history says by kind of device), null until it was asked for. */
+    val reports: app.gameport.core.model.CompatReports? = null,
+    /** The details were opened: the lines are asked for. */
+    val onOpened: () -> Unit = {},
+)
+
+/** A label of what is known about the game: its colour, and before the words the mark of the same colour, as tall as the capitals of the text. Touching it opens the details. */
 @Composable
-private fun CompatChip(label: String, colour: Color, glyph: Glyph) {
+private fun CompatChip(label: String, colour: Color, glyph: Glyph, onClick: () -> Unit) {
     val capitals = with(LocalDensity.current) { (MaterialTheme.typography.labelLarge.fontSize * CAPITAL_HEIGHT).toDp() }
-    GlassChip(label, accent = colour, leading = { CompatGlyph(glyph, colour, capitals) })
+    GlassChip(label, onClick = onClick, accent = colour, leading = { CompatGlyph(glyph, colour, capitals) })
 }
 
 /** The height of a capital letter, as a share of the size of the font. */
