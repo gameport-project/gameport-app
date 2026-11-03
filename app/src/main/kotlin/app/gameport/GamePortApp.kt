@@ -137,7 +137,7 @@ private fun GamePortContent(viewModel: AppViewModel, openWorkshop: Int?, onWorks
         steamPageScreen(onBack = navController::goBack)
         settingsScreen(onBack = navController::goBack, onOpenGame = navController::navigateToGame)
         downloadsScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame)
-        gameScreen(onBack = navController::goBack, onOpenSettings = navController::navigateToGameSettings, onOpenSaves = navController::navigateToGameSaves, onOpenControllers = navController::navigateToGameControllers, onOpenCompat = navController::navigateToGameCompat, onOpenAchievements = navController::navigateToGameAchievements, onOpenSteamSettings = { navController.navigate(SettingsRoute(account = true)) }, onOpenWorkshop = navController::navigateToGameWorkshop, onOpenStore = { navController.navigate(StoreGameRoute(it)) })
+        gameScreen(onBack = navController::goBack, onOpenSettings = navController::navigateToGameSettings, onOpenSaves = navController::navigateToGameSaves, onOpenControllers = navController::navigateToGameControllers, onOpenCompat = navController::navigateToGameCompat, onOpenComfort = { navController.navigateToGameSettings(it, comfort = true) }, onOpenAchievements = navController::navigateToGameAchievements, onOpenSteamSettings = { navController.navigate(SettingsRoute(account = true)) }, onOpenWorkshop = navController::navigateToGameWorkshop, onOpenStore = { navController.navigate(StoreGameRoute(it)) })
         gameWorkshopScreen(onBack = navController::goBack)
         gameMockupScreen(onBack = navController::goBack)
         gameControllersScreen(onBack = navController::goBack)

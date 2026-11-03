@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
 data class GameRoute(val appId: Int)
 
 @Serializable
-data class GameSettingsRoute(val appId: Int)
+data class GameSettingsRoute(val appId: Int, val comfort: Boolean = false)
 
 @Serializable
 data class GameSavesRoute(val appId: Int)
@@ -29,7 +29,7 @@ data class GameWorkshopRoute(val appId: Int)
 
 fun NavController.navigateToGame(appId: Int) = navigate(GameRoute(appId))
 
-fun NavController.navigateToGameSettings(appId: Int) = navigate(GameSettingsRoute(appId))
+fun NavController.navigateToGameSettings(appId: Int, comfort: Boolean = false) = navigate(GameSettingsRoute(appId, comfort))
 
 fun NavController.navigateToGameSaves(appId: Int) = navigate(GameSavesRoute(appId))
 
@@ -49,10 +49,10 @@ fun NavGraphBuilder.gameMockupScreen(onBack: () -> Unit) {
     composable<GameMockupRoute> { GameMockupScreen(onBack = onBack) }
 }
 
-fun NavGraphBuilder.gameScreen(onBack: () -> Unit, onOpenSettings: (Int) -> Unit, onOpenSaves: (Int) -> Unit, onOpenControllers: (Int) -> Unit, onOpenCompat: (Int) -> Unit, onOpenAchievements: (Int) -> Unit, onOpenSteamSettings: () -> Unit, onOpenWorkshop: (Int) -> Unit, onOpenStore: (Int) -> Unit) {
+fun NavGraphBuilder.gameScreen(onBack: () -> Unit, onOpenSettings: (Int) -> Unit, onOpenSaves: (Int) -> Unit, onOpenControllers: (Int) -> Unit, onOpenCompat: (Int) -> Unit, onOpenComfort: (Int) -> Unit, onOpenAchievements: (Int) -> Unit, onOpenSteamSettings: () -> Unit, onOpenWorkshop: (Int) -> Unit, onOpenStore: (Int) -> Unit) {
     composable<GameRoute> { entry ->
         val appId = entry.toRoute<GameRoute>().appId
-        GameScreen(onBack = onBack, onOpenSettings = { onOpenSettings(appId) }, onOpenSaves = { onOpenSaves(appId) }, onOpenControllers = { onOpenControllers(appId) }, onOpenCompat = { onOpenCompat(appId) }, onOpenAchievements = { onOpenAchievements(appId) }, onOpenSteamSettings = onOpenSteamSettings, onOpenWorkshop = { onOpenWorkshop(appId) }, onOpenStore = { onOpenStore(appId) })
+        GameScreen(onBack = onBack, onOpenSettings = { onOpenSettings(appId) }, onOpenSaves = { onOpenSaves(appId) }, onOpenControllers = { onOpenControllers(appId) }, onOpenCompat = { onOpenCompat(appId) }, onOpenComfort = { onOpenComfort(appId) }, onOpenAchievements = { onOpenAchievements(appId) }, onOpenSteamSettings = onOpenSteamSettings, onOpenWorkshop = { onOpenWorkshop(appId) }, onOpenStore = { onOpenStore(appId) })
     }
 }
 

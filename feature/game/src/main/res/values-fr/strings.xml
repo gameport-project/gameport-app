@@ -7,7 +7,6 @@
     <string name="game_discard">Supprimer</string>
     <string name="game_play">Jouer</string>
     <string name="game_patch_and_play">Patcher et jouer</string>
-    <string name="game_uninstall">Désinstaller</string>
     <string name="game_retry">Réessayer</string>
     <string name="game_compat_works">Fonctionne sur %1$s</string>
     <string name="game_compat_offline_only">Hors ligne seulement sur %1$s</string>
@@ -42,7 +41,11 @@
     <string name="game_dlc_install">Installer (%1$s · %2$s)</string>
     <string name="game_not_found">Ce jeu n\'est pas dans la bibliothèque.</string>
     <string name="game_settings_title">Réglages du jeu</string>
-    <string name="game_settings_vr">Réalité virtuelle</string>
+    <string name="game_settings_comfort">Option de confort</string>
+    <string name="game_settings_uninstall">Désinstaller</string>
+    <string name="game_settings_uninstall_description">Retire le jeu et ses données de cet appareil. Les sauvegardes déjà synchronisées avec le Steam Cloud y restent.</string>
+    <string name="game_settings_uninstall_title">Désinstaller %1$s ?</string>
+    <string name="game_settings_uninstall_confirm">Le jeu est retiré de cet appareil, avec ses données. Android demande de confirmer.</string>
     <string name="game_settings_seated">Je joue assis</string>
     <string name="game_settings_seated_description">Le jeu est remonté pour correspondre à la taille debout, même en position assise.</string>
     <string name="game_settings_height">Taille : %1$d cm</string>

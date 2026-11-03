@@ -135,7 +135,7 @@ private fun GameDemoScreen(onBack: () -> Unit) {
         GameContent(
             uiState = content,
             speedUnit = SpeedUnit.MEGABYTES_PER_SECOND,
-            onOpenSettings = {}, onOpenSaves = {}, onOpenControllers = {}, onOpenCompat = {},
+            onOpenSettings = {}, onOpenSaves = {}, onOpenControllers = {}, onOpenCompat = {}, onOpenComfort = {},
             onActivateFrame = {}, onToggleFavorite = {}, onSetHidden = {}, onBack = onBack,
             onInstall = { _, _ -> }, onCancel = {}, onPause = {}, onVersionChosen = {}, onDuplicateChosen = {},
             onDiscard = {}, onUninstall = {}, onPlay = {}, onPatchAndPlay = {}, onOpenPermissions = {},

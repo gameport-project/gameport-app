@@ -30,7 +30,11 @@ class GameSettingsViewModel @Inject constructor(
     device: DeviceProfile,
     private val launchOptionsRepository: app.gameport.core.steam.LaunchOptionsRepository,
 ) : ViewModel() {
-    private val appId = savedStateHandle.toRoute<GameSettingsRoute>().appId
+    private val route = savedStateHandle.toRoute<GameSettingsRoute>()
+    private val appId = route.appId
+
+    /** True when the page was opened straight on the comfort options. */
+    val opensOnComfort: Boolean = route.comfort
 
     init {
         viewModelScope.launch { launchOptionsRepository.refresh(appId) }
@@ -68,6 +72,8 @@ class GameSettingsViewModel @Inject constructor(
     /** True when the player took the patch off this game. */
     val patchRemoved: StateFlow<Boolean> = installer.observePatchRemoved(appId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
+
+    fun onUninstall() = installer.uninstall(appId)
 
     fun appSettingsIntent() = installer.appSettingsIntent(appId)
 

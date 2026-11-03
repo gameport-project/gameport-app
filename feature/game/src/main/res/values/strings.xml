@@ -7,7 +7,6 @@
     <string name="game_discard">Discard</string>
     <string name="game_play">Play</string>
     <string name="game_patch_and_play">Patch and play</string>
-    <string name="game_uninstall">Uninstall</string>
     <string name="game_retry">Try again</string>
     <string name="game_compat_works">Works on %1$s</string>
     <string name="game_compat_offline_only">Offline only on %1$s</string>
@@ -43,7 +42,11 @@
     <string name="game_dlc_install">Install (%1$s · %2$s)</string>
     <string name="game_not_found">This game is not in the library.</string>
     <string name="game_settings_title">Game settings</string>
-    <string name="game_settings_vr">Virtual reality</string>
+    <string name="game_settings_comfort">Comfort option</string>
+    <string name="game_settings_uninstall">Uninstall</string>
+    <string name="game_settings_uninstall_description">Removes the game and its data from this device. Saves already synced with Steam Cloud stay there.</string>
+    <string name="game_settings_uninstall_title">Uninstall %1$s?</string>
+    <string name="game_settings_uninstall_confirm">The game is removed from this device, with its data. Android asks to confirm.</string>
     <string name="game_settings_seated">I play seated</string>
     <string name="game_settings_seated_description">The game is raised so it matches the standing height, even while seated.</string>
     <string name="game_settings_height">Height: %1$d cm</string>

@@ -51,6 +51,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
@@ -107,6 +108,20 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
             dismissButton = { DangerTextButton(onClick = { confirmingRemoval = false }) { Text(stringResource(R.string.game_settings_cancel)) } },
         )
     }
+    var confirmingUninstall by remember { mutableStateOf(false) }
+    if (confirmingUninstall) {
+        BackdropDialog(
+            onDismissRequest = { confirmingUninstall = false },
+            title = { Text(stringResource(R.string.game_settings_uninstall_title, gameName)) },
+            text = { Text(stringResource(R.string.game_settings_uninstall_confirm)) },
+            confirmButton = {
+                DangerButton(onClick = { confirmingUninstall = false; viewModel.onUninstall(); onBack() }) {
+                    Text(stringResource(R.string.game_settings_uninstall))
+                }
+            },
+            dismissButton = { DangerTextButton(onClick = { confirmingUninstall = false }) { Text(stringResource(R.string.game_settings_cancel)) } },
+        )
+    }
 
     val installedNow = installState is InstallState.Installed
     // What the page has to show, as categories like the application's settings: only those that mean something for this game now.
@@ -117,9 +132,10 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
         // Only when Steam has a channel other than the normal one with an Android build: otherwise there is nothing to tell.
         if (UpdateChannels.hasOthers(channels)) add(GameCategory.CHANNELS)
         if (launchOptions.isNotEmpty()) add(GameCategory.LAUNCH)
-        if (viewModel.isHeadset && isVrGame) add(GameCategory.VR)
+        if (viewModel.isHeadset && isVrGame) add(GameCategory.COMFORT)
+        if (installedNow) add(GameCategory.UNINSTALL)
     }
-    var chosen by rememberSaveable { mutableStateOf<String?>(null) }
+    var chosen by rememberSaveable { mutableStateOf<String?>(if (viewModel.opensOnComfort) GameCategory.COMFORT.name else null) }
     val category = available.firstOrNull { it.name == chosen } ?: available.firstOrNull()
 
     Scaffold { padding ->
@@ -194,8 +210,19 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
                                     effective = LaunchOptions.chosen(launchOptions, settings.launchArguments, isVrGame).toSet(),
                                     onPicked = viewModel::onLaunchArgumentsChanged,
                                 )
-                                GameCategory.VR -> {
-                                    Text(stringResource(R.string.game_settings_vr), style = MaterialTheme.typography.headlineSmall)
+                                GameCategory.UNINSTALL -> {
+                                    Text(stringResource(R.string.game_settings_uninstall), style = MaterialTheme.typography.headlineSmall)
+                                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text(stringResource(R.string.game_settings_uninstall_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        DangerButton(onClick = { confirmingUninstall = true }) {
+                                            Icon(Icons.Filled.Delete, contentDescription = null)
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(stringResource(R.string.game_settings_uninstall))
+                                        }
+                                    }
+                                }
+                                GameCategory.COMFORT -> {
+                                    Text(stringResource(R.string.game_settings_comfort), style = MaterialTheme.typography.headlineSmall)
                                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                         Column(Modifier.weight(1f)) {
                                             Text(stringResource(R.string.game_settings_seated), style = MaterialTheme.typography.titleMedium)
@@ -255,7 +282,8 @@ private enum class GameCategory(val title: Int) {
     EXTRA(R.string.extra_title),
     CHANNELS(R.string.game_settings_channels),
     LAUNCH(R.string.game_settings_launch),
-    VR(R.string.game_settings_vr),
+    COMFORT(R.string.game_settings_comfort),
+    UNINSTALL(R.string.game_settings_uninstall),
 }
 
 private val COMPACT_WIDTH = 600.dp

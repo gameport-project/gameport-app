@@ -53,6 +53,7 @@ import app.gameport.core.designsystem.Glyph
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.EventSeat
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Check
@@ -181,7 +182,7 @@ import app.gameport.core.model.Ownership
 import app.gameport.core.install.ExpansionStorageAccess
 
 @Composable
-fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -> Unit, onOpenControllers: () -> Unit, onOpenCompat: () -> Unit, onOpenAchievements: () -> Unit, onOpenSteamSettings: () -> Unit, onOpenWorkshop: () -> Unit = {}, onOpenStore: () -> Unit = {}, viewModel: GameViewModel = hiltViewModel()) {
+fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -> Unit, onOpenControllers: () -> Unit, onOpenCompat: () -> Unit, onOpenComfort: () -> Unit, onOpenAchievements: () -> Unit, onOpenSteamSettings: () -> Unit, onOpenWorkshop: () -> Unit = {}, onOpenStore: () -> Unit = {}, viewModel: GameViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val speedUnit by viewModel.speedUnit.collectAsStateWithLifecycle()
@@ -237,6 +238,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onOpenSaves = onOpenSaves,
         onOpenControllers = onOpenControllers,
         onOpenCompat = onOpenCompat,
+        onOpenComfort = onOpenComfort,
         onActivateFrame = viewModel::onActivateFrame,
         onRepair = viewModel::onRepair,
         onReinstallWorks = viewModel::onReinstallWorks,
@@ -285,6 +287,7 @@ internal fun GameContent(
     onOpenSaves: () -> Unit,
     onOpenControllers: () -> Unit,
     onOpenCompat: () -> Unit,
+    onOpenComfort: () -> Unit,
     onActivateFrame: () -> Unit,
     onRepair: () -> Unit = {},
     onReinstallWorks: () -> Unit = {},
@@ -362,6 +365,7 @@ internal fun GameContent(
                     vrDevice = uiState.vrDevice,
                     onOpenControllers = onOpenControllers,
                     onOpenCompat = onOpenCompat,
+                    onOpenComfort = onOpenComfort,
                     onActivateFrame = onActivateFrame,
                     onRepair = onRepair,
                     onReinstallWorks = onReinstallWorks,
@@ -440,6 +444,7 @@ private fun GameDetails(
     vrDevice: Boolean,
     onOpenControllers: () -> Unit,
     onOpenCompat: () -> Unit,
+    onOpenComfort: () -> Unit,
     onActivateFrame: () -> Unit,
     onRepair: () -> Unit,
     onReinstallWorks: () -> Unit = {},
@@ -921,8 +926,9 @@ private fun GameDetails(
         onOpenStore = onOpenStore,
         onOpenControllers = onOpenControllers,
         onOpenCompat = { onCompatNoticeSeen(); onOpenCompat() },
+        comfort = vrDevice && game.androidBuild?.isVr != false && install is InstallState.Installed,
+        onOpenComfort = onOpenComfort,
         onReport = { reporting = true },
-        onUninstall = onUninstall,
     )
     }
 }
@@ -1052,8 +1058,9 @@ private fun GameActionsOverlay(
     onOpenStore: () -> Unit,
     onOpenControllers: () -> Unit,
     onOpenCompat: () -> Unit,
+    comfort: Boolean,
+    onOpenComfort: () -> Unit,
     onReport: () -> Unit,
-    onUninstall: () -> Unit,
 ) {
     BackHandler(enabled = open, onBack = onClose)
     Box(Modifier.fillMaxSize()) {
@@ -1098,6 +1105,8 @@ private fun GameActionsOverlay(
                         if (controllerProfile) ActionRow(Icons.Filled.SportsEsports, stringResource(R.string.controllers_title), usable, { onClose(); onOpenControllers() }, tint = controllerTint)
                         // The options that make a game work: orange as the compatibility labels, with a small mark when GamePort adapted the game by itself.
                         if (compat) ActionRow(Icons.Filled.Build, stringResource(R.string.gamecompat_button), usable, { onClose(); onOpenCompat() }, tint = CompatOrange, badge = CompatOrange.takeIf { compatNotice })
+                        // The seated option and the height, which sit in the settings of the game: opened straight on them.
+                        if (comfort) ActionRow(Icons.Filled.EventSeat, stringResource(R.string.game_settings_comfort), usable, { onClose(); onOpenComfort() })
                         ActionRow(Icons.Filled.BugReport, stringResource(R.string.report_open), canReport, { onClose(); onReport() })
                         Spacer(Modifier.height(8.dp))
                     }
@@ -1118,13 +1127,6 @@ private fun GameActionsOverlay(
                         { onClose(); onToggleHidden() },
                         tint = if (hidden) LocalContentColor.current else HideRed,
                     )
-                }
-                if (showGameActions) {
-                    DangerButton(onClick = { onClose(); onUninstall() }, enabled = usable, modifier = Modifier.fillMaxWidth().height(ACTION_ROW_HEIGHT)) {
-                        Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.game_uninstall), Modifier.weight(1f))
-                    }
                 }
             }
         }
