@@ -552,6 +552,8 @@ private fun GameDetails(
     // What waits for the game when Play is pressed: a new version, a newer patch (not while one of them is going on).
     val updatePending = GameIssue.UpdateAvailable in issues && repatch == Repatch.None
     val patchPending = GameIssue.PatchOutdated in issues && repatch == Repatch.None
+    // A game that says some of its large files are missing: the repair is offered first, in a card, and Play goes into it.
+    val expansionMissing = issues.filterIsInstance<GameIssue.ExpansionMissing>().firstOrNull()?.takeIf { install is InstallState.Installed && repatch == Repatch.None }
     var choosingPlay by remember { mutableStateOf(false) }
     if (choosingPlay) {
         BackdropDialog(
@@ -870,6 +872,7 @@ private fun GameDetails(
                 ) {
                     Box(Modifier.tourTarget(TourIds.GAME_ACTIONS)) { InstallActions(
                         install = install,
+                        playInCard = expansionMissing != null,
                         speedUnit = speedUnit,
                         onInstall = { if (compat?.level == app.gameport.core.model.CompatLevel.FAILS) warning = true else startInstall() },
                         onResume = { onInstall(null) },
@@ -892,8 +895,14 @@ private fun GameDetails(
                 // A patch or an update of the installed game goes through the steps of an install, in the same card.
                 (repatch as? Repatch.Running)?.let { Progress(state = it.asInstallState(), speedUnit = speedUnit, extras = emptyList(), onCancel = null) }
                 // A game that says some of its large files are missing cannot load its data: a card on the page says so, and offers the repair. Play stays available.
-                issues.filterIsInstance<GameIssue.ExpansionMissing>().firstOrNull()?.takeIf { install is InstallState.Installed && repatch == Repatch.None }
-                    ?.let { ExpansionMissingCard(it.missing, onRepair = { confirmingRepair = true }) }
+                expansionMissing?.let {
+                    ExpansionMissingCard(
+                        it.missing,
+                        onRepair = { confirmingRepair = true },
+                        onPlay = { if (updatePending || patchPending) choosingPlay = true else onPlay() },
+                        busy = repatch is Repatch.Running,
+                    )
+                }
                 // The notifications are in the card of the bell, the progress of a patch in the card of the install; what stays here is the report that can be sent, and a patch that failed.
                 val suspected = issues.filterIsInstance<GameIssue.ProblemSuspected>().firstOrNull()
                 if (install is InstallState.Installed && (suspected != null || repatch is Repatch.Failed)) {
@@ -1006,6 +1015,8 @@ private val COVER_HEIGHT = 285.dp
 private fun InstallActions(
     install: InstallState,
     speedUnit: SpeedUnit,
+    // Play is in the card of a game that lacks files, where the repair comes first: nothing of it is drawn here.
+    playInCard: Boolean = false,
     onInstall: () -> Unit,
     onResume: () -> Unit,
     onCancel: () -> Unit,
@@ -1048,7 +1059,7 @@ private fun InstallActions(
         is InstallState.Installed -> if (install.otherGamePort != null) {
             // The game was patched by another GamePort of this device: it starts and updates it, this one leaves it alone.
             Text(stringResource(R.string.game_other_gameport, install.otherGamePort!!), color = Color(0xFFFF9800), style = MaterialTheme.typography.bodyMedium)
-        } else FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        } else if (!playInCard) FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = if (patchOutdated) onPatchAndPlay else onPlay, enabled = !busy, modifier = Modifier.height(ACTION_HEIGHT)) {
                 Icon(if (patchOutdated) Icons.Filled.Build else Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -1263,17 +1274,25 @@ private fun MediaCard(appId: Int, media: app.gameport.core.model.AppMedia) {
 
 /** The card of a game that lacks some of its large files: what is wrong, and the button that downloads them again. */
 @Composable
-private fun ExpansionMissingCard(missing: Int, onRepair: () -> Unit) {
+private fun ExpansionMissingCard(missing: Int, onRepair: () -> Unit, onPlay: () -> Unit, busy: Boolean) {
     Column(Modifier.fillMaxWidth().glass(CardShape).padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Icon(Icons.Filled.Warning, contentDescription = null, tint = CompatOrange, modifier = Modifier.size(26.dp))
             Text(stringResource(R.string.game_expansion_title), style = MaterialTheme.typography.titleMedium)
         }
         Text(pluralStringResource(R.plurals.issue_expansion_missing, missing, missing), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        GlassButton(onClick = onRepair) {
-            Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.issue_expansion_unchecked_action))
+        // The repair is what the game needs, so it comes first and filled; playing as it is stays possible, as the second choice.
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onRepair, enabled = !busy) {
+                Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.issue_expansion_unchecked_action))
+            }
+            GlassButton(onClick = onPlay, enabled = !busy) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.game_expansion_play_anyway))
+            }
         }
     }
 }

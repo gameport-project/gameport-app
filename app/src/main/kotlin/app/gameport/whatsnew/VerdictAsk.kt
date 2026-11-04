@@ -108,6 +108,7 @@ class VerdictAskViewModel @Inject constructor(
     private val verdicts: GameVerdicts,
     private val reports: ReportSender,
     private val reporter: ProblemReporter,
+    private val expansionVerifier: app.gameport.core.sync.ExpansionVerifier,
 ) : ViewModel() {
     private val version: String get() = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
     private val today: String get() = LocalDate.now().toString()
@@ -135,6 +136,8 @@ class VerdictAskViewModel @Inject constructor(
      */
     private fun prepareReport(appId: Int, offlineOnly: Boolean) {
         _followUp.value = ReportFollowUp(appId, status = null, offlineOnly = offlineOnly)
+        // A game that does not work may have lost its large files since it was last looked at: it is looked at again, and a card says so on its page.
+        viewModelScope.launch { expansionVerifier.recheck(appId) }
         viewModelScope.launch {
             val kept = gameOf(appId)?.let { reports.prepareAfterFailure(it) } ?: false
             if (kept) {

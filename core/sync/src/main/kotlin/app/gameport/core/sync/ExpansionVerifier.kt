@@ -49,18 +49,41 @@ class ExpansionVerifier @Inject constructor(
     private val sessions: SteamSessionHolder,
     private val packages: PackageGateway,
     private val coordinator: CloudSyncCoordinator,
+    private val reports: ReportStore,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Mutex()
 
     /** Looks again each time Steam can be reached, and each time the games in doubt change. */
     fun start() {
+        startWatchingSuspicions()
         scope.launch {
             // Every installed game is looked at, once for each build: the files Steam lists for it say whether it has an expansion, so no size decides who is asked.
             combine(auth.connection, installer.installedOnDevice) { connection, games -> connection to games }.collect { (connection, games) ->
                 if (connection == SteamConnection.ONLINE && games.isNotEmpty()) runDue(games)
             }
         }
+    }
+
+    /**
+     * A game that closed within seconds or crashed is looked at again at once, whatever was said of its build: its large files may have gone since. It is looked at once for each
+     * time the suspicion appears, not at every change of the list.
+     */
+    private fun startWatchingSuspicions() {
+        scope.launch {
+            var seen = emptySet<String>()
+            reports.suspected.collect { suspected ->
+                val fresh = suspected.keys - seen
+                seen = suspected.keys
+                for (packageName in fresh) installed.all().entries.firstOrNull { it.value == packageName }?.key?.let { recheck(it) }
+            }
+        }
+    }
+
+    /** Looks at a game's expansion files now, even if it was already looked at for this build: after a crash, a short run, or an answer that says it did not work. */
+    suspend fun recheck(appId: Int) = lock.withLock {
+        if (auth.connection.value != SteamConnection.ONLINE) return@withLock
+        runCatching { verify(appId) }.onFailure { Log.w(TAG, "could not check the expansion files of $appId", it) }
     }
 
     private suspend fun runDue(suspects: Set<Int>) = lock.withLock {
