@@ -15,6 +15,7 @@ import javax.inject.Singleton
 class LifeWatch @Inject constructor(
     private val playtime: PlaytimeTracker,
     private val asker: VerdictAsker,
+    private val reports: ReportStore,
 ) {
     private class Watch(val witness: IBinder, val recipient: IBinder.DeathRecipient)
 
@@ -46,7 +47,8 @@ class LifeWatch @Inject constructor(
         }
         Log.i(TAG, "$packageName: its process is gone")
         runCatching {
-            // The time played stops, and the question about the run is asked.
+            // The run's length is told even when the game never said it closed (killed, crashed, out of memory), and the time played stops.
+            reports.left(packageName)
             playtime.paused(packageName)
             asker.gameClosed(packageName)
         }.onFailure { Log.w(TAG, "$packageName: the end of its process could not be dealt with", it) }

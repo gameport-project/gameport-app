@@ -47,6 +47,10 @@ class ReportStore @Inject constructor(
         extras.getString("launch")?.takeIf { it.isNotEmpty() }?.let { File(folder, LAUNCH).writeText(it.takeLast(MAX_CHARS)) }
         // Said at every hand-over, empty when the run has met none: what an earlier run found must not stay as if this one had.
         extras.getString("nativeGaps")?.let { gaps -> if (gaps.isEmpty()) File(folder, NATIVE_GAPS).delete() else File(folder, NATIVE_GAPS).writeText(gaps.take(MAX_CHARS)) }
+        // What the whole log of the run says; replaced at every hand-over, as it counts the run from its first line.
+        extras.getString("digest")?.let { digest -> if (digest.isEmpty()) File(folder, DIGEST).delete() else File(folder, DIGEST).writeText(digest.take(MAX_CHARS)) }
+        // The calls the game made to Steam (the shim's table, read by the hook); replaced at every hand-over, it counts the whole run.
+        extras.getString("steamCalls")?.let { calls -> if (calls.isEmpty()) File(folder, STEAM_CALLS).delete() else File(folder, STEAM_CALLS).writeText(calls.take(MAX_CHARS)) }
         extras.getByteArray("traceGz")?.let { gz ->
             gunzip(gz, MAX_TRACE_BYTES)?.let { trace ->
                 File(folder, TOMBSTONE).writeBytes(trace)
@@ -90,7 +94,7 @@ class ReportStore @Inject constructor(
     /** Forgets everything kept for a game that was uninstalled. */
     fun forget(packageName: String) {
         File(directory, safe(packageName)).deleteRecursively()
-        prefs.edit().remove(packageName).remove(SESSION_PREFIX + packageName).apply()
+        prefs.edit().remove(packageName).remove(SESSION_PREFIX + packageName).remove(LAUNCH_PREFIX + packageName).apply()
         _suspected.value = _suspected.value - packageName
         synchronized(this) { launched.remove(packageName) }
     }
@@ -128,17 +132,18 @@ class ReportStore @Inject constructor(
         }
     }.getOrNull()
 
-    /** The game just started. */
+    /** The game just started. The moment is also kept on disk: a game that is killed, crashes or runs out of memory never says it closed, and GamePort may be stopped meanwhile. */
     @Synchronized
     fun launched(packageName: String, nowMillis: Long = System.currentTimeMillis()) {
         launched[packageName] = nowMillis
+        prefs.edit().putLong(LAUNCH_PREFIX + packageName, nowMillis).apply()
     }
 
-    /** The game left the screen or closed: closing within seconds of the start is a sign of trouble. */
+    /** The game left the screen or closed, or its process is gone: closing within seconds of the start is a sign of trouble. */
     @Synchronized
     fun left(packageName: String, nowMillis: Long = System.currentTimeMillis()) {
-        val start = launched.remove(packageName) ?: return
-        prefs.edit().putLong(SESSION_PREFIX + packageName, nowMillis - start).apply()
+        val start = launched.remove(packageName) ?: prefs.getLong(LAUNCH_PREFIX + packageName, -1L).takeIf { it >= 0 } ?: return
+        prefs.edit().remove(LAUNCH_PREFIX + packageName).putLong(SESSION_PREFIX + packageName, nowMillis - start).apply()
         if (nowMillis - start < SHORT_SESSION_MS) suspect(packageName, Suspicion.SHORT_SESSION)
     }
 
@@ -158,7 +163,7 @@ class ReportStore @Inject constructor(
     }
 
     private fun readSuspicions(): Map<String, Suspicion> =
-        prefs.all.filterKeys { !it.startsWith(SESSION_PREFIX) }.mapNotNull { (key, value) -> (value as? String)?.let { runCatching { Suspicion.valueOf(it) }.getOrNull() }?.let { key to it } }.toMap()
+        prefs.all.filterKeys { !it.startsWith(SESSION_PREFIX) && !it.startsWith(LAUNCH_PREFIX) }.mapNotNull { (key, value) -> (value as? String)?.let { runCatching { Suspicion.valueOf(it) }.getOrNull() }?.let { key to it } }.toMap()
 
     private fun safe(packageName: String) = packageName.filter { it.isLetterOrDigit() || it == '.' || it == '_' }
 
@@ -174,6 +179,8 @@ class ReportStore @Inject constructor(
         const val DIAG_PREFIX = "diag-"
         const val LIBRARIES = "libraries.txt"
         const val NATIVE_GAPS = "native-gaps.txt"
+        const val DIGEST = "log-digest.txt"
+        const val STEAM_CALLS = "steam-calls.txt"
         const val LAUNCH = "launch.txt"
         const val TOMBSTONE = "tombstone.pb"
         const val TOMBSTONE_INFO = "tombstone-info.txt"
@@ -182,5 +189,6 @@ class ReportStore @Inject constructor(
         const val MAX_CHARS = 600_000
         const val SHORT_SESSION_MS = 30_000L
         const val SESSION_PREFIX = "session:"
+        const val LAUNCH_PREFIX = "launch:"
     }
 }
