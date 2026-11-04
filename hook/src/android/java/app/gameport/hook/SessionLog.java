@@ -279,8 +279,10 @@ final class SessionLog {
                     "OpenGLRenderer:S", "AdrenoGLES-0:S", "NetworkChangedManager:S")
                     .redirectErrorStream(true).start();
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), "UTF-8"));
+            LogTimes times = new LogTimes(System.currentTimeMillis(), java.util.TimeZone.getDefault());
             String line;
             while ((line = reader.readLine()) != null) {
+                if (beforeThisRun(times, line)) continue;
                 nativeGaps.scan(line);
                 // A line that came again and again is counted by the digest and not kept: it filled the kept lines in seconds and hid the rest of the run.
                 if (!digest.scan(line)) continue;
@@ -304,12 +306,23 @@ final class SessionLog {
         }
     }
 
+    /**
+     * The system log still holds what the earlier runs of this app wrote, and an app can read all of it: a line written before this process began (a little earlier is allowed,
+     * the clock of the log and the one that dates the start are not the same) belongs to a run before and must not count in this one's log, steps or frame rate.
+     */
+    private boolean beforeThisRun(LogTimes times, String line) {
+        long at = times.of(line);
+        return at >= 0 && at < processStartMs - 2_000;
+    }
+
     private void followPerformance() {
         try {
             Process process = new ProcessBuilder("logcat", "-v", "threadtime", "VrApi:I", "*:S").redirectErrorStream(true).start();
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), "UTF-8"));
+            LogTimes times = new LogTimes(System.currentTimeMillis(), java.util.TimeZone.getDefault());
             String line;
             while ((line = reader.readLine()) != null) {
+                if (beforeThisRun(times, line)) continue;
                 digest.frameRate(line);
                 synchronized (performance) {
                     performance.addLast(line);
