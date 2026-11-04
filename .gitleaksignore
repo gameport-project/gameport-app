@@ -1,0 +1,3 @@
+# Not secrets: the made-up values (password=hunter2hunter2, token=abcdef123456, a DeviceKey of 1111-2222-3333) that the test of the report redactor feeds to the redactor, to check they are removed.
+# The finding belongs to the commit that added the test, which is in the history for good, so it is named here rather than changed.
+46155958f8c2743b1f3845f76783fe232de91d6b:core/sync/src/test/kotlin/app/gameport/core/sync/ReportRedactorTest.kt:generic-api-key:64
