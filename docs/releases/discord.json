@@ -40,5 +40,12 @@
   "0.9.3": {
     "images": [],
     "intro": "Each game's settings have a comfort option with a shortcut in its Menu, the copy of a family member can be picked for a game, the details behind the compatibility label are there, Deadly Delivery signs in online, and a Pico 4 on Android 10 can install more games."
+  },
+  "0.9.4": {
+    "images": [
+      "docs/screenshots/compatibility.png",
+      "docs/screenshots/game-compatibility-details.png"
+    ],
+    "intro": "Games that lack large files are told and offered the repair first, the label of a game gives the verdict for the exact model of the device, and reports say more about what goes wrong, with tickets and account numbers hidden. The details of a game and the compatibility page also tell how steadily a game runs, by model and frame rate (the pictures show example values)."
   }
 }

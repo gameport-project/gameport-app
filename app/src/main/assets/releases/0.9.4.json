@@ -1,0 +1,128 @@
+{
+  "version": "0.9.4",
+  "previous": "0.9.3",
+  "code": 904,
+  "patchNeeded": true,
+  "window": {
+    "items": [
+      {
+        "id": "expansion-files",
+        "icon": "info",
+        "text": {
+          "en": "Missing large files. Installed games are checked for missing expansion files, and a card offers the repair first, with Play second.",
+          "fr": "Gros fichiers manquants. Les jeux installés sont vérifiés, et une carte propose d'abord la réparation, puis de jouer quand même."
+        }
+      },
+      {
+        "id": "device-verdict",
+        "icon": "info",
+        "text": {
+          "en": "Verdict by device. The label of a game gives the answer for the exact model of the device, else for its kind of device, else for every device, and a button shows all the reports.",
+          "fr": "Verdict par appareil. L'étiquette d'un jeu donne la réponse pour le modèle exact de l'appareil, sinon pour son type d'appareil, sinon pour tous, et un bouton montre tous les rapports."
+        }
+      },
+      {
+        "id": "steadiness",
+        "icon": "info",
+        "text": {
+          "en": "Smoothness by model and frame rate. The details of a game and the compatibility page tell how steadily a game runs.",
+          "fr": "Fluidité par modèle et par fréquence. Le détail d'un jeu et la page de compatibilité disent si un jeu tient sa fréquence d'images."
+        }
+      },
+      {
+        "id": "stronger-reports",
+        "icon": "build",
+        "text": {
+          "en": "Stronger reports. A report tells what a game asks of Steam, how its run ended and where its frame rate stood, with tickets and account numbers hidden.",
+          "fr": "Rapports plus complets. Un rapport dit ce que le jeu demande à Steam, comment sa partie s'est terminée et où en était sa fréquence d'images, avec les tickets et les numéros de compte masqués."
+        }
+      },
+      {
+        "id": "unreal-vr",
+        "icon": "build",
+        "text": {
+          "en": "Unreal Engine 4 games get their VR entry, and so do games of any later Unreal version.",
+          "fr": "Les jeux Unreal Engine 4 reçoivent leur entrée VR, comme ceux des versions suivantes d'Unreal."
+        }
+      }
+    ]
+  },
+  "notes": [
+    {
+      "id": "section-0",
+      "title": {
+        "en": "New features",
+        "fr": "Nouvelles fonctionnalités"
+      },
+      "items": [
+        {
+          "id": "item-0-0",
+          "text": {
+            "en": "**Missing large files.** Installed games are checked for missing expansion files, and a card offers the repair first, with Play second. The check runs again after a crash or a failed answer.",
+            "fr": "**Gros fichiers manquants.** Les jeux installés sont vérifiés, et une carte propose d'abord la réparation, puis de jouer quand même. La vérification reprend après un plantage ou une réponse en échec."
+          }
+        },
+        {
+          "id": "item-0-1",
+          "text": {
+            "en": "**Verdict by device.** The label of a game gives the answer for the exact model of the device, else for its kind of device, else for every device, and a button shows all the reports.",
+            "fr": "**Verdict par appareil.** L'étiquette d'un jeu donne la réponse pour le modèle exact de l'appareil, sinon pour son type d'appareil, sinon pour tous, et un bouton montre tous les rapports."
+          }
+        },
+        {
+          "id": "item-0-2",
+          "text": {
+            "en": "**Smoothness by model and frame rate.** The details of a game tell how steadily it ran, for each device model and each frame rate, with the share of the play time that held it. The picture shows example values.",
+            "fr": "**Fluidité par modèle et par fréquence.** Le détail d'un jeu dit si le jeu a tenu sa fréquence d'images, pour chaque modèle d'appareil et chaque fréquence, avec la part du temps de jeu où elle a été tenue. L'image montre des valeurs d'exemple."
+          },
+          "image": {
+            "src": "screenshots/game-compatibility-details.png",
+            "alt": {
+              "en": "The details of a game, with its smoothness for each frame rate (example values)",
+              "fr": "Le détail d'un jeu, avec sa fluidité pour chaque fréquence (valeurs d'exemple)"
+            },
+            "width": 640
+          }
+        },
+        {
+          "id": "item-0-3",
+          "text": {
+            "en": "**Smoothness on the compatibility page.** The same lines are on the page of compatibility, under each device model of each game. The picture shows example values.",
+            "fr": "**Fluidité sur la page de compatibilité.** Les mêmes lignes sont sur la page de compatibilité, sous chaque modèle d'appareil de chaque jeu. L'image montre des valeurs d'exemple."
+          },
+          "image": {
+            "src": "screenshots/compatibility.png",
+            "alt": {
+              "en": "The compatibility page, with the smoothness of each model (example values)",
+              "fr": "La page de compatibilité, avec la fluidité de chaque modèle (valeurs d'exemple)"
+            },
+            "width": 640
+          }
+        },
+        {
+          "id": "item-0-4",
+          "text": {
+            "en": "**Stronger reports.** A report tells what a game asks of Steam, how its run ended and where its frame rate stood. Tickets and account numbers are hidden, the raw crash dump is no longer attached, and a run under a minute is told apart, since it rarely shows the cause.",
+            "fr": "**Rapports plus complets.** Un rapport dit ce que le jeu demande à Steam, comment sa partie s'est terminée et où en était sa fréquence d'images. Les tickets et les numéros de compte sont masqués, le vidage brut du plantage n'est plus joint, et une partie de moins d'une minute est signalée, car elle montre rarement la cause."
+          }
+        }
+      ]
+    },
+    {
+      "id": "section-1",
+      "title": {
+        "en": "Fixes",
+        "fr": "Corrections"
+      },
+      "items": [
+        {
+          "id": "item-1-0",
+          "text": {
+            "en": "Unreal Engine 4 games, and games of any later Unreal version, get their VR entry.",
+            "fr": "Les jeux Unreal Engine 4, et ceux de toute version d'Unreal suivante, reçoivent leur entrée VR."
+          }
+        }
+      ]
+    }
+  ]
+}
