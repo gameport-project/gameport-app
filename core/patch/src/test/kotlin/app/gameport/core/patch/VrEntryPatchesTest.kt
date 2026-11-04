@@ -60,6 +60,30 @@ class VrEntryPatchesTest {
     }
 
     @Test
+    fun `an Unreal 4 GameActivity behind its splash activity gets the same VR entry`() {
+        val unreal4 = "com.epicgames.ue4.GameActivity"
+        val root = manifest(activity("com.epicgames.ue4.SplashActivity", filter(launcher)), activity(unreal4))
+        VrLauncherPatch.patchManifest(root)
+        VrGameActivityPatch.patchManifest(root)
+        val added = filtersOf(root, unreal4).single()
+        assertFalse(launcher in added)
+        assertTrue(added.containsAll(vr))
+        repeat(2) { VrLauncherPatch.patchManifest(root); VrGameActivityPatch.patchManifest(root) }
+        assertEquals(1, filtersOf(root, unreal4).size)
+    }
+
+    @Test
+    fun `a later Unreal package is found by its pattern, and a name that is not the engine's is not`() {
+        assertTrue(VrGameActivityPatch.isGameActivity("com.epicgames.ue4.GameActivity"))
+        assertTrue(VrGameActivityPatch.isGameActivity("com.epicgames.unreal.GameActivity"))
+        assertTrue(VrGameActivityPatch.isGameActivity("com.epicgames.ue6.GameActivity"))
+        assertFalse(VrGameActivityPatch.isGameActivity("com.example.ue4.GameActivity"))
+        assertFalse(VrGameActivityPatch.isGameActivity("com.epicgames.ue4.SplashActivity"))
+        assertFalse(VrGameActivityPatch.isGameActivity("com.epicgames.GameActivity"))
+        assertFalse(VrGameActivityPatch.isGameActivity(null))
+    }
+
+    @Test
     fun `patching again changes nothing`() {
         val once = splashThenGame().also { VrLauncherPatch.patchManifest(it); VrGameActivityPatch.patchManifest(it) }
         val twice = splashThenGame().also { repeat(2) { _ -> VrLauncherPatch.patchManifest(it); VrGameActivityPatch.patchManifest(it) } }

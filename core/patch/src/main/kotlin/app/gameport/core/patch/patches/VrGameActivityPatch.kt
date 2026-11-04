@@ -21,7 +21,7 @@ import com.reandroid.json.JSONArray
 import com.reandroid.json.JSONObject
 
 /**
- * An Unreal game can start from a splash activity that hands over to `GameActivity`, the one that runs the game. The system reads the manifest
+ * An Unreal game (4 or 5) can start from a splash activity that hands over to `GameActivity`, the one that runs the game. The system reads the manifest
  * of each activity, so the second one opens in a flat window beside the first, whatever the intent that starts it carries. This gives it the
  * immersive categories too, without the launcher one so it stays out of the app list.
  *
@@ -33,7 +33,14 @@ object VrGameActivityPatch : ApkPatch {
     override val recommended = true
     override val locked = false
 
-    const val UNREAL_GAME_ACTIVITY = "com.epicgames.unreal.GameActivity"
+    /**
+     * The activity that runs an Unreal game, by the package the engine puts it in: `com.epicgames.ue4` for Unreal 4, `com.epicgames.unreal` for Unreal 5. Any other package
+     * under `com.epicgames` counts too, so a later version of the engine that names it differently is still found.
+     */
+    private val GAME_ACTIVITY = Regex("""com\.epicgames\.[A-Za-z0-9_]+\.GameActivity""")
+
+    /** True for the name of an Unreal game's activity. */
+    fun isGameActivity(name: String?): Boolean = name != null && GAME_ACTIVITY.matches(name)
 
     /** Application metadata the hook reads: present when this patch gave the game's activity its VR entry. */
     const val META_KEY = "app.gameport.vr_game_activity"
@@ -54,7 +61,7 @@ object VrGameActivityPatch : ApkPatch {
             takeNodesEach({ named("application") }) {
                 var ours = false
                 val patched = takeNodesEach({ named("activity") }) {
-                    val isGameActivity = nameAttribute() == UNREAL_GAME_ACTIVITY
+                    val isGameActivity = isGameActivity(nameAttribute())
                     val hasEntry = elem<JSONArray>("nodes").elemEach<JSONObject> { named("intent-filter") }.any { filter ->
                         filter.elem<JSONArray>("nodes").elemEach<JSONObject> { named("category") }.any { it.nameAttribute() in ENTRY_CATEGORIES }
                     }

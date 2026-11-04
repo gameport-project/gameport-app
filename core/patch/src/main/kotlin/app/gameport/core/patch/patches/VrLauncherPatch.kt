@@ -41,7 +41,7 @@ object VrLauncherPatch : ApkPatch {
         manifest.takeNodesEach({ named("manifest") }) {
             takeNodesEach({ named("application") }) {
                 takeNodesEach({ named("activity") }) {
-                    val isGameActivity = nameAttribute() == VrGameActivityPatch.UNREAL_GAME_ACTIVITY
+                    val isGameActivity = VrGameActivityPatch.isGameActivity(nameAttribute())
                     takeNodesEach({ named("intent-filter") }) {
                         val categories = elem<JSONArray>("nodes").elemEach<JSONObject> { named("category") }.mapNotNull { it.nameAttribute() }
                         // The VR-only filter of an Unreal GameActivity (see VrGameActivityPatch) is not a launcher entry: a second pass leaves it as it is.
