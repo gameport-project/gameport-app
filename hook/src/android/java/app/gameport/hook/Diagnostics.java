@@ -127,8 +127,30 @@ final class Diagnostics {
                 }
                 t.append('\n');
             }
+            // The expansion files as the game itself sees them (its own rights, not GamePort's): a folder it cannot open or a file it cannot read is a game that starts without them.
+            if (i == 3) appendFiles(t, place, "  ", 0);
         }
         return t.toString();
+    }
+
+    /** Each file under [folder] with its size and whether the game can read it, and each subfolder with its own entries (two levels). */
+    private static void appendFiles(StringBuilder t, File folder, String indent, int depth) {
+        File[] files = folder.listFiles();
+        if (files == null) {
+            t.append(indent).append("(the game cannot list this folder)\n");
+            return;
+        }
+        Arrays.sort(files);
+        int shown = 0;
+        for (File file : files) {
+            if (shown++ >= 30) { t.append(indent).append("...\n"); break; }
+            if (file.isDirectory()) {
+                t.append(indent).append(file.getName()).append("/  read=").append(file.canRead()).append(" write=").append(file.canWrite()).append('\n');
+                if (depth < 1) appendFiles(t, file, indent + "  ", depth + 1);
+            } else {
+                t.append(indent).append(file.getName()).append("  ").append(file.length()).append(" bytes  read=").append(file.canRead()).append('\n');
+            }
+        }
     }
 
     private static String writeTest(File folder) {

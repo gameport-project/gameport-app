@@ -50,6 +50,8 @@ final class SessionLog {
 
     /** What the game asked for natively and did not find, seen in its whole log and not only the lines kept (see [NativeGaps]). */
     private final NativeGaps nativeGaps = new NativeGaps();
+    /** What the whole log says (exceptions, repeats, sign-in problems, session states, frame rate, steps), counted on every line and not only the kept ones (see [StreamDigest]). */
+    private final StreamDigest digest = new StreamDigest();
     /** The runtime's once-a-second performance lines (frame rate, CPU and GPU levels), kept apart because they would flood the log. */
     private final ArrayDeque<String> performance = new ArrayDeque<>();
     private static final int PERFORMANCE_LINES = 180;
@@ -77,6 +79,14 @@ final class SessionLog {
     private int performanceVersion;
     private int sentPerformanceVersion = -1;
     private String sentLibraries = "";
+    /**
+     * The calls the game made to Steam, as the shim's table says (see [SteamCalls]). The counts never stop growing, so the table is sent again when a new kind of call appears
+     * and otherwise at most every two minutes, not at each flush: a quiet game would otherwise send its whole report every thirty seconds.
+     */
+    private static final long STEAM_CALLS_REFRESH_MS = 120_000;
+    private int sentSteamKinds = -1;
+    private long sentSteamCallsAt;
+    private String previousRunCalls;
     private volatile String launchInfo = "";
     private String lastEngineDigest = "";
     private volatile boolean crashFlushed = false;
@@ -202,10 +212,34 @@ final class SessionLog {
                 }
                 lastRx = rx;
                 lastTx = tx;
+                sampleMemory(started);
             }
         } catch (Throwable t) {
             Log.w(TAG, "the game's traffic cannot be followed", t);
         }
+    }
+
+    /** The memory the game holds and the device has left, read from /proc (an app may read its own): a game that leaks or is short of memory shows it over time. */
+    private void sampleMemory(long started) {
+        try {
+            long resident = kbOf(readSmall(new File("/proc/self/status")), "VmRSS:");
+            long available = kbOf(readSmall(new File("/proc/meminfo")), "MemAvailable:");
+            if (resident < 0 || available < 0) return;
+            if (digest.memory(System.currentTimeMillis(), started, resident, available)) synchronized (network) { networkVersion++; }
+        } catch (Throwable ignored) {
+            // Not readable on this system: the report simply has no memory lines.
+        }
+    }
+
+    /** The number of a line such as "VmRSS:   123456 kB", or -1. */
+    private static long kbOf(String text, String key) {
+        int at = text.indexOf(key);
+        if (at < 0) return -1;
+        int start = at + key.length();
+        while (start < text.length() && text.charAt(start) == ' ') start++;
+        int end = start;
+        while (end < text.length() && Character.isDigit(text.charAt(end))) end++;
+        return end > start ? Long.parseLong(text.substring(start, end)) : -1;
     }
 
     /** Sends what is new now (the game left the screen or is closing). */
@@ -246,6 +280,8 @@ final class SessionLog {
             String line;
             while ((line = reader.readLine()) != null) {
                 nativeGaps.scan(line);
+                // A line that came again and again is counted by the digest and not kept: it filled the kept lines in seconds and hid the rest of the run.
+                if (!digest.scan(line)) continue;
                 synchronized (head) {
                     if (head.size() < HEAD_LINES) head.add(line);
                     else {
@@ -272,6 +308,7 @@ final class SessionLog {
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), "UTF-8"));
             String line;
             while ((line = reader.readLine()) != null) {
+                digest.frameRate(line);
                 synchronized (performance) {
                     performance.addLast(line);
                     performanceVersion++;
@@ -299,9 +336,10 @@ final class SessionLog {
         synchronized (threads) { threadsAt = threadsVersion; }
         int diagnosticsAt;
         synchronized (diagnostics) { diagnosticsAt = diagnosticsVersion; }
+        String steamCalls = steamCalls();
         synchronized (head) {
             at = version;
-            if (at == sentVersion && performanceAt == sentPerformanceVersion && networkAt == sentNetworkVersion && threadsAt == sentThreadsVersion && diagnosticsAt == sentDiagnosticsVersion && librariesSignature.equals(sentLibraries) && exitSent) return;
+            if (at == sentVersion && performanceAt == sentPerformanceVersion && networkAt == sentNetworkVersion && threadsAt == sentThreadsVersion && diagnosticsAt == sentDiagnosticsVersion && librariesSignature.equals(sentLibraries) && steamCallsKinds(steamCalls) == sentSteamKinds && System.currentTimeMillis() - sentSteamCallsAt < STEAM_CALLS_REFRESH_MS && exitSent) return;
             StringBuilder h = new StringBuilder();
             for (String line : head) h.append(line).append('\n');
             StringBuilder t = new StringBuilder();
@@ -328,14 +366,16 @@ final class SessionLog {
         extras.putByteArray("diagGz", gzip(diag.toString()));
         extras.putString("launch", launchInfo);
         extras.putString("nativeGaps", nativeGaps.report());
+        extras.putString("digest", digest.report());
+        extras.putString("steamCalls", steamCalls);
         extras.putString("libraries", libraries);
         // Which run this is: GamePort keeps the log of the run before when a new one begins.
         extras.putInt("pid", android.os.Process.myPid());
         String engine = engineLogs();
-        String digest = Integer.toHexString(engine.hashCode());
-        if (!digest.equals(lastEngineDigest) && !engine.isEmpty()) {
+        String engineDigest = Integer.toHexString(engine.hashCode());
+        if (!engineDigest.equals(lastEngineDigest) && !engine.isEmpty()) {
             extras.putByteArray("engineGz", gzip(engine));
-            lastEngineDigest = digest;
+            lastEngineDigest = engineDigest;
         }
         if (!exitSent) addPreviousExit(extras);
         try {
@@ -347,10 +387,51 @@ final class SessionLog {
                 sentThreadsVersion = threadsAt;
                 sentDiagnosticsVersion = diagnosticsAt;
                 sentLibraries = librariesSignature;
+                sentSteamKinds = steamCallsKinds(steamCalls);
+                sentSteamCallsAt = System.currentTimeMillis();
                 exitSent = true;
             }
         } catch (Throwable t) {
             Log.w(TAG, "could not hand the log to GamePort", t);
+        }
+    }
+
+    /**
+     * The table of the calls the game made to Steam, which the shim keeps in a file of the game's folder, and the one the run before left in its own (a game that was killed
+     * leaves the table that says how far it got). Read by this process, which owns the folder.
+     */
+    private String steamCalls() {
+        try {
+            File folder = new File(context.getExternalFilesDir(null), "gameport");
+            String current = SteamCalls.render(readAll(new File(folder, "steam-calls.bin")));
+            if (previousRunCalls == null) previousRunCalls = SteamCalls.render(readAll(new File(folder, "steam-calls.previous.bin")));
+            if (previousRunCalls.isEmpty()) return current;
+            return current + (current.isEmpty() ? "" : "\n\n") + "== The run before this one: the table it left in its file ==\n" + previousRunCalls;
+        } catch (Throwable t) {
+            return "";
+        }
+    }
+
+    /** How many kinds of call the text lists (one per line): a call never leaves the table, so a larger number means a new kind appeared. */
+    private static int steamCallsKinds(String text) {
+        int lines = 0;
+        for (int i = 0; i < text.length(); i++) if (text.charAt(i) == '\n') lines++;
+        return lines;
+    }
+
+    private static byte[] readAll(File file) {
+        if (!file.isFile() || file.length() > 400_000) return null;
+        try (FileInputStream in = new FileInputStream(file)) {
+            byte[] bytes = new byte[(int) file.length()];
+            int done = 0;
+            while (done < bytes.length) {
+                int n = in.read(bytes, done, bytes.length - done);
+                if (n < 0) break;
+                done += n;
+            }
+            return done == bytes.length ? bytes : Arrays.copyOf(bytes, done);
+        } catch (Throwable t) {
+            return null;
         }
     }
 
