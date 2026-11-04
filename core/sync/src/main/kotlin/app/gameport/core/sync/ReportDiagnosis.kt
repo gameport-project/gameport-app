@@ -27,7 +27,7 @@ object ReportDiagnosis {
         if (apkEntries.any { it.endsWith("libovrplatformloader.so") }) add("Meta: libovrplatformloader.so (the Meta platform SDK, which can check the app's entitlement)")
     }
 
-    fun of(libraries: String, startLog: String, previousExit: String, dataAgeSeconds: Long?, expansion: Expansion? = null, launch: Launch? = null, vendorChecks: List<String> = emptyList()): String = buildString {
+    fun of(libraries: String, startLog: String, previousExit: String, dataAgeSeconds: Long?, expansion: Expansion? = null, launch: Launch? = null, vendorChecks: List<String> = emptyList(), digest: String = "", steamCalls: String = ""): String = buildString {
         fun yes(value: Boolean) = if (value) "yes" else "no"
         // First of all: a game whose essential controls the runtime refused cannot be played with the controllers.
         leftOutControls(startLog).filter { it.essential.isNotBlank() }.forEach {
@@ -58,6 +58,8 @@ object ReportDiagnosis {
             if (it > STALE_SECONDS) appendLine("  (old: what the lists hold may be from the start of the run, not from now)")
         }
         launch?.let { appendLaunch(it, vendorChecks.isNotEmpty()) }
+        appendDigest(digest, libraries)
+        appendSteamCalls(steamCalls)
         if (vendorChecks.isNotEmpty()) {
             appendLine("checks built into the game by the headset's maker (a re-signed game can be refused by them, at start and without a log line):")
             vendorChecks.forEach { appendLine("  $it") }
@@ -78,6 +80,65 @@ object ReportDiagnosis {
                 appendLine("  The newest of these ended on ${stamp(newest)}, ${ago(now - newest)} before this report (made ${stamp(now)}, the time of the device).")
                 if (launch.launchedAtMillis != null && launch.launchedAtMillis > newest) appendLine("  The game was started again since: that end does not explain the run of this report.")
             }
+        }
+    }
+
+    private val FOCUSED = Regex("""focused reached: (yes|no)""")
+    private val STATES = Regex("""OpenXR session states reached: (.+)""")
+    private val FRAME_RATE = Regex("""Frame rate \(.*?\): median (\d+), lowest tenth (\d+), over (\d+) s, target (\d+)""")
+    private val SIGN_IN = Regex("""Sign-in problems: (\d+) line""")
+    private val ENGINE_LINES = Regex("""lines of the engine's own log tag \(UE, UE4, Unity\): (\d+)""")
+    private val EXCEPTION_LINE = Regex("""(?m)^  (\d+)x  \(first at [^)]*\)  (.+)$""")
+
+    /**
+     * What the whole log says (log-digest.txt, counted by the game's hook over every line), in the few facts that tell a reader where to look: whether the OpenXR session
+     * ever had focus, a frame rate far under its target, sign-in problems, an Unreal game that wrote nothing of its own, and the exception that came most often.
+     */
+    private fun StringBuilder.appendDigest(digest: String, libraries: String) {
+        if (digest.isBlank()) return
+        val states = STATES.find(digest)?.groupValues?.get(1)?.trim().orEmpty()
+        if (states.isNotEmpty() && !states.startsWith("none")) {
+            val focused = FOCUSED.find(digest)?.groupValues?.get(1) == "yes"
+            appendLine("OpenXR session reached focus: " + if (focused) "yes" else "no (states seen: $states): the game was not given the controllers' input as the active application")
+        }
+        FRAME_RATE.find(digest)?.let { match ->
+            val (median, low, seconds, target) = match.destructured
+            val slow = target.toInt() > 0 && median.toInt() < target.toInt() * 8 / 10
+            appendLine("frame rate: median $median of $target, lowest tenth $low, over $seconds s" + if (slow) " (far under the target)" else "")
+        }
+        SIGN_IN.find(digest)?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it > 0 }?.let { appendLine("sign-in problems in the log: $it line(s) (the first ones are in log-digest.txt)") }
+        val engineLines = ENGINE_LINES.find(digest)?.groupValues?.get(1)?.toLongOrNull()
+        val unreal = libraries.contains("libUnreal.so") || libraries.contains("libUE4.so")
+        if (unreal && engineLines == 0L) {
+            appendLine("the game is an Unreal game and its engine wrote no line to the system log (a build without the engine's logs): a failure of its sign-in or network is not told by it.")
+            appendLine("  Its exceptions and the lines that repeat the most are in log-digest.txt.")
+        }
+        EXCEPTION_LINE.find(digest)?.let { appendLine("exception named most often in the log: ${it.groupValues[1]}x ${it.groupValues[2].take(160)}") }
+    }
+
+    private val CALL_LINE = Regex("""(?m)^\s*(\d+)x\s+\+\s*[\d.]+ s\s+\+\s*[\d.]+ s\s+(.+?)(?:\s+\[\d+ timed.*)?$""")
+
+    /**
+     * What the game asked of Steam (steam-calls.txt, kept by the shim): whether it ever asked for a ticket and for which service. A game that signs in online and never asks
+     * Steam for one takes another way (a check on the device it runs on, a store account of its own), which no log line says.
+     */
+    private fun StringBuilder.appendSteamCalls(steamCalls: String) {
+        if (steamCalls.isBlank()) return
+        val current = steamCalls.substringBefore("== The run before this one")
+        val calls = CALL_LINE.findAll(current).associate { it.groupValues[2] to it.groupValues[1].toLong() }
+        if (calls.isEmpty()) return
+        val sessionAsked = calls.entries.filter { it.key.startsWith("Steam_User::GetAuthSessionTicket") }.sumOf { it.value }
+        val webServices = calls.entries.filter { it.key.startsWith("web ticket asked for service: ") }.map { it.key.removePrefix("web ticket asked for service: ") to it.value }
+        val given = calls.entries.filter { it.key.startsWith("session ticket read from GamePort") || it.key.startsWith("web ticket read from GamePort") }.sumOf { it.value }
+        val notGiven = calls.entries.filter { it.key.contains("NOT given by GamePort") || it.key.contains("refused") }.sumOf { it.value }
+        if (sessionAsked == 0L && webServices.isEmpty()) {
+            appendLine("Steam tickets asked by the game: none (it never asked Steam for a session ticket or a web ticket in this run: if its online sign-in fails, it does not go through Steam)")
+        } else {
+            val parts = buildList {
+                if (sessionAsked > 0) add("session ticket x$sessionAsked")
+                webServices.forEach { (service, count) -> add("web ticket for \"$service\" x$count") }
+            }
+            appendLine("Steam tickets asked by the game: ${parts.joinToString(", ")}; given to it: $given" + if (notGiven > 0) ", NOT given: $notGiven" else "")
         }
     }
 

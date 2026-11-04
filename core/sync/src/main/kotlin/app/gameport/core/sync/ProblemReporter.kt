@@ -136,22 +136,21 @@ class ProblemReporter @Inject constructor(
                 entry("components.txt", clean(components(packageName)))
                 entry("launch.txt", clean(launchFacts(packageName)))
                 entry("loaded-libraries.txt", clean(store.text(packageName, "libraries.txt").ifBlank { "(the game has not handed it over yet)" }))
+                store.text(packageName, "log-digest.txt").takeIf { it.isNotBlank() }?.let { entry("log-digest.txt", clean(it)) }
+                store.text(packageName, "steam-calls.txt").takeIf { it.isNotBlank() }?.let { entry("steam-calls.txt", clean(it)) }
                 entry("missing-native.txt", clean(store.text(packageName, "native-gaps.txt").ifBlank { "(the game's log shows no function, library or symbol it asked for and did not find)" }))
                 entry("game-log-start.txt", clean(store.text(packageName, "log-start.txt").ifBlank { "(the game has not handed over its log yet)" }))
                 entry("game-log.txt", clean(store.hookLog(packageName).ifBlank { "(empty: a short run fits in game-log-start.txt, or the game has not handed over its log)" }))
                 // The run before the last one, when the last one began after it ended: the one that explains how it ended.
                 store.previousLogStart(packageName).takeIf { it.isNotBlank() }?.let { entry("previous-run-log-start.txt", clean(it)) }
                 store.previousHookLog(packageName).takeIf { it.isNotBlank() }?.let { entry("previous-run-log.txt", clean(it)) }
-                if (!lean) entry("engine-logs.txt", clean(store.text(packageName, "engine.log").ifBlank { "(no log file of the game's engine found)" }))
+                // Left out when the game's engine wrote no log file of its own: a line saying so in every report was noise.
+                if (!lean) store.text(packageName, "engine.log").takeIf { it.isNotBlank() }?.let { entry("engine-logs.txt", clean(it)) }
                 entry("last-exits.txt", clean(ExitReasons.withTimes(store.previousExit(packageName)).ifBlank { "(not available)" }))
-                entry("diagnosis.txt", ReportDiagnosis.of(store.text(packageName, "libraries.txt"), store.text(packageName, "log-start.txt"), store.previousExit(packageName), store.lastDataMillis(packageName)?.let { (System.currentTimeMillis() - it) / 1000 }, expansionFacts(packageName), ReportDiagnosis.Launch(events.lastTimeOf(game.appId, app.gameport.core.install.LAUNCH_NOTE), store.lastDataMillis(packageName), System.currentTimeMillis(), onPico = device.vrPlatform?.id == "pico"), vendorChecks(packageName)))
-                // The crash in words, in every report (it is a few lines); the trace itself only in the full one.
-                store.bytes(packageName, "tombstone.pb")?.let { trace -> CrashSummary.of(trace)?.let { entry("crash-summary.txt", clean(it)) } }
-                store.bytes(packageName, "tombstone.pb")?.takeIf { !lean }?.let { trace ->
-                    zip.putNextEntry(ZipEntry("crash-tombstone.pb"))
-                    zip.write(trace)
-                    zip.closeEntry()
-                    entry("crash-tombstone-info.txt", store.text(packageName, "tombstone-info.txt"))
+                entry("diagnosis.txt", ReportDiagnosis.of(store.text(packageName, "libraries.txt"), store.text(packageName, "log-start.txt"), store.previousExit(packageName), store.lastDataMillis(packageName)?.let { (System.currentTimeMillis() - it) / 1000 }, expansionFacts(packageName), ReportDiagnosis.Launch(events.lastTimeOf(game.appId, app.gameport.core.install.LAUNCH_NOTE), store.lastDataMillis(packageName), System.currentTimeMillis(), onPico = device.vrPlatform?.id == "pico"), vendorChecks(packageName), store.text(packageName, "log-digest.txt"), store.text(packageName, "steam-calls.txt")))
+                // The crash in words, in every report (it is a few lines). The raw trace is not attached: it holds a copy of the memory of the stack, which no filter can clean.
+                store.bytes(packageName, "tombstone.pb")?.let { trace ->
+                    CrashSummary.of(trace)?.let { summary -> entry("crash-summary.txt", clean(staleNote(store.text(packageName, "tombstone-info.txt"), events.lastTimeOf(game.appId, app.gameport.core.install.LAUNCH_NOTE)) + summary)) }
                 }
             }
             if (installFailure != null) entry("install.txt", clean("Install error: $installFailure\n\n" + installer.downloadReport(game.appId)))
@@ -198,6 +197,17 @@ class ProblemReporter @Inject constructor(
             "lastSession.seconds" to packageName?.let { store.lastSessionMillis(it) }?.let { it / 1000 },
         )
         return facts.entries.joinToString(",\n", "{\n", "\n}\n") { (key, value) -> "  ${q(key)}: ${if (value == null) "null" else q(value)}" }
+    }
+
+    /** How long the game's last run lasted, in seconds, or null when GamePort does not know (the game never ran, or ended before it was told). */
+    fun lastRunSeconds(appId: Int): Long? =
+        installed.all()[appId]?.let { store.lastSessionMillis(it) }?.let { it / 1000 }
+
+    /** A crash from before the last launch of the game is not the run of this report: the summary says so, with how long before it was. */
+    private fun staleNote(info: String, launchedAtMillis: Long?): String {
+        val time = Regex("time=(\\d+)").find(info)?.groupValues?.get(1)?.toLongOrNull() ?: return ""
+        if (launchedAtMillis == null || time >= launchedAtMillis) return ""
+        return "NOTE: this crash ended a run that came before the last launch of the game (${ReportDiagnosis.ago(System.currentTimeMillis() - time)} before this report): it does not explain the run of this report.\n\n"
     }
 
     private fun files(packageName: String): String = buildString {
@@ -326,12 +336,28 @@ class ProblemReporter @Inject constructor(
         return ReportDiagnosis.vendorChecks(info?.requestedPermissions?.toList().orEmpty(), info?.applicationInfo?.metaData?.keySet()?.toList().orEmpty(), entries)
     }
 
+    /**
+     * What the game's APKs hold: every native library and the files that name the engine or the scripting (the metadata, the engine's data), and for everything else
+     * one line per folder with how many files and how many bytes. The full list ran to 230 KB and said little more.
+     */
     private fun apkContents(packageName: String): String = buildString {
         packages.apkFilesOf(packageName).forEach { apk ->
             appendLine("== ${apk.name} (${apk.length()} bytes)")
             runCatching {
                 java.util.zip.ZipFile(apk).use { zip ->
-                    zip.entries().asSequence().take(MAX_APK_ENTRIES).forEach { appendLine("  ${it.name}  ${it.size} (${it.compressedSize})") }
+                    val others = sortedMapOf<String, LongArray>()
+                    zip.entries().asSequence().take(MAX_APK_ENTRIES).forEach { entry ->
+                        val name = entry.name
+                        if (name.startsWith("lib/") || name.endsWith(".dex") || name == "AndroidManifest.xml" || name.endsWith("global-metadata.dat") || name.startsWith("META-INF/") && name.endsWith(".version")) {
+                            appendLine("  $name  ${entry.size} (${entry.compressedSize})")
+                        } else {
+                            val folder = name.substringBeforeLast('/', "").split('/').take(2).joinToString("/").ifEmpty { "(top)" }
+                            val total = others.getOrPut(folder) { LongArray(2) }
+                            total[0]++
+                            total[1] += entry.size
+                        }
+                    }
+                    others.forEach { (folder, total) -> appendLine("  $folder/  ${total[0]} file(s), ${total[1]} bytes") }
                 }
             }.onFailure { appendLine("  (not readable: ${it.javaClass.simpleName})") }
         }
@@ -353,7 +379,8 @@ class ProblemReporter @Inject constructor(
                 }
             }
         }
-        found.forEach { (name, versions) ->
+        // The versions the shim offers are GamePort's own and the same for every game: only what the game asks for, and what is missing, is listed.
+        found.filterKeys { it != "lib/arm64-v8a/libsteamclient.so" }.forEach { (name, versions) ->
             appendLine("$name:")
             if (versions.isEmpty()) appendLine("  (none found)") else versions.forEach { appendLine("  $it") }
         }
@@ -432,28 +459,30 @@ class ProblemReporter @Inject constructor(
             diag-*.txt            diagnostics from inside the game: when its screens came and went (lifecycle), whether it can write where it keeps its data (storage),
                                   the state of the network and whether the servers online games use can be reached (network-state, reach), what its threads were doing (stacks)
             files.txt             the game's APK and expansion files (names and sizes)
-            apk-contents.txt      every file inside the game's APK (names and sizes)
-            steam-interfaces.txt  the Steam interface versions the game's libraries ask for
+            apk-contents.txt      the native libraries and the engine's key files inside the game's APK, and one line per folder for the rest (files and bytes)
+            steam-interfaces.txt  the Steam interface versions the game's libraries ask for, and the ones GamePort's stand-in does not offer
             patch.txt             which GamePort pieces the game carries (shim, OpenXR layer, hook)
             manifest.txt          the permissions and metadata the game declares
             components.txt        the game's screens, services, providers, receivers
             launch.txt            how the game is started
             loaded-libraries.txt  the files the game process really loaded (which OpenXR runtime, the shim...)
             missing-native.txt    the functions, libraries and symbols the game asked for and did not find, each once with how many times: what a stand-in library would have to answer
-            game-log-start.txt    the first lines of the game's system log (its start)
-            game-log.txt          the latest lines of the game's system log
+            log-digest.txt        what the whole log of the run says, counted on every line: the steps and when they came, the OpenXR session states, the frame rate, the sign-in problems,
+                                  the exceptions with how many times, the lines that repeat the most, the memory of the game over time
+            steam-calls.txt       the calls the game made to Steam through GamePort's stand-in, in the order each was first made, with how many times and when (counted over the whole run, no value kept):
+                                  tells at once whether the game asked for a ticket, for which service, and what it never asked
+            game-log-start.txt    the first lines of the game's system log (its start); a line repeated many times is kept 40 times, the others are only counted in log-digest.txt
+            game-log.txt          the latest lines of the game's system log (same rule)
             previous-run-log-*.txt the same for the run before the last one, when there was one
             engine-logs.txt       log files the game's engine wrote in the game's folders, when there are some
             last-exits.txt        how the last runs ended, as Android recorded it
             crash-summary.txt     the last native crash in words: the signal, the address that faulted, the thread that crashed and the top of its call stack
-            crash-tombstone.pb    Android's crash report of the last native crash, when there was one (binary; it holds
-                                  the call stack and technical memory data of the game process)
+                                  (a crash from before the last launch is marked as such; the raw crash dump is never attached, as it holds a copy of memory)
             install.txt           for a failed install: the error, the download folder and what its APKs say about themselves
             events.txt            what GamePort did for this game: download (and what it held besides the APK), patch, install and their errors, each line with the version of GamePort
             gameport-log.txt      GamePort's own warnings, errors and messages about this game
 
-            Account numbers, e-mail addresses, network addresses and the account's display name are removed from every
-            text file. The crash report is a binary file and is not filtered.
+            Account numbers, tickets and keys, e-mail addresses, network addresses and the account's display name are removed from every text file.
         """.trimIndent() + "\n"
     }
 }

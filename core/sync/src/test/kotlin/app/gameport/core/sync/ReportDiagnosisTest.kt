@@ -1,5 +1,6 @@
 package app.gameport.core.sync
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -199,5 +200,60 @@ class ReportDiagnosisTest {
         assertTrue(ReportDiagnosis.ago(10 * 60_000L) == "10 min")
         assertTrue(ReportDiagnosis.ago(28 * 3_600_000L) == "28 h")
         assertTrue(ReportDiagnosis.ago(5 * 86_400_000L) == "5 days")
+    }
+
+    @Test
+    fun `the digest of the log gives its facts at once`() {
+        val digest = """
+            lines seen: 900, kept: 800, lines of the engine's own log tag (UE, UE4, Unity): 0
+
+            OpenXR session states reached: idle, ready, synchronized, visible
+            focused reached: no
+
+            Frame rate (the runtime's line, once a second): median 5, lowest tenth 1, over 40 s, target 72
+
+            Sign-in problems: 3 line(s), the first different ones:
+              11-04 13:41:30.000 E Unity : Steam sign-in failed (invalid token)
+
+            Exceptions and errors named in the log, most frequent first:
+              300x  (first at 13:41:31.061)  W System.err: java.lang.NoClassDefFoundError: Failed resolution of: Lx;
+        """.trimIndent()
+        val text = ReportDiagnosis.of("/data/app/lib/arm64/libUnreal.so\n", "", "", null, digest = digest)
+        assertTrue(text, text.contains("OpenXR session reached focus: no (states seen: idle, ready, synchronized, visible)"))
+        assertTrue(text, text.contains("frame rate: median 5 of 72, lowest tenth 1, over 40 s (far under the target)"))
+        assertTrue(text, text.contains("sign-in problems in the log: 3 line(s)"))
+        assertTrue(text, text.contains("its engine wrote no line to the system log"))
+        assertTrue(text, text.contains("exception named most often in the log: 300x"))
+    }
+
+    @Test
+    fun `no digest adds nothing`() {
+        val text = ReportDiagnosis.of("", "", "", null)
+        assertFalse(text, text.contains("frame rate:"))
+        assertFalse(text, text.contains("OpenXR session reached focus"))
+    }
+
+    @Test
+    fun `a game that never asked Steam for a ticket is told so`() {
+        val calls = """
+            Calls the game made to Steam through the stand-in of GamePort, in the order each was first made. The counts cover the whole run.
+
+                  1x  +   0.1 s  +   0.1 s  Steam_Client::CreateSteamPipe
+                 12x  +   0.4 s  +  45.2 s  Steam_Apps::BIsSubscribed
+        """.trimIndent()
+        val text = ReportDiagnosis.of("", "", "", null, steamCalls = calls)
+        assertTrue(text, text.contains("Steam tickets asked by the game: none"))
+    }
+
+    @Test
+    fun `the tickets the game asked for and was given are counted with their services`() {
+        val calls = """
+                  3x  +   0.4 s  +  20.0 s  Steam_User::GetAuthSessionTicket %i
+                  3x  +   0.4 s  +  20.0 s  session ticket read from GamePort  [3 timed, average 2.0 ms, longest 3.1 ms]
+                  2x  +   1.0 s  +   9.0 s  web ticket asked for service: epiconlineservices
+                  1x  +   1.0 s  +   1.0 s  web ticket NOT given by GamePort (the request fails)  [1 timed, average 0.1 ms, longest 0.1 ms]
+        """.trimIndent()
+        val text = ReportDiagnosis.of("", "", "", null, steamCalls = calls)
+        assertTrue(text, text.contains("session ticket x3, web ticket for \"epiconlineservices\" x2; given to it: 3, NOT given: 1"))
     }
 }
