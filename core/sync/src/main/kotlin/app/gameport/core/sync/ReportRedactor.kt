@@ -11,6 +11,15 @@ object ReportRedactor {
     private val ipv4 = Regex("""\b(?:10\.$OCTET\.$OCTET\.$OCTET|172\.(?:1[6-9]|2\d|3[01])\.$OCTET\.$OCTET|192\.168\.$OCTET\.$OCTET|169\.254\.$OCTET\.$OCTET)\b""")
     private val mac = Regex("""\b(?:[0-9A-Fa-f]{2}[:\-]){5}[0-9A-Fa-f]{2}\b""")
 
+    // A Steam ticket is a long run of hexadecimal digits and carries the account number and the public address: any run that long is a secret of one kind or another.
+    private val longHex = Regex("""\b[0-9A-Fa-f]{64,}\b""")
+    // The account number as the Steam client writes it in hexadecimal (0x0110000100000000 and up), and in the "[U:1:n]" form.
+    private val steamIdHex = Regex("""\b0x0*110000[0-9A-Fa-f]{9,10}\b""", RegexOption.IGNORE_CASE)
+    private val steamIdBracket = Regex("""\[U:\d:\d+(?::\d+)?]""")
+    // The value of a key that holds a secret, in JSON or as key=value: the name stays, the value goes.
+    private val secretJson = Regex("""("(?:[A-Za-z_]*(?:ticket|token|password|passwd|secret|DeviceKey|apikey|api_key|authorization)[A-Za-z_]*)"\s*:\s*")([^"]{4,})(")""", RegexOption.IGNORE_CASE)
+    private val secretPair = Regex("""\b((?:[A-Za-z_]*(?:ticket|token|password|passwd|secret|apikey|api_key)[A-Za-z_]*)=)([^\s&,;]{8,})""", RegexOption.IGNORE_CASE)
+
     /** What the system and the games put in their own words: a name that is one of them would hide the words, not the person. */
     private val commonWords = setOf("true", "false", "null", "none", "default", "unknown", "android", "system", "game", "user", "debug", "error", "info")
 
@@ -26,6 +35,11 @@ object ReportRedactor {
             .replace(steamId, "[steamid]")
             .replace(email) { match -> if (isFile(text, match)) match.value else "[email]" }
             .replace(mac, "[mac]")
+            .replace(secretJson) { it.groupValues[1] + "[secret]" + it.groupValues[3] }
+            .replace(secretPair) { it.groupValues[1] + "[secret]" }
+            .replace(longHex, "[hex]")
+            .replace(steamIdHex, "[steamid]")
+            .replace(steamIdBracket, "[steamid]")
             .replace(ipv4) { match -> if (match.value.startsWith("0.") || match.value == "127.0.0.1") match.value else "[ip]" }
         names.map { it.trim() }.filter { it.length >= 3 && it.lowercase() !in commonWords }.distinct().forEach { name ->
             out = out.replace(Regex("(?<![\\p{L}\\p{N}])" + Regex.escape(name) + "(?![\\p{L}\\p{N}])", RegexOption.IGNORE_CASE), "[name]")

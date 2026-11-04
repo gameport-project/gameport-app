@@ -57,4 +57,22 @@ class ReportRedactorTest {
         val line = "2026-10-02 17:45:12 app=846470 gp=0.7.3 installed com.polyarc.MossGame"
         assertEquals(line, ReportRedactor.clean(line, emptyList()))
     }
+
+    @Test
+    fun `a steam ticket in hexadecimal and the keys that hold secrets are removed`() {
+        val ticket = "14000000" + "28A47224".repeat(40)
+        val text = """{"SteamTicket":"$ticket","DeviceKey":"389cfd44-1111-2222-3333-444455556666","name":"ok"} password=hunter2hunter2 token=abcdef123456"""
+        val cleaned = ReportRedactor.clean(text)
+        assertFalse(cleaned, cleaned.contains(ticket))
+        assertFalse(cleaned, cleaned.contains("389cfd44"))
+        assertFalse(cleaned, cleaned.contains("hunter2"))
+        assertFalse(cleaned, cleaned.contains("abcdef123456"))
+        assertEquals(true, cleaned.contains(""""name":"ok""""))
+    }
+
+    @Test
+    fun `an account number in the bracket and hexadecimal forms is removed, a build id is left`() {
+        val cleaned = ReportRedactor.clean("user [U:1:123456789] id 0x0110000100000001 build ba5db481ae7bbc4739784f466e7130a6e6d66215")
+        assertEquals("user [steamid] id [steamid] build ba5db481ae7bbc4739784f466e7130a6e6d66215", cleaned)
+    }
 }
