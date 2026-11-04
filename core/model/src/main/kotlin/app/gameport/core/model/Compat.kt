@@ -72,8 +72,23 @@ enum class CompatLevel {
     FAILS,
 }
 
-/** The verdict of the players on a game, for one kind of device, with the numbers it rests on. Its three counts are the three answers. */
-data class Compat(val level: CompatLevel, val device: String, val works: Int, val offlineOnly: Int, val fails: Int, val worksOffline: Int) {
+/** What a verdict is about: the exact model of the device, its kind (a Quest, a Pico, a phone), or every device that was tried. */
+enum class CompatScope { MODEL, KIND, ALL }
+
+/**
+ * The verdict of the players on a game, with the numbers it rests on. Its three counts are the three answers. [device] is the kind of device in hand; [scope] says how narrow the
+ * verdict is, and [name] is the model it is about when [scope] is [CompatScope.MODEL].
+ */
+data class Compat(
+    val level: CompatLevel,
+    val device: String,
+    val works: Int,
+    val offlineOnly: Int,
+    val fails: Int,
+    val worksOffline: Int,
+    val scope: CompatScope = CompatScope.KIND,
+    val name: String? = null,
+) {
     val players: Int get() = works + offlineOnly + fails
 
     /** Few players answered: the verdict is shown, but it may not be reliable. */
@@ -91,19 +106,42 @@ object CompatRules {
     private const val WORKS_SHARE = 0.75
     private const val FAILS_SHARE = 0.25
 
+    /** Answers a model needs to have of its own before its verdict is the one shown. */
+    const val MIN_MODEL_ANSWERS = 2
+
     /** What the players of [device] (a kind of device) say of the game, or null while none of them said anything: what players of another kind said does not count. */
     fun of(counts: CompatCounts?, device: String): Compat? {
         val own = counts?.devices?.get(device) ?: return null
-        val total = own.works + own.offlineOnly + own.fails
+        return verdict(device, own.works, own.offlineOnly, own.fails, own.worksOffline, CompatScope.KIND, null)
+    }
+
+    /**
+     * What the players say of the game for the device in hand, as narrowly as there are answers to say it: the exact [model] when at least [MIN_MODEL_ANSWERS] players with it
+     * answered, else the kind of device ([device]) when any did, else every device that was tried. Null while nobody said anything.
+     */
+    fun ofDevice(counts: CompatCounts?, device: String, model: String?): Compat? {
+        counts ?: return null
+        val own = counts.devices[device]
+        val modelCounts = model?.let { own?.models?.get(it) }
+        if (modelCounts != null && modelCounts.works + modelCounts.offlineOnly + modelCounts.fails >= MIN_MODEL_ANSWERS) {
+            val name = CompatRows.shortName(modelCounts.name) ?: model
+            return verdict(device, modelCounts.works, modelCounts.offlineOnly, modelCounts.fails, 0, CompatScope.MODEL, name)
+        }
+        of(counts, device)?.let { return it }
+        return verdict(device, counts.works, counts.offlineOnly, counts.fails, counts.worksOffline, CompatScope.ALL, null)
+    }
+
+    private fun verdict(device: String, works: Int, offlineOnly: Int, fails: Int, worksOffline: Int, scope: CompatScope, name: String?): Compat? {
+        val total = works + offlineOnly + fails
         if (total == 0) return null
         // A game that works without the network works, for this: the answers "it works" and "it works offline only" are on the same side.
-        val positive = own.works + own.offlineOnly
+        val positive = works + offlineOnly
         val share = positive.toDouble() / total
         val level = when {
-            share >= WORKS_SHARE -> if (own.offlineOnly * 2 >= positive) CompatLevel.OFFLINE_ONLY else CompatLevel.WORKS
+            share >= WORKS_SHARE -> if (offlineOnly * 2 >= positive) CompatLevel.OFFLINE_ONLY else CompatLevel.WORKS
             share <= FAILS_SHARE -> CompatLevel.FAILS
             else -> CompatLevel.MIXED
         }
-        return Compat(level, device, own.works, own.offlineOnly, own.fails, own.worksOffline.coerceIn(0, own.works))
+        return Compat(level, device, works, offlineOnly, fails, worksOffline.coerceIn(0, works), scope, name)
     }
 }

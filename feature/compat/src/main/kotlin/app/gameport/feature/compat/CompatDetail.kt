@@ -14,6 +14,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import app.gameport.core.model.CompatScope
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -48,6 +55,8 @@ private val IncompatibleRed = Color(0xFFE57373)
 fun CompatDetailDialog(
     gameName: String,
     level: CompatLevel?,
+    verdictLabel: String? = null,
+    scope: CompatScope? = null,
     counts: CompatCounts?,
     reports: List<CompatReport>?,
     turn: CompatTurn?,
@@ -58,7 +67,16 @@ fun CompatDetailDialog(
     incompatibleText: String?,
     onDismiss: () -> Unit,
 ) {
-    val rows = CompatRows.of(reports, counts, deviceKind, deviceModel)
+    val all = CompatRows.of(reports, counts, deviceKind, deviceModel)
+    // The lines are the ones the verdict rests on: the device in hand when its own model gave the verdict, the kind of device when that did. A button lets the rest be seen.
+    val narrowed = when (scope) {
+        CompatScope.MODEL -> all.filter { it.mine }
+        CompatScope.KIND -> all.filter { it.kind == deviceKind }
+        else -> all
+    }
+    var showingAll by remember { mutableStateOf(false) }
+    val rows = if (showingAll || narrowed.isEmpty()) all else narrowed
+    val canWiden = narrowed.isNotEmpty() && narrowed.size < all.size
     val shownTurn = turn ?: counts?.devices?.get(deviceKind)?.turn
     BackdropDialog(
         onDismissRequest = onDismiss,
@@ -72,7 +90,7 @@ fun CompatDetailDialog(
                     }
                 } else if (level != null) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        FlowRow { VerdictChip(level, deviceKind) }
+                        FlowRow { VerdictChip(level, deviceKind, words = verdictLabel) }
                         Text(
                             stringResource(R.string.compat_detail_device_line, deviceModel ?: deviceName(deviceKind), appVersion),
                             style = MaterialTheme.typography.bodySmall,
@@ -87,6 +105,13 @@ fun CompatDetailDialog(
                         Text(stringResource(R.string.compat_detail_nobody), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         rows.forEach { ReportRow(it) }
+                    }
+                    if (canWiden) {
+                        GlassButton(onClick = { showingAll = !showingAll }) {
+                            Icon(if (showingAll) Icons.Filled.FilterList else Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(if (showingAll) R.string.compat_detail_see_mine else R.string.compat_detail_see_all))
+                        }
                     }
                 }
             }

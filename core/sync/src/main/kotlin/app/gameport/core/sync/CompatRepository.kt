@@ -107,8 +107,8 @@ class CompatRepository @Inject constructor(@ApplicationContext private val conte
     // A test build asks again after seconds, so what was just sent can be seen; a release build after minutes, to spare the relay.
     private val refreshMs = if (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) DEBUG_REFRESH_MS else REFRESH_MS
 
-    /** The verdict of the players who use the same kind of device as this one, or null while there are too few answers (or none were ever read). */
-    fun observe(appId: Int): Flow<Compat?> = summary.map { CompatRules.of(it?.of(appId), device.kind) }
+    /** The verdict of the players for this device: its exact model when two or more of them answered, else its kind of device, else every device; null while nobody answered. */
+    fun observe(appId: Int): Flow<Compat?> = summary.map { CompatRules.ofDevice(it?.of(appId), device.kind, device.model) }
 
     /** What the players of every kind of device said about one game, for its details; null while nothing about it was read. */
     fun observeCounts(appId: Int): Flow<app.gameport.core.model.CompatCounts?> = summary.map { it?.of(appId) }

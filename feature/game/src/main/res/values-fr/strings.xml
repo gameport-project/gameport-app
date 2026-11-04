@@ -12,6 +12,11 @@
     <string name="game_compat_offline_only">Hors ligne seulement sur %1$s</string>
     <string name="game_compat_mixed">Mitigé sur %1$s</string>
     <string name="game_compat_fails">Problèmes sur %1$s</string>
+    <string name="game_compat_works_all">Fonctionne, tous appareils</string>
+    <string name="game_compat_offline_only_all">Hors ligne seulement, tous appareils</string>
+    <string name="game_compat_mixed_all">Mitigé, tous appareils</string>
+    <string name="game_compat_fails_all">Problèmes, tous appareils</string>
+    <string name="game_compat_subject_all">les appareils testés</string>
     <string name="game_compat_incompatible">Incompatible</string>
     <string name="game_compat_offline">Essayé avec le mode hors ligne.</string>
     <string name="game_compat_unreliable">Peu de réponses pour l\'instant : le résultat peut ne pas être fiable.</string>

@@ -510,6 +510,8 @@ private fun GameDetails(
         app.gameport.feature.compat.CompatDetailDialog(
             gameName = game.name,
             level = compat?.level,
+            verdictLabel = compat?.let { compatChipLabel(it) },
+            scope = compat?.scope,
             counts = compatDetail.counts,
             reports = compatDetail.reports?.reports,
             turn = compatDetail.reports?.turns?.get(compatDetail.deviceKind),
@@ -620,7 +622,7 @@ private fun GameDetails(
         BackdropDialog(
             onDismissRequest = { warning = false },
             title = { Text(stringResource(R.string.game_compat_warning_title)) },
-            text = { Text(stringResource(R.string.game_compat_warning_text, deviceName(compat.device))) },
+            text = { Text(stringResource(R.string.game_compat_warning_text, compatSubject(compat))) },
             confirmButton = { Button(onClick = { warning = false; startInstall() }) { Text(stringResource(R.string.game_compat_warning_install)) } },
             dismissButton = { GlassButton(onClick = { warning = false }) { Text(stringResource(R.string.game_compat_warning_cancel)) } },
         )
@@ -1753,12 +1755,36 @@ private fun CompatChips(compat: app.gameport.core.model.Compat?, incompatible: a
     when {
         // A game known not to run says so, whatever the players said.
         incompatible != null -> CompatChip(stringResource(R.string.game_compat_incompatible), CompatRed, Glyph.CROSS, onClick)
-        compat != null -> when (compat.level) {
-            app.gameport.core.model.CompatLevel.WORKS -> CompatChip(stringResource(R.string.game_compat_works, deviceName(compat.device)), CompatGreen, Glyph.CHECK, onClick)
-            app.gameport.core.model.CompatLevel.OFFLINE_ONLY -> CompatChip(stringResource(R.string.game_compat_offline_only, deviceName(compat.device)), CompatOrange, Glyph.NO_NETWORK, onClick)
-            app.gameport.core.model.CompatLevel.MIXED -> CompatChip(stringResource(R.string.game_compat_mixed, deviceName(compat.device)), CompatOrange, Glyph.EXCLAMATION, onClick)
-            app.gameport.core.model.CompatLevel.FAILS -> CompatChip(stringResource(R.string.game_compat_fails, deviceName(compat.device)), CompatRed, Glyph.CROSS, onClick)
+        compat != null -> {
+            val label = compatChipLabel(compat)
+            when (compat.level) {
+                app.gameport.core.model.CompatLevel.WORKS -> CompatChip(label, CompatGreen, Glyph.CHECK, onClick)
+                app.gameport.core.model.CompatLevel.OFFLINE_ONLY -> CompatChip(label, CompatOrange, Glyph.NO_NETWORK, onClick)
+                app.gameport.core.model.CompatLevel.MIXED -> CompatChip(label, CompatOrange, Glyph.EXCLAMATION, onClick)
+                app.gameport.core.model.CompatLevel.FAILS -> CompatChip(label, CompatRed, Glyph.CROSS, onClick)
+            }
         }
+    }
+}
+
+/** What a verdict is about, in words: the exact model, the kind of device, or every device that was tried. */
+@Composable
+private fun compatSubject(compat: app.gameport.core.model.Compat): String = when (compat.scope) {
+    app.gameport.core.model.CompatScope.MODEL -> compat.name ?: deviceName(compat.device)
+    app.gameport.core.model.CompatScope.KIND -> deviceName(compat.device)
+    app.gameport.core.model.CompatScope.ALL -> stringResource(R.string.game_compat_subject_all)
+}
+
+/** The words of the verdict's label: "Works on Quest 3", "Works on Quest", or, when no one narrower said anything, "Works, all devices". */
+@Composable
+private fun compatChipLabel(compat: app.gameport.core.model.Compat): String {
+    val all = compat.scope == app.gameport.core.model.CompatScope.ALL
+    val subject = compatSubject(compat)
+    return when (compat.level) {
+        app.gameport.core.model.CompatLevel.WORKS -> if (all) stringResource(R.string.game_compat_works_all) else stringResource(R.string.game_compat_works, subject)
+        app.gameport.core.model.CompatLevel.OFFLINE_ONLY -> if (all) stringResource(R.string.game_compat_offline_only_all) else stringResource(R.string.game_compat_offline_only, subject)
+        app.gameport.core.model.CompatLevel.MIXED -> if (all) stringResource(R.string.game_compat_mixed_all) else stringResource(R.string.game_compat_mixed, subject)
+        app.gameport.core.model.CompatLevel.FAILS -> if (all) stringResource(R.string.game_compat_fails_all) else stringResource(R.string.game_compat_fails, subject)
     }
 }
 

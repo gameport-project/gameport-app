@@ -79,10 +79,10 @@ internal fun deviceName(kind: String): String = stringResource(
 
 /** The label of the game's page: the verdict for this kind of device, in colour, with its mark before the words. */
 @Composable
-fun VerdictChip(level: CompatLevel, deviceKind: String, small: Boolean = false, modifier: Modifier = Modifier) {
+fun VerdictChip(level: CompatLevel, deviceKind: String, small: Boolean = false, modifier: Modifier = Modifier, words: String? = null) {
     val device = deviceName(deviceKind)
     val (colour, glyph, _) = mark(level)
-    val label = stringResource(
+    val label = words ?: stringResource(
         when (level) {
             CompatLevel.WORKS -> R.string.compat_chip_works
             CompatLevel.OFFLINE_ONLY -> R.string.compat_chip_offline_only

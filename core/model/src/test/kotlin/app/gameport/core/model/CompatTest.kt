@@ -142,4 +142,40 @@ class CompatTest {
         val text = """{"v":1,"games":[{"appId":5,"works":2,"fails":0,"devices":{"quest":{"works":2,"fails":0}}}]}"""
         assertEquals(emptyList<Pair<Symptom, Int>>(), CompatSummary.parse(text)!!.of(5)!!.devices.getValue("quest").reported())
     }
+
+    private fun withModels(models: Map<String, ModelCounts>, works: Int, fails: Int, device: String = "quest") =
+        CompatCounts(1, works, fails, 0, mapOf(device to DeviceCounts(works, fails, models = models)))
+
+    @Test
+    fun `the exact model gives the verdict when two players with it answered`() {
+        val counts = withModels(mapOf("Quest 3" to ModelCounts(works = 0, fails = 2, name = "Meta Quest 3")), works = 8, fails = 2)
+        val verdict = CompatRules.ofDevice(counts, "quest", "Quest 3")!!
+        assertEquals(CompatScope.MODEL, verdict.scope)
+        assertEquals("Quest 3", verdict.name)
+        assertEquals(CompatLevel.FAILS, verdict.level)
+    }
+
+    @Test
+    fun `a model with one answer falls back on the kind of device`() {
+        val counts = withModels(mapOf("Quest 3" to ModelCounts(works = 0, fails = 1)), works = 8, fails = 2)
+        val verdict = CompatRules.ofDevice(counts, "quest", "Quest 3")!!
+        assertEquals(CompatScope.KIND, verdict.scope)
+        assertEquals(CompatLevel.WORKS, verdict.level)
+        assertEquals(CompatScope.KIND, CompatRules.ofDevice(counts, "quest", null)!!.scope)
+    }
+
+    @Test
+    fun `without answers for the kind of device, every device that was tried gives the verdict`() {
+        val counts = CompatCounts(1, works = 4, fails = 0, worksOffline = 1, devices = mapOf("pico" to DeviceCounts(4, 0)))
+        val verdict = CompatRules.ofDevice(counts, "quest", "Quest 3")!!
+        assertEquals(CompatScope.ALL, verdict.scope)
+        assertEquals(CompatLevel.WORKS, verdict.level)
+        assertEquals("quest", verdict.device)
+    }
+
+    @Test
+    fun `nothing is said when nobody answered, whatever the narrowing`() {
+        assertNull(CompatRules.ofDevice(null, "quest", "Quest 3"))
+        assertNull(CompatRules.ofDevice(CompatCounts(1, 0, 0), "quest", "Quest 3"))
+    }
 }

@@ -42,6 +42,8 @@
     <string name="compat_detail_device_line">Cet appareil : %1$s · GamePort %2$s</string>
     <string name="compat_detail_players">Ce que signalent les joueurs</string>
     <string name="compat_detail_nobody">Aucun joueur n\'a encore signalé ce jeu.</string>
+    <string name="compat_detail_see_all">Voir tous les rapports</string>
+    <string name="compat_detail_see_mine">Voir seulement mon appareil</string>
     <string name="compat_detail_close">Fermer</string>
     <string name="compat_row_works">Compatible</string>
     <string name="compat_row_offline_only">Hors ligne seulement</string>

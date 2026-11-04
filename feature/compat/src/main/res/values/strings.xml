@@ -42,6 +42,8 @@
     <string name="compat_detail_device_line">This device: %1$s · GamePort %2$s</string>
     <string name="compat_detail_players">What players report</string>
     <string name="compat_detail_nobody">No player has reported this game yet.</string>
+    <string name="compat_detail_see_all">See all the reports</string>
+    <string name="compat_detail_see_mine">See only my device</string>
     <string name="compat_detail_close">Close</string>
     <string name="compat_row_works">Compatible</string>
     <string name="compat_row_offline_only">Offline only</string>

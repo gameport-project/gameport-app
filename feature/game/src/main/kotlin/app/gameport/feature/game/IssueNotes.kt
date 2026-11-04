@@ -58,10 +58,8 @@ internal fun issueNotes(
             action = stringResource(R.string.issue_reinstall_not_working), onClick = onAskReinstall, actionEnabled = !busy,
             secondAction = stringResource(R.string.issue_reinstall_working), onSecond = onReinstallWorks,
         )
-        is GameIssue.ExpansionMissing -> NoteItem(
-            pluralStringResource(R.plurals.issue_expansion_missing, issue.missing, issue.missing), NoteColors.Orange, NoteColors.OrangeText,
-            onClick = onAskRepair, action = stringResource(R.string.issue_expansion_unchecked_action), actionEnabled = !busy,
-        )
+        // Files that are known to be missing have a card of their own on the page, with the repair first: the bell does not repeat it. The doubt below (the files may be missing) stays a notice.
+        is GameIssue.ExpansionMissing -> null
         GameIssue.ExpansionMayBeMissing -> NoteItem(
             stringResource(R.string.issue_expansion_unchecked), NoteColors.Info, NoteColors.InfoText,
             onClick = onAskRepair, action = stringResource(R.string.issue_expansion_unchecked_action), actionEnabled = !busy,
