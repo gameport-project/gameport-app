@@ -17,6 +17,7 @@
     <string name="verdict_offline_only">Works offline only</string>
     <string name="verdict_later">Not now</string>
     <string name="report_title">Thanks for the answer</string>
+    <string name="report_short_run">The game ran for only a few seconds. A description of what appeared on screen, or of the problem after playing a little longer, makes the report much more useful.</string>
     <string name="report_intro">Sorry it did not work. A small technical report goes with the answer: versions, files and logs of the game, never a name, an e-mail address or an account.</string>
     <string name="report_intro_offline">Thanks for the answer. A small technical report goes with it: versions, files and logs of the game, never a name, an e-mail address or an account.</string>
     <string name="report_status_working">Preparing the report…</string>

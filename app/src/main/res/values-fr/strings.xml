@@ -17,6 +17,7 @@
     <string name="verdict_offline_only">Marche hors ligne seulement</string>
     <string name="verdict_later">Pas maintenant</string>
     <string name="report_title">Merci pour la réponse</string>
+    <string name="report_short_run">Le jeu n\'a tourné que quelques secondes. Décrire ce qui est apparu à l\'écran, ou le problème constaté après avoir joué un peu plus longtemps, rend le rapport bien plus utile.</string>
     <string name="report_intro">Dommage que ça n\'ait pas marché. Un petit rapport technique accompagne la réponse : versions, fichiers et journaux du jeu, jamais un nom, une adresse e-mail ou un compte.</string>
     <string name="report_intro_offline">Merci pour la réponse. Un petit rapport technique l\'accompagne : versions, fichiers et journaux du jeu, jamais un nom, une adresse e-mail ou un compte.</string>
     <string name="report_status_working">Préparation du rapport…</string>

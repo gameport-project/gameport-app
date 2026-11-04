@@ -78,6 +78,9 @@ import kotlinx.coroutines.launch
 /** The game the player is asked about, and whether the answer will be sent to the project. */
 data class VerdictQuestion(val appId: Int, val name: String, val shared: Boolean, val cover: app.gameport.core.model.Art)
 
+/** A run shorter than this says little in its files: the report asks what was seen. */
+private const val SHORT_RUN_SECONDS = 60L
+
 /**
  * The window that follows the answer "it did not work": what became of the technical report, and the two ways to take it. [status] is null while the
  * report is being made. [busy] is true while the player's own request is being dealt with.
@@ -90,6 +93,8 @@ data class ReportFollowUp(
     val saveFailed: Boolean = false,
     val offlineOnly: Boolean = false,
     val describedAndSent: Boolean = false,
+    /** The run that just ended lasted under a minute: what the player saw says more than the files then. */
+    val shortRun: Boolean = false,
     /** The report is made and kept on the device, not sent yet: it goes with the answer when the player is done. */
     val ready: Boolean = false,
     /** The report and the answer have gone (or are kept for the next start): closing the window sends nothing more. */
@@ -135,7 +140,7 @@ class VerdictAskViewModel @Inject constructor(
      * with what was ticked and written. When no report can be made, the answer is let go at once, saying so.
      */
     private fun prepareReport(appId: Int, offlineOnly: Boolean) {
-        _followUp.value = ReportFollowUp(appId, status = null, offlineOnly = offlineOnly)
+        _followUp.value = ReportFollowUp(appId, status = null, offlineOnly = offlineOnly, shortRun = reporter.lastRunSeconds(appId)?.let { it < SHORT_RUN_SECONDS } == true)
         // A game that does not work may have lost its large files since it was last looked at: it is looked at again, and a card says so on its page.
         viewModelScope.launch { expansionVerifier.recheck(appId) }
         viewModelScope.launch {
@@ -291,6 +296,7 @@ private fun ReportFollowUpDialog(state: ReportFollowUp, onDownload: (String, Set
         text = {
             if (sentNow) app.gameport.core.designsystem.ReportSentMark() else Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(if (state.offlineOnly) R.string.report_intro_offline else R.string.report_intro))
+                if (state.shortRun) Text(stringResource(R.string.report_short_run), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 val (message, color) = when (state.status) {
                     null -> (if (state.ready) R.string.report_status_ready else R.string.report_status_working) to MaterialTheme.colorScheme.onSurfaceVariant
                     ReportStatus.SENT -> R.string.report_status_sent to WorksGreen
