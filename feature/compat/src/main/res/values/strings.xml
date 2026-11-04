@@ -57,4 +57,11 @@
         <item quantity="one">%1$d player</item>
         <item quantity="other">%1$d players</item>
     </plurals>
+    <string name="compat_perf_good">Steady at %1$d fps</string>
+    <string name="compat_perf_mid">Mostly steady at %1$d fps</string>
+    <string name="compat_perf_low">Often drops below %1$d fps</string>
+    <plurals name="compat_perf_detail">
+        <item quantity="one">held %1$d%% of the play time, %2$d player</item>
+        <item quantity="other">held %1$d%% of the play time, %2$d players</item>
+    </plurals>
 </resources>

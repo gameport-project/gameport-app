@@ -19,6 +19,8 @@ data class CompatReport(
     val issues: Map<String, Int> = emptyMap(),
     /** For a line that does not work: the version from which it may be solved, since players say it works from there. */
     val fixedSince: String? = null,
+    /** How steadily the players of this line ran the game, for each frame rate (only the ones with enough players). */
+    val perf: List<CompatPerf> = emptyList(),
 )
 
 @Serializable
@@ -46,6 +48,8 @@ data class CompatRow(
     val symptoms: List<Symptom> = emptyList(),
     /** The version from which a line that does not work may be solved, when players say it works from there. */
     val fixedSince: String? = null,
+    /** How steadily the players ran the game, one figure for each frame rate they asked of the screen, the most players first. */
+    val perf: List<CompatPerf> = emptyList(),
 )
 
 object CompatRows {
@@ -82,6 +86,7 @@ object CompatRows {
         CompatRow(
             report.n, report.device, shortName(report.name), verdict, report.version?.takeIf { it.isNotBlank() }, mine = false,
             symptoms = symptomsOf(report.issues), fixedSince = report.fixedSince?.takeIf { it.isNotBlank() && verdict != Verdict.WORKS },
+            perf = report.perf,
         )
     }
 
@@ -93,9 +98,9 @@ object CompatRows {
         val rows = mutableListOf<CompatRow>()
         for ((kind, device) in counts?.devices.orEmpty()) {
             if (device.models.isNotEmpty()) {
-                device.models.values.forEach { model -> rows += linesOf(kind, shortName(model.name), model.works, model.offlineOnly, model.fails, symptomsOf(model.issues)) }
+                device.models.values.forEach { model -> rows += linesOf(kind, shortName(model.name), model.works, model.offlineOnly, model.fails, symptomsOf(model.issues), model.perf) }
             } else {
-                rows += linesOf(kind, null, device.works, device.offlineOnly, device.fails, symptomsOf(device.issues))
+                rows += linesOf(kind, null, device.works, device.offlineOnly, device.fails, symptomsOf(device.issues), emptyList())
             }
         }
         // The most said first.
@@ -103,11 +108,12 @@ object CompatRows {
     }
 
     /** The totals of a model give no version, and say what was ticked for the model, not for each answer: it goes with the lines that do not work. */
-    private fun linesOf(kind: String, name: String?, works: Int, offlineOnly: Int, fails: Int, symptoms: List<Symptom>): List<CompatRow> = listOf(
+    private fun linesOf(kind: String, name: String?, works: Int, offlineOnly: Int, fails: Int, symptoms: List<Symptom>, perf: List<CompatPerf>): List<CompatRow> = listOf(
         Verdict.WORKS to works,
         Verdict.OFFLINE_ONLY to offlineOnly,
         Verdict.FAILS to fails,
-    ).filter { it.second > 0 }.map { (verdict, count) ->
-        CompatRow(count, kind, name, verdict, version = null, mine = false, symptoms = if (verdict == Verdict.WORKS) emptyList() else symptoms)
+    ).filter { it.second > 0 }.mapIndexed { index, (verdict, count) ->
+        // How steadily the model ran is said for the model, not for each answer: it goes with its first line only, not repeated under each.
+        CompatRow(count, kind, name, verdict, version = null, mine = false, symptoms = if (verdict == Verdict.WORKS) emptyList() else symptoms, perf = if (index == 0) perf else emptyList())
     }
 }

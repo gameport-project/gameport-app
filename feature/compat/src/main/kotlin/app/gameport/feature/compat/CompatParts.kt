@@ -32,6 +32,12 @@ import app.gameport.core.designsystem.GlassChip
 import app.gameport.core.designsystem.Glyph
 import app.gameport.core.model.CompatCounts
 import app.gameport.core.model.CompatLevel
+import app.gameport.core.model.CompatPerf
+import app.gameport.core.model.CompatRows
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import app.gameport.core.designsystem.FewAnswersNote
 import app.gameport.core.model.CompatRules
 import app.gameport.core.designsystem.symptomLabel
@@ -156,7 +162,45 @@ internal fun DeviceLine(counts: CompatCounts, kind: String, own: DeviceCounts, m
                 style = MaterialTheme.typography.bodySmall,
             )
         }
+        // How steadily the game ran for each model that has figures, the model with the most answers first: the same sentences as in the details of a game.
+        own.models.entries.filter { it.value.perf.isNotEmpty() }
+            .sortedByDescending { it.value.works + it.value.offlineOnly + it.value.fails }
+            .forEach { (model, figures) ->
+                Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Text(CompatRows.shortName(figures.name) ?: model, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                    figures.perf.forEach { PerfLine(it, Modifier.padding(start = 14.dp)) }
+                }
+            }
     }
+}
+
+/**
+ * How steadily the game ran at one frame rate, in one sentence: the words of the level in its colour, then the share of the play time that held the rate and how many players
+ * said so. A model can have a sentence for each rate, since players can run the same game at 72, 90 or 120 frames a second. Shared by the details of a game and the page of
+ * compatibility, so both say it the same way.
+ */
+@Composable
+internal fun PerfLine(perf: CompatPerf, modifier: Modifier = Modifier) {
+    val (colour, _, _) = mark(perf.level)
+    val head = stringResource(
+        when (perf.level) {
+            CompatLevel.WORKS -> R.string.compat_perf_good
+            CompatLevel.MIXED -> R.string.compat_perf_mid
+            else -> R.string.compat_perf_low
+        },
+        perf.target,
+    )
+    val detail = pluralStringResource(R.plurals.compat_perf_detail, perf.n, perf.pct, perf.n)
+    Text(
+        buildAnnotatedString {
+            withStyle(SpanStyle(color = colour, fontWeight = FontWeight.SemiBold)) { append(head) }
+            append(" ")
+            append(detail)
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier,
+    )
 }
 
 /** The verdict reduced to its mark, as the home shows it on a cover: the glyph in a tinted circle. */

@@ -23,7 +23,29 @@ data class DeviceCounts(
 
 /** What the players of one model of device said about a game: how many said it works, works offline only, or fails, and the name the relay knows the model by. */
 @Serializable
-data class ModelCounts(val works: Int = 0, val offlineOnly: Int = 0, val fails: Int = 0, val name: String? = null, val issues: Map<String, Int> = emptyMap())
+data class ModelCounts(
+    val works: Int = 0,
+    val offlineOnly: Int = 0,
+    val fails: Int = 0,
+    val name: String? = null,
+    val issues: Map<String, Int> = emptyMap(),
+    /** How steadily players ran the game with this model, one figure for each frame rate the screens asked for. */
+    val perf: List<CompatPerf> = emptyList(),
+)
+
+/**
+ * How steadily the game ran at one frame rate ([target], frames a second) according to [n] players who chose to send it: [pct] is the middle player's share of the play time that held
+ * the rate without the system showing old frames again. The relay gives a rate only from three players (see its README).
+ */
+@Serializable
+data class CompatPerf(val target: Int, val n: Int, val pct: Int) {
+    /** Steady from 90 %, mostly steady from 70 %, below that the game often drops under the rate. */
+    val level: CompatLevel get() = when {
+        pct >= 90 -> CompatLevel.WORKS
+        pct >= 70 -> CompatLevel.MIXED
+        else -> CompatLevel.FAILS
+    }
+}
 
 /**
  * What the history of the answers says of a game for one kind of device (see the relay's README): [fixedIn] the oldest version of GamePort where a player said it works after saying it

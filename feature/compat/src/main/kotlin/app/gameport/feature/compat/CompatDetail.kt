@@ -190,6 +190,7 @@ private fun ReportRow(row: CompatRow) {
             if (maybeFixed != null) Text(maybeFixed, style = MaterialTheme.typography.labelSmall, color = FixedGreen)
         }
     }
+    row.perf.forEach { PerfLine(it, Modifier.padding(start = 32.dp)) }
     }
 }
 

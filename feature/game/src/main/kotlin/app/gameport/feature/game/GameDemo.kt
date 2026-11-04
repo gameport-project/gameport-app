@@ -144,7 +144,14 @@ private fun GameDemoScreen(onBack: () -> Unit) {
                 v = 1,
                 reports = listOf(
                     app.gameport.core.model.CompatReport(device = "quest", model = "Quest 3S", name = "Meta Quest 3S", verdict = "works", version = "0.9.2", n = 1),
-                    app.gameport.core.model.CompatReport(device = "quest", model = "Quest 3", name = "Meta Quest 3", verdict = "works", version = "0.8.2", n = 3),
+                    app.gameport.core.model.CompatReport(
+                        device = "quest", model = "Quest 3", name = "Meta Quest 3", verdict = "works", version = "0.8.2", n = 12,
+                        perf = listOf(
+                            app.gameport.core.model.CompatPerf(target = 90, n = 6, pct = 97),
+                            app.gameport.core.model.CompatPerf(target = 72, n = 3, pct = 78),
+                            app.gameport.core.model.CompatPerf(target = 120, n = 3, pct = 52),
+                        ),
+                    ),
                     app.gameport.core.model.CompatReport(device = "quest", model = "Quest 3", name = "Meta Quest 3", verdict = "offline_only", version = "0.9.2", n = 1),
                     app.gameport.core.model.CompatReport(
                         device = "quest", model = "Quest 3", name = "Meta Quest 3", verdict = "fails", version = "0.7.0", n = 1,

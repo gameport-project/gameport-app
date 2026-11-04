@@ -41,6 +41,40 @@ class CompatRowsTest {
     }
 
     @Test
+    fun `how steadily a game ran has a level from the share of the play time that held the rate`() {
+        assertEquals(CompatLevel.WORKS, CompatPerf(90, 9, 97).level)
+        assertEquals(CompatLevel.WORKS, CompatPerf(72, 3, 90).level)
+        assertEquals(CompatLevel.MIXED, CompatPerf(72, 6, 89).level)
+        assertEquals(CompatLevel.MIXED, CompatPerf(72, 6, 70).level)
+        assertEquals(CompatLevel.FAILS, CompatPerf(72, 4, 69).level)
+    }
+
+    @Test
+    fun `the figures of the relay are read for each frame rate, and a relay that gives none leaves them empty`() {
+        val parsed = CompatReports.parse(
+            """{"v":1,"appId":7,"reports":[{"device":"quest","model":"Quest 3","verdict":"works","version":"0.9.3","n":16,
+               "perf":[{"target":90,"n":9,"pct":97},{"target":72,"n":4,"pct":94},{"target":120,"n":3,"pct":83}]},
+               {"device":"pico","verdict":"works","n":2}]}""",
+        )!!
+        assertEquals(listOf(90, 72, 120), parsed.reports[0].perf.map { it.target })
+        assertEquals(97, parsed.reports[0].perf[0].pct)
+        assertTrue(parsed.reports[1].perf.isEmpty())
+    }
+
+    @Test
+    fun `the figures go with the line of the report, and with the first line of a model when only the totals are known`() {
+        val figures = listOf(CompatPerf(90, 9, 97), CompatPerf(72, 4, 80))
+        val fromReports = CompatRows.of(listOf(report("Quest 3", "Meta Quest 3", "works", "0.9.3", 16).copy(perf = figures)), null, "quest", "Quest 3")
+        assertEquals(figures, fromReports.single().perf)
+        val counts = CompatCounts(
+            appId = 7, works = 5, fails = 2,
+            devices = mapOf("quest" to DeviceCounts(works = 5, fails = 2, models = mapOf("Quest 3" to ModelCounts(works = 5, fails = 2, name = "Meta Quest 3", perf = figures)))),
+        )
+        val fromTotals = CompatRows.of(null, counts, "quest", "Quest 3")
+        assertEquals(listOf(figures, emptyList()), fromTotals.map { it.perf })
+    }
+
+    @Test
     fun `a device whose name is not known counts as the device in hand when its kind is the same`() {
         val rows = CompatRows.of(listOf(report(null, null, "works", "0.9.2", 2, device = "phone")), null, deviceKind = "phone", deviceName = null)
         assertTrue(rows.single().mine)

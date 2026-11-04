@@ -57,4 +57,11 @@
         <item quantity="one">%1$d joueur</item>
         <item quantity="other">%1$d joueurs</item>
     </plurals>
+    <string name="compat_perf_good">Fluide à %1$d fps</string>
+    <string name="compat_perf_mid">Plutôt fluide à %1$d fps</string>
+    <string name="compat_perf_low">Chutes fréquentes sous %1$d fps</string>
+    <plurals name="compat_perf_detail">
+        <item quantity="one">tenu %1$d %% du temps de jeu, %2$d joueur</item>
+        <item quantity="other">tenu %1$d %% du temps de jeu, %2$d joueurs</item>
+    </plurals>
 </resources>
