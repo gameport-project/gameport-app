@@ -53,6 +53,16 @@ public class SteamCallsTest {
     }
 
     @Test
+    public void the_start_of_the_run_that_wrote_a_table_is_told_and_a_file_that_is_not_a_table_has_none() {
+        assertEquals(1_793_000_123_456L, SteamCalls.startedMs(table(1, 1_793_000_123_456L).array()));
+        assertEquals(-1, SteamCalls.startedMs(null));
+        assertEquals(-1, SteamCalls.startedMs(new byte[10]));
+        byte[] wrong = table(1, 5).array();
+        wrong[1] = 'X';
+        assertEquals(-1, SteamCalls.startedMs(wrong));
+    }
+
+    @Test
     public void a_table_cut_short_by_a_kill_is_read_as_far_as_it_goes() {
         ByteBuffer data = table(2, 0);
         slot(data, "first call", 1, 100, 100, 0, 0, 0);

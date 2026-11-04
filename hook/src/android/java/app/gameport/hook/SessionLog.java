@@ -45,6 +45,8 @@ final class SessionLog {
     private static final long LATER_FLUSH_MS = 30_000;
 
     private final Context context;
+    /** When this process began, in wall-clock milliseconds: what tells a table of this run from the one the run before left. */
+    private final long processStartMs = System.currentTimeMillis() - (android.os.SystemClock.elapsedRealtime() - android.os.Process.getStartElapsedRealtime());
     private final ArrayList<String> head = new ArrayList<>();
     private final ArrayDeque<String> tail = new ArrayDeque<>();
 
@@ -403,8 +405,14 @@ final class SessionLog {
     private String steamCalls() {
         try {
             File folder = new File(context.getExternalFilesDir(null), "gameport");
-            String current = SteamCalls.render(readAll(new File(folder, "steam-calls.bin")));
-            if (previousRunCalls == null) previousRunCalls = SteamCalls.render(readAll(new File(folder, "steam-calls.previous.bin")));
+            byte[] file = readAll(new File(folder, "steam-calls.bin"));
+            // The stand-in renames the file of the run before when it starts, which can come after this reads: a table that began before this process is the run before's, not this run's.
+            boolean ofThisRun = SteamCalls.startedMs(file) >= processStartMs;
+            String current = ofThisRun ? SteamCalls.render(file) : "";
+            if (previousRunCalls == null) {
+                byte[] before = !ofThisRun && file != null && SteamCalls.startedMs(file) >= 0 ? file : readAll(new File(folder, "steam-calls.previous.bin"));
+                previousRunCalls = SteamCalls.render(before);
+            }
             if (previousRunCalls.isEmpty()) return current;
             return current + (current.isEmpty() ? "" : "\n\n") + "== The run before this one: the table it left in its file ==\n" + previousRunCalls;
         } catch (Throwable t) {

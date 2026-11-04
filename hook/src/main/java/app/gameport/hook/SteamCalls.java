@@ -32,6 +32,14 @@ final class SteamCalls {
     private SteamCalls() {
     }
 
+    /** When the run that wrote [data] began, in milliseconds, or -1 when [data] is not a table: it tells the table of this run from the one a run before left in the same file. */
+    static long startedMs(byte[] data) {
+        if (data == null || data.length < HEADER) return -1;
+        ByteBuffer in = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
+        if (in.get(0) != 'G' || in.get(1) != 'P' || in.get(2) != 'S' || in.get(3) != 'C') return -1;
+        return in.getLong(16);
+    }
+
     /** The table as text for a report, the calls in the order each was first made; empty when [data] is not a table. */
     static String render(byte[] data) {
         if (data == null || data.length < HEADER + SLOT) return "";
