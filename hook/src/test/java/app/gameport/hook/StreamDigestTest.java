@@ -71,6 +71,52 @@ public class StreamDigestTest {
         assertTrue(report, report.contains("median 72, lowest tenth 1, over 10 s, target 72"));
     }
 
+    private static void seconds(StreamDigest digest, int count, int fps, int stale) {
+        for (int i = 0; i < count; i++) digest.frameRate("11-04 13:41:30.000 1 1 I VrApi   : FPS=" + fps + "/72,Prd=0ms,Tear=0,Early=0,Stale=" + stale + ",Stale2/5/10/max=0/0/0/0,VSnc=1");
+    }
+
+    private static void focus(StreamDigest digest) {
+        digest.scan(line("13:41:30.000", "I", "GPXR", "session state -> 5 (1 idle, 2 ready, 3 synchronized, 4 visible, 5 focused)"));
+    }
+
+    @Test
+    public void the_stability_counts_only_seconds_in_focus_and_after_the_first_minute() {
+        StreamDigest digest = new StreamDigest();
+        seconds(digest, 40, 1, 0);
+        focus(digest);
+        seconds(digest, StreamDigest.STABILITY_WARMUP_SECONDS, 10, 70);
+        assertEquals(0, digest.stabilitySeconds());
+        seconds(digest, 200, 72, 0);
+        assertEquals(200, digest.stabilitySeconds());
+        assertEquals(200, digest.stabilityHeldSeconds());
+        assertTrue(digest.report(), digest.report().contains("Seconds that held the target: 200 of 200 (100 %)"));
+    }
+
+    @Test
+    public void a_second_with_few_frames_or_many_old_frames_shown_again_does_not_hold_the_target() {
+        StreamDigest digest = new StreamDigest();
+        focus(digest);
+        seconds(digest, StreamDigest.STABILITY_WARMUP_SECONDS, 72, 0);
+        seconds(digest, 100, 72, 0);
+        seconds(digest, 40, 60, 0);
+        seconds(digest, 40, 72, 30);
+        seconds(digest, 20, 70, 2);
+        assertEquals(200, digest.stabilitySeconds());
+        assertEquals(120, digest.stabilityHeldSeconds());
+        assertTrue(digest.report(), digest.report().contains("Seconds that held the target: 120 of 200 (60 %)"));
+    }
+
+    @Test
+    public void seconds_with_the_session_out_of_focus_do_not_count_and_a_short_play_gives_no_number() {
+        StreamDigest digest = new StreamDigest();
+        focus(digest);
+        seconds(digest, StreamDigest.STABILITY_WARMUP_SECONDS + 50, 72, 0);
+        digest.scan(line("13:42:30.000", "I", "GPXR", "session state -> 4 (1 idle, 2 ready, 3 synchronized, 4 visible, 5 focused)"));
+        seconds(digest, 500, 2, 0);
+        assertEquals(50, digest.stabilitySeconds());
+        assertTrue(digest.report(), digest.report().contains("not enough play to say (50 s counted, " + StreamDigest.STABILITY_MIN_SECONDS + " needed)"));
+    }
+
     @Test
     public void a_line_with_no_threadtime_start_is_kept_and_not_counted_as_a_repeat() {
         StreamDigest digest = new StreamDigest();

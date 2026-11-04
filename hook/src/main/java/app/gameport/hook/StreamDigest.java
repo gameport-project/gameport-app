@@ -37,6 +37,12 @@ final class StreamDigest {
     private static final Pattern EXCEPTION = Pattern.compile("\\b((?:[a-z][\\w]*\\.)+[A-Z][\\w$]*(?:Exception|Error)|[A-Z][A-Za-z0-9]*(?:Exception|Error))\\b");
     private static final Pattern SESSION_STATE = Pattern.compile("session state -> (\\d)");
     private static final Pattern FPS = Pattern.compile("FPS=(\\d+)/(\\d+)");
+    private static final Pattern STALE = Pattern.compile("Stale=(\\d+)");
+    /** A second counts for the stability only after this many seconds with the session in focus: the loading and the start of the menus come first. */
+    static final int STABILITY_WARMUP_SECONDS = 60;
+    /** Fewer counted seconds than this say nothing about a game, and no number is given. */
+    static final int STABILITY_MIN_SECONDS = 180;
+    private static final int FOCUSED = 5;
     private static final Pattern TIME = Pattern.compile("^(\\d\\d)-(\\d\\d) (\\d\\d):(\\d\\d):(\\d\\d)\\.(\\d\\d\\d)");
     private static final String[] SESSION_STATE_NAMES = {"", "idle", "ready", "synchronized", "visible", "focused", "stopping", "loss pending", "exiting"};
 
@@ -55,6 +61,10 @@ final class StreamDigest {
     private final int[] fpsHistogram = new int[1024];
     private int fpsSamples;
     private int fpsTarget;
+    private int sessionState;
+    private int focusedSeconds;
+    private int countedSeconds;
+    private int heldSeconds;
     private final ArrayList<String> memory = new ArrayList<>();
 
     private long seen;
@@ -106,6 +116,36 @@ final class StreamDigest {
         fpsHistogram[fps]++;
         fpsSamples++;
         fpsTarget = Integer.parseInt(m.group(2));
+        countStability(fps, line);
+    }
+
+    /**
+     * The seconds that tell how steady a game runs: those with the session in focus (the game has the view: not the loading before it, the system menu, a headset put down) and after
+     * the first minute of it. A second is held when the game handed over nearly all the frames the screen asked for and the system had to show an old frame again only a few times
+     * (the "Stale" count of the same line: the screen was filled in, which the frame rate alone does not tell).
+     */
+    private void countStability(int fps, String line) {
+        if (sessionState != FOCUSED || fpsTarget <= 0) return;
+        if (focusedSeconds++ < STABILITY_WARMUP_SECONDS) return;
+        Matcher stale = STALE.matcher(line);
+        int shownAgain = stale.find() ? Integer.parseInt(stale.group(1)) : 0;
+        countedSeconds++;
+        if (fps * 100 >= fpsTarget * 95 && shownAgain * 100 <= fpsTarget * 5) heldSeconds++;
+    }
+
+    /** The seconds that count for the stability (see [countStability]). */
+    synchronized int stabilitySeconds() {
+        return countedSeconds;
+    }
+
+    /** How many of them held the target. */
+    synchronized int stabilityHeldSeconds() {
+        return heldSeconds;
+    }
+
+    /** The frame rate the screen asked for, 0 when no line was seen. */
+    synchronized int stabilityTarget() {
+        return fpsTarget;
     }
 
     /** A memory reading of the game (resident set, and what the device still has free), kept when it moved or a minute went by. */
@@ -137,6 +177,7 @@ final class StreamDigest {
         Matcher m = SESSION_STATE.matcher(line);
         if (!m.find()) return;
         int state = Integer.parseInt(m.group(1));
+        sessionState = state;
         if (sessionStates.add(state) && state >= 1 && state < SESSION_STATE_NAMES.length) milestone("OpenXR session " + SESSION_STATE_NAMES[state], millis);
     }
 
@@ -285,6 +326,12 @@ final class StreamDigest {
         out.append("\nFrame rate (the runtime's line, once a second): ");
         if (fpsSamples == 0) out.append("no line seen\n");
         else out.append("median ").append(percentile(50)).append(", lowest tenth ").append(percentile(10)).append(", over ").append(fpsSamples).append(" s, target ").append(fpsTarget).append('\n');
+        if (countedSeconds >= STABILITY_MIN_SECONDS) {
+            out.append("Seconds that held the target: ").append(heldSeconds).append(" of ").append(countedSeconds).append(" (").append(heldSeconds * 100 / countedSeconds)
+                    .append(" %), counted with the session in focus and after its first minute\n");
+        } else {
+            out.append("Seconds that held the target: not enough play to say (").append(countedSeconds).append(" s counted, ").append(STABILITY_MIN_SECONDS).append(" needed)\n");
+        }
 
         out.append("\nSign-in problems: ").append(authTotal == 0 ? "none seen\n" : authTotal + " line(s), the first different ones:\n");
         for (String sample : authLines) out.append("  ").append(sample).append('\n');
