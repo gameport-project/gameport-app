@@ -891,6 +891,9 @@ private fun GameDetails(
                 }
                 // A patch or an update of the installed game goes through the steps of an install, in the same card.
                 (repatch as? Repatch.Running)?.let { Progress(state = it.asInstallState(), speedUnit = speedUnit, extras = emptyList(), onCancel = null) }
+                // A game that says some of its large files are missing cannot load its data: a card on the page says so, and offers the repair. Play stays available.
+                issues.filterIsInstance<GameIssue.ExpansionMissing>().firstOrNull()?.takeIf { install is InstallState.Installed && repatch == Repatch.None }
+                    ?.let { ExpansionMissingCard(it.missing, onRepair = { confirmingRepair = true }) }
                 // The notifications are in the card of the bell, the progress of a patch in the card of the install; what stays here is the report that can be sent, and a patch that failed.
                 val suspected = issues.filterIsInstance<GameIssue.ProblemSuspected>().firstOrNull()
                 if (install is InstallState.Installed && (suspected != null || repatch is Repatch.Failed)) {
@@ -1255,6 +1258,23 @@ private fun MediaCard(appId: Int, media: app.gameport.core.model.AppMedia) {
             Text(stringResource(R.string.game_media_title), style = MaterialTheme.typography.titleMedium)
         }
         app.gameport.core.designsystem.MediaGallery(appId, media)
+    }
+}
+
+/** The card of a game that lacks some of its large files: what is wrong, and the button that downloads them again. */
+@Composable
+private fun ExpansionMissingCard(missing: Int, onRepair: () -> Unit) {
+    Column(Modifier.fillMaxWidth().glass(CardShape).padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(Icons.Filled.Warning, contentDescription = null, tint = CompatOrange, modifier = Modifier.size(26.dp))
+            Text(stringResource(R.string.game_expansion_title), style = MaterialTheme.typography.titleMedium)
+        }
+        Text(pluralStringResource(R.plurals.issue_expansion_missing, missing, missing), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        GlassButton(onClick = onRepair) {
+            Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.issue_expansion_unchecked_action))
+        }
     }
 }
 

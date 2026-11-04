@@ -33,6 +33,15 @@ class GameIssuesRepository @Inject constructor(
     private val reports: ReportStore,
     private val reinstallNotice: app.gameport.core.settings.ReinstallNoticeStore,
 ) {
+    private val debuggable = context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+
+    /**
+     * Development only: a debug build treats the games whose ids are in its files folder, in `debug-expansion-missing.txt` (one id per line), as lacking one of their large
+     * files, so the card that says so can be looked at on the emulator. A release build never reads it.
+     */
+    private fun simulatedMissing(): Set<Int> = if (!debuggable) emptySet() else
+        runCatching { java.io.File(context.filesDir, "debug-expansion-missing.txt").readLines().mapNotNull { it.trim().toIntOrNull() }.toSet() }.getOrDefault(emptySet())
+
     // Permissions are granted outside GamePort, so the screens ask for a re-check when they come back.
     private val recheck = MutableStateFlow(0)
 
@@ -59,7 +68,7 @@ class GameIssuesRepository @Inject constructor(
                 mappingNoticeSource?.let { GameIssue.ControllerMappingAvailable(it) },
                 silent?.let { GameIssue.ControllerSilent(activated = it) },
                 GameIssue.ExpansionMayBeMissing.takeIf { appId in others.unchecked },
-                others.missing[appId]?.let { GameIssue.ExpansionMissing(it) },
+                others.missing[appId]?.let { GameIssue.ExpansionMissing(it) } ?: GameIssue.ExpansionMissing(1).takeIf { appId in simulatedMissing() },
             )
     }
 

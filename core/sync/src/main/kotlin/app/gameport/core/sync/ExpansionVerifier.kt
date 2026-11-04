@@ -34,8 +34,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  * sizes of what it holds when GamePort asks (the same way the saves are fetched, by starting the game's process briefly, without the game appearing). The sizes are set
  * against the files Steam lists for the build the game was installed from (see [ExpansionVerification]).
  *
- * A game is asked once per build. One that does not answer (its hook is from before this existed) is asked again only after it was patched or updated, so its process
- * is not started at every launch of GamePort.
+ * Every installed game is looked at once per build, whatever it weighs: the files Steam lists for its build say whether it has an expansion at all, and only a game that
+ * has one is asked. One that does not answer (its hook is from before this existed) is asked again only after it was patched or updated, so its process is not started at
+ * every launch of GamePort.
  */
 @Singleton
 class ExpansionVerifier @Inject constructor(
@@ -55,8 +56,9 @@ class ExpansionVerifier @Inject constructor(
     /** Looks again each time Steam can be reached, and each time the games in doubt change. */
     fun start() {
         scope.launch {
-            combine(auth.connection, installer.expansionMayBeMissing) { connection, suspects -> connection to suspects }.collect { (connection, suspects) ->
-                if (connection == SteamConnection.ONLINE && suspects.isNotEmpty()) runDue(suspects)
+            // Every installed game is looked at, once for each build: the files Steam lists for it say whether it has an expansion, so no size decides who is asked.
+            combine(auth.connection, installer.installedOnDevice) { connection, games -> connection to games }.collect { (connection, games) ->
+                if (connection == SteamConnection.ONLINE && games.isNotEmpty()) runDue(games)
             }
         }
     }
@@ -81,11 +83,6 @@ class ExpansionVerifier @Inject constructor(
         val packageName = installed.all()[appId] ?: return
         val build = builds.get(appId) ?: return
         val updatedAt = packages.lastUpdateTimeOf(packageName) ?: 0L
-        val held = askGame(packageName)
-        if (held == null) {
-            verdicts.put(appId, ExpansionVerdict(ExpansionVerdict.State.UNKNOWN, build.manifests, packageUpdatedAt = updatedAt))
-            return
-        }
         val session = sessions.current.value ?: return
         val expected = mutableListOf<Long>()
         for ((depotId, manifestId) in build.manifests) {
@@ -93,6 +90,16 @@ class ExpansionVerifier @Inject constructor(
             val files = SteamInspector.manifestFiles(session, appId, depotId, manifestId) ?: return
             val sizes = files.associate { it.first to it.second }
             ObbNames.selectPlaced(files.map { it.first }, packageName).forEach { (path, _) -> sizes[path]?.let(expected::add) }
+        }
+        // A game for which Steam lists no expansion has nothing to be missing: its process is not woken to ask it.
+        if (expected.isEmpty()) {
+            verdicts.put(appId, ExpansionVerdict(ExpansionVerdict.State.COMPLETE, build.manifests, expected = 0, packageUpdatedAt = updatedAt))
+            return
+        }
+        val held = askGame(packageName)
+        if (held == null) {
+            verdicts.put(appId, ExpansionVerdict(ExpansionVerdict.State.UNKNOWN, build.manifests, packageUpdatedAt = updatedAt))
+            return
         }
         val verdict = when (val result = ExpansionVerification.compare(expected, held)) {
             ExpansionVerification.Result.Complete -> ExpansionVerdict(ExpansionVerdict.State.COMPLETE, build.manifests, expected = expected.size, packageUpdatedAt = updatedAt)

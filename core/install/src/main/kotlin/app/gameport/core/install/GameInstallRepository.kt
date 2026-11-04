@@ -1001,6 +1001,14 @@ class GameInstallRepository @Inject constructor(
         }.toSet()
     }.distinctUntilChanged().flowOn(Dispatchers.IO)
 
+    /**
+     * Every game that is installed on the device, for the check of the expansion files: none is left out for the size it weighs, since a small game can have an expansion too.
+     * What a game needs is told by the files Steam lists for its build (see [app.gameport.core.sync.ExpansionVerifier]), and only a game that has some is asked.
+     */
+    val installedOnDevice: Flow<Set<Int>> = observeAll().map { _ ->
+        installed.all().filterValues { packages.isInstalled(it) }.keys
+    }.distinctUntilChanged().flowOn(Dispatchers.IO)
+
     /** The installed games that said some of the files Steam lists for them are not there, by the number missing. Only for the build the game was asked about. */
     val expansionMissing: Flow<Map<Int, Int>> = combine(verdicts.all, observeAll()) { said, _ ->
         said.filter { (appId, verdict) -> verdict.state == ExpansionVerdict.State.MISSING && verdict.manifests == builds.get(appId)?.manifests && appId in installed.all() }
