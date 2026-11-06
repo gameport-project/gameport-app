@@ -24,8 +24,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -226,6 +228,8 @@ private fun EntryRow(
                 InstallState.Interrupted, is InstallState.Failed -> {
                     if ((entry.state as? InstallState.Failed)?.error.let { it == InstallError.ExpansionStoragePermission || it == InstallError.ExpansionFiles }) {
                         OutlinedButton(onClick = { ExpansionStorageAccess.openSettings(entryContext) }) {
+                            androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                            androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
                             Text(stringResource(app.gameport.core.designsystem.R.string.game_error_expansion_storage_open))
                         }
                     }

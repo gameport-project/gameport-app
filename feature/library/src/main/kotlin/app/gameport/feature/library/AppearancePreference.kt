@@ -98,7 +98,7 @@ internal class InstallerLibraryActions @Inject constructor(
     override fun setSort(sort: LibrarySort) = settings.updateDisplay { it.copy(sort = sort) }
 
     override fun playIntent(game: Game): Intent? =
-        if (installer.shouldExplainStoragePermission(game.appId)) null else installer.launchIntent(game.appId, game.androidBuild?.isVr)
+        if (installer.storagePermissionBlocksPlay(game.appId)) null else installer.launchIntent(game.appId, game.androidBuild?.isVr)
 }
 
 @Module

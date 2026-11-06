@@ -104,7 +104,7 @@ class VerdictSender @Inject constructor(
             val codename = device.codename
             sendAnswers(
                 verdicts.book.value.unsent(),
-                { answer -> VoteMessage(answer.appId, answer.verdict, appVersion, kind, verdicts.voterId, offline = answer.offline, issues = answer.issues, model = model, codename = codename, report = answer.report) },
+                { answer -> VoteMessage(answer.appId, answer.verdict, appVersion, kind, verdicts.voterId, offline = answer.offline, issues = answer.issues, model = model, codename = codename, report = answer.report, discord = verdicts.discordName.value) },
                 transport,
             ) { answer -> verdicts.update { it.sent(answer.appId, answer.verdict) } }
         }

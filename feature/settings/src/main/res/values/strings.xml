@@ -221,7 +221,6 @@
     <string name="help_age_title">Adult games</string>
     <string name="help_ask_title">Questions and bugs</string>
     <string name="help_ask_text">A problem with a game is best sent with the report button of its page. For everything else, the project\'s Discord is open to anyone.</string>
-    <string name="help_discord">Join the Discord</string>
     <string name="help_discord_where">The link opens in a browser, and Discord can see this device\'s IP address, like any web page.</string>
     <string name="help_tour_store">Tour of the store</string>
     <string name="help_tour_table">Tour of the compatibility table</string>

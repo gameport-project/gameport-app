@@ -77,6 +77,9 @@ class PackageGateway @Inject constructor(
         index >= 0 && (info.requestedPermissionsFlags?.get(index) ?: 0) and android.content.pm.PackageInfo.REQUESTED_PERMISSION_GRANTED == 0
     }.getOrDefault(false)
 
+    /** The version of Android the installed package was built for (its target SDK), or null when it is not installed. */
+    fun targetSdkOf(packageName: String): Int? = runCatching { packageManager.getApplicationInfo(packageName, 0).targetSdkVersion }.getOrNull()
+
     /** When the package was first installed (epoch millis), or null when it is not installed. */
     fun installTimeOf(packageName: String): Long? = runCatching { packageManager.getPackageInfo(packageName, 0).firstInstallTime }.getOrNull()
 

@@ -116,7 +116,8 @@ class GameIssuesRepository @Inject constructor(
         return buildList {
             if (updateAvailable) add(GameIssue.UpdateAvailable)
             if (patchOutdated) add(GameIssue.PatchOutdated)
-            if (installer.shouldExplainStoragePermission(appId)) add(GameIssue.StoragePermissionMissing)
+            // Only when the access can be given: a note that sends the player to a setting that does not exist is worse than none.
+            if (installer.storagePermissionBlocksPlay(appId)) add(GameIssue.StoragePermissionMissing)
             if (appId !in reinstallAnswered && installer.reinstallMayHelp(packageName)) add(GameIssue.ReinstallMayHelp)
             if (packageName in conflictPackages) add(GameIssue.SaveConflict)
             suspected[packageName]?.let { add(GameIssue.ProblemSuspected(crash = it == Suspicion.CRASH)) }

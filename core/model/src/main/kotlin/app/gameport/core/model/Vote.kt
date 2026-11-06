@@ -52,6 +52,11 @@ data class VoteMessage(
      * says something went wrong, and only when it is known.
      */
     val report: String? = null,
+    /**
+     * The Discord name the player gave, to talk about their answers on the project's Discord (see [DiscordName]). Null says nothing about it; an empty one says the player has none
+     * (or took it away), which the relay keeps as "none".
+     */
+    val discord: String? = null,
 ) {
     fun toJson(): String = buildJsonObject {
         put("v", 1)
@@ -66,6 +71,7 @@ data class VoteMessage(
         if (model.isNotBlank()) put("model", model.trim())
         if (codename.isNotBlank()) put("codename", codename.trim())
         report?.takeIf { it in ReportStates.ALL }?.let { put("report", it) }
+        discord?.let { put("discord", DiscordName.clean(it)) }
     }.toString()
 }
 

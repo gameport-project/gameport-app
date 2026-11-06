@@ -13,6 +13,7 @@ import app.gameport.core.model.LaunchOptions
 import app.gameport.core.model.UpdateChannels
 import app.gameport.core.model.reportable
 import app.gameport.core.model.ObbNames
+import app.gameport.core.model.StorageAccess
 import app.gameport.core.model.VersionOption
 import app.gameport.core.model.AuthState
 import app.gameport.core.settings.GameDefaults
@@ -299,6 +300,11 @@ class GameInstallRepository @Inject constructor(
                     events.note(game.appId, "the download also holds: ${besidesApks(directory)}")
                     val downloaded = chooseBuild(game.appId, everything) ?: return@launch clearState(game.appId).also { directory.deleteRecursively() }
                     events.note(game.appId, "build chosen: ${downloaded.joinToString { it.name }}")
+                    // Nothing is patched or installed while the files that go beside the game cannot be placed: a game started without its data only looks broken. The download is kept.
+                    if (placementBlockedByAccess(directory, downloaded)) {
+                        events.note(game.appId, "the game has files to place and GamePort cannot write their folder: the access to all files is needed, nothing is installed")
+                        return@launch fail(game.appId, InstallError.ExpansionStoragePermission)
+                    }
                     val account = (auth.authState.value as? AuthState.SignedIn)?.account
                         ?: return@launch fail(game.appId, InstallError.NotSignedIn)
                     notEnoughSpaceToPatch(directory, downloaded)?.let { return@launch fail(game.appId, it) }
@@ -860,21 +866,29 @@ class GameInstallRepository @Inject constructor(
     }
 
     /**
-     * True when the installed game asks for access to shared storage and has not been given it, and
-     * the player has not been told yet. Some games ask again at every resume, and on a headset that
-     * request takes the focus from the game until they crash (seen with Underdogs).
+     * What the installed game's request for access to shared storage comes to (see [StorageAccess]), read from the system each time: nothing is remembered, so the answer is
+     * right as soon as the player comes back from the settings. Some games ask again at every resume, and on a headset that request takes the focus from the game until they
+     * crash (seen with Underdogs), which is why a game that can be given the access does not start without it.
      */
-    fun shouldExplainStoragePermission(appId: Int): Boolean {
-        val packageName = installed.all()[appId]?.takeIf(packages::isInstalled) ?: return false
-        if (prompts.getBoolean(appId.toString(), false)) return false
-        return packages.requestsButLacks(packageName, STORAGE_PERMISSION)
+    fun storageAccessOf(appId: Int): StorageAccess {
+        val packageName = installed.all()[appId]?.takeIf(packages::isInstalled) ?: return StorageAccess.NOT_NEEDED
+        return StorageAccess.of(packages.requestsButLacks(packageName, STORAGE_PERMISSION), packages.targetSdkOf(packageName), packages.deviceSdk, storageVisits.getInt(storageVisitsKey(appId, packageName), 0))
     }
 
-    fun markStoragePermissionExplained(appId: Int) {
-        prompts.edit().putBoolean(appId.toString(), true).apply()
+    /** The page of the permissions of the game was opened: counted, so Play is freed if the device never gives the access (see [StorageAccess.MAX_SETTINGS_VISITS]). */
+    fun markStoragePermissionSettingsOpened(appId: Int) {
+        val packageName = installed.all()[appId] ?: return
+        val key = storageVisitsKey(appId, packageName)
+        storageVisits.edit().putInt(key, storageVisits.getInt(key, 0) + 1).apply()
     }
 
-    private val prompts by lazy { context.getSharedPreferences("gameport_storage_prompt", Context.MODE_PRIVATE) }
+    // Tied to the install the game has now: a new patch or a new version starts the count again.
+    private fun storageVisitsKey(appId: Int, packageName: String) = "$appId:${packages.lastUpdateTimeOf(packageName)}"
+
+    private val storageVisits by lazy { context.getSharedPreferences("gameport_storage_visits", Context.MODE_PRIVATE) }
+
+    /** True when Play waits: the game asks for the access to files, lacks it, and the system lets it be given. */
+    fun storagePermissionBlocksPlay(appId: Int): Boolean = storageAccessOf(appId) == StorageAccess.GRANTABLE
 
     /** The system page of the installed game's own settings, where its permissions can be granted. */
     fun appSettingsIntent(appId: Int): Intent? = installed.all()[appId]?.takeIf(packages::isInstalled)?.let { packageName ->
@@ -1322,6 +1336,27 @@ class GameInstallRepository @Inject constructor(
             runCatching { downloadDirectory(appId).takeIf { it.exists() }?.let { File(it, FAILED_FILE).createNewFile() } }
         }
         setState(appId, InstallState.Failed(error))
+    }
+
+    /**
+     * True when the download holds files that go to `Android/obb/<package>`, GamePort cannot write there, and the access to all files can still be given. The test is a real write,
+     * not the access alone: some devices let the folder be written without it, and some refuse it even with it (the game then places its own files, see [ExpansionHandoff]).
+     */
+    private fun placementBlockedByAccess(directory: File, downloaded: List<File>): Boolean {
+        if (hasAllFilesAccess() || !ExpansionStorageAccess.settingsPageExists(context)) return false
+        val packageName = downloaded.firstNotNullOfOrNull { packages.packageNameOf(it) } ?: return false
+        if (ExpansionFiles.select(directory, packageName, PATCHED_DIR).isEmpty()) return false
+        return !canWriteObbFolder(packageName)
+    }
+
+    private fun canWriteObbFolder(packageName: String): Boolean {
+        val folder = File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName")
+        if (!folder.isDirectory && !runCatching { folder.mkdirs() }.getOrDefault(false)) return false
+        return runCatching {
+            val probe = File(folder, ".gameport-write-test")
+            probe.writeText("x")
+            probe.delete()
+        }.isSuccess
     }
 
     /** True when GamePort has the special access to all files (Android 11 and later), which a game's expansion files may need. */

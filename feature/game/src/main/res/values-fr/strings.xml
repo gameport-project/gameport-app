@@ -128,12 +128,12 @@
     <string name="game_settings_permissions_description">Un jeu qui fait clignoter une fenêtre de permission ou se ferme tout seul a besoin de l\'accès aux fichiers et médias, à autoriser ici.</string>
     <string name="game_settings_permissions_open">Ouvrir les permissions du jeu</string>
     <string name="game_storage_title">Autoriser l\'accès aux fichiers</string>
-    <string name="game_storage_text">Ce jeu demande l\'accès aux fichiers de l\'appareil. Sans cette autorisation, il peut se fermer tout seul. Les permissions du jeu permettent d\'autoriser les fichiers et médias.</string>
+    <string name="game_storage_text">Ce jeu a besoin de l\'accès aux fichiers de l\'appareil pour fonctionner, et il ne peut pas être lancé tant que cet accès n\'est pas autorisé. Les permissions du jeu permettent d\'autoriser les fichiers et médias.</string>
     <string name="game_storage_open">Ouvrir les permissions</string>
-    <string name="game_storage_play_anyway">Jouer quand même</string>
+    <string name="game_storage_later">Plus tard</string>
     <string name="issue_patch_outdated">Un patch plus récent est disponible pour ce jeu.</string>
     <string name="issue_patch_outdated_action">Re-patcher</string>
-    <string name="issue_storage_permission">Ce jeu demande l\'accès aux fichiers et ne l\'a pas. Il peut se fermer tout seul.</string>
+    <string name="issue_storage_permission">Ce jeu a besoin de l\'accès aux fichiers et ne l\'a pas. Il ne peut pas être lancé tant que cet accès n\'est pas autorisé.</string>
     <string name="issue_save_conflict">Les sauvegardes diffèrent entre cet appareil et Steam : un choix est attendu.</string>
     <string name="issue_save_conflict_action">Choisir</string>
     <string name="issue_saves_apart">Ce jeu garde ses sauvegardes sur Android à part de celles du PC : elles ne sont pas synchronisées avec la version PC. GamePort peut récupérer celles du PC.</string>
@@ -340,6 +340,7 @@
     <string name="report_send">Envoyer le rapport</string>
     <string name="report_description_label">Décrire le problème (facultatif)</string>
     <string name="report_description_why">Quelques mots aident beaucoup : le rapport montre comment le jeu a tourné, pas ce qui a été vu.</string>
+    <string name="report_sent_discord">Pour en parler, le Discord est ouvert à tous.</string>
     <string name="report_status_sent">Rapport envoyé, merci.</string>
     <string name="report_status_waiting">Le rapport sera envoyé dès que cet appareil sera en ligne.</string>
     <string name="report_status_refused">Le rapport n\'a pas pu être envoyé.</string>

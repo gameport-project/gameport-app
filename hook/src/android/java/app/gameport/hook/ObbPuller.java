@@ -53,12 +53,15 @@ final class ObbPuller {
             long[] done = {0};
             for (int i = 0; i < names.length; i++) {
                 String name = names[i];
-                if (name.isEmpty() || name.indexOf('/') >= 0 || name.indexOf('\\') >= 0 || name.startsWith(".")) return new Result(false, "a file has a name that is not allowed");
+                if (!allowed(name)) return new Result(false, "a file has a name that is not allowed");
                 File target = new File(dir, name);
                 if (target.isFile() && target.length() == sizes[i]) {
                     done[0] += sizes[i];
                     continue;
                 }
+                // A file kept in folders (assets/...) needs them made first, and open to every app so the game itself can enter them.
+                Result folderMade = makeFolders(dir, target, name);
+                if (!folderMade.ok) return folderMade;
                 Result copied = copy(context, cloud, pkg, name, sizes[i], new File(dir, name + ".part"), target, done, total, log);
                 if (!copied.ok) return copied;
             }
@@ -69,6 +72,28 @@ final class ObbPuller {
             log.info("obb: failed: " + t);
             return new Result(false, t.getClass().getSimpleName() + ": " + t.getMessage());
         }
+    }
+
+    /** A path under the game's folder: folders separated by `/`, none empty, none hidden, none going up, and no backslash. */
+    static boolean allowed(String name) {
+        if (name.isEmpty() || name.indexOf('\\') >= 0) return false;
+        for (String part : name.split("/", -1)) {
+            if (part.isEmpty() || part.startsWith(".")) return false;
+        }
+        return true;
+    }
+
+    /** Makes the folders [target] is kept in, under [root], and opens them to every app so the game itself can enter them. */
+    private static Result makeFolders(File root, File target, String name) {
+        File parent = target.getParentFile();
+        if (parent == null || parent.isDirectory()) return new Result(true, null);
+        if (!parent.mkdirs() && !parent.isDirectory()) return new Result(false, "the folder of " + name + " cannot be made");
+        for (File folder = parent; folder != null && !folder.equals(root); folder = folder.getParentFile()) {
+            boolean readable = folder.setReadable(true, false);
+            boolean enterable = folder.setExecutable(true, false);
+            if (!readable || !enterable) break;
+        }
+        return new Result(true, null);
     }
 
     private static Result copy(Context context, Uri cloud, String pkg, String name, long size, File part, File target, long[] done, long total, Log log) throws IOException {

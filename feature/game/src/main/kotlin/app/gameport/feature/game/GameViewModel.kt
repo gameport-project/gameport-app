@@ -292,12 +292,17 @@ class GameViewModel @Inject constructor(
         .map { installer.installedPackage(appId)?.let(it::get) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
+    /** The Discord name given with an earlier report: it fills the field of the report window. Empty when none. */
+    internal val discordName: StateFlow<String> = verdicts.discordName
+
     private val _reportProgress = MutableStateFlow<ReportProgress>(ReportProgress.Idle)
     internal val reportProgress: StateFlow<ReportProgress> = _reportProgress
 
     /** The report is made now and sent to the project, even when the automatic sending is off: the player asked. */
-    internal fun onSendReport(game: Game, description: String? = null, symptoms: Set<app.gameport.core.model.Symptom> = emptySet()) {
+    internal fun onSendReport(game: Game, description: String? = null, symptoms: Set<app.gameport.core.model.Symptom> = emptySet(), discord: String? = null) {
         if (_reportProgress.value == ReportProgress.Working) return
+        // The Discord name is kept for the next report, so the field is filled in and never asked again; what is typed now replaces it, and an emptied field removes it.
+        if (discord != null) verdicts.setDiscordName(discord)
         // A problem reported by hand counts as "it did not work" for the players' totals, unless the player already said so; what was ticked goes with that answer.
         val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
         verdicts.reportedProblem(appId, version, java.time.LocalDate.now().toString())
@@ -357,9 +362,9 @@ class GameViewModel @Inject constructor(
 
     fun conflictIntent() = issuesRepository.conflictIntent(appId)
 
-    fun shouldExplainStoragePermission() = installer.shouldExplainStoragePermission(appId)
+    fun storagePermissionBlocksPlay() = installer.storagePermissionBlocksPlay(appId)
 
-    fun markStoragePermissionExplained() = installer.markStoragePermissionExplained(appId)
+    fun onPermissionsOpened() = installer.markStoragePermissionSettingsOpened(appId)
 
     fun appSettingsIntent() = installer.appSettingsIntent(appId)
 

@@ -535,6 +535,8 @@ private fun Header(
         // The spacing and the size of the buttons are the ones of the shop's header: 12 dp apart, 48 dp each.
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             GamePortLogo(Modifier.size(40.dp))
+            // The invitation to the project's Discord, small and round, next to the logo.
+            app.gameport.core.designsystem.DiscordRoundButton()
             GlassSearchField(
                 value = state.query,
                 onValueChange = onQueryChanged,

@@ -221,7 +221,6 @@
     <string name="help_age_title">Jeux pour adultes</string>
     <string name="help_ask_title">Questions et bugs</string>
     <string name="help_ask_text">Un problème avec un jeu s\'envoie de préférence avec le bouton de signalement de sa page. Pour tout le reste, le Discord du projet est ouvert à tous.</string>
-    <string name="help_discord">Rejoindre le Discord</string>
     <string name="help_discord_where">Le lien s\'ouvre dans un navigateur, et Discord peut voir l\'adresse IP de cet appareil, comme pour toute page web.</string>
     <string name="help_tour_store">Visite de la boutique</string>
     <string name="help_tour_table">Visite du tableau de compatibilité</string>

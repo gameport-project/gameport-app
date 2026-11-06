@@ -247,9 +247,9 @@ class CloudProvider : ContentProvider() {
             putLongArray("sizes", files.map { it.second }.toLongArray())
         }
         "obb_list" -> Bundle().apply {
-            val files = if (entryPoint.expansionHandoff().isRequested(packageName)) entryPoint.expansionHandoff().staged(packageName) else emptyList()
-            putStringArray("names", files.map { it.name }.toTypedArray())
-            putLongArray("sizes", files.map { it.length() }.toLongArray())
+            val files = if (entryPoint.expansionHandoff().isRequested(packageName)) entryPoint.expansionHandoff().stagedNamed(packageName) else emptyList()
+            putStringArray("names", files.map { it.first }.toTypedArray())
+            putLongArray("sizes", files.map { it.second.length() }.toLongArray())
         }
         "obb_progress" -> okAfter { entryPoint.expansionHandoff().reportProgress(packageName, extras.getLong("done"), extras.getLong("total")) }
         "obb_done" -> okAfter { entryPoint.expansionHandoff().reportDone(packageName, extras.getBoolean("ok"), extras.getString("reason")) }

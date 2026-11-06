@@ -382,4 +382,12 @@ class VoteTest {
         assertEquals(listOf("no_sound"), answer.issues)
         assertEquals(ReportStates.SENT, answer.report)
     }
+
+    @Test
+    fun `the Discord name goes with the answer when it is given, even empty, and not at all when nothing is said`() {
+        val base = VoteMessage(1, Verdict.FAILS, "0.9.4", "quest", "0123456789abcdef0123456789abcdef")
+        assertEquals(false, Json.parseToJsonElement(base.toJson()).jsonObject.containsKey("discord"))
+        assertEquals("Some.Name", Json.parseToJsonElement(base.copy(discord = "  @Some.Name ").toJson()).jsonObject.getValue("discord").jsonPrimitive.content)
+        assertEquals("", Json.parseToJsonElement(base.copy(discord = "").toJson()).jsonObject.getValue("discord").jsonPrimitive.content)
+    }
 }

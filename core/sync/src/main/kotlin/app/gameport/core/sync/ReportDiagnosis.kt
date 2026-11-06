@@ -210,7 +210,7 @@ object ReportDiagnosis {
             else -> "${expansion.files} file(s) in Android/obb"
         }
         appendLine("expansion files declared by the game: ${if (expansion.declared) "yes" else "no"}; $where")
-        expansion.allFilesAccess?.let { appendLine("access to all files given to GamePort: ${if (it) "yes" else "no (GamePort asks for it before it installs a game with expansion files)"}") }
+        expansion.allFilesAccess?.let { appendLine("access to all files given to GamePort: ${if (it) "yes" else "no (GamePort stops before installing a game whose expansion files it cannot place without it)"}") }
         expansion.obbFolderWritable?.let { appendLine("the Android/obb folder can be written by GamePort: ${if (it) "yes" else "no"}") }
         if (!expansion.declared || expansion.files > 0) return
         if (expansion.folder == Expansion.Folder.NOT_READABLE) {

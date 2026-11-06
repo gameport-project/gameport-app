@@ -196,7 +196,11 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         viewModel.refreshIssues()
         viewModel.refreshPlaytime()
     }
-    val openPermissions = { viewModel.appSettingsIntent()?.let { runCatching { context.startActivity(it) } }; Unit }
+    val openPermissions = {
+        viewModel.onPermissionsOpened()
+        viewModel.appSettingsIntent()?.let { runCatching { context.startActivity(it) } }
+        Unit
+    }
     val play = { viewModel.launchIntent()?.let(context::startActivity); Unit }
     if (explainingStorage) {
         BackdropDialog(
@@ -204,17 +208,21 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
             title = { Text(stringResource(R.string.game_storage_title)) },
             text = { Text(stringResource(R.string.game_storage_text)) },
             confirmButton = {
-                TextButton(onClick = {
+                GlassButton(onClick = {
                     explainingStorage = false
                     openPermissions()
-                }) { Text(stringResource(R.string.game_storage_open)) }
+                }) {
+                    Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.game_storage_open))
+                }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    explainingStorage = false
-                    viewModel.markStoragePermissionExplained()
-                    play()
-                }) { Text(stringResource(R.string.game_storage_play_anyway)) }
+                GlassButton(onClick = { explainingStorage = false }) {
+                    Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.game_storage_later))
+                }
             },
         )
     }
@@ -222,13 +230,15 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
     val suspicion by viewModel.suspicion.collectAsStateWithLifecycle()
     val reportProgress by viewModel.reportProgress.collectAsStateWithLifecycle()
     val shownGame = (uiState as? GameUiState.Content)?.game
+    val discordName by viewModel.discordName.collectAsStateWithLifecycle()
     val report = ReportActions(
         suspicion = suspicion,
         progress = reportProgress,
-        onSend = { text, symptoms -> shownGame?.let { viewModel.onSendReport(it, text, symptoms) } },
+        onSend = { text, symptoms, discord -> shownGame?.let { viewModel.onSendReport(it, text, symptoms, discord) } },
         onTicket = { shownGame?.let { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, viewModel.ticketUri(it))) } } },
         onDismissProblem = viewModel::onDismissProblem,
         onResetProgress = viewModel::onResetReport,
+        discordName = discordName,
     )
     GameContent(
         uiState = uiState,
@@ -267,8 +277,8 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onDuplicateChosen = viewModel::onDuplicateChosen,
         onDiscard = viewModel::onDiscard,
         onUninstall = viewModel::onUninstall,
-        onPlay = { if (viewModel.shouldExplainStoragePermission()) explainingStorage = true else play() },
-        onPatchAndPlay = { viewModel.onPatchAndPlay { if (viewModel.shouldExplainStoragePermission()) explainingStorage = true else play() } },
+        onPlay = { if (viewModel.storagePermissionBlocksPlay()) explainingStorage = true else play() },
+        onPatchAndPlay = { viewModel.onPatchAndPlay { if (viewModel.storagePermissionBlocksPlay()) explainingStorage = true else play() } },
         onOpenPermissions = openPermissions,
         onRepatch = viewModel::onRepatch,
         onUpdate = viewModel::onUpdate,
@@ -1077,7 +1087,11 @@ private fun InstallActions(
             )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (install.error == InstallError.ExpansionStoragePermission || install.error == InstallError.ExpansionFiles) {
-                    OutlinedButton(onClick = { ExpansionStorageAccess.openSettings(installContext) }) { Text(stringResource(app.gameport.core.designsystem.R.string.game_error_expansion_storage_open)) }
+                    OutlinedButton(onClick = { ExpansionStorageAccess.openSettings(installContext) }) {
+                        Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(app.gameport.core.designsystem.R.string.game_error_expansion_storage_open))
+                    }
                 }
                 Button(onClick = onInstall) { Text(stringResource(R.string.game_retry)) }
                 // Removes whatever was downloaded, so a failed attempt never has to keep gigabytes.

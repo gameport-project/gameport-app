@@ -31,15 +31,29 @@ internal class HandoffStaging(private val root: File) {
         return placed
     }
 
-    /** The files that wait for [packageName]'s game, by name. */
-    fun staged(packageName: String): List<File> =
-        folder(packageName)?.listFiles { file -> file.isFile && !file.name.startsWith(".") }?.sortedBy { it.name }.orEmpty()
+    /**
+     * The files that wait for [packageName]'s game, each with its path under the game's folder (`/` between the folders). The files kept in folders count: a game such as
+     * Escape Simulator has all of its files under `assets/`, and a list of the top level alone would take them for nothing to deliver.
+     */
+    fun stagedNamed(packageName: String): List<Pair<String, File>> {
+        val root = folder(packageName)?.takeIf { it.isDirectory } ?: return emptyList()
+        return root.walkTopDown().filter { it.isFile }
+            .map { it.relativeTo(root).invariantSeparatorsPath to it }
+            .filter { (name, _) -> isAllowedName(name) }
+            .sortedBy { it.first }
+            .toList()
+    }
 
-    /** One staged file by its name, or null: a name is never a path. */
+    fun staged(packageName: String): List<File> = stagedNamed(packageName).map { it.second }
+
+    /** One staged file by its path under the game's folder, or null: a name never leaves that folder (no `..`, no hidden part, no backslash). */
     fun file(packageName: String, name: String): File? {
-        if (name.isEmpty() || name.startsWith(".") || '/' in name || '\\' in name) return null
+        if (!isAllowedName(name)) return null
         return folder(packageName)?.let { File(it, name) }?.takeIf { it.isFile }
     }
+
+    private fun isAllowedName(name: String): Boolean =
+        name.isNotEmpty() && '\\' !in name && name.split('/').all { it.isNotEmpty() && !it.startsWith(".") }
 
     fun clear(packageName: String) {
         folder(packageName)?.deleteRecursively()
@@ -74,6 +88,9 @@ class ExpansionHandoff @Inject constructor(
     fun hasStaged(packageName: String): Boolean = staging.staged(packageName).isNotEmpty()
 
     fun staged(packageName: String): List<File> = staging.staged(packageName)
+
+    /** The staged files with their path under the game's folder, for the list the game is given. */
+    fun stagedNamed(packageName: String): List<Pair<String, File>> = staging.stagedNamed(packageName)
 
     fun clear(packageName: String) {
         requests.remove(packageName)

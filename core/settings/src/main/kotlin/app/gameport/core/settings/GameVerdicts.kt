@@ -31,6 +31,20 @@ class GameVerdicts @Inject constructor(@ApplicationContext context: Context) {
         _share.value = share
     }
 
+    private val _discordName = MutableStateFlow(prefs.getString(DISCORD, null).orEmpty())
+
+    /**
+     * The Discord name the player gave with a problem report, kept so it is filled in the next time and never asked again; the player can change it there. Empty when there is none.
+     * It goes with the report, to talk about it on the project's Discord (see the README of the relay), and nothing checks that it belongs to the player.
+     */
+    val discordName: StateFlow<String> = _discordName.asStateFlow()
+
+    fun setDiscordName(typed: String) {
+        val name = app.gameport.core.model.DiscordName.clean(typed)
+        prefs.edit().putString(DISCORD, name).apply()
+        _discordName.value = name
+    }
+
     /** A random number made once, kept on this device, never shown: the relay only ever sees a salted hash of it. */
     val voterId: String
         @Synchronized get() = prefs.getString(VOTER, null)?.takeIf { it.length == 32 } ?: newVoterId().also { prefs.edit().putString(VOTER, it).apply() }
@@ -65,5 +79,6 @@ class GameVerdicts @Inject constructor(@ApplicationContext context: Context) {
         const val BOOK = "book"
         const val SHARE = "share"
         const val VOTER = "voter"
+        const val DISCORD = "discord"
     }
 }

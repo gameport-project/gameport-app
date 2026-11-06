@@ -32,14 +32,29 @@ class HandoffStagingTest {
     }
 
     @Test
-    fun `a staged file is found by its name, and a name that is a path is refused`() {
+    fun `a staged file is found by its name, and a name that leaves the folder is refused`() {
         staging.stage(download("main.5.$pkg.obb"), pkg, "patched", null, mutableListOf())
         assertNotNull(staging.file(pkg, "main.5.$pkg.obb"))
         assertNull(staging.file(pkg, "../main.5.$pkg.obb"))
-        assertNull(staging.file(pkg, "sub/main.5.$pkg.obb"))
+        assertNull(staging.file(pkg, "sub/../main.5.$pkg.obb"))
+        assertNull(staging.file(pkg, "/main.5.$pkg.obb"))
+        assertNull(staging.file(pkg, "sub\\main.5.$pkg.obb"))
         assertNull(staging.file(pkg, ".hidden"))
         assertNull(staging.file(pkg, ""))
         assertNull(staging.file(pkg, "missing.obb"))
+    }
+
+    @Test
+    fun `files kept in folders wait for the game too, with their path`() {
+        // Escape Simulator keeps all of its files under assets/: a list of the top level alone showed nothing to deliver and the files were deleted as if delivered.
+        val downloaded = download("app.apk", "assets/dependencies.bundle", "assets/deep/vr.bundle")
+        val problems = mutableListOf<String>()
+        staging.stage(downloaded, pkg, skipped = "patched", code = null, problems = problems)
+        assertTrue(problems.toString(), problems.isEmpty())
+        assertEquals(listOf("assets/deep/vr.bundle", "assets/dependencies.bundle"), staging.stagedNamed(pkg).map { it.first })
+        assertTrue(staging.staged(pkg).isNotEmpty())
+        assertNotNull(staging.file(pkg, "assets/dependencies.bundle"))
+        assertNull(staging.file(pkg, "assets"))
     }
 
     @Test

@@ -129,12 +129,12 @@
     <string name="game_settings_permissions_description">A game that keeps flashing a permission window or closes on its own needs access to files and media, allowed here.</string>
     <string name="game_settings_permissions_open">Open the game\'s permissions</string>
     <string name="game_storage_title">Allow access to files</string>
-    <string name="game_storage_text">This game asks for access to the device\'s files. Without it, it may close on its own. The game\'s permissions allow files and media access.</string>
+    <string name="game_storage_text">This game needs access to the device\'s files to run, and Play stays unavailable until it is allowed. The game\'s permissions allow files and media access.</string>
     <string name="game_storage_open">Open permissions</string>
-    <string name="game_storage_play_anyway">Play anyway</string>
+    <string name="game_storage_later">Later</string>
     <string name="issue_patch_outdated">A newer patch is available for this game.</string>
     <string name="issue_patch_outdated_action">Patch again</string>
-    <string name="issue_storage_permission">This game asks for access to files and does not have it. It may close on its own.</string>
+    <string name="issue_storage_permission">This game needs access to files and does not have it. Play stays unavailable until it is allowed.</string>
     <string name="issue_save_conflict">Saves differ between this device and Steam: a choice is needed.</string>
     <string name="issue_save_conflict_action">Choose</string>
     <string name="issue_saves_apart">This game keeps its saves on Android apart from the PC ones: they are not synced with the PC version. GamePort can bring the PC saves here.</string>
@@ -341,6 +341,7 @@
     <string name="report_send">Send the report</string>
     <string name="report_description_label">Describe the problem (optional)</string>
     <string name="report_description_why">A few words help a lot: the report shows how the game ran, not what was seen.</string>
+    <string name="report_sent_discord">To talk about it, the Discord is open to anyone.</string>
     <string name="report_status_sent">Report sent, thanks.</string>
     <string name="report_status_waiting">The report will be sent as soon as this device is online.</string>
     <string name="report_status_refused">The report could not be sent.</string>

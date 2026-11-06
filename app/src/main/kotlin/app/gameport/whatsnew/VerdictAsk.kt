@@ -126,6 +126,11 @@ class VerdictAskViewModel @Inject constructor(
     private val _followUp = MutableStateFlow<ReportFollowUp?>(null)
     val followUp: StateFlow<ReportFollowUp?> = _followUp.asStateFlow()
 
+    /** The Discord name kept from an earlier answer: it fills the field of the window, and goes with the answers to talk about them on the Discord. */
+    val discordName: StateFlow<String> = verdicts.discordName
+
+    fun onDiscordName(typed: String) = verdicts.setDiscordName(typed)
+
     fun onAnswer(verdict: Verdict) {
         val asked = question.value ?: return
         // A game that did not work, or whose online part does not, leaves something to look at in the report: the report goes first, and the answer waits to say what became of it.
@@ -217,7 +222,8 @@ class VerdictAskViewModel @Inject constructor(
 fun VerdictAskHost(viewModel: VerdictAskViewModel = hiltViewModel()) {
     val asked by viewModel.question.collectAsStateWithLifecycle()
     val followUp by viewModel.followUp.collectAsStateWithLifecycle()
-    followUp?.let { ReportFollowUpDialog(it, viewModel::onDownloadReport, viewModel::onSendReport, viewModel::onCloseReport) }
+    val discordName by viewModel.discordName.collectAsStateWithLifecycle()
+    followUp?.let { ReportFollowUpDialog(it, discordName, viewModel::onDiscordName, viewModel::onDownloadReport, viewModel::onSendReport, viewModel::onCloseReport) }
     // The question waits behind the window that follows an answer: only one of the two is on screen.
     if (followUp != null) return
     val question = asked ?: return
@@ -267,9 +273,11 @@ fun VerdictAskHost(viewModel: VerdictAskViewModel = hiltViewModel()) {
 
 /** After "it did not work": the report that goes with the answer, what became of it, and the two ways to take it by hand. Closed by its button only. */
 @Composable
-private fun ReportFollowUpDialog(state: ReportFollowUp, onDownload: (String, Set<Symptom>) -> Unit, onSend: (String, Set<Symptom>) -> Unit, onClose: (String, Set<Symptom>) -> Unit) {
+private fun ReportFollowUpDialog(state: ReportFollowUp, discordName: String, onDiscordName: (String) -> Unit, onDownload: (String, Set<Symptom>) -> Unit, onSend: (String, Set<Symptom>) -> Unit, onClose: (String, Set<Symptom>) -> Unit) {
     // What the player writes goes in the report, in their own words: the files show how the game ran, not what was seen.
     var description by rememberSaveable { mutableStateOf("") }
+    // The Discord name is kept as it is typed, so the answer that leaves when the window closes carries it; it is filled in from the last time, and never asked again.
+    var discord by rememberSaveable { mutableStateOf(discordName) }
     // What was ticked as going wrong goes in the report as fixed codes, which the project can count.
     var codes by rememberSaveable { mutableStateOf(emptyList<String>()) }
     val symptoms = Symptom.parse(codes)
@@ -318,6 +326,7 @@ private fun ReportFollowUpDialog(state: ReportFollowUp, onDownload: (String, Set
                     colors = app.gameport.core.designsystem.glassTextFieldColors(),
                     modifier = Modifier.fillMaxWidth(),
                 )
+                app.gameport.core.designsystem.DiscordNameField(discord, { discord = it; onDiscordName(it) })
                 state.savedName?.let { Text(stringResource(R.string.report_saved, it), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
                 if (state.saveFailed) Text(stringResource(R.string.report_save_failed), color = FailsRed, style = MaterialTheme.typography.bodySmall)
             }

@@ -64,8 +64,6 @@ import app.gameport.core.model.TourKind
 import app.gameport.core.designsystem.R as DesignR
 
 /** Where the project is found: the invitation is the one in the README. */
-private const val DISCORD_URL = "https://discord.gg/yWXXAC2AKc"
-private val DiscordBlurple = Color(0xFF5865F2)
 private val CompatGreen = Color(0xFF66BB6A)
 private val CompatRed = Color(0xFFE57373)
 
@@ -179,14 +177,7 @@ internal fun HelpSection(onStartComplete: () -> Unit, onStartTour: (TourKind) ->
 
     HelpBlock(R.string.help_ask_title) {
         Text(stringResource(R.string.help_ask_text), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.readable())
-        val links = LocalUriHandler.current
-        Button(
-            onClick = { links.openUri(DISCORD_URL) },
-            colors = ButtonDefaults.buttonColors(containerColor = DiscordBlurple, contentColor = Color.White),
-        ) {
-            Icon(painterResource(DesignR.drawable.ic_discord), contentDescription = null, modifier = Modifier.size(22.dp))
-            Text(stringResource(R.string.help_discord), modifier = Modifier.padding(start = 8.dp))
-        }
+        app.gameport.core.designsystem.DiscordButton()
         Text(stringResource(R.string.help_discord_where), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
     }
 }
