@@ -44,6 +44,47 @@ class VoteTest {
     }
 
     @Test
+    fun `a game build the relay would refuse is left out, so it never costs the answer`() {
+        fun sent(build: String?) = Json.parseToJsonElement(VoteMessage(1, Verdict.WORKS, "0.9.4", "quest", "0123456789abcdef0123456789abcdef", build).toJson()).jsonObject
+        assertEquals("1.1.87759", sent(" 1.1.87759 ").getValue("game").jsonPrimitive.content)
+        assertFalse(sent("1.1 beta").containsKey("game"))
+        assertFalse(sent("x".repeat(33)).containsKey("game"))
+        assertFalse(sent("").containsKey("game"))
+        assertFalse(sent(null).containsKey("game"))
+    }
+
+    @Test
+    fun `how steadily a run went goes with the answer only when there was enough play`() {
+        fun sent(steady: Steadiness?) = Json.parseToJsonElement(VoteMessage(1, Verdict.WORKS, "0.9.4", "quest", "0123456789abcdef0123456789abcdef", steadiness = steady).toJson()).jsonObject
+        val perf = sent(Steadiness(seconds = 240, held = 200, target = 72)).getValue("perf").jsonObject
+        assertEquals(240, perf.getValue("seconds").jsonPrimitive.content.toInt())
+        assertEquals(200, perf.getValue("held").jsonPrimitive.content.toInt())
+        assertEquals(72, perf.getValue("target").jsonPrimitive.content.toInt())
+        // Under three minutes, or numbers that do not fit together, are left out: the relay would refuse them.
+        assertFalse(sent(Steadiness(seconds = 179, held = 100, target = 72)).containsKey("perf"))
+        assertFalse(sent(Steadiness(seconds = 240, held = 241, target = 72)).containsKey("perf"))
+        assertFalse(sent(Steadiness(seconds = 240, held = 200, target = 10)).containsKey("perf"))
+        assertFalse(sent(null).containsKey("perf"))
+    }
+
+    @Test
+    fun `an answer keeps the steadiness the player agreed to send, and only a usable one`() {
+        val book = VerdictBook().answered(7, Verdict.WORKS, "0.9.4", "2026-11-07", send = true, steadiness = Steadiness(300, 250, 72))
+        assertEquals(Steadiness(300, 250, 72), book.unsent().single().steadiness)
+        assertEquals(83, book.unsent().single().steadiness?.percent)
+        assertNull(VerdictBook().answered(7, Verdict.WORKS, "0.9.4", "2026-11-07", send = true, steadiness = Steadiness(100, 90, 72)).unsent().single().steadiness)
+        assertNull(VerdictBook().answered(7, Verdict.WORKS, "0.9.4", "2026-11-07", send = true).unsent().single().steadiness)
+    }
+
+    @Test
+    fun `steadiness is written as three numbers and read back`() {
+        assertEquals(Steadiness(300, 250, 72), Steadiness.parse(Steadiness(300, 250, 72).write()))
+        assertNull(Steadiness.parse(null))
+        assertNull(Steadiness.parse("300 250"))
+        assertNull(Steadiness.parse("a b c"))
+    }
+
+    @Test
     fun `the device is told in the few words the relay knows`() {
         assertEquals("quest", VoteDevice.of("meta", tablet = false))
         assertEquals("pico", VoteDevice.of("pico", tablet = false))

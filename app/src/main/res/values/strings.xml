@@ -33,7 +33,6 @@
     <string name="report_send">Send the report</string>
     <string name="report_description_label">Describe the problem (optional)</string>
     <string name="report_description_why">A few words help a lot: the report shows how the game ran, not what was seen.</string>
-    <string name="report_close">Close</string>
     <string name="whatsnew_games">Games concerned:</string>
     <plurals name="whatsnew_alert_title">
         <item quantity="one">%1$d game must be patched again to benefit from these new features.</item>

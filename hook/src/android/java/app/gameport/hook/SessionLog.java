@@ -382,6 +382,10 @@ final class SessionLog {
         extras.putString("launch", launchInfo);
         extras.putString("nativeGaps", nativeGaps.report());
         extras.putString("digest", digest.report());
+        // How steady the run was, counted by the digest: the app shows it when the game closes, and sends it with the answer if the player agrees.
+        extras.putInt("steadinessSeconds", digest.stabilitySeconds());
+        extras.putInt("steadinessHeld", digest.stabilityHeldSeconds());
+        extras.putInt("steadinessTarget", digest.stabilityTarget());
         extras.putString("steamCalls", steamCalls);
         extras.putString("libraries", libraries);
         // Which run this is: GamePort keeps the log of the run before when a new one begins.

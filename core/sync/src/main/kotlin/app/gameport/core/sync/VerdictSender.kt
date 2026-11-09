@@ -3,6 +3,7 @@ package app.gameport.core.sync
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import app.gameport.core.device.DeviceProfile
+import app.gameport.core.install.GameInstallRepository
 import app.gameport.core.model.Answer
 import app.gameport.core.model.VoteMessage
 import app.gameport.core.settings.GameVerdicts
@@ -79,6 +80,7 @@ class VerdictSender @Inject constructor(
     @ApplicationContext private val context: Context,
     private val verdicts: GameVerdicts,
     private val device: DeviceProfile,
+    private val installer: GameInstallRepository,
 ) {
     private val lock = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -95,6 +97,9 @@ class VerdictSender @Inject constructor(
         scope.launch { combine(verdicts.book, verdicts.share) { book, share -> share && book.unsent().isNotEmpty() }.collect { if (it) flush() } }
     }
 
+    /** The version name of the game as installed, when it is (the real version of the game, not a number of GamePort's): it tells the project whether a game changed between two answers. */
+    private fun gameBuildOf(appId: Int): String? = installer.installedPackage(appId)?.let { name -> runCatching { context.packageManager.getPackageInfo(name, 0).versionName }.getOrNull() }
+
     /** Sends what is waiting. Safe to call at any time: one run at a time, and what fails stays for the next run. */
     suspend fun flush() {
         lock.withLock {
@@ -104,7 +109,7 @@ class VerdictSender @Inject constructor(
             val codename = device.codename
             sendAnswers(
                 verdicts.book.value.unsent(),
-                { answer -> VoteMessage(answer.appId, answer.verdict, appVersion, kind, verdicts.voterId, offline = answer.offline, issues = answer.issues, model = model, codename = codename, report = answer.report, discord = verdicts.discordName.value) },
+                { answer -> VoteMessage(answer.appId, answer.verdict, appVersion, kind, verdicts.voterId, offline = answer.offline, issues = answer.issues, model = model, codename = codename, report = answer.report, discord = verdicts.discordName.value, gameBuild = gameBuildOf(answer.appId), steadiness = answer.steadiness) },
                 transport,
             ) { answer -> verdicts.update { it.sent(answer.appId, answer.verdict) } }
         }

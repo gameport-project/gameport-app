@@ -25,6 +25,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
@@ -71,6 +72,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -123,6 +125,13 @@ class VerdictAskViewModel @Inject constructor(
         else loaded.games.filter { it.appId in book.pending }.minByOrNull { it.name.lowercase() }?.let { VerdictQuestion(it.appId, it.name, share, it.capsuleArt) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /**
+     * How steadily the run of the game asked about went, when there was enough play to say: sent with the answer, with nothing to choose or show. Counted by the hook
+     * of GamePort in the game (see `Steadiness`); nothing in it says who played.
+     */
+    val steadiness: StateFlow<app.gameport.core.model.Steadiness?> = question.map { asked -> asked?.let { reporter.lastRunSteadiness(it.appId) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     private val _followUp = MutableStateFlow<ReportFollowUp?>(null)
     val followUp: StateFlow<ReportFollowUp?> = _followUp.asStateFlow()
 
@@ -135,7 +144,8 @@ class VerdictAskViewModel @Inject constructor(
         val asked = question.value ?: return
         // A game that did not work, or whose online part does not, leaves something to look at in the report: the report goes first, and the answer waits to say what became of it.
         val withReport = verdict == Verdict.FAILS || verdict == Verdict.OFFLINE_ONLY
-        verdicts.answer(asked.appId, verdict, version, today, holdForReport = withReport)
+        val steady = steadiness.value.takeIf { asked.shared }
+        verdicts.answer(asked.appId, verdict, version, today, holdForReport = withReport, steadiness = steady)
         if (withReport) prepareReport(asked.appId, offlineOnly = verdict == Verdict.OFFLINE_ONLY)
     }
 
@@ -149,7 +159,7 @@ class VerdictAskViewModel @Inject constructor(
         // A game that does not work may have lost its large files since it was last looked at: it is looked at again, and a card says so on its page.
         viewModelScope.launch { expansionVerifier.recheck(appId) }
         viewModelScope.launch {
-            val kept = gameOf(appId)?.let { reports.prepareAfterFailure(it) } ?: false
+            val kept = gameOf(appId)?.let { reports.prepareAfterFailure(it, trigger = if (offlineOnly) "vote:offline-only" else "vote:fails") } ?: false
             if (kept) {
                 _followUp.update { it?.copy(ready = true) }
             } else {
@@ -292,8 +302,22 @@ private fun ReportFollowUpDialog(state: ReportFollowUp, discordName: String, onD
             onClose(description, symptoms)
         }
     }
+    // There is no Close button: the window ends by itself once the report has been saved on the device, or when none could be made (the answer has gone already, saying so), after a moment to read it.
+    androidx.compose.runtime.LaunchedEffect(state.savedName, state.busy) {
+        if (state.savedName != null && !state.busy) {
+            kotlinx.coroutines.delay(2_000L)
+            onClose(description, symptoms)
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(state.status, state.delivered) {
+        if (state.status == ReportStatus.UNAVAILABLE && state.delivered) {
+            kotlinx.coroutines.delay(3_000L)
+            onClose(description, symptoms)
+        }
+    }
     BackdropDialog(
-        onDismissRequest = {},
+        // A tap outside the window, or "back", is the way out for a player who wants neither: what was due goes, as it did with the Close button.
+        onDismissRequest = { onClose(description, symptoms) },
         maxHeight = dialogMaxHeight(),
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -333,42 +357,25 @@ private fun ReportFollowUpDialog(state: ReportFollowUp, discordName: String, onD
         },
         confirmButton = {
             CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (ready) {
-                        GlassButton(onClick = { onDownload(description, symptoms) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)) {
-                            Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                // The two ways to take the report, side by side at the bottom of the window and nothing else, so the content keeps its room. They wait until the report is made.
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // The send is not offered once the relay has the report, unless there is a description it does not have yet.
+                    if (state.status != ReportStatus.SENT || (written && !state.describedAndSent)) {
+                        GlassButton(onClick = { sentByHand = true; onSend(description, symptoms) }, enabled = ready && !state.busy, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)) {
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.report_download), maxLines = 1)
-                        }
-                        // Not offered once the relay has it, unless there is a description it does not have yet.
-                        if (state.status != ReportStatus.SENT || (written && !state.describedAndSent)) {
-                            GlassButton(onClick = { sentByHand = true; onSend(description, symptoms) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)) {
-                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text(stringResource(R.string.report_send), maxLines = 1)
-                            }
+                            Text(stringResource(R.string.report_send), maxLines = 1)
                         }
                     }
-                    CloseButton { onClose(description, symptoms) }
+                    GlassButton(onClick = { onDownload(description, symptoms) }, enabled = ready && !state.busy, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)) {
+                        Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.report_download), maxLines = 1)
+                    }
                 }
             }
         },
     )
-}
-
-/** The way out, in white like "not now" in the question. */
-@Composable
-private fun CloseButton(onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
-    ) {
-        Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(stringResource(R.string.report_close), maxLines = 1)
-    }
 }
 
 @Composable

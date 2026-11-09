@@ -33,7 +33,6 @@
     <string name="report_send">Envoyer le rapport</string>
     <string name="report_description_label">Décrire le problème (facultatif)</string>
     <string name="report_description_why">Quelques mots aident beaucoup : le rapport montre comment le jeu a tourné, pas ce qui a été vu.</string>
-    <string name="report_close">Fermer</string>
     <string name="whatsnew_games">Jeux concernés :</string>
     <plurals name="whatsnew_alert_title">
         <item quantity="one">%1$d jeu doit être patché de nouveau pour profiter de ces nouveautés.</item>

@@ -43,6 +43,11 @@ class ReportStore @Inject constructor(
         extras.getByteArray("threadsGz")?.let { gunzip(it)?.let { text -> File(folder, THREADS).writeBytes(text) } }
         extras.getByteArray("diagGz")?.let { gunzip(it)?.let { text -> saveDiagnostics(folder, String(text, Charsets.UTF_8)) } }
         extras.getByteArray("engineGz")?.let { gunzip(it)?.let { text -> File(folder, ENGINE_LOG).writeBytes(text) } }
+        // How steadily the run went, as the hook counted it so far: replaced at every hand-over, as it counts the run from its start.
+        if (extras.containsKey("steadinessSeconds")) {
+            val counted = app.gameport.core.model.Steadiness(extras.getInt("steadinessSeconds"), extras.getInt("steadinessHeld"), extras.getInt("steadinessTarget"))
+            prefs.edit().putString(STEADINESS_PREFIX + packageName, counted.write()).apply()
+        }
         extras.getString("libraries")?.takeIf { it.isNotEmpty() }?.let { File(folder, LIBRARIES).writeText(it.takeLast(MAX_CHARS)) }
         extras.getString("launch")?.takeIf { it.isNotEmpty() }?.let { File(folder, LAUNCH).writeText(it.takeLast(MAX_CHARS)) }
         // Said at every hand-over, empty when the run has met none: what an earlier run found must not stay as if this one had.
@@ -147,6 +152,9 @@ class ReportStore @Inject constructor(
         if (nowMillis - start < SHORT_SESSION_MS) suspect(packageName, Suspicion.SHORT_SESSION)
     }
 
+    /** How steadily the game's last run went, as the hook counted it, or null when nothing was handed over. It may be too short to say: see [app.gameport.core.model.Steadiness.usable]. */
+    fun steadiness(packageName: String): app.gameport.core.model.Steadiness? = app.gameport.core.model.Steadiness.parse(prefs.getString(STEADINESS_PREFIX + packageName, null))
+
     /** How long the game's last run lasted before it left the screen or closed, in milliseconds, or null if unknown. */
     fun lastSessionMillis(packageName: String): Long? = prefs.getLong(SESSION_PREFIX + packageName, -1L).takeIf { it >= 0 }
 
@@ -189,6 +197,7 @@ class ReportStore @Inject constructor(
         const val MAX_CHARS = 600_000
         const val SHORT_SESSION_MS = 30_000L
         const val SESSION_PREFIX = "session:"
+        const val STEADINESS_PREFIX = "steadiness:"
         const val LAUNCH_PREFIX = "launch:"
     }
 }

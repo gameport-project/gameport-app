@@ -7,6 +7,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+/** What the relay keeps as the build of a game: letters, digits, dots, dashes and underscores, 32 characters at most (its own rule, see `validate` in the relay). */
+private val GAME_BUILD = Regex("[0-9A-Za-z._-]{1,32}")
+
 /** What a player says about a game once it has closed. [wire] is how the relay writes it. */
 enum class Verdict(val wire: String) {
     WORKS("works"),
@@ -57,6 +60,8 @@ data class VoteMessage(
      * (or took it away), which the relay keeps as "none".
      */
     val discord: String? = null,
+    /** How steadily the run went, when the player agreed to send it (see [Steadiness]). Left out when there is not enough play to say. */
+    val steadiness: Steadiness? = null,
 ) {
     fun toJson(): String = buildJsonObject {
         put("v", 1)
@@ -65,7 +70,9 @@ data class VoteMessage(
         put("app", appVersion)
         put("device", device)
         put("voter", voter)
-        gameBuild?.let { put("game", JsonPrimitive(it)) }
+        // The relay refuses a build it cannot keep (and would refuse the whole answer for it): one that does not fit its shape is left out.
+        gameBuild?.trim()?.takeIf { GAME_BUILD.matches(it) }?.let { put("game", JsonPrimitive(it)) }
+        steadiness?.takeIf { it.usable }?.let { put("perf", buildJsonObject { put("seconds", it.seconds); put("held", it.held); put("target", it.target) }) }
         if (offline) put("offline", true)
         if (issues.isNotEmpty()) put("issues", JsonArray(issues.map { JsonPrimitive(it) }))
         if (model.isNotBlank()) put("model", model.trim())
@@ -103,10 +110,12 @@ data class GameVerdict(
     val report: String? = null,
     /** The answer waits for its report to be sent, so as to say what became of it: it is not sent while this is true (see [VerdictBook.reportStated], [VerdictBook.releaseHolds]). */
     val holding: Boolean = false,
+    /** How steadily the run went, when the player agreed to send it with the answer (see [Steadiness]). */
+    val steadiness: Steadiness? = null,
 )
 
 /** An answer that has not reached the relay yet. */
-data class Answer(val appId: Int, val verdict: Verdict, val offline: Boolean, val issues: List<String> = emptyList(), val report: String? = null)
+data class Answer(val appId: Int, val verdict: Verdict, val offline: Boolean, val issues: List<String> = emptyList(), val report: String? = null, val steadiness: Steadiness? = null)
 
 /** The last sign of life of a game that is being played: when, and whether it was "the game left the screen". Kept on disk, so it outlives GamePort. */
 @Serializable
@@ -159,11 +168,11 @@ data class VerdictBook(
 
     /**
      * The player answered. [send] is false when they chose not to share: the answer stays on this device. [holdForReport] keeps the answer from going until the state of its report
-     * is known ([reportStated]): the report is sent first, and the answer says what became of it.
+     * is known ([reportStated]): the report is sent first, and the answer says what became of it. [steadiness] is what the player agreed to send about the run, if anything.
      */
-    fun answered(appId: Int, verdict: Verdict, appVersion: String, today: String, send: Boolean, holdForReport: Boolean = false): VerdictBook =
+    fun answered(appId: Int, verdict: Verdict, appVersion: String, today: String, send: Boolean, holdForReport: Boolean = false, steadiness: Steadiness? = null): VerdictBook =
         copy(
-            games = games + (appId to GameVerdict(verdict.wire, appVersion, today, sent = !send, offline = verdict == Verdict.WORKS && appId in offlineRuns, holding = send && holdForReport)),
+            games = games + (appId to GameVerdict(verdict.wire, appVersion, today, sent = !send, offline = verdict == Verdict.WORKS && appId in offlineRuns, holding = send && holdForReport, steadiness = steadiness?.takeIf { it.usable })),
             pending = pending - appId,
             offlineRuns = offlineRuns - appId,
         )
@@ -209,7 +218,7 @@ data class VerdictBook(
     fun releaseHolds(): VerdictBook = if (games.values.none { it.holding }) this else copy(games = games.mapValues { (_, game) -> if (game.holding) game.copy(holding = false) else game })
 
     /** The answers the relay has not received yet, but for the ones that wait for their report. */
-    fun unsent(): List<Answer> = games.mapNotNull { (appId, game) -> if (!game.sent && !game.holding) Verdict.fromWire(game.verdict)?.let { Answer(appId, it, game.offline, game.issues, game.report) } else null }
+    fun unsent(): List<Answer> = games.mapNotNull { (appId, game) -> if (!game.sent && !game.holding) Verdict.fromWire(game.verdict)?.let { Answer(appId, it, game.offline, game.issues, game.report, game.steadiness) } else null }
 
     /** The relay received this answer, unless the player changed it meanwhile. */
     fun sent(appId: Int, verdict: Verdict): VerdictBook {
