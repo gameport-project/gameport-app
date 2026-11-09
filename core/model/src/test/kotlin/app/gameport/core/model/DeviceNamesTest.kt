@@ -27,6 +27,14 @@ class DeviceNamesTest {
     }
 
     @Test
+    fun `a Pico that calls itself by a code is named from it`() {
+        assertEquals("Pico 4", DeviceNames.friendly("A8110", ""))
+        assertEquals("Pico 4", DeviceNames.friendly("A81E0", ""))
+        assertEquals("Pico 4 Pro", DeviceNames.friendly("A8210", ""))
+        assertEquals("Pico 4 Ultra", DeviceNames.friendly("A92Y0", ""))
+    }
+
+    @Test
     fun `a device this does not know has no name`() {
         assertNull(DeviceNames.friendly("SM-X710", "gts9"))
         assertNull(DeviceNames.friendly("", ""))

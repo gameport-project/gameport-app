@@ -17,6 +17,10 @@ object DeviceNames {
             name.startsWith("pico 4 pro") -> "Pico 4 Pro"
             name.startsWith("pico 4") -> "Pico 4"
             name.startsWith("pico neo 3") -> "Pico Neo 3"
+            // The Pico headsets call themselves by a code (Build.MODEL).
+            name == "a8110" || name == "a81e0" -> "Pico 4"
+            name == "a8210" -> "Pico 4 Pro"
+            name == "a92y0" -> "Pico 4 Ultra"
             else -> null
         }
     }

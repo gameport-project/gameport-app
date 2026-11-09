@@ -377,6 +377,7 @@ internal fun GameContent(
                     savesNotSynced = uiState.savesNotSynced,
                     compat = uiState.compat,
                     incompatible = uiState.incompatible,
+                    caution = uiState.warning,
                     compatDetail = CompatDetailInfo(uiState.compatCounts, uiState.deviceKind, uiState.deviceName, uiState.appVersion, compatReports, onCompatDetailsOpened),
                     vrDevice = uiState.vrDevice,
                     onOpenControllers = onOpenControllers,
@@ -452,6 +453,8 @@ private fun GameDetails(
     savesNotSynced: Boolean,
     compat: app.gameport.core.model.Compat?,
     incompatible: app.gameport.core.model.IncompatibleReason?,
+    /** What is to be known about the game on this device though it runs: shown on the page, in orange. */
+    caution: app.gameport.core.model.IncompatibleReason? = null,
     /** What the details behind the compatibility label show besides the verdict. */
     compatDetail: CompatDetailInfo = CompatDetailInfo(),
     favorite: Boolean,
@@ -875,7 +878,7 @@ private fun GameDetails(
                     }
                     CompatChips(compat, incompatible, onClick = { showingCompat = true })
                 }
-                CompatDetails(compat, incompatible)
+                CompatDetails(compat, incompatible, caution)
                 FlowRow(
                     // While an install goes on, the card is taller than the buttons: the cover keeps the place it has with the buttons (one row high), it does not follow the card.
                     modifier = Modifier.onGloballyPositioned { alignment.actionsPlaced(it, if (install.stage != null) with(density) { ACTION_HEIGHT.toPx() } else null) },
@@ -1826,7 +1829,7 @@ private const val CAPITAL_HEIGHT = 0.72f
 
 /** What stands behind the label: why the game is incompatible, that players tried it with the offline mode, or that few answered so far. No numbers: the label says it. */
 @Composable
-private fun CompatDetails(compat: app.gameport.core.model.Compat?, incompatible: app.gameport.core.model.IncompatibleReason?) {
+private fun CompatDetails(compat: app.gameport.core.model.Compat?, incompatible: app.gameport.core.model.IncompatibleReason?, warning: app.gameport.core.model.IncompatibleReason?) {
     val language = LocalConfiguration.current.locales[0].language
     val style = MaterialTheme.typography.bodySmall
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1834,6 +1837,25 @@ private fun CompatDetails(compat: app.gameport.core.model.Compat?, incompatible:
         incompatible != null -> IncompatibleNote(incompatible.title.pick(language), incompatible.text.pick(language))
         compat != null && compat.offlineTested -> Text(stringResource(R.string.game_compat_offline), style = style, color = muted)
         // (A result with few answers is not told here: it is not taken into account.)
+    }
+    // A warning is told whatever else the page says, and stays: nothing to open, switch or close.
+    warning?.let { WarningNote(it.title.pick(language), it.text.pick(language)) }
+}
+
+/** What is to be known about a game that runs: in orange, with a warning sign, always on the page of the game it is about. */
+@Composable
+private fun WarningNote(title: String, text: String) {
+    val shape = RoundedCornerShape(16.dp)
+    Row(
+        Modifier.fillMaxWidth().glass(shape).border(1.dp, CompatOrange.copy(alpha = 0.7f), shape).padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(Icons.Filled.Warning, contentDescription = null, tint = CompatOrange, modifier = Modifier.size(22.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = CompatOrange)
+            Text(text.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }
 

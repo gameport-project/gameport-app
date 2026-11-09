@@ -1,6 +1,7 @@
 package app.gameport.core.settings
 
 import android.content.Context
+import app.gameport.core.device.DeviceProfile
 import app.gameport.core.model.IncompatibleList
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -25,7 +26,7 @@ import kotlinx.coroutines.withContext
  * cannot be read never replaces the one in use.
  */
 @Singleton
-class IncompatibleGames @Inject constructor(@ApplicationContext private val context: Context) {
+class IncompatibleGames @Inject constructor(@ApplicationContext private val context: Context, private val device: DeviceProfile) {
     private val prefs = context.getSharedPreferences("gameport_incompatible", Context.MODE_PRIVATE)
     private val _showAnyway = MutableStateFlow(prefs.getBoolean(SHOW_ANYWAY, false))
     private val _acknowledged = MutableStateFlow(prefs.getStringSet(ACKNOWLEDGED, emptySet()).orEmpty().mapNotNull(String::toIntOrNull).toSet())
@@ -33,10 +34,16 @@ class IncompatibleGames @Inject constructor(@ApplicationContext private val cont
     private val debuggable = context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
     private val kept = File(context.cacheDir, "incompatible-relay.json")
     private val lock = Mutex()
-    internal var fetch: suspend () -> String? = { download(if (debuggable) "$RELAY/test/incompatible" else "$RELAY/incompatible") }
+    internal var fetch: suspend () -> String? = { download(if (debuggable) "$RELAY/test/incompatible?v=2" else "$RELAY/incompatible?v=2") }
     internal var now: () -> Long = System::currentTimeMillis
 
-    private val _list = MutableStateFlow(runCatching { kept.readText() }.getOrNull()?.let(IncompatibleList::fromRelay) ?: IncompatibleList())
+    /** What this device is called, to tell the games limited to some devices from the others: its kind, the name people know it by, what it calls itself. */
+    private val deviceNames: Set<String> by lazy { setOfNotNull(device.kind, device.friendlyName, device.model) }
+
+    /** The list as it holds for this device: a game limited to other devices (a game that fails on a Quest only) is not in it. */
+    private fun mine(list: IncompatibleList): IncompatibleList = list.forDevice(deviceNames)
+
+    private val _list = MutableStateFlow(mine(runCatching { kept.readText() }.getOrNull()?.let(IncompatibleList::fromRelay) ?: IncompatibleList()))
 
     /** The list in use, and what it becomes when the relay says otherwise. */
     val lists: StateFlow<IncompatibleList> = _list.asStateFlow()
@@ -51,7 +58,7 @@ class IncompatibleGames @Inject constructor(@ApplicationContext private val cont
             val text = fetch() ?: return
             val read = IncompatibleList.fromRelay(text) ?: return
             runCatching { kept.writeText(text) }
-            _list.value = read
+            _list.value = mine(read)
         }
     }
 

@@ -60,4 +60,46 @@ class IncompatibleListTest {
         assertNull(IncompatibleList.fromRelay("""{"v":2,"games":[]}"""))
         assertNull(IncompatibleList.fromRelay("not json"))
     }
+
+    @Test
+    fun `a game limited to some devices is incompatible only on those`() {
+        val limited = IncompatibleList.fromRelay(
+            """{"v":1,"reasons":{"meta":{"title":{"en":"T","fr":"T"},"text":{"en":"t","fr":"t"}}},""" +
+                """"games":[{"appId":1,"name":"Everywhere","reason":"meta"},{"appId":2,"name":"Quests","reason":"meta","devices":["quest"]},""" +
+                """{"appId":3,"name":"One model","reason":"meta","devices":["Meta Quest 3"]}]}""",
+        )!!
+        val quest3 = setOf("quest", "Quest 3", "Quest 3")
+        val pico = setOf("pico", "Pico 4", "Pico 4")
+        assertEquals(listOf(1, 2, 3), limited.forDevice(quest3).games.map { it.appId })
+        assertEquals(listOf(1), limited.forDevice(pico).games.map { it.appId })
+        assertEquals(listOf(1, 2), limited.forDevice(setOf("quest", "Quest 2", "Quest 2")).games.map { it.appId })
+    }
+
+    @Test
+    fun `a game can name a different reason for each device`() {
+        val two = IncompatibleList.fromRelay(
+            """{"v":1,"reasons":{"a":{"title":{"en":"A","fr":"A"},"text":{"en":"a","fr":"a"}},"b":{"title":{"en":"B","fr":"B"},"text":{"en":"b","fr":"b"}}},""" +
+                """"games":[{"appId":7,"name":"G","reason":"a","devices":["quest"]},{"appId":7,"name":"G","reason":"b","devices":["pico"]}]}""",
+        )!!
+        assertEquals("a", two.forDevice(setOf("quest", "Quest 3")).game(7)?.reason)
+        assertEquals("b", two.forDevice(setOf("pico", "Pico 4")).game(7)?.reason)
+        assertNull(two.forDevice(setOf("phone")).game(7))
+        assertTrue(two.problems(listOf("en", "fr")).isEmpty())
+    }
+
+    @Test
+    fun `a reason that warns never hides a game, and a reason that says nothing blocks`() {
+        val mixed = IncompatibleList.fromRelay(
+            """{"v":1,"reasons":{"a":{"title":{"en":"A","fr":"A"},"text":{"en":"a","fr":"a"}},"w":{"kind":"warns","title":{"en":"W","fr":"W"},"text":{"en":"w","fr":"w"}}},""" +
+                """"games":[{"appId":1,"name":"Blocked","reason":"a"},{"appId":2,"name":"Warned","reason":"w","devices":["quest"]}]}""",
+        )!!
+        assertEquals(listOf(1), mixed.games.map { it.appId })
+        assertNull(mixed.game(2))
+        assertEquals("w", mixed.warning(2)?.reason)
+        assertEquals("W", mixed.warningReasonOf(2)?.title?.get("en"))
+        assertNull(mixed.warning(1))
+        assertEquals("Warned", mixed.forDevice(setOf("quest", "Quest 3")).warning(2)?.name)
+        assertNull(mixed.forDevice(setOf("pico")).warning(2))
+        assertTrue(mixed.problems(listOf("en", "fr")).isEmpty())
+    }
 }

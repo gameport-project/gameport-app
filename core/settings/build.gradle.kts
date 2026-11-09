@@ -9,5 +9,6 @@ android {
 
 dependencies {
     api(project(":core:model"))
+    implementation(project(":core:device"))
     implementation(libs.kotlinx.coroutines.core)
 }

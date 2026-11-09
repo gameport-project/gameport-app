@@ -62,6 +62,8 @@ sealed interface GameUiState {
         val compat: app.gameport.core.model.Compat? = null,
         /** Why the game is known not to run, when it is on the list of incompatible games. */
         val incompatible: app.gameport.core.model.IncompatibleReason? = null,
+        /** What is to be known about the game on this device though it runs (for instance that it may close on its own): told on its page, never hiding it. */
+        val warning: app.gameport.core.model.IncompatibleReason? = null,
         /** What the players of every kind of device said about the game, for the details behind its label. */
         val compatCounts: app.gameport.core.model.CompatCounts? = null,
         /** The kind of device in hand ("quest", "pico", "phone", "tablet", "other") and its name when that is known (Quest 3, Pico 4). */
@@ -185,9 +187,9 @@ class GameViewModel @Inject constructor(
     private val savesNotSynced: Flow<Boolean> = saves.observe(appId).map { it.files.isNotEmpty() && !it.inSync }
 
     /** What is said about the game by the players, and by the list of incompatible games. */
-    private class Opinion(val compat: app.gameport.core.model.Compat?, val counts: app.gameport.core.model.CompatCounts?, val incompatible: app.gameport.core.model.IncompatibleReason?)
+    private class Opinion(val compat: app.gameport.core.model.Compat?, val counts: app.gameport.core.model.CompatCounts?, val incompatible: app.gameport.core.model.IncompatibleReason?, val warning: app.gameport.core.model.IncompatibleReason?)
 
-    private val opinion: Flow<Opinion> = combine(compat.observe(appId), compat.observeCounts(appId), incompatibleGames.lists) { community, counts, confirmed -> Opinion(community, counts, confirmed.reasonOf(appId)) }
+    private val opinion: Flow<Opinion> = combine(compat.observe(appId), compat.observeCounts(appId), incompatibleGames.lists) { community, counts, confirmed -> Opinion(community, counts, confirmed.reasonOf(appId), confirmed.warningReasonOf(appId)) }
 
     private val deviceKind = device.kind
     private val deviceName = device.friendlyName
@@ -237,6 +239,7 @@ class GameViewModel @Inject constructor(
                 savesNotSynced = notSynced,
                 compat = opinion.compat,
                 incompatible = opinion.incompatible,
+                warning = opinion.warning,
                 compatCounts = opinion.counts,
                 deviceKind = deviceKind,
                 deviceName = deviceName,
