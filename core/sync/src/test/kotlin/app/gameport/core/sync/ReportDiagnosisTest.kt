@@ -256,4 +256,37 @@ class ReportDiagnosisTest {
         val text = ReportDiagnosis.of("", "", "", null, steamCalls = calls)
         assertTrue(text, text.contains("session ticket x3, web ticket for \"epiconlineservices\" x2; given to it: 3, NOT given: 1"))
     }
+
+    private val encryptedCalls = """
+        == The run before this one
+        == This run
+          87x  + 0.8 s  + 867.6 s  Steam_User::RequestEncryptedAppTicket
+         174x  + 0.8 s  + 867.6 s  Steam_User::GetEncryptedAppTicket
+    """.trimIndent()
+
+    @Test
+    fun `a game that asks the encrypted app ticket is not told as one that does not go through Steam`() {
+        val text = ReportDiagnosis.of("", "", "", null, steamCalls = "== This run\n  87x  + 0.8 s  + 867.6 s  Steam_User::RequestEncryptedAppTicket\n")
+        assertTrue(text, text.contains("encrypted app ticket asked by the game: x87"))
+        assertTrue(text, text.contains("refuses the sign-in"))
+        assertFalse(text, text.contains("does not go through Steam"))
+    }
+
+    @Test
+    fun `the stand-in that answered the game's calls is not told as not loaded when the list is read after it left`() {
+        val text = ReportDiagnosis.of("/data/app/x/lib/arm64/libUnreal.so\n", "", "", null, steamCalls = encryptedCalls)
+        assertTrue(text, text.contains("Steam stand-in of GamePort (shim) loaded: yes, during the run"))
+        val none = ReportDiagnosis.of("/data/app/x/lib/arm64/libUnreal.so\n", "", "", null)
+        assertTrue(none, none.contains("Steam stand-in of GamePort (shim) loaded: no"))
+    }
+
+    @Test
+    fun `a native crash in the log is told on a system that records no exit`() {
+        val log = "11-06 21:15:11.327  5973  7535 F libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x1c in tid 7535 (Thread-3), pid 5973 (x)\n" +
+            "11-06 21:15:11.328  5973  7535 W Unity   : #0 0x7ea2313a54 (libunity.so)\n"
+        val text = ReportDiagnosis.of("", log, "", null)
+        assertTrue(text, text.contains("native crash seen in the log of the game: signal 11 (SIGSEGV), fault address 0x1c, thread Thread-3"))
+        assertTrue(text, text.contains("this system records none"))
+        assertFalse(ReportDiagnosis.of("", "I GPHook : ok", "", null).contains("native crash"))
+    }
 }

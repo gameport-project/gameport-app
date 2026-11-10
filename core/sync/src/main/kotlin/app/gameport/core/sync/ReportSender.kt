@@ -180,8 +180,8 @@ class ReportSender @Inject constructor(
      * player is done telling what went wrong ([sendNow], or [sendByHand] with what they wrote), so the project gets one answer and one report, not one before and one after. Returns
      * false when there is no report to keep (the game is not installed, or the report is too large).
      */
-    suspend fun prepareAfterFailure(game: Game): Boolean = lock.withLock {
-        val zip = reporter.bytes(game)
+    suspend fun prepareAfterFailure(game: Game, trigger: String? = null): Boolean = lock.withLock {
+        val zip = reporter.bytes(game, trigger = trigger)
         if (zip == null) {
             Log.i(TAG, "${game.appId}: no report to keep (the game is not installed, or the report is too large)")
             return false
@@ -196,7 +196,7 @@ class ReportSender @Inject constructor(
 
     /** The player asked from the game's page: the report is made now and sent, even when the automatic sending is off. */
     suspend fun sendByHand(game: Game, installFailure: String? = null, description: String? = null, symptoms: Set<app.gameport.core.model.Symptom> = emptySet()): ReportStatus = lock.withLock {
-        val zip = reporter.bytes(game, installFailure = installFailure, description = description, symptoms = symptoms) ?: return ReportStatus.UNAVAILABLE
+        val zip = reporter.bytes(game, installFailure = installFailure, description = description, symptoms = symptoms, trigger = if (installFailure != null) "install-failure" else "game-page") ?: return ReportStatus.UNAVAILABLE
         runCatching { outbox.put(game.appId, zip) }.onFailure {
             Log.w(TAG, "${game.appId}: the report could not be kept", it)
             return ReportStatus.UNAVAILABLE

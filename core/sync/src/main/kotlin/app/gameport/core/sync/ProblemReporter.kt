@@ -80,11 +80,11 @@ class ProblemReporter @Inject constructor(
      * The report as bytes, to send it to the relay. A report larger than [maxBytes] is made again without its heaviest optional files (the list of
      * the game's files, the engine's logs, the crash dump); when it is still too large, or the game is not installed, there is none.
      */
-    suspend fun bytes(game: Game, maxBytes: Int = MAX_SENT_BYTES, installFailure: String? = null, description: String? = null, symptoms: Set<app.gameport.core.model.Symptom> = emptySet()): ByteArray? = withContext(Dispatchers.IO) {
+    suspend fun bytes(game: Game, maxBytes: Int = MAX_SENT_BYTES, installFailure: String? = null, description: String? = null, symptoms: Set<app.gameport.core.model.Symptom> = emptySet(), trigger: String? = null): ByteArray? = withContext(Dispatchers.IO) {
         // A game whose install failed has no package yet: the report then holds the download and the events instead.
         val packageName = installed.all()[game.appId]?.takeIf(packages::isInstalled)
         if (packageName == null && installFailure == null) return@withContext null
-        fun build(lean: Boolean) = java.io.ByteArrayOutputStream().also { writeZip(game, packageName, installFailure, it, lean, description, symptoms) }.toByteArray()
+        fun build(lean: Boolean) = java.io.ByteArrayOutputStream().also { writeZip(game, packageName, installFailure, it, lean, description, symptoms, trigger) }.toByteArray()
         build(lean = false).takeIf { it.size <= maxBytes } ?: build(lean = true).takeIf { it.size <= maxBytes }
     }
 
@@ -108,7 +108,7 @@ class ProblemReporter @Inject constructor(
             .build()
     }
 
-    private fun writeZip(game: Game, packageName: String?, installFailure: String?, target: java.io.OutputStream, lean: Boolean = false, description: String? = null, symptoms: Set<app.gameport.core.model.Symptom> = emptySet()) {
+    private fun writeZip(game: Game, packageName: String?, installFailure: String?, target: java.io.OutputStream, lean: Boolean = false, description: String? = null, symptoms: Set<app.gameport.core.model.Symptom> = emptySet(), trigger: String? = null) {
         val names = (auth.authState.value as? AuthState.SignedIn)?.account?.displayName?.let(::listOf).orEmpty()
         fun clean(text: String) = ReportRedactor.clean(text, names)
         ZipOutputStream(target, Charsets.UTF_8).use { zip ->
@@ -120,7 +120,7 @@ class ProblemReporter @Inject constructor(
             entry("README.txt", README)
             // What the player says went wrong, in their own words: the files below show how the game ran, not what was seen.
             ReportDescription.of(description)?.let { entry("description.txt", clean(it)) }
-            entry("report.json", clean(summary(game, packageName, installFailure, symptoms)))
+            entry("report.json", clean(summary(game, packageName, installFailure, symptoms, trigger)))
             entry("device.txt", clean(deviceFacts()))
             entry("settings.txt", clean(settingsFacts(game.appId)))
             if (packageName != null) {
@@ -159,7 +159,7 @@ class ProblemReporter @Inject constructor(
         }
     }
 
-    private fun summary(game: Game, packageName: String?, installFailure: String?, symptoms: Set<app.gameport.core.model.Symptom> = emptySet()): String {
+    private fun summary(game: Game, packageName: String?, installFailure: String?, symptoms: Set<app.gameport.core.model.Symptom> = emptySet(), trigger: String? = null): String {
         fun q(value: Any?) = "\"" + value.toString().replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ") + "\""
         val info = packageName?.let { runCatching { context.packageManager.getPackageInfo(it, 0) }.getOrNull() }
         val patchVersion = packageName?.let { packages.metaDataInt(it, "app.gameport.patch_version") }
@@ -192,6 +192,11 @@ class ProblemReporter @Inject constructor(
             // What the player ticked as going wrong, as fixed codes (see Symptom).
             "player.symptoms" to app.gameport.core.model.Symptom.write(symptoms),
             "suspicion" to packageName?.let { store.suspected.value[it]?.name },
+            // How this report came to be made: the answer the player gave in the window that follows a game ("vote:fails", "vote:offline-only"), the button on the game's page
+            // ("game-page") or a failed install. What the player ticked is in player.symptoms; nothing here is ticked for them.
+            "report.trigger" to trigger,
+            // A device whose system was changed to inject code into every app (Zygisk shows in the game's own log): a crash there says little of the game or of GamePort.
+            "device.injection" to packageName?.let { store.text(it, "log-start.txt").contains("zygisk", ignoreCase = true) }?.takeIf { it }?.let { "zygisk seen in the game's log" },
             // How old what the game handed over is: a game that logs little leaves it as it was.
             "hook.lastDataSecondsAgo" to packageName?.let { store.lastDataMillis(it) }?.let { (System.currentTimeMillis() - it) / 1000 },
             "lastSession.seconds" to packageName?.let { store.lastSessionMillis(it) }?.let { it / 1000 },
@@ -202,6 +207,10 @@ class ProblemReporter @Inject constructor(
     /** How long the game's last run lasted, in seconds, or null when GamePort does not know (the game never ran, or ended before it was told). */
     fun lastRunSeconds(appId: Int): Long? =
         installed.all()[appId]?.let { store.lastSessionMillis(it) }?.let { it / 1000 }
+
+    /** How steadily the game's last run went, when there was enough play to say (see [app.gameport.core.model.Steadiness.usable]); null otherwise. */
+    fun lastRunSteadiness(appId: Int): app.gameport.core.model.Steadiness? =
+        installed.all()[appId]?.let { store.steadiness(it) }?.takeIf { it.usable }
 
     /** A crash from before the last launch of the game is not the run of this report: the summary says so, with how long before it was. */
     private fun staleNote(info: String, launchedAtMillis: Long?): String {
@@ -450,7 +459,7 @@ class ProblemReporter @Inject constructor(
 
             description.txt       what the player wrote about the problem, when they did (optional); the symptoms they ticked are in report.json (player.symptoms)
             diagnosis.txt         what the files show at once (the hook ran, the OpenXR loader and layer loaded, the expansion files, the controllers the game asked for, how the last runs ended) and how old the data is
-            report.json           versions of GamePort, the game and the patch; the connection to Steam; why a report is suggested
+            report.json           versions of GamePort, the game and the patch; the connection to Steam; why a report is suggested; how it was made (report.trigger: the answer to the window after a game, the game's page, a failed install)
             device.txt            the device, its system, storage, memory, VR features
             settings.txt          the player's choices for this game (seated mode, height, controller mapping), the save sync state
             performance.txt       the runtime's frame rate, CPU and GPU lines from the last minutes of play

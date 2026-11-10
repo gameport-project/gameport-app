@@ -49,7 +49,10 @@ object ReportDiagnosis {
             )
             appendLine("Steam library of the game loaded: " + yes(libraries.contains("libsteam_api")))
             // The game's library loads the shim only when the game starts Steam: not there, the game did not get that far.
-            appendLine("Steam stand-in of GamePort (shim) loaded: " + yes(libraries.contains("libsteamclient")))
+            // The list is read at the end of the run, after the game let the stand-in go: the table of the calls it answered says it was there all the same.
+            val shimLoaded = libraries.contains("libsteamclient")
+            val shimAnswered = !shimLoaded && steamCalls.isNotBlank() && CALL_LINE.containsMatchIn(steamCalls)
+            appendLine("Steam stand-in of GamePort (shim) loaded: " + if (shimAnswered) "yes, during the run (it answered the game's calls, see steam-calls.txt; it is no longer in the list, which is read at the end)" else yes(shimLoaded))
         } else {
             appendLine("loaded libraries: not handed over")
         }
@@ -67,8 +70,10 @@ object ReportDiagnosis {
         expansion?.let { appendExpansion(it) }
         appendControllers(startLog)
         val exits = previousExit.lineSequence().filter { it.startsWith("time=") }.toList()
+        // A system that does not record how a game ended (before Android 11) still prints a native crash in the log: it is told here, from the log itself.
+        val crashes = nativeCrashes(startLog)
         if (exits.isEmpty()) {
-            appendLine("last exits: none recorded")
+            appendLine("last exits: none recorded" + if (crashes.isNotEmpty()) " (this system records none; the log of the game shows a native crash, below)" else "")
         } else {
             val summary = exits.groupingBy { line -> field(line, "reason") + (field(line, "status").takeIf { line.contains("reason=SIGNALED") }?.let { "/$it" } ?: "") }.eachCount()
             appendLine("last exits (newest first, as Android recorded them): " + summary.entries.joinToString(", ") { "${it.key} x${it.value}" })
@@ -81,7 +86,17 @@ object ReportDiagnosis {
                 if (launch.launchedAtMillis != null && launch.launchedAtMillis > newest) appendLine("  The game was started again since: that end does not explain the run of this report.")
             }
         }
+        if (crashes.isNotEmpty()) {
+            appendLine("native crash seen in the log of the game: " + crashes.joinToString(" | "))
+            appendLine("  It says where the game died, not whose fault it is: the frames of the crash (the library that faulted) are in game-log-start.txt when the game handed them over.")
+        }
     }
+
+    private val FATAL_SIGNAL = Regex("""Fatal signal (\d+) \((\w+)\)[^\n]*?fault addr (0x[0-9a-f]+) in tid \d+ \(([^)]*)\)""")
+
+    /** What the game's log says of its native crashes: the signal, the address that faulted and the name of the thread, once for each (a run that crashed twice is two). */
+    internal fun nativeCrashes(startLog: String): List<String> =
+        FATAL_SIGNAL.findAll(startLog).map { "signal ${it.groupValues[1]} (${it.groupValues[2]}), fault address ${it.groupValues[3]}, thread ${it.groupValues[4]}" }.distinct().toList()
 
     private val FOCUSED = Regex("""focused reached: (yes|no)""")
     private val STATES = Regex("""OpenXR session states reached: (.+)""")
@@ -131,8 +146,17 @@ object ReportDiagnosis {
         val webServices = calls.entries.filter { it.key.startsWith("web ticket asked for service: ") }.map { it.key.removePrefix("web ticket asked for service: ") to it.value }
         val given = calls.entries.filter { it.key.startsWith("session ticket read from GamePort") || it.key.startsWith("web ticket read from GamePort") }.sumOf { it.value }
         val notGiven = calls.entries.filter { it.key.contains("NOT given by GamePort") || it.key.contains("refused") }.sumOf { it.value }
+        // The ticket an online service checks with the publisher's key: GamePort's stand-in makes one itself, which carries no such proof, so a service that verifies it refuses it.
+        val encryptedAsked = calls.entries.filter { it.key.startsWith("Steam_User::RequestEncryptedAppTicket") }.sumOf { it.value }
+        if (encryptedAsked > 0) {
+            appendLine("encrypted app ticket asked by the game: x$encryptedAsked. GamePort cannot give a real one yet: the stand-in builds a ticket without the publisher's encryption, so an online service that verifies it refuses the sign-in.")
+            appendLine("  Many requests one after the other (about one every few seconds) read as a sign-in that is refused and tried again. The service's own answer is not in any log.")
+        }
         if (sessionAsked == 0L && webServices.isEmpty()) {
-            appendLine("Steam tickets asked by the game: none (it never asked Steam for a session ticket or a web ticket in this run: if its online sign-in fails, it does not go through Steam)")
+            appendLine(
+                if (encryptedAsked > 0) "Steam session and web tickets asked by the game: none (the game asked the encrypted app ticket above instead)"
+                else "Steam tickets asked by the game: none (it never asked Steam for a session ticket or a web ticket in this run: if its online sign-in fails, it does not go through Steam)",
+            )
         } else {
             val parts = buildList {
                 if (sessionAsked > 0) add("session ticket x$sessionAsked")
