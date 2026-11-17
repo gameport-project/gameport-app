@@ -281,5 +281,5 @@
     <string name="manage_parts_recorded">App %1$s · Expansion %2$s (noted at the install)</string>
     <string name="help_notice_saves_apart">The studio keeps this game\'s Android saves apart from its PC ones, so a player who has played on a PC starts with none. A button opens the saves, where the PC saves can be brought here.</string>
     <string name="help_notice_expansion">The game has large files beside its app and GamePort cannot check that they are all there. A button repairs it by downloading them again.</string>
-    <string name="help_notice_expansion_missing">The game itself said that some of its large files are not there, so it cannot load its data. A button repairs it by downloading them again.</string>
+    <string name="help_notice_expansion_missing">GamePort cannot find the size of some of the large files Steam lists for the game. If the game runs normally, this notice can be ignored. A button repairs it by downloading them again.</string>
 </resources>

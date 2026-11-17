@@ -218,13 +218,9 @@ public final class GamePortHookProvider extends ContentProvider {
         boolean listed = false;
         try {
             java.io.File folder = context.getObbDir();
-            java.io.File[] files = folder == null ? null : folder.listFiles();
-            if (files != null) {
+            if (folder != null && folder.listFiles() != null) {
                 listed = true;
-                for (java.io.File file : files) {
-                    // A file still being copied is not a file the game can load.
-                    if (file.isFile() && !file.getName().endsWith(".part")) sizes.add(file.length());
-                }
+                addSizesOf(folder, sizes, 0);
             }
         } catch (Throwable t) {
             Log.w(TAG, "could not list the expansion files", t);
@@ -235,6 +231,17 @@ public final class GamePortHookProvider extends ContentProvider {
         out.putLongArray("sizes", list);
         if (catchUpMode) exitIfNobodyPlays();
         return out;
+    }
+
+    /** The sizes of the files in [folder] and in the folders inside it: a game can keep its large files in sub-folders (some depots do), and they count as much as the others. */
+    private static void addSizesOf(java.io.File folder, java.util.List<Long> sizes, int depth) {
+        java.io.File[] files = folder.listFiles();
+        if (files == null || depth > 12) return;
+        for (java.io.File file : files) {
+            if (file.isDirectory()) addSizesOf(file, sizes, depth + 1);
+            // A file still being copied is not a file the game can load.
+            else if (file.isFile() && !file.getName().endsWith(".part")) sizes.add(file.length());
+        }
     }
 
     private final java.util.concurrent.atomic.AtomicBoolean pullingExpansionFiles = new java.util.concurrent.atomic.AtomicBoolean();

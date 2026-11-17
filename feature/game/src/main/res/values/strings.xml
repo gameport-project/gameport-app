@@ -354,10 +354,10 @@
     <string name="repair_confirm">Repair</string>
     <string name="repair_cancel">Cancel</string>
     <string name="game_expansion_play_anyway">Play anyway</string>
-    <string name="game_expansion_title">Large files missing</string>
+    <string name="game_expansion_title">Large files to check</string>
     <plurals name="issue_expansion_missing">
-        <item quantity="one">The game says %1$d of its large files is missing, so it cannot load its data. Repairing downloads it again.</item>
-        <item quantity="other">The game says %1$d of its large files are missing, so it cannot load its data. Repairing downloads them again.</item>
+        <item quantity="one">GamePort cannot find the size of %1$d of the large files Steam lists for this game. If the game starts and runs normally, this notice can be ignored. Otherwise, repairing downloads this file again.</item>
+        <item quantity="other">GamePort cannot find the size of %1$d of the large files Steam lists for this game. If the game starts and runs normally, this notice can be ignored. Otherwise, repairing downloads them again.</item>
     </plurals>
     <string name="report_contents_show">See what the report contains</string>
     <string name="report_contents_hide">Hide what the report contains</string>

@@ -60,7 +60,7 @@ class ExpansionVerifier @Inject constructor(
         scope.launch {
             // Every installed game is looked at, once for each build: the files Steam lists for it say whether it has an expansion, so no size decides who is asked.
             combine(auth.connection, installer.installedOnDevice) { connection, games -> connection to games }.collect { (connection, games) ->
-                if (connection == SteamConnection.ONLINE && games.isNotEmpty()) runDue(games)
+                if (connection == SteamConnection.ONLINE && games.isNotEmpty()) runDue(games.keys)
             }
         }
     }
@@ -94,12 +94,12 @@ class ExpansionVerifier @Inject constructor(
         }
     }
 
-    /** A game is asked when nothing is known of this build, or when it could not answer and has been patched or updated since. */
+    /** A game is asked when nothing is known of this build, or when it could not answer or said files were missing and has been patched or updated since (its files or its hook may have changed). */
     private fun isDue(appId: Int): Boolean {
         val packageName = installed.all()[appId] ?: return false
         val said = verdicts.all.value[appId]
         return said == null || said.manifests != builds.get(appId)?.manifests ||
-            (said.state == ExpansionVerdict.State.UNKNOWN && said.packageUpdatedAt != packages.lastUpdateTimeOf(packageName))
+            (said.state != ExpansionVerdict.State.COMPLETE && said.packageUpdatedAt != packages.lastUpdateTimeOf(packageName))
     }
 
     private suspend fun verify(appId: Int) {
