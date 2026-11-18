@@ -18,8 +18,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import app.gameport.core.model.InstallStep
 import kotlin.coroutines.resume
 
 /** Talks to Android's package installer. Both install and uninstall may ask the user to confirm. */
@@ -148,8 +152,79 @@ class PackageGateway @Inject constructor(
      * Installs one APK, or a base APK with its splits, in a single session. [note] is told the steps (the files handed to the system, the confirmation it asks for),
      * so that a report says where an installation that seems stuck is.
      */
-    suspend fun install(apks: List<File>, note: (String) -> Unit = {}): Outcome {
+    /**
+     * One install at a time. Android shows one confirmation window at a time, and on a headset a window asked while another one is open is lost: its install then waits for ever.
+     * An install that comes while another is under way waits its turn here ([InstallStep.WAITING_TURN]); downloads and patches are not held by this.
+     */
+    private val installTurn = Mutex()
+
+    /** The confirmation window Android asked for the install in flight, kept to be opened again; null when there is none. */
+    @Volatile private var confirmation: Intent? = null
+
+    /** The session of the install in flight, -1 when there is none. */
+    @Volatile private var inFlightSession = -1
+
+    /**
+     * Opens again the confirmation Android asked for the install in flight: a window that was closed, covered or lost leaves the install waiting, and this is the button that
+     * brings it back. False when there is nothing to open.
+     */
+    fun reopenConfirmation(): Boolean {
+        val intent = confirmation ?: return false
+        return runCatching { context.startActivity(Intent(intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess
+    }
+
+    /**
+     * Called with the turn held, before the session of the install is made: installs go one at a time, so every other session of GamePort is nobody's. A process that ended while a
+     * confirmation was asked leaves its session behind, with a copy of the game in the system's storage; it is given up here, and what the system answers is told.
+     */
+    private fun abandonOtherSessions(note: (String) -> Unit) {
         val installer = packageManager.packageInstaller
+        val others = runCatching { installer.mySessions }.getOrDefault(emptyList())
+        if (others.isEmpty()) return
+        var given = 0
+        var refused = 0
+        var why = ""
+        others.forEach { session ->
+            runCatching { installer.abandonSession(session.sessionId) }
+                .onSuccess { given++ }
+                .onFailure { refused++; why = "${it.javaClass.simpleName}: ${it.message}" }
+        }
+        note("install: $given earlier session(s) of GamePort given up" + if (refused > 0) ", $refused refused by the system ($why)" else "")
+    }
+
+    /**
+     * Installs one APK, or a base APK with its splits, one install at a time. [onStep] is told where it is, with the progress of the copy. [confirmTimeoutMs], when given, bounds
+     * the wait for the confirmation: unconfirmed in time, the session is given up and the outcome is [Outcome.Cancelled]. A job cancelled meanwhile gives up its session too.
+     */
+    suspend fun install(
+        apks: List<File>,
+        note: (String) -> Unit = {},
+        confirmTimeoutMs: Long? = null,
+        onStep: (InstallStep, Float) -> Unit = { _, _ -> },
+        onTurn: suspend () -> Unit = {},
+    ): Outcome {
+        if (!installTurn.tryLock()) {
+            note("install: waiting for the install of another game to be done")
+            onStep(InstallStep.WAITING_TURN, 0f)
+            installTurn.lock()
+        }
+        try {
+            // Told when the turn is there, for what has to be done only for the install under way (and not while it waits).
+            onTurn()
+            return installInTurn(apks, note, confirmTimeoutMs, onStep)
+        } finally {
+            confirmation = null
+            inFlightSession = -1
+            installTurn.unlock()
+        }
+    }
+
+    private suspend fun installInTurn(apks: List<File>, note: (String) -> Unit, confirmTimeoutMs: Long?, onStep: (InstallStep, Float) -> Unit): Outcome {
+        val installer = packageManager.packageInstaller
+        val total = apks.sumOf { it.length() }
+        onStep(InstallStep.COPYING, 0f)
+        abandonOtherSessions(note)
+        val copyStartedAt = android.os.SystemClock.elapsedRealtime()
         val sessionId = withContext(Dispatchers.IO) {
             val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
             // From Android 12, an installer may update, without asking, an app it installed itself, when the system's conditions are met
@@ -157,20 +232,58 @@ class PackageGateway @Inject constructor(
             // (the Nvidia Shield): the confirmation is handled below either way.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
             val id = installer.createSession(params)
-            installer.openSession(id).use { session ->
-                apks.forEach { apk ->
-                    apk.inputStream().use { input ->
-                        session.openWrite(apk.name, 0, apk.length()).use { output ->
-                            input.copyTo(output)
-                            session.fsync(output)
+            inFlightSession = id
+            try {
+                installer.openSession(id).use { session ->
+                    var written = 0L
+                    var reportedAtMs = 0L
+                    val buffer = ByteArray(COPY_BUFFER_BYTES)
+                    apks.forEach { apk ->
+                        apk.inputStream().use { input ->
+                            session.openWrite(apk.name, 0, apk.length()).use { output ->
+                                while (true) {
+                                    // A cancelled install stops copying, not at the end of a file of gigabytes.
+                                    ensureActive()
+                                    val read = input.read(buffer)
+                                    if (read < 0) break
+                                    output.write(buffer, 0, read)
+                                    written += read
+                                    // Told a few times a second, not at each block: on a fast storage a block takes a few milliseconds.
+                                    val nowMs = android.os.SystemClock.elapsedRealtime()
+                                    if (nowMs - reportedAtMs >= COPY_REPORT_EVERY_MS) {
+                                        reportedAtMs = nowMs
+                                        onStep(InstallStep.COPYING, if (total > 0) written.toFloat() / total else 0f)
+                                    }
+                                }
+                                session.fsync(output)
+                            }
                         }
                     }
                 }
+            } catch (e: Throwable) {
+                runCatching { installer.abandonSession(id) }
+                throw e
             }
             id
         }
-        note("install: ${apks.sumOf { it.length() } / (1024 * 1024)} MB handed to the system's installer, committing")
-        return awaitStatus(sessionId, note) { intentSender -> installer.openSession(sessionId).use { it.commit(intentSender) } }
+        note("install: ${total / (1024 * 1024)} MB handed to the system's installer, committing (copied in ${(android.os.SystemClock.elapsedRealtime() - copyStartedAt) / 1000} s)")
+        // Committed: Android works, and asks for a confirmation when it needs one ([InstallStep.AWAITING_CONFIRMATION]).
+        onStep(InstallStep.WORKING, 1f)
+        var installed = false
+        try {
+            val await: suspend () -> Outcome = {
+                awaitStatus(sessionId, note, onConfirmation = { window -> confirmation = window; onStep(InstallStep.AWAITING_CONFIRMATION, 1f) }) { intentSender ->
+                    installer.openSession(sessionId).use { it.commit(intentSender) }
+                }
+            }
+            val outcome = if (confirmTimeoutMs == null) await() else withTimeoutOrNull(confirmTimeoutMs) { await() }
+                ?: Outcome.Cancelled.also { note("install: the confirmation did not come in time, the install is given up") }
+            installed = outcome == Outcome.Success
+            return outcome
+        } finally {
+            // Not installed (cancelled, refused, timed out, or the job ended): the session does not stay behind with its copy of the game.
+            if (!installed) runCatching { installer.abandonSession(sessionId) }
+        }
     }
 
     /** What an APK says about itself, enough to tell the builds of one game apart. Null when it cannot be read. */
@@ -190,7 +303,7 @@ class PackageGateway @Inject constructor(
     suspend fun uninstall(packageName: String): Outcome =
         awaitStatus(packageName.hashCode()) { intentSender -> packageManager.packageInstaller.uninstall(packageName, intentSender) }
 
-    private suspend fun awaitStatus(token: Int, note: (String) -> Unit = {}, start: (android.content.IntentSender) -> Unit): Outcome =
+    private suspend fun awaitStatus(token: Int, note: (String) -> Unit = {}, onConfirmation: ((Intent) -> Unit)? = null, start: (android.content.IntentSender) -> Unit): Outcome =
         suspendCancellableCoroutine { continuation ->
             val action = "${context.packageName}.PACKAGE_RESULT.$token"
             val receiver = object : BroadcastReceiver() {
@@ -202,6 +315,7 @@ class PackageGateway @Inject constructor(
                             if (confirmation == null) note("install: the system asks for a confirmation but gave no window to open")
                             else {
                                 note("install: the system asks for a confirmation, its window is opened")
+                                onConfirmation?.invoke(Intent(confirmation))
                                 runCatching { context.startActivity(confirmation.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                                     .onFailure { note("install: the confirmation window could not be opened (${it.javaClass.simpleName}: ${it.message})") }
                             }
@@ -267,6 +381,10 @@ class PackageGateway @Inject constructor(
         awaitClose { context.unregisterReceiver(receiver) }
     }
 }
+
+/** The copy of the APKs into the install session is done in blocks of this size, and its progress is told a few times a second. */
+private const val COPY_BUFFER_BYTES = 1 shl 20
+private const val COPY_REPORT_EVERY_MS = 250L
 
 /** The facts about an APK that decide which build of a game suits a device. */
 data class ApkInfo(

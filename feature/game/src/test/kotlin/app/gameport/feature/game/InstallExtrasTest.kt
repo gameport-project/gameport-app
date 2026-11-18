@@ -58,7 +58,7 @@ class InstallExtrasTest {
         assertEquals(InstallState.Downloading(0.4f, 1_000L), Repatch.Running(RepatchStage.DOWNLOADING, 0.4f, 1_000L).asInstallState())
         assertEquals(InstallState.Downloading(0f, 0L), Repatch.Running(RepatchStage.DOWNLOADING).asInstallState())
         assertEquals(InstallState.Patching, Repatch.Running(RepatchStage.PATCHING).asInstallState())
-        assertEquals(InstallState.Installing, Repatch.Running(RepatchStage.INSTALLING).asInstallState())
+        assertEquals(InstallState.Installing(), Repatch.Running(RepatchStage.INSTALLING).asInstallState())
     }
 
     @Test

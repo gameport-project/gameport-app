@@ -8,6 +8,7 @@
     <string name="downloads_failed">Échec de l\'installation</string>
     <string name="downloads_installed">Installé</string>
     <string name="downloads_cancel">Annuler</string>
+    <string name="downloads_reopen_confirmation">Ouvrir la confirmation</string>
     <string name="downloads_resume">Reprendre</string>
     <string name="downloads_discard">Supprimer</string>
     <string name="downloads_play">Jouer</string>

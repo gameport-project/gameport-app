@@ -272,6 +272,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         channelInUse = viewModel.channelInUse.collectAsStateWithLifecycle().value,
         onChannelChosen = viewModel::onChannelChosen,
         onCancel = viewModel::onCancel,
+        onReopenConfirmation = viewModel::onReopenConfirmation,
         onPause = viewModel::onPause,
         onVersionChosen = viewModel::onVersionChosen,
         onDuplicateChosen = viewModel::onDuplicateChosen,
@@ -315,6 +316,7 @@ internal fun GameContent(
     channelInUse: String = UpdateChannels.NORMAL,
     onChannelChosen: (String) -> Unit = {},
     onCancel: () -> Unit,
+    onReopenConfirmation: () -> Unit = {},
     onPause: () -> Unit,
     onVersionChosen: (String?) -> Unit,
     onDuplicateChosen: (Boolean) -> Unit,
@@ -359,6 +361,7 @@ internal fun GameContent(
                     channelInUse = channelInUse,
                     onChannelChosen = onChannelChosen,
                     onCancel = onCancel,
+                    onReopenConfirmation = onReopenConfirmation,
                     onPause = onPause,
                     onVersionChosen = onVersionChosen,
                     onDuplicateChosen = onDuplicateChosen,
@@ -434,6 +437,7 @@ private fun GameDetails(
     channelInUse: String,
     onChannelChosen: (String) -> Unit,
     onCancel: () -> Unit,
+    onReopenConfirmation: () -> Unit = {},
     onPause: () -> Unit,
     onVersionChosen: (String?) -> Unit,
     onDuplicateChosen: (Boolean) -> Unit,
@@ -892,6 +896,7 @@ private fun GameDetails(
                         onInstall = { if (compat?.level == app.gameport.core.model.CompatLevel.FAILS) warning = true else startInstall() },
                         onResume = { onInstall(null) },
                         onCancel = onCancel,
+                        onReopenConfirmation = onReopenConfirmation,
                     onPause = onPause,
                     onVersionChosen = onVersionChosen,
                     onDuplicateChosen = onDuplicateChosen,
@@ -1035,6 +1040,7 @@ private fun InstallActions(
     onInstall: () -> Unit,
     onResume: () -> Unit,
     onCancel: () -> Unit,
+    onReopenConfirmation: () -> Unit = {},
     onPause: () -> Unit,
     onVersionChosen: (String?) -> Unit,
     onDuplicateChosen: (Boolean) -> Unit,
@@ -1070,7 +1076,12 @@ private fun InstallActions(
             DuplicateDialog(otherGamePort = install.otherGamePort, onChosen = onDuplicateChosen)
             Text(stringResource(R.string.game_choose_version_waiting), style = MaterialTheme.typography.bodyMedium)
         }
-        InstallState.Patching, InstallState.Installing, InstallState.Finishing -> Progress(state = install, speedUnit = speedUnit, extras = extras, onCancel = null)
+        InstallState.Patching, InstallState.Finishing -> Progress(state = install, speedUnit = speedUnit, extras = extras, onCancel = null)
+        // The install waits its turn, copies, or waits for Android's confirmation: it can be given up (the download stays), and the confirmation window opened again.
+        is InstallState.Installing -> Progress(
+            state = install, speedUnit = speedUnit, extras = extras, onCancel = onCancel,
+            onReopen = if (install.step == app.gameport.core.model.InstallStep.AWAITING_CONFIRMATION) onReopenConfirmation else null,
+        )
         is InstallState.Installed -> if (install.otherGamePort != null) {
             // The game was patched by another GamePort of this device: it starts and updates it, this one leaves it alone.
             Text(stringResource(R.string.game_other_gameport, install.otherGamePort!!), color = Color(0xFFFF9800), style = MaterialTheme.typography.bodyMedium)
@@ -1359,7 +1370,7 @@ private fun ActionRow(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
 
 /** The steps an install goes through, with the current one highlighted, what it is doing, and its progress: the same as on the downloads page, in a card of its own. */
 @Composable
-private fun Progress(state: InstallState, speedUnit: SpeedUnit, extras: List<ExtraPlanItem>, onCancel: (() -> Unit)?, onPause: (() -> Unit)? = null) {
+private fun Progress(state: InstallState, speedUnit: SpeedUnit, extras: List<ExtraPlanItem>, onCancel: (() -> Unit)?, onPause: (() -> Unit)? = null, onReopen: (() -> Unit)? = null) {
     val stage = state.stage ?: return
     // Where each extra content stands: the ones in the game's download are in place when the game is downloaded, the others are fetched one after the other once it is installed.
     val rows = extraStands(extras, stage, (state as? InstallState.ExtraContent)?.index)
@@ -1372,6 +1383,11 @@ private fun Progress(state: InstallState, speedUnit: SpeedUnit, extras: List<Ext
             InstallStepper(stage, Modifier.weight(1f))
             // Both stay where they are for the whole install, greyed when they cannot be used in this step: the card keeps its height from one step to the next.
             val small = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 0.dp)
+            if (state is InstallState.Installing) {
+                androidx.compose.material3.OutlinedButton(onClick = { onReopen?.invoke() }, enabled = onReopen != null, contentPadding = small, modifier = Modifier.height(32.dp)) {
+                    Text(stringResource(R.string.game_reopen_confirmation), style = MaterialTheme.typography.labelLarge)
+                }
+            }
             androidx.compose.material3.OutlinedButton(onClick = { onPause?.invoke() }, enabled = onPause != null, contentPadding = small, modifier = Modifier.height(32.dp)) {
                 Text(stringResource(R.string.game_pause), style = MaterialTheme.typography.labelLarge)
             }
@@ -1383,7 +1399,7 @@ private fun Progress(state: InstallState, speedUnit: SpeedUnit, extras: List<Ext
         InstallRow(
             name = stringResource(R.string.install_game),
             stand = if (gameInPlace) Stand.DONE else Stand.ACTIVE,
-            progress = (state as? InstallState.Downloading)?.progress,
+            progress = (state as? InstallState.Downloading)?.progress ?: (state as? InstallState.Installing)?.takeIf { it.step == app.gameport.core.model.InstallStep.COPYING }?.progress,
             status = if (gameInPlace) null else app.gameport.core.designsystem.installStatusText(state, speedUnit),
             dimmed = gameInPlace,
         )

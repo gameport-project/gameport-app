@@ -29,8 +29,11 @@ sealed interface InstallState {
     /** The downloaded APK is being prepared: Steam shim, VR entry, signature. */
     data object Patching : InstallState
 
-    /** The APK is handed to Android; the user may have to confirm on screen. */
-    data object Installing : InstallState
+    /**
+     * The APK is handed to Android; a confirmation may be asked on screen. [step] says where this is, [progress] is 0..1 of the copy while [step] is [InstallStep.COPYING].
+     * The default is the step of the system working, which is also what a state without more to say stands for.
+     */
+    data class Installing(val step: InstallStep = InstallStep.WORKING, val progress: Float = 0f) : InstallState
 
     /** Android installed the game; GamePort now puts its expansion files in place and registers it. The game is not ready to play yet. */
     data object Finishing : InstallState
@@ -46,6 +49,12 @@ sealed interface InstallState {
 
     data class Failed(val error: InstallError) : InstallState
 }
+
+/**
+ * Where the install step is. Installs go one after the other, since Android shows one confirmation at a time and loses the others: [WAITING_TURN] is the wait behind another
+ * install, [COPYING] the handing of the files to Android, [AWAITING_CONFIRMATION] the confirmation Android asks for on screen, [WORKING] Android installing.
+ */
+enum class InstallStep { WAITING_TURN, COPYING, AWAITING_CONFIRMATION, WORKING }
 
 /** Why an install stopped; the UI turns these into messages in the user's language. */
 sealed interface InstallError {
@@ -119,7 +128,7 @@ val InstallState.stage: InstallStage?
     get() = when (this) {
         InstallState.Queued, is InstallState.Downloading -> InstallStage.DOWNLOAD
         InstallState.Patching -> InstallStage.PATCH
-        InstallState.Installing -> InstallStage.INSTALL
+        is InstallState.Installing -> InstallStage.INSTALL
         InstallState.Finishing, is InstallState.ExtraContent -> InstallStage.FINISH
         else -> null
     }

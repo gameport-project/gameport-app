@@ -82,6 +82,7 @@ fun DownloadsScreen(
         onUpdate = viewModel::onUpdate,
         onCancel = viewModel::onCancel,
         onPause = viewModel::onPause,
+        onReopenConfirmation = viewModel::onReopenConfirmation,
         onDiscard = viewModel::onDiscard,
         onUninstall = viewModel::onUninstall,
         onResume = viewModel::onResume,
@@ -100,6 +101,7 @@ internal fun DownloadsContent(
     onUpdate: (DownloadEntry) -> Unit,
     onCancel: (Int) -> Unit,
     onPause: (Int) -> Unit,
+    onReopenConfirmation: () -> Unit = {},
     onDiscard: (Int) -> Unit,
     onUninstall: (Int) -> Unit,
     onResume: (DownloadEntry) -> Unit,
@@ -157,6 +159,7 @@ internal fun DownloadsContent(
                         onOpen = { onGameClick(entry.appId) },
                         onCancel = { onCancel(entry.appId) },
                         onPause = { onPause(entry.appId) },
+                        onReopenConfirmation = onReopenConfirmation,
                         onDiscard = { onDiscard(entry.appId) },
                         onUninstall = { onUninstall(entry.appId) },
                         onResume = { onResume(entry) },
@@ -178,6 +181,7 @@ private fun EntryRow(
     onOpen: () -> Unit,
     onCancel: () -> Unit,
     onPause: () -> Unit,
+    onReopenConfirmation: () -> Unit = {},
     onDiscard: () -> Unit,
     onUninstall: () -> Unit,
     onResume: () -> Unit,
@@ -201,7 +205,7 @@ private fun EntryRow(
                 modifier = Modifier.bleed(NAME_BLEED).clip(RoundedCornerShape(8.dp)).clickable(onClick = onOpen).padding(horizontal = NAME_BLEED),
             )
             when (val state = entry.state) {
-                InstallState.Queued, is InstallState.Downloading, InstallState.Patching, InstallState.Installing, InstallState.Finishing, is InstallState.ExtraContent -> {
+                InstallState.Queued, is InstallState.Downloading, InstallState.Patching, is InstallState.Installing, InstallState.Finishing, is InstallState.ExtraContent -> {
                     // The same steps and words as on the game's page.
                     state.stage?.let { InstallStepper(it) }
                     app.gameport.core.designsystem.InstallStatusLine(state, speedUnit)
@@ -223,6 +227,13 @@ private fun EntryRow(
             when (entry.state) {
                 InstallState.Queued, is InstallState.Downloading, is InstallState.ExtraContent -> {
                     if (entry.state is InstallState.Downloading) GlassButton(onClick = onPause) { Text(stringResource(R.string.downloads_pause)) }
+                    DangerButton(onClick = onCancel) { Text(stringResource(R.string.downloads_cancel)) }
+                }
+                // In the install step: the confirmation window can be opened again, and the install given up (the download stays).
+                is InstallState.Installing -> {
+                    if ((entry.state as InstallState.Installing).step == app.gameport.core.model.InstallStep.AWAITING_CONFIRMATION) {
+                        GlassButton(onClick = onReopenConfirmation) { Text(stringResource(R.string.downloads_reopen_confirmation)) }
+                    }
                     DangerButton(onClick = onCancel) { Text(stringResource(R.string.downloads_cancel)) }
                 }
                 InstallState.Interrupted, is InstallState.Failed -> {

@@ -3,6 +3,7 @@
     <string name="game_back">Back</string>
     <string name="game_install">Install</string>
     <string name="game_cancel">Cancel</string>
+    <string name="game_reopen_confirmation">Open the confirmation</string>
     <string name="game_resume">Resume download</string>
     <string name="game_discard">Discard</string>
     <string name="game_play">Play</string>

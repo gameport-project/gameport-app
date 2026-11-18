@@ -48,6 +48,9 @@
     <string name="install_verifying">Vérification des fichiers déjà téléchargés… %1$d %%</string>
     <string name="install_patching">Préparation du jeu pour Steam… cela peut prendre quelques minutes</string>
     <string name="install_installing">Installation… une confirmation peut être demandée à l\'écran</string>
+    <string name="install_waiting_turn">En attente de la fin d\'une autre installation. Android affiche une confirmation à la fois.</string>
+    <string name="install_copying">Remise du jeu à Android… %1$d %%</string>
+    <string name="install_awaiting_confirmation">Android attend une confirmation à l\'écran. Si aucune fenêtre n\'apparaît, le bouton la rouvre.</string>
     <string name="install_extra">Contenu supplémentaire %1$d/%2$d · %3$d %%</string>
     <string name="install_finishing">Mise en place des fichiers du jeu… il pourra être lancé juste après</string>
     <string name="price_free">Gratuit</string>

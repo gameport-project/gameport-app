@@ -51,9 +51,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 /**
@@ -120,7 +118,8 @@ class GameInstallRepository @Inject constructor(
         }
     }
 
-    private val downloadSlots = Semaphore(MAX_CONCURRENT_DOWNLOADS)
+    /** How many games download at once is the player's choice (2 unless changed); the installs that follow go one after the other, see [PackageGateway.install]. */
+    private val downloadSlots = DownloadSlots(userSettings.downloadsAtOnce)
     private val patchLock = Mutex()
 
     fun observe(appId: Int): Flow<InstallState> =
@@ -211,7 +210,7 @@ class GameInstallRepository @Inject constructor(
                     // Only a couple of games download at once, the rest wait their turn: several
                     // at a time would each keep buffers in memory and starve the app.
                     setState(game.appId, InstallState.Queued)
-                    downloadSlots.withPermit {
+                    downloadSlots.withSlot {
                         // Resuming: the downloader first checks what is already there, which takes a while and announces nothing. Say so from the start.
                         val onDisk = bytesOnDisk(directory)
                         val resuming = onDisk > 0
@@ -339,8 +338,13 @@ class GameInstallRepository @Inject constructor(
                 if (alreadyOnDevice) events.note(game.appId, "$packageName is already on the device, incomplete: only its expansion files are placed again")
                 // The build this download holds, read now: the folder no longer has it once the files are placed.
                 val downloadedManifests = DownloadedManifests.read(directory)
-                setState(game.appId, InstallState.Installing)
-                when (val outcome = if (alreadyOnDevice) PackageGateway.Outcome.Success else packages.install(apks) { events.note(game.appId, it) }) {
+                setState(game.appId, InstallState.Installing())
+                val installOutcome = if (alreadyOnDevice) PackageGateway.Outcome.Success else packages.install(
+                    apks,
+                    note = { events.note(game.appId, it) },
+                    onStep = { step, progress -> setState(game.appId, InstallState.Installing(step, progress)) },
+                )
+                when (val outcome = installOutcome) {
                     PackageGateway.Outcome.Success -> {
                         if (!alreadyOnDevice) events.note(game.appId, "installed $packageName")
                         // Not playable yet: the expansion files have to be in place, under the name the game looks for.
@@ -484,7 +488,7 @@ class GameInstallRepository @Inject constructor(
         // Part of the install of the game: the install's own place tells it.
         step?.let { setState(game.appId, InstallState.ExtraContent(content.name, it.first, it.second, 0f)) }
         return try {
-            downloadSlots.withPermit {
+            downloadSlots.withSlot {
                 // Steam gives a depot's key, and its files, to the app that declares it: the DLC app for a game that sells its content as DLC, else the game.
                 downloader.download(content.depots.first().declaredBy ?: game.appId, content.depots.map { it.id }, directory, content.depots.associate { it.id to it.downloadBytes }) { progress, _ ->
                     if (progress >= 0f) {
@@ -748,11 +752,17 @@ class GameInstallRepository @Inject constructor(
                         result
                     }
                 }
-                setState(appId, InstallState.Installing)
-                // Installing over the game can leave its expansion folder empty: the files wait aside, and come back whatever the outcome.
-                stashExpansionFiles(appId, packageName)
-                val outcome = try { if (confirmTimeoutMs == null) packages.install(patched) { events.note(appId, it) } else kotlinx.coroutines.withTimeoutOrNull(confirmTimeoutMs) { packages.install(patched) { events.note(appId, it) } }
-                    ?: PackageGateway.Outcome.Cancelled.also { events.note(appId, "the update was not confirmed in time: given up") }
+                setState(appId, InstallState.Installing())
+                // Installing over the game can leave its expansion folder empty: the files wait aside, and come back whatever the outcome. Put aside when the turn of the install
+                // comes, not while it waits behind another one: the game keeps its files meanwhile.
+                val outcome = try {
+                    packages.install(
+                        patched,
+                        note = { events.note(appId, it) },
+                        confirmTimeoutMs = confirmTimeoutMs,
+                        onStep = { step, progress -> setState(appId, InstallState.Installing(step, progress)) },
+                        onTurn = { stashExpansionFiles(appId, packageName) },
+                    )
                 } finally {
                     withContext(NonCancellable) { restoreExpansionFiles(appId, packageName) }
                 }
@@ -781,7 +791,24 @@ class GameInstallRepository @Inject constructor(
     }
 
     fun cancel(appId: Int) {
+        // In the install step a cancel gives the session up and keeps the download (see [cancelInstalling]); before it, a cancel throws the download away.
+        if (operations.value[appId] is InstallState.Installing && appId !in repatching) return cancelInstalling(appId)
         jobs[appId]?.cancel()
+    }
+
+    /**
+     * Opens again the confirmation window Android asked for the install under way: a window that was closed, covered or lost leaves the install waiting, and this brings it back
+     * (see [PackageGateway.reopenConfirmation]). False when there is no window to open.
+     */
+    fun reopenInstallConfirmation(): Boolean = packages.reopenConfirmation()
+
+    /**
+     * Gives up an install that waits for its turn or for Android's confirmation. The session Android holds for it is given up with it. What was downloaded stays, so the game shows as
+     * interrupted and goes on from the install; a game being patched again is left as it was.
+     */
+    fun cancelInstalling(appId: Int) {
+        events.note(appId, "the install is given up from the game's page")
+        if (appId in repatching) cancel(appId) else pause(appId)
     }
 
     /** Stops a download but keeps the files, so it can be resumed later (it then shows as interrupted). */
@@ -1376,7 +1403,6 @@ private const val RUN_CONFIRM_TIMEOUT_MS = 3 * 60_000L
 /** How many of the files placed for a game its event log names. */
 private const val MAX_PLACED_LISTED = 12
 private const val STORAGE_PERMISSION = "android.permission.READ_EXTERNAL_STORAGE"
-private const val MAX_CONCURRENT_DOWNLOADS = 2
 
 /** How long after the apps were asked to close the free memory is read again. */
 private const val MEMORY_SETTLE_MS = 700L

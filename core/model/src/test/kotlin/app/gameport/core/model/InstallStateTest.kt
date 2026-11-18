@@ -7,7 +7,7 @@ class InstallStateTest {
     @Test
     fun `a game on its way to being installed is in progress`() {
         val inProgress = listOf(
-            InstallState.Queued, InstallState.Downloading(0.4f), InstallState.Downloading(0.1f, 0L, true), InstallState.Patching, InstallState.Installing, InstallState.Finishing,
+            InstallState.Queued, InstallState.Downloading(0.4f), InstallState.Downloading(0.1f, 0L, true), InstallState.Patching, InstallState.Installing(), InstallState.Installing(InstallStep.WAITING_TURN), InstallState.Finishing,
             InstallState.ChoosingVersion(emptyList()), InstallState.ChoosingDuplicate("a.b"),
         )
         assertEquals(inProgress.size, inProgress.count { it.inProgress })
@@ -24,7 +24,8 @@ class InstallStateTest {
         assertEquals(InstallStage.DOWNLOAD, InstallState.Queued.stage)
         assertEquals(InstallStage.DOWNLOAD, InstallState.Downloading(0.5f).stage)
         assertEquals(InstallStage.PATCH, InstallState.Patching.stage)
-        assertEquals(InstallStage.INSTALL, InstallState.Installing.stage)
+        assertEquals(InstallStage.INSTALL, InstallState.Installing().stage)
+        InstallStep.entries.forEach { assertEquals(InstallStage.INSTALL, InstallState.Installing(it).stage) }
         assertEquals(InstallStage.FINISH, InstallState.Finishing.stage)
         assertEquals(null, InstallState.Installed("a.b").stage)
         assertEquals(null, InstallState.Interrupted.stage)

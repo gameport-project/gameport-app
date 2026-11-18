@@ -8,6 +8,7 @@
     <string name="downloads_failed">Install failed</string>
     <string name="downloads_installed">Installed</string>
     <string name="downloads_cancel">Cancel</string>
+    <string name="downloads_reopen_confirmation">Open the confirmation</string>
     <string name="downloads_resume">Resume</string>
     <string name="downloads_discard">Discard</string>
     <string name="downloads_play">Play</string>

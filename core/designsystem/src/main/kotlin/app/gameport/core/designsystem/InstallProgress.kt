@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.gameport.core.model.InstallStage
+import app.gameport.core.model.InstallStep
 import app.gameport.core.model.InstallState
 import app.gameport.core.model.SpeedUnit
 
@@ -67,7 +68,12 @@ fun installStatusText(state: InstallState, speedUnit: SpeedUnit): String? = when
         }
     }
     InstallState.Patching -> stringResource(R.string.install_patching)
-    InstallState.Installing -> stringResource(R.string.install_installing)
+    is InstallState.Installing -> when (state.step) {
+        InstallStep.WAITING_TURN -> stringResource(R.string.install_waiting_turn)
+        InstallStep.COPYING -> stringResource(R.string.install_copying, (state.progress * 100).toInt())
+        InstallStep.AWAITING_CONFIRMATION -> stringResource(R.string.install_awaiting_confirmation)
+        InstallStep.WORKING -> stringResource(R.string.install_installing)
+    }
     InstallState.Finishing -> stringResource(R.string.install_finishing)
     is InstallState.ExtraContent -> stringResource(R.string.install_extra, state.index, state.total, (state.progress * 100).toInt())
     else -> null
