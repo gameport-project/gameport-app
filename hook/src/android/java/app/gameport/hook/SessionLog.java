@@ -92,9 +92,23 @@ final class SessionLog {
     private volatile String launchInfo = "";
     private String lastEngineDigest = "";
     private volatile boolean crashFlushed = false;
+    /** The record kept in the game's own folder, which survives what the hand-overs to GamePort do not (see {@link BlackBox}). */
+    private final BlackBox box;
+    /** A hand-over to GamePort gives up waiting after this long: GamePort stopped by the headset, or not answering, must not stop the hand-overs that follow. */
+    private static final long SEND_TIMEOUT_MS = 8_000;
+    private final java.util.concurrent.ExecutorService sender = java.util.concurrent.Executors.newSingleThreadExecutor(new java.util.concurrent.ThreadFactory() {
+        @Override public Thread newThread(Runnable task) {
+            Thread thread = new Thread(task, "gameport-send");
+            thread.setDaemon(true);
+            return thread;
+        }
+    });
+    /** The call to GamePort that is on its way, null when none: only one at a time. */
+    private volatile java.util.concurrent.Future<Bundle> sending;
 
     SessionLog(Context context) {
         this.context = context.getApplicationContext();
+        this.box = new BlackBox(this.context);
     }
 
     /** How the game was started (action, categories, flags, extra names), recorded when its first screen is created. */
@@ -103,6 +117,7 @@ final class SessionLog {
     }
 
     void start() {
+        box.start();
         HandlerThread thread = new HandlerThread("gameport-log");
         thread.start();
         handler = new Handler(thread.getLooper());
@@ -282,6 +297,7 @@ final class SessionLog {
             LogTimes times = new LogTimes(System.currentTimeMillis(), java.util.TimeZone.getDefault());
             String line;
             while ((line = reader.readLine()) != null) {
+                box.line();
                 if (beforeThisRun(times, line)) continue;
                 nativeGaps.scan(line);
                 // A line that came again and again is counted by the digest and not kept: it filled the kept lines in seconds and hid the rest of the run.
@@ -397,9 +413,23 @@ final class SessionLog {
             lastEngineDigest = engineDigest;
         }
         if (!exitSent) addPreviousExit(extras);
+        // What the run before left in its record, handed over once (it is kept until GamePort has taken it).
+        String boxBefore = box.previous();
+        if (!boxBefore.isEmpty()) extras.putByteArray("blackBoxGz", gzip(boxBefore));
+        // One hand-over at a time: while the one before still waits for GamePort, this one is not made (the next flush tries again), except at a crash, which must go at once.
+        java.util.concurrent.Future<Bundle> inFlight = sending;
+        if (!crashFlushed && inFlight != null && !inFlight.isDone()) {
+            box.note("send skipped: the one before still waits for GamePort");
+            return;
+        }
+        long sendStartedAt = android.os.SystemClock.elapsedRealtime();
         try {
-            Bundle result = Calls.call(context, Owner.cloud(context), "log", context.getPackageName(), extras);
+            Bundle result = callGamePort(extras);
+            long took = android.os.SystemClock.elapsedRealtime() - sendStartedAt;
+            if (result == null) box.sendResult(false, took, "no answer");
+            else box.sendResult(true, took, "");
             if (result != null) {
+                if (!boxBefore.isEmpty()) box.previousHandedOver();
                 sentVersion = at;
                 sentPerformanceVersion = performanceAt;
                 sentNetworkVersion = networkAt;
@@ -411,7 +441,29 @@ final class SessionLog {
                 exitSent = true;
             }
         } catch (Throwable t) {
+            box.sendResult(false, android.os.SystemClock.elapsedRealtime() - sendStartedAt, t.getClass().getSimpleName() + ": " + t.getMessage());
             Log.w(TAG, "could not hand the log to GamePort", t);
+        }
+    }
+
+    /**
+     * The hand-over itself, on a thread of its own that is waited for a few seconds only: a call that does not come back leaves this one free, and the next flush finds it still on its
+     * way and waits its turn. At a crash it is made at once on the calling thread, as it always was.
+     */
+    private Bundle callGamePort(final Bundle extras) throws Exception {
+        if (crashFlushed) return Calls.call(context, Owner.cloud(context), "log", context.getPackageName(), extras);
+        java.util.concurrent.Future<Bundle> call = sender.submit(new java.util.concurrent.Callable<Bundle>() {
+            @Override public Bundle call() {
+                return Calls.call(context, Owner.cloud(context), "log", context.getPackageName(), extras);
+            }
+        });
+        sending = call;
+        try {
+            return call.get(SEND_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (java.util.concurrent.TimeoutException e) {
+            throw new java.io.IOException("GamePort did not answer in " + SEND_TIMEOUT_MS + " ms");
+        } catch (java.util.concurrent.ExecutionException e) {
+            throw e.getCause() instanceof Exception ? (Exception) e.getCause() : e;
         }
     }
 
@@ -576,6 +628,7 @@ final class SessionLog {
             boolean traced = false;
             for (ApplicationExitInfo info : exits) {
                 out.append("time=").append(info.getTimestamp())
+                        .append(" pid=").append(info.getPid())
                         .append(" reason=").append(reasonName(info.getReason()))
                         .append(" status=").append(info.getStatus())
                         .append(" importance=").append(info.getImportance())
@@ -629,6 +682,9 @@ final class SessionLog {
             case ApplicationExitInfo.REASON_USER_REQUESTED: return "USER_REQUESTED";
             case ApplicationExitInfo.REASON_USER_STOPPED: return "USER_STOPPED";
             case ApplicationExitInfo.REASON_DEPENDENCY_DIED: return "DEPENDENCY_DIED";
+            case 14: return "FREEZER";
+            case 15: return "PACKAGE_STATE_CHANGE";
+            case 16: return "PACKAGE_UPDATED";
             default: return "OTHER_" + reason;
         }
     }

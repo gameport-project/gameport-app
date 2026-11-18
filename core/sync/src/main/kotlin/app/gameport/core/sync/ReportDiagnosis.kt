@@ -27,7 +27,7 @@ object ReportDiagnosis {
         if (apkEntries.any { it.endsWith("libovrplatformloader.so") }) add("Meta: libovrplatformloader.so (the Meta platform SDK, which can check the app's entitlement)")
     }
 
-    fun of(libraries: String, startLog: String, previousExit: String, dataAgeSeconds: Long?, expansion: Expansion? = null, launch: Launch? = null, vendorChecks: List<String> = emptyList(), digest: String = "", steamCalls: String = ""): String = buildString {
+    fun of(libraries: String, startLog: String, previousExit: String, dataAgeSeconds: Long?, expansion: Expansion? = null, launch: Launch? = null, vendorChecks: List<String> = emptyList(), digest: String = "", steamCalls: String = "", sessionMillis: Long? = null, calls: String = "", events: String = "", blackBox: String = ""): String = buildString {
         fun yes(value: Boolean) = if (value) "yes" else "no"
         // First of all: a game whose essential controls the runtime refused cannot be played with the controllers.
         leftOutControls(startLog).filter { it.essential.isNotBlank() }.forEach {
@@ -61,6 +61,8 @@ object ReportDiagnosis {
             if (it > STALE_SECONDS) appendLine("  (old: what the lists hold may be from the start of the run, not from now)")
         }
         launch?.let { appendLaunch(it, vendorChecks.isNotEmpty()) }
+        appendCoverage(sessionMillis, calls)
+        appendBlackBox(blackBox)
         appendDigest(digest, libraries)
         appendSteamCalls(steamCalls)
         if (vendorChecks.isNotEmpty()) {
@@ -78,6 +80,7 @@ object ReportDiagnosis {
             val summary = exits.groupingBy { line -> field(line, "reason") + (field(line, "status").takeIf { line.contains("reason=SIGNALED") }?.let { "/$it" } ?: "") }.eachCount()
             appendLine("last exits (newest first, as Android recorded them): " + summary.entries.joinToString(", ") { "${it.key} x${it.value}" })
             appendLine("  A game closed from the system menu can also end as SIGNALED/9: this alone does not say it failed.")
+            appendExitsAgainstLaunches(exits, events, calls)
             // A crash of long ago says nothing of the run that is reported: when it was, and whether the game ran again since, is what a reader needs to weigh it.
             val newest = exits.firstOrNull()?.let { field(it, "time").toLongOrNull() }
             val now = launch?.nowMillis
@@ -90,6 +93,95 @@ object ReportDiagnosis {
             appendLine("native crash seen in the log of the game: " + crashes.joinToString(" | "))
             appendLine("  It says where the game died, not whose fault it is: the frames of the crash (the library that faulted) are in game-log-start.txt when the game handed them over.")
         }
+    }
+
+    /** A line of the file of the calls of the game to GamePort: the time of the device, the moment in the run, the process, the kind of call and how it ended. */
+    private val CALL_RECORD = Regex("""^\S+ \+([\d.]+)s pid=(\d+) (\w+) (\S+)""")
+
+    /**
+     * What the calls of the game to GamePort say (hook-calls.txt): which process they came from, how many of each kind and when the last of each was. Compared with how long the run
+     * lasted, it tells a game whose hook stopped handing over from one that was stopped: the files of the report describe only what was handed over.
+     */
+    private fun StringBuilder.appendCoverage(sessionMillis: Long?, calls: String) {
+        val all = calls.lineSequence().mapNotNull { CALL_RECORD.find(it) }.map { Triple(it.groupValues[1].toDouble(), it.groupValues[2], it.groupValues[3]) }.toList()
+        if (all.isEmpty()) {
+            appendLine("calls of the game to GamePort: none recorded (hook-calls.txt): the hook of the game has not reached GamePort since this was kept")
+            return
+        }
+        // Only the process that called last: a run before has its own moments, which would be mixed with this one's.
+        val pid = all.last().second
+        val rows = all.takeLastWhile { it.second == pid }
+        val byKind = rows.groupBy { it.third }.entries.joinToString(", ") { (kind, list) -> "$kind x${list.size} (last at +${list.maxOf { it.first }.toLong()} s)" }
+        appendLine("calls of the game to GamePort, process $pid: $byKind")
+        val lastAny = rows.maxOf { it.first }
+        val lastLog = rows.filter { it.third == "log" }.maxOfOrNull { it.first }
+        val session = sessionMillis?.let { it / 1000.0 }
+        when {
+            lastLog != null && lastAny - lastLog >= SILENCE_SECONDS ->
+                appendLine("  The game still called GamePort until +${lastAny.toLong()} s, but handed no log after +${lastLog.toLong()} s: it was running, and the hook stopped handing over. The files below describe the run only up to +${lastLog.toLong()} s.")
+            session != null && session - lastAny >= SILENCE_SECONDS && session >= LONG_RUN_SECONDS ->
+                appendLine("  Nothing came from the game after +${lastAny.toLong()} s, though the run lasted ${session.toLong()} s: the game was stopped or frozen from then, or GamePort was stopped. The files below describe the run only up to +${lastAny.toLong()} s.")
+        }
+    }
+
+    private val LAUNCH_EVENT = Regex("""^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) .*launch requested from GamePort""")
+
+    /** Each end Android recorded, with the launch it follows: the end of a run is told only at the next launch, and which launch it belongs to is what makes it readable. */
+    private fun StringBuilder.appendExitsAgainstLaunches(exits: List<String>, events: String, calls: String) {
+        // What each process said to GamePort: a process that never said the game came to the screen ("resumed") is one GamePort woke to fetch the saves or the sizes of its files, not a run that was played.
+        val processes = calls.lineSequence().mapNotNull { CALL_WITH_CLOCK.find(it) }.groupBy({ it.groupValues[2] }, { it.groupValues[1] to it.groupValues[3] })
+        val format = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.ROOT)
+        val launches = events.lineSequence().mapNotNull { LAUNCH_EVENT.find(it)?.groupValues?.get(1) }
+            .mapNotNull { runCatching { format.parse(it)?.time }.getOrNull() }.toList().sorted()
+        if (launches.isEmpty()) return
+        exits.take(5).forEach { line ->
+            val end = field(line, "time").toLongOrNull() ?: return@forEach
+            val own = field(line, "pid").let { processes[it] }
+            if (own != null && own.none { it.second == "resumed" }) {
+                appendLine("  process ${field(line, "pid")} ended ${format.format(java.util.Date(end))}: ${field(line, "reason")}, a short process GamePort started to fetch the saves (${own.size} call(s) to GamePort), not a run that was played")
+                return@forEach
+            }
+            val start = launches.lastOrNull { it <= end } ?: return@forEach
+            val pid = field(line, "pid").takeIf { it.isNotEmpty() }?.let { " (process $it)" }.orEmpty()
+            appendLine("  the run launched ${format.format(java.util.Date(start))} ended ${format.format(java.util.Date(end))}$pid, ${(end - start) / 1000} s after its launch: ${field(line, "reason")}, importance ${field(line, "importance")}")
+        }
+    }
+
+    private val CALL_WITH_CLOCK = Regex("""^(\d{2}:\d{2}:\d{2}) \S+ pid=(\d+) (\w+)""")
+    private val BLACKBOX_TIME = Regex("""^\+([\d.]+)s """)
+    private val BLACKBOX_SENDS = Regex("""sends=(\d+)/(\d+)""")
+
+    /**
+     * What the record the hook kept in the game's own folder says of the run before (previous-run-blackbox.txt): how long it went on, how many hand-overs to GamePort worked and failed,
+     * and the stretches where the process did not run. That record does not depend on GamePort being there, so it is what tells a run whose hand-overs stopped from one that was stopped.
+     */
+    private fun StringBuilder.appendBlackBox(blackBox: String) {
+        if (blackBox.isBlank()) return
+        val lines = blackBox.lines().filter { it.isNotBlank() }
+        val last = lines.mapNotNull { BLACKBOX_TIME.find(it)?.groupValues?.get(1)?.toDoubleOrNull() }.maxOrNull() ?: return
+        val sends = lines.lastOrNull { it.contains(" beat ") }?.let { BLACKBOX_SENDS.find(it) }
+        val gaps = lines.filter { it.contains(" GAP ") }
+        appendLine(
+            "record the hook kept for the run before (previous-run-blackbox.txt): it goes on to +${last.toLong()} s" +
+                (sends?.let { ", hand-overs to GamePort ${it.groupValues[1]} worked and ${it.groupValues[2]} failed" } ?: "") +
+                ", " + if (gaps.isEmpty()) "no stretch where the process did not run" else "${gaps.size} stretch(es) where the process did not run",
+        )
+        gaps.take(3).forEach { appendLine("  $it") }
+    }
+
+    private val TABLE_TIMES = Regex("""(?m)^\s*\d+x\s+\+\s*[\d.]+ s\s+\+\s*([\d.]+) s""")
+
+    /** When the Steam stand-in last answered the game, in this run (as far as the last hand-over) and in the run before: the game was alive until then, whatever its log says. */
+    private fun StringBuilder.appendSteamLife(steamCalls: String) {
+        val now = steamCalls.substringBefore("== The run before this one")
+        val before = steamCalls.substringAfter("== The run before this one", "")
+        val lastNow = TABLE_TIMES.findAll(now).maxOfOrNull { it.groupValues[1].toDouble() }
+        val lastBefore = TABLE_TIMES.findAll(before).maxOfOrNull { it.groupValues[1].toDouble() }
+        if (lastNow == null && lastBefore == null) return
+        appendLine("the Steam stand-in answered the game until: " + listOfNotNull(
+            lastNow?.let { "+${it.toLong()} s in this run (as of the last hand-over)" },
+            lastBefore?.let { "+${it.toLong()} s in the run before (it was alive that long)" },
+        ).joinToString(", "))
     }
 
     private val FATAL_SIGNAL = Regex("""Fatal signal (\d+) \((\w+)\)[^\n]*?fault addr (0x[0-9a-f]+) in tid \d+ \(([^)]*)\)""")
@@ -118,6 +210,11 @@ object ReportDiagnosis {
         }
         FRAME_RATE.find(digest)?.let { match ->
             val (median, low, seconds, target) = match.destructured
+            // A few seconds of measure are the start of the run, which loads things: a figure from them says nothing of how the game runs.
+            if (seconds.toInt() < FRAME_RATE_MIN_SECONDS) {
+                appendLine("frame rate: too few measures to say ($seconds s of the runtime's line, taken at the start of the run): see performance.txt for the line itself")
+                return@let
+            }
             val slow = target.toInt() > 0 && median.toInt() < target.toInt() * 8 / 10
             appendLine("frame rate: median $median of $target, lowest tenth $low, over $seconds s" + if (slow) " (far under the target)" else "")
         }
@@ -142,6 +239,7 @@ object ReportDiagnosis {
         val current = steamCalls.substringBefore("== The run before this one")
         val calls = CALL_LINE.findAll(current).associate { it.groupValues[2] to it.groupValues[1].toLong() }
         if (calls.isEmpty()) return
+        appendSteamLife(steamCalls)
         val sessionAsked = calls.entries.filter { it.key.startsWith("Steam_User::GetAuthSessionTicket") }.sumOf { it.value }
         val webServices = calls.entries.filter { it.key.startsWith("web ticket asked for service: ") }.map { it.key.removePrefix("web ticket asked for service: ") to it.value }
         val given = calls.entries.filter { it.key.startsWith("session ticket read from GamePort") || it.key.startsWith("web ticket read from GamePort") }.sumOf { it.value }
@@ -260,4 +358,7 @@ object ReportDiagnosis {
     private fun field(line: String, key: String): String = Regex("$key=(\\S+)").find(line)?.groupValues?.get(1).orEmpty()
 
     private const val STALE_SECONDS = 120L
+    private const val FRAME_RATE_MIN_SECONDS = 10
+    private const val SILENCE_SECONDS = 10.0
+    private const val LONG_RUN_SECONDS = 20.0
 }

@@ -104,11 +104,25 @@ class CloudProvider : ContentProvider() {
         }
         // The game is there: GamePort stays connected for it (see [ConnectionKeeper]), except when it says it is leaving.
         if (method != "closed" && method != "end" && !method.startsWith("obb_")) entryPoint.playtime().gameCalled()
-        return try {
+        val callerPid = android.os.Binder.getCallingPid()
+        val startedAt = android.os.SystemClock.elapsedRealtime()
+        val answer = try {
             handle(method, packageName, extras ?: Bundle.EMPTY)
         } catch (e: Exception) {
             Log.w(TAG, "$method failed", e)
             Bundle().apply { putString(STATUS, ERROR) }
+        }
+        noteCall(packageName, method, callerPid, startedAt, answer, extras)
+        return answer
+    }
+
+    /** Each call of the game is kept in a line (see [ReportStore.noteCall]): when it came, from which process, how long it took and how big it was. */
+    private fun noteCall(packageName: String, method: String, callerPid: Int, startedAt: Long, answer: Bundle?, extras: Bundle?) {
+        runCatching {
+            val took = android.os.SystemClock.elapsedRealtime() - startedAt
+            @Suppress("DEPRECATION")
+            val bytes = extras?.keySet()?.sumOf { key -> (extras.get(key) as? ByteArray)?.size ?: 0 } ?: 0
+            entryPoint.reports().noteCall(packageName, method, callerPid, "${answer?.getString(STATUS) ?: "none"} ${took}ms" + if (bytes > 0) " ${bytes}B" else "")
         }
     }
 
@@ -290,7 +304,7 @@ class CloudProvider : ContentProvider() {
     private fun noteLaunch(packageName: String) {
         val appId = entryPoint.installedGames().all().entries.firstOrNull { it.value == packageName }?.key ?: return
         entryPoint.playHistory().markPlayed(appId)
-        entryPoint.reports().launched(packageName)
+        entryPoint.reports().launched(packageName, android.os.Binder.getCallingPid())
     }
 
     private fun gameLabel(packageName: String): String = runCatching {

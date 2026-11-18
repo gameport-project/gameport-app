@@ -281,6 +281,86 @@ class ReportDiagnosisTest {
     }
 
     @Test
+    fun `a run that outlasted the data of its game is told, with when the game last reached GamePort`() {
+        val calls = "12:23:24 +1.4s pid=21317 log OK 20ms 1000B\n12:23:26 +3.4s pid=21317 log OK 18ms 1200B\n12:23:28 +5.4s pid=21317 log OK 22ms 1500B\n"
+        val text = ReportDiagnosis.of("", "I GPHook : ok", "", 50, sessionMillis = 43_000, calls = calls)
+        assertTrue(text, text.contains("calls of the game to GamePort, process 21317: log x3 (last at +5 s)"))
+        assertTrue(text, text.contains("Nothing came from the game after +5 s, though the run lasted 43 s"))
+    }
+
+    @Test
+    fun `a game that still called GamePort after its hook stopped handing over the log is told as running`() {
+        val calls = "12:00:01 +1.0s pid=7 log OK 20ms 1000B\n12:00:03 +3.0s pid=7 log OK 20ms 1000B\n12:00:30 +30.0s pid=7 alive OK 2ms\n12:00:55 +55.0s pid=7 warm OK 3ms\n"
+        val text = ReportDiagnosis.of("", "I GPHook : ok", "", 50, sessionMillis = 60_000, calls = calls)
+        assertTrue(text, text.contains("still called GamePort until +55 s, but handed no log after +3 s"))
+        assertFalse(text, text.contains("Nothing came from the game"))
+    }
+
+    @Test
+    fun `only the process that called last is counted, and a short run with calls to the end says nothing of silence`() {
+        val calls = "12:00:01 +1.0s pid=7 log OK 20ms 1000B\n12:00:05 +1.0s pid=8 log OK 20ms 1000B\n12:00:09 +5.0s pid=8 log OK 20ms 1000B\n"
+        val text = ReportDiagnosis.of("", "I GPHook : ok", "", 5, sessionMillis = 8_000, calls = calls)
+        assertTrue(text, text.contains("process 8: log x2"))
+        assertFalse(text, text.contains("Nothing came from the game"))
+    }
+
+    @Test
+    fun `no call recorded is said`() {
+        assertTrue(ReportDiagnosis.of("", "", "", null).contains("calls of the game to GamePort: none recorded"))
+    }
+
+    @Test
+    fun `a frame rate taken from a few seconds is not a figure`() {
+        val short = "Frame rate (the runtime's line, once a second): median 1, lowest tenth 1, over 1 s, target 72\nfocused reached: yes\n"
+        val text = ReportDiagnosis.of("", "I GPHook : ok", "", null, digest = short)
+        assertTrue(text, text.contains("frame rate: too few measures to say (1 s"))
+        assertFalse(text, text.contains("far under the target"))
+        val long = "Frame rate (the runtime's line, once a second): median 20, lowest tenth 10, over 40 s, target 72\n"
+        assertTrue(ReportDiagnosis.of("", "I GPHook : ok", "", null, digest = long).contains("far under the target"))
+    }
+
+    @Test
+    fun `each end of a run is set against the launch it follows`() {
+        val format = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.ROOT)
+        val launch = format.parse("2026-11-17 12:22:12")!!.time
+        val end = launch + 49_000
+        val exits = "time=$end pid=19402 reason=OTHER_13 status=0 importance=100 description=[UNDELIVERED BROADCAST]\n"
+        val events = "2026-11-17 12:22:12 app=1 gp=0.9.4 launch requested from GamePort: com.x/.Main\n"
+        val text = ReportDiagnosis.of("", "I GPHook : ok", exits, null, events = events)
+        assertTrue(text, text.contains("the run launched 2026-11-17 12:22:12 ended 2026-11-17 12:23:01 (process 19402), 49 s after its launch: OTHER_13"))
+    }
+
+    @Test
+    fun `a process GamePort woke to fetch the saves is not told as a run that was played`() {
+        val format = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.ROOT)
+        val launch = format.parse("2026-11-18 22:26:17")!!.time
+        val exits = "time=${launch + 126_000} pid=25524 reason=EXIT_SELF status=0 importance=100\ntime=${launch + 114_000} pid=22205 reason=USER_REQUESTED status=0 importance=400\n"
+        val events = "2026-11-18 22:26:17 app=1 gp=0.9.4 launch requested from GamePort: com.x/.Main\n"
+        val calls = "22:26:18 +0.0s pid=22205 catchup OK 0ms\n22:26:19 +1.0s pid=22205 begin READY 300ms\n22:26:20 +2.0s pid=22205 resumed OK 3ms\n22:26:30 +12.0s pid=22205 log OK 8ms 900B\n22:28:20 +0.0s pid=25524 catchup OK 0ms\n"
+        val text = ReportDiagnosis.of("", "I GPHook : ok", exits, null, events = events, calls = calls)
+        assertTrue(text, text.contains("process 25524 ended"))
+        assertTrue(text, text.contains("a short process GamePort started to fetch the saves (1 call(s) to GamePort), not a run that was played"))
+        assertTrue(text, text.contains("the run launched 2026-11-18 22:26:17 ended 2026-11-18 22:28:11 (process 22205), 114 s after its launch: USER_REQUESTED"))
+    }
+
+    @Test
+    fun `the record kept by the hook is summarised, with its gaps`() {
+        val box = "+0.0s start pid=7 sdk=34\n+2.0s beat sends=0/0 last=none logLines=10 threads=80\n+6.0s GAP 4100ms between two beats: the process did not run for that long\n+8.0s beat sends=3/1 last=ok 9ms logLines=40 threads=80\n"
+        val text = ReportDiagnosis.of("", "I GPHook : ok", "", null, blackBox = box)
+        assertTrue(text, text.contains("it goes on to +8 s, hand-overs to GamePort 3 worked and 1 failed, 1 stretch(es) where the process did not run"))
+        assertTrue(text, text.contains("GAP 4100ms"))
+        assertTrue(ReportDiagnosis.of("", "I GPHook : ok", "", null, blackBox = "+0.0s beat sends=1/0\n").contains("no stretch where the process did not run"))
+        assertFalse(ReportDiagnosis.of("", "I GPHook : ok", "", null).contains("previous-run-blackbox"))
+    }
+
+    @Test
+    fun `the last moment the steam stand-in answered is told for this run and the run before`() {
+        val table = "      8x  +   0.1 s  +   0.9 s  Steam_Friends::RunCallbacks\n\n== The run before this one: the table it left in its file ==\n      8x  +   0.1 s  +  34.4 s  Steam_Friends::RunCallbacks\n"
+        val text = ReportDiagnosis.of("", "I GPHook : ok", "", null, steamCalls = table)
+        assertTrue(text, text.contains("the Steam stand-in answered the game until: +0 s in this run (as of the last hand-over), +34 s in the run before (it was alive that long)"))
+    }
+
+    @Test
     fun `a native crash in the log is told on a system that records no exit`() {
         val log = "11-06 21:15:11.327  5973  7535 F libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x1c in tid 7535 (Thread-3), pid 5973 (x)\n" +
             "11-06 21:15:11.328  5973  7535 W Unity   : #0 0x7ea2313a54 (libunity.so)\n"

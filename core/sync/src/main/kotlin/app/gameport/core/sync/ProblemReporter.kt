@@ -124,10 +124,16 @@ class ProblemReporter @Inject constructor(
             entry("device.txt", clean(deviceFacts()))
             entry("settings.txt", clean(settingsFacts(game.appId)))
             if (packageName != null) {
-                entry("performance.txt", clean(store.text(packageName, "performance.txt").ifBlank { "(no performance line received from the game: it has not run with the current patch, or the runtime printed none while it ran)" }))
-                entry("network.txt", clean(store.text(packageName, "network.txt").ifBlank { "(no traffic line received from the game: it has not run with the current patch)" }))
-                entry("threads.txt", clean(store.text(packageName, "threads.txt").ifBlank { "(no thread list received from the game: it has not run with the current patch)" }))
+                entry("performance.txt", clean(store.text(packageName, "performance.txt").ifBlank { "(none received: the runtime printed no such line while the hook was handing over, or the hook handed nothing over: see hook-calls.txt)" }))
+                entry("network.txt", clean(store.text(packageName, "network.txt").ifBlank { "(none received: the hook handed no traffic line over, see hook-calls.txt for when it last reached GamePort)" }))
+                entry("threads.txt", clean(store.text(packageName, "threads.txt").ifBlank { "(none received: the lists are taken 8, 20 and 45 s after the start, and none had been handed over by then, see hook-calls.txt)" }))
                 store.diagnostics(packageName).forEach { (name, text) -> entry(name, clean(text)) }
+                // Every call of the game to GamePort, one line each: what reached GamePort and until when, and from which process.
+                entry("hook-calls.txt", clean(store.calls(packageName).ifBlank { "(no call of the game was recorded)" }))
+                // The run before, as the hook kept it in the game's own folder (it does not depend on GamePort being there), and the files of the run before that are kept apart.
+                store.previousBlackBox(packageName).takeIf { it.isNotBlank() }?.let { entry("previous-run-blackbox.txt", clean(it)) }
+                store.text(packageName, "previous-log-digest.txt").takeIf { it.isNotBlank() }?.let { entry("previous-run-log-digest.txt", clean(it)) }
+                store.text(packageName, "previous-performance.txt").takeIf { it.isNotBlank() }?.let { entry("previous-run-performance.txt", clean(it)) }
                 entry("files.txt", clean(files(packageName)))
                 if (!lean) entry("apk-contents.txt", clean(apkContents(packageName)))
                 entry("steam-interfaces.txt", clean(steamInterfaces(packageName)))
@@ -147,7 +153,7 @@ class ProblemReporter @Inject constructor(
                 // Left out when the game's engine wrote no log file of its own: a line saying so in every report was noise.
                 if (!lean) store.text(packageName, "engine.log").takeIf { it.isNotBlank() }?.let { entry("engine-logs.txt", clean(it)) }
                 entry("last-exits.txt", clean(ExitReasons.withTimes(store.previousExit(packageName)).ifBlank { "(not available)" }))
-                entry("diagnosis.txt", ReportDiagnosis.of(store.text(packageName, "libraries.txt"), store.text(packageName, "log-start.txt"), store.previousExit(packageName), store.lastDataMillis(packageName)?.let { (System.currentTimeMillis() - it) / 1000 }, expansionFacts(packageName), ReportDiagnosis.Launch(events.lastTimeOf(game.appId, app.gameport.core.install.LAUNCH_NOTE), store.lastDataMillis(packageName), System.currentTimeMillis(), onPico = device.vrPlatform?.id == "pico"), vendorChecks(packageName), store.text(packageName, "log-digest.txt"), store.text(packageName, "steam-calls.txt")))
+                entry("diagnosis.txt", ReportDiagnosis.of(store.text(packageName, "libraries.txt"), store.text(packageName, "log-start.txt"), store.previousExit(packageName), store.lastDataMillis(packageName)?.let { (System.currentTimeMillis() - it) / 1000 }, expansionFacts(packageName), ReportDiagnosis.Launch(events.lastTimeOf(game.appId, app.gameport.core.install.LAUNCH_NOTE), store.lastDataMillis(packageName), System.currentTimeMillis(), onPico = device.vrPlatform?.id == "pico"), vendorChecks(packageName), store.text(packageName, "log-digest.txt"), store.text(packageName, "steam-calls.txt"), sessionMillis = store.lastSessionMillis(packageName), calls = store.calls(packageName), events = events.read(game.appId), blackBox = store.previousBlackBox(packageName)))
                 // The crash in words, in every report (it is a few lines). The raw trace is not attached: it holds a copy of the memory of the stack, which no filter can clean.
                 store.bytes(packageName, "tombstone.pb")?.let { trace ->
                     CrashSummary.of(trace)?.let { summary -> entry("crash-summary.txt", clean(staleNote(store.text(packageName, "tombstone-info.txt"), events.lastTimeOf(game.appId, app.gameport.core.install.LAUNCH_NOTE)) + summary)) }
@@ -155,7 +161,9 @@ class ProblemReporter @Inject constructor(
             }
             if (installFailure != null) entry("install.txt", clean("Install error: $installFailure\n\n" + installer.downloadReport(game.appId)))
             entry("events.txt", clean(events.read(game.appId).ifBlank { "(nothing recorded for this game)" }))
-            entry("gameport-log.txt", clean(ownLog(packageName ?: "")))
+            entry("gameport-log.txt", clean(ownLog(packageName ?: "", events.lastTimeOf(game.appId, app.gameport.core.install.LAUNCH_NOTE)?.minus(60_000L))))
+            // How GamePort's own process ended lately: a headset stops GamePort while a game runs, and what the game handed over to it is lost with it.
+            entry("gameport-exits.txt", clean(ownExits()))
         }
     }
 
@@ -269,17 +277,33 @@ class ProblemReporter @Inject constructor(
     }
 
     /** GamePort's own log lines (an app only sees its own): warnings and errors, and everything GamePort tags as its own. */
-    private fun ownLog(packageName: String): String = runCatching {
-        val process = ProcessBuilder("logcat", "-d", "-t", "4000", "-v", "threadtime").redirectErrorStream(true).start()
+    private fun ownLog(packageName: String, sinceMillis: Long? = null): String = runCatching {
+        // The log of a busy headset fills a few thousand lines a minute: with a launch to look back to, more lines are read and only those from a little before it are kept.
+        val process = ProcessBuilder("logcat", "-d", "-t", if (sinceMillis != null) "30000" else "4000", "-v", "threadtime").redirectErrorStream(true).start()
         val lines = process.inputStream.bufferedReader(Charsets.UTF_8).readLines()
         process.destroy()
+        val year = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+        val format = java.text.SimpleDateFormat("yyyy MM-dd HH:mm:ss.SSS", java.util.Locale.ROOT)
         lines.filter { line ->
             val parts = line.trim().split(Regex("\\s+"), limit = 7)
             val level = parts.getOrNull(4)
             val tag = parts.getOrNull(5)?.removeSuffix(":").orEmpty()
             level == "W" || level == "E" || level == "F" || tag.startsWith("GP") || (packageName.isNotEmpty() && line.contains(packageName))
-        }.takeLast(1500).joinToString("\n")
+        }.filter { line ->
+            val at = if (sinceMillis == null || line.length < 18) null else runCatching { format.parse("$year ${line.substring(0, 18)}")?.time }.getOrNull()
+            at == null || at >= sinceMillis!!
+        }.takeLast(if (sinceMillis != null) 2500 else 1500).joinToString("\n")
     }.getOrDefault("(GamePort's log is not available)")
+
+    /** How GamePort's own process ended lately, as Android recorded it, newest first, with the date. */
+    private fun ownExits(): String = runCatching {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return@runCatching "(not recorded before Android 11)"
+        val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        val lines = manager.getHistoricalProcessExitReasons(context.packageName, 0, 8).joinToString("\n") { info ->
+            "time=${info.timestamp} pid=${info.pid} reason=${ExitReasons.name(info.reason)} status=${info.status} importance=${info.importance} description=${info.description}"
+        }
+        ExitReasons.withTimes(lines).ifBlank { "(none recorded)" }
+    }.getOrDefault("(not available)")
 
     /** The player's choices that change how the game runs, and the sync state. Nothing about the account. */
     private fun settingsFacts(appId: Int): String = buildString {
@@ -483,13 +507,20 @@ class ProblemReporter @Inject constructor(
             game-log-start.txt    the first lines of the game's system log (its start); a line repeated many times is kept 40 times, the others are only counted in log-digest.txt
             game-log.txt          the latest lines of the game's system log (same rule)
             previous-run-log-*.txt the same for the run before the last one, when there was one
+            previous-run-blackbox.txt  what the run before the last one kept in the game's own folder, which does not depend on GamePort being there: a line every two seconds
+                                  (the hand-overs to GamePort that worked or failed, the lines of the system log read, the threads and what they wait in) and a line "GAP" for each
+                                  stretch where the process did not run. Handed over by the last run, so it exists from the second launch of a game
+            previous-run-log-digest.txt, previous-run-performance.txt  the same files for the run before the last one
+            hook-calls.txt        every call of the game to GamePort, one line each (the time, the moment in the run, the process, the kind of call, how it ended and how big): tells
+                                  until when the game reached GamePort, and which process each file of the report comes from
             engine-logs.txt       log files the game's engine wrote in the game's folders, when there are some
             last-exits.txt        how the last runs ended, as Android recorded it
             crash-summary.txt     the last native crash in words: the signal, the address that faulted, the thread that crashed and the top of its call stack
                                   (a crash from before the last launch is marked as such; the raw crash dump is never attached, as it holds a copy of memory)
             install.txt           for a failed install: the error, the download folder and what its APKs say about themselves
             events.txt            what GamePort did for this game: download (and what it held besides the APK), patch, install and their errors, each line with the version of GamePort
-            gameport-log.txt      GamePort's own warnings, errors and messages about this game
+            gameport-log.txt      GamePort's own warnings, errors and messages about this game, from a little before the last launch
+            gameport-exits.txt    how GamePort's own process ended lately, as Android recorded it (a headset stops GamePort while a game runs)
 
             Account numbers, tickets and keys, e-mail addresses, network addresses and the account's display name are removed from every text file.
         """.trimIndent() + "\n"

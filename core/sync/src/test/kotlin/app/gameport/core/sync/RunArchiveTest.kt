@@ -38,6 +38,32 @@ class RunArchiveTest {
     }
 
     @Test
+    fun `a new run discards the files of the run before that it did not send, and keeps the ones set apart`() {
+        write("log-start.txt", "run one start")
+        write("diag-stacks.txt", "stacks of run one")
+        write("threads.txt", "threads of run one")
+        write("performance.txt", "perf of run one")
+        write("previous-run-blackbox.txt", "kept")
+        val archived = names + ("performance.txt" to "previous-performance.txt")
+        val discarded = { name: String -> name.startsWith("diag-") || name == "threads.txt" || name == "performance.txt" }
+        RunArchive.noteRun(folder.root, 100, archived, discarded)
+        RunArchive.noteRun(folder.root, 200, archived, discarded)
+        assertFalse("the stacks of a run before must not be read as this run's", File(folder.root, "diag-stacks.txt").exists())
+        assertFalse(File(folder.root, "threads.txt").exists())
+        assertFalse(File(folder.root, "performance.txt").exists())
+        assertEquals("perf of run one", File(folder.root, "previous-performance.txt").readText())
+        assertEquals("kept", File(folder.root, "previous-run-blackbox.txt").readText())
+    }
+
+    @Test
+    fun `the same run discards nothing`() {
+        write("diag-stacks.txt", "stacks")
+        RunArchive.noteRun(folder.root, 100, names) { it.startsWith("diag-") }
+        RunArchive.noteRun(folder.root, 100, names) { it.startsWith("diag-") }
+        assertTrue(File(folder.root, "diag-stacks.txt").exists())
+    }
+
+    @Test
     fun `a hook that does not tell its run keeps nothing apart`() {
         write("log-start.txt", "x")
         assertFalse(RunArchive.noteRun(folder.root, 0, names))
