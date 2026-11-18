@@ -282,4 +282,6 @@
     <string name="help_notice_saves_apart">Le studio garde les sauvegardes Android de ce jeu à part de celles du PC, donc un joueur qui a joué sur PC démarre sans rien. Un bouton ouvre les sauvegardes, où celles du PC peuvent être amenées ici.</string>
     <string name="help_notice_expansion">Le jeu a de gros fichiers à côté de son application et GamePort ne peut pas vérifier qu\'ils sont tous là. Un bouton le répare en les téléchargeant à nouveau.</string>
     <string name="help_notice_expansion_missing">GamePort ne retrouve pas la taille de certains des gros fichiers que Steam liste pour le jeu. Si le jeu fonctionne normalement, cet avis peut être ignoré. Un bouton le répare en les téléchargeant à nouveau.</string>
+    <string name="settings_downloads_at_once">Téléchargements simultanés</string>
+    <string name="settings_downloads_at_once_description">Nombre de jeux téléchargés en même temps. Un jeu qui attend l\'indique. Les installations se font toujours l\'une après l\'autre, car Android affiche une confirmation à la fois.</string>
 </resources>

@@ -129,6 +129,17 @@ class UserSettings @Inject constructor(
         _updateCheckHours.value = hours
     }
 
+    private val _downloadsAtOnce = MutableStateFlow(prefs.getInt(KEY_DOWNLOADS_AT_ONCE, DEFAULT_DOWNLOADS_AT_ONCE).coerceIn(MIN_DOWNLOADS_AT_ONCE, MAX_DOWNLOADS_AT_ONCE))
+
+    /** How many games download at the same time, from [MIN_DOWNLOADS_AT_ONCE] to [MAX_DOWNLOADS_AT_ONCE]; the others wait their turn. Installs always go one after the other. */
+    val downloadsAtOnce: StateFlow<Int> = _downloadsAtOnce.asStateFlow()
+
+    fun setDownloadsAtOnce(count: Int) {
+        val kept = count.coerceIn(MIN_DOWNLOADS_AT_ONCE, MAX_DOWNLOADS_AT_ONCE)
+        prefs.edit().putInt(KEY_DOWNLOADS_AT_ONCE, kept).apply()
+        _downloadsAtOnce.value = kept
+    }
+
     private val _display = MutableStateFlow(readDisplay())
 
     /** How the app looks and what the library shows. */
@@ -206,6 +217,10 @@ class UserSettings @Inject constructor(
         const val KEY_LANGUAGE = "language"
         const val KEY_UPDATE_HOURS = "update_check_hours"
         const val DEFAULT_UPDATE_HOURS = 4
+        const val KEY_DOWNLOADS_AT_ONCE = "downloads_at_once"
+        const val DEFAULT_DOWNLOADS_AT_ONCE = 2
+        const val MIN_DOWNLOADS_AT_ONCE = 1
+        const val MAX_DOWNLOADS_AT_ONCE = 10
         const val KEY_RETURN = "return_to_gameport"
         const val KEY_RETURN_MODE = "return_mode"
         const val KEY_COUNT_PLAYTIME = "count_playtime_on_steam"

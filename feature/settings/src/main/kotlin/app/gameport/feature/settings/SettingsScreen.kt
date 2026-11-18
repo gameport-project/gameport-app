@@ -182,7 +182,7 @@ fun SettingsScreen(onBack: () -> Unit, onOpenGame: (Int) -> Unit = {}, startOnUp
                     ) {
                         when (category) {
                             Category.ACCOUNT -> AccountSection(accountName, offline, viewModel::onOfflineModeChanged, countPlaytime, viewModel::onCountPlaytimeOnSteamChanged, sendAchievements, viewModel::onSendAchievementsToSteamChanged, shareVerdicts, viewModel::onShareVerdictsChanged, returnMode, viewModel::onReturnModeChanged, viewModel::onRefreshLibrary, viewModel::onSignOut)
-                            Category.DOWNLOADS -> DownloadsSection(speedUnit, viewModel::onSpeedUnitSelected, viewModel.downloadRegionId.collectAsStateWithLifecycle().value, viewModel::onDownloadRegionSelected)
+                            Category.DOWNLOADS -> DownloadsSection(speedUnit, viewModel::onSpeedUnitSelected, viewModel.downloadRegionId.collectAsStateWithLifecycle().value, viewModel::onDownloadRegionSelected, viewModel.downloadsAtOnce.collectAsStateWithLifecycle().value, viewModel::onDownloadsAtOnceChanged)
                             Category.APPEARANCE -> AppearanceSection(display, viewModel::onDisplayChanged)
                             Category.HOME -> HomeSection(display, viewModel.isHeadset, viewModel::onDisplayChanged)
                             Category.LANGUAGE -> LanguageSection(language) { chosen ->
@@ -365,7 +365,7 @@ private fun AccountSection(
 }
 
 @Composable
-private fun DownloadsSection(speedUnit: SpeedUnit, onSelect: (SpeedUnit) -> Unit, regionId: Int, onRegionSelected: (Int) -> Unit) {
+private fun DownloadsSection(speedUnit: SpeedUnit, onSelect: (SpeedUnit) -> Unit, regionId: Int, onRegionSelected: (Int) -> Unit, downloadsAtOnce: Int, onDownloadsAtOnceChanged: (Int) -> Unit) {
     Text(stringResource(R.string.settings_category_downloads), style = MaterialTheme.typography.headlineSmall)
     Text(stringResource(R.string.settings_speed_unit), style = MaterialTheme.typography.titleMedium)
     SpeedUnit.entries.forEach { unit ->
@@ -396,6 +396,22 @@ private fun DownloadsSection(speedUnit: SpeedUnit, onSelect: (SpeedUnit) -> Unit
             DropdownMenuItem(text = { Text(stringResource(R.string.settings_download_region_auto)) }, onClick = { onRegionSelected(app.gameport.core.model.SteamRegions.AUTOMATIC); choosing = false })
             app.gameport.core.model.SteamRegions.all.forEach { (id, name) ->
                 DropdownMenuItem(text = { Text(name) }, onClick = { onRegionSelected(id); choosing = false })
+            }
+        }
+    }
+
+    // How many games download at once, from 1 to 10; the installs that follow always go one after the other.
+    Text(stringResource(R.string.settings_downloads_at_once), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
+    Text(stringResource(R.string.settings_downloads_at_once_description), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.widthIn(max = 720.dp))
+    var choosingCount by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(onClick = { choosingCount = true }, contentPadding = PaddingValues(start = 16.dp, end = 8.dp)) {
+            Text(downloadsAtOnce.toString())
+            Icon(Icons.Filled.ArrowDropDown, contentDescription = null, modifier = Modifier.size(24.dp))
+        }
+        DropdownMenu(expanded = choosingCount, onDismissRequest = { choosingCount = false }) {
+            (1..10).forEach { count ->
+                DropdownMenuItem(text = { Text(count.toString()) }, onClick = { onDownloadsAtOnceChanged(count); choosingCount = false })
             }
         }
     }

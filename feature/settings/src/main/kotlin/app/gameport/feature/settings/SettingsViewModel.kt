@@ -188,6 +188,11 @@ class SettingsViewModel @Inject constructor(
 
     fun onUpdateCheckHoursChanged(hours: Int) = settings.setUpdateCheckHours(hours)
 
+    /** How many games download at the same time (the installs always go one after the other). */
+    val downloadsAtOnce: StateFlow<Int> = settings.downloadsAtOnce
+
+    fun onDownloadsAtOnceChanged(count: Int) = settings.setDownloadsAtOnce(count)
+
     fun onCheckForUpdate() = updater.check(manual = true)
 
     fun onUpdate() = updater.update()

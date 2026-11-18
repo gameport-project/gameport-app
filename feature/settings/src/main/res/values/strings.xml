@@ -282,4 +282,6 @@
     <string name="help_notice_saves_apart">The studio keeps this game\'s Android saves apart from its PC ones, so a player who has played on a PC starts with none. A button opens the saves, where the PC saves can be brought here.</string>
     <string name="help_notice_expansion">The game has large files beside its app and GamePort cannot check that they are all there. A button repairs it by downloading them again.</string>
     <string name="help_notice_expansion_missing">GamePort cannot find the size of some of the large files Steam lists for the game. If the game runs normally, this notice can be ignored. A button repairs it by downloading them again.</string>
+    <string name="settings_downloads_at_once">Downloads at once</string>
+    <string name="settings_downloads_at_once_description">How many games download at the same time. A game that waits says so. Installs always go one after the other, as Android shows one confirmation at a time.</string>
 </resources>
