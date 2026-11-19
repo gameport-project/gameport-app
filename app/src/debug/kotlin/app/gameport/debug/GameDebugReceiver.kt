@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * adb shell am broadcast -n app.gameport.dev/app.gameport.debug.GameDebugReceiver --ei appId <id> --es action <state|install|dlc-install|dlc-remove> [--es dlcs <id,id>] [--ei dlc <id>] (also `uninstall`)
+ * adb shell am broadcast -n app.gameport.dev/app.gameport.debug.GameDebugReceiver --ei appId <id> --es action <state|install|dlc-install|dlc-remove|packagename|cancel> [--es dlcs <id,id>] [--ei dlc <id>] [--es mode <auto|on|off>] [--ez repatch false] (also `uninstall`)
  * Test only. Does what the buttons of a game's page and its settings do, for a game, without the screen, and logs what it finds (tag GPGame): `state` tells whether the game
  * is in the library, what it is installed as and which extra content it has; `install` installs it with the extra content of `dlcs` (none by default); `dlc-install` and
  * `dlc-remove` add or take off one extra content of an installed game. The system still asks to confirm an installation.
@@ -28,6 +28,7 @@ class GameDebugReceiver : BroadcastReceiver() {
     @Inject lateinit var auth: SteamAuthRepository
     @Inject lateinit var workshop: app.gameport.core.install.WorkshopRepository
     @Inject lateinit var gameSettings: app.gameport.core.settings.GameSettingsStore
+    @Inject lateinit var issues: app.gameport.core.sync.GameIssuesRepository
     @Inject lateinit var sessions: app.gameport.core.steam.session.SteamSessionHolder
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -50,6 +51,10 @@ class GameDebugReceiver : BroadcastReceiver() {
                         val (installed, removable) = installer.observeInstalledDlc(appId).first()
                         Log.i(TAG, "app $appId ${game.name}: state=${installer.observe(appId).first()} ownership=${game.ownership} package=${installer.installedPackage(appId)} dlc owned=${extra.count { it.owned }} of ${extra.size} " +
                             "installed=$installed removable=$removable work=${installer.observeDlcWork(appId).first()}")
+                        // The name GamePort gives a game on a device whose store refuses a re-signed one, and whether installing it again would change it.
+                        Log.i(TAG, "app $appId: name wanted=${installer.renamedPackageFor(appId)} installed=${installer.installedPackage(appId)} needsRename=${installer.needsRename(appId)}")
+                        // The notices the game's page builds, as the player sees them.
+                        Log.i(TAG, "app $appId: issues=${issues.observe(appId).first()}")
                         extra.filter { it.owned }.forEach { Log.i(TAG, "  dlc ${it.appId} ${it.name}: ${it.downloadBytes / 1_000_000} MB, depots ${it.depots.map { d -> "${d.id}@${d.declaredBy ?: "game"}" }}") }
                     }
                     "install" -> {
@@ -57,6 +62,10 @@ class GameDebugReceiver : BroadcastReceiver() {
                         installer.install(game, dlcs)
                     }
                     "uninstall" -> installer.uninstall(appId)
+                    "cancel" -> {
+                        Log.i(TAG, "app $appId: its install is given up")
+                        installer.cancelInstalling(appId)
+                    }
                     "repair" -> installer.repair(game)
                     "features" -> {
                         // What the headset's runtime reads to decide whether a game may use the alpha blend mode: the features the installed package asks for (0 not declared, 1 required, 2 declared not required).
@@ -80,6 +89,19 @@ class GameDebugReceiver : BroadcastReceiver() {
                         gameSettings.set(appId, gameSettings.get(appId).copy(passthrough = mode))
                         Log.i(TAG, "app $appId: passthrough set to $mode, patching again")
                         installer.repatch(appId)
+                    }
+                    "packagename" -> {
+                        val mode = when (intent.getStringExtra("mode")) {
+                            "on" -> app.gameport.core.model.PackageNameMode.ON
+                            "off" -> app.gameport.core.model.PackageNameMode.OFF
+                            else -> app.gameport.core.model.PackageNameMode.AUTO
+                        }
+                        val before = installer.installedPackage(appId)
+                        gameSettings.set(appId, gameSettings.get(appId).copy(packageName = mode))
+                        // The choice can be written without patching again: that is how a game left under its own name meets the choice that wants it renamed, which is what the page reacts to.
+                        val repatch = intent.getBooleanExtra("repatch", true)
+                        Log.i(TAG, "app $appId: package name set to $mode (installed as $before, will be ${installer.renamedPackageFor(appId) ?: before})${if (repatch) ", patching again" else ", not patching"}")
+                        if (repatch) installer.repatch(appId)
                     }
                     "workshop" -> {
                         // A broadcast held open for minutes is reported as GamePort not answering: it is let go at once.

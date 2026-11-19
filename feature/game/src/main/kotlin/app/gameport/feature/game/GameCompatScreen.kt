@@ -49,7 +49,8 @@ fun GameCompatScreen(onBack: () -> Unit, viewModel: GameCompatViewModel = hiltVi
     val gameName by viewModel.gameName.collectAsStateWithLifecycle()
     val showOpenInVr by viewModel.showOpenInVr.collectAsStateWithLifecycle()
     val showOvrPluginStandIn by viewModel.showOvrPluginStandIn.collectAsStateWithLifecycle()
-    GameCompatContent(mapping, settings, stageFallback, gameName, onBack, viewModel::onUseFrameChanged, viewModel::onRecenterChosen, showOpenInVr, viewModel::onOpenInVrChosen, showOvrPluginStandIn, viewModel::onOvrPluginStandInChosen, viewModel::onPassthroughChosen, viewModel.passthroughListed, viewModel.showEyeFoveation, viewModel::onEyeFoveationChosen, viewModel.showHaptics, viewModel::onHapticsChosen)
+    val renameNeeded by viewModel.renameNeeded.collectAsStateWithLifecycle()
+    GameCompatContent(mapping, settings, stageFallback, gameName, onBack, viewModel::onUseFrameChanged, viewModel::onRecenterChosen, showOpenInVr, viewModel::onOpenInVrChosen, showOvrPluginStandIn, viewModel::onOvrPluginStandInChosen, viewModel::onPassthroughChosen, viewModel.passthroughListed, viewModel.showEyeFoveation, viewModel::onEyeFoveationChosen, viewModel.showHaptics, viewModel::onHapticsChosen, viewModel::onPackageNameChosen, viewModel.refusesReSignedGames, renameNeeded)
 }
 
 /** The page of the options, from what it shows: the screen feeds it from the game, the tour of the page feeds it made-up values. */
@@ -72,6 +73,9 @@ internal fun GameCompatContent(
     onEyeFoveationChosen: (app.gameport.core.model.EyeFoveationMode) -> Unit = {},
     showHaptics: Boolean = false,
     onHapticsChosen: (Int) -> Unit = {},
+    onPackageNameChosen: (app.gameport.core.model.PackageNameMode) -> Unit = {},
+    refusesReSignedGames: Boolean = false,
+    renameNeeded: Boolean = false,
 ) {
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp)) {
@@ -105,6 +109,19 @@ internal fun GameCompatContent(
                     selected = settings.passthrough.ordinal,
                     onSelect = { onPassthroughChosen(PassthroughMode.entries[it]) },
                     note = stringResource(R.string.gamecompat_passthrough_auto).takeIf { passthroughListed && settings.passthrough == PassthroughMode.AUTO },
+                )
+                ChoiceBox(
+                    title = stringResource(R.string.gamecompat_package_name),
+                    legend = stringResource(R.string.gamecompat_package_name_legend),
+                    labels = listOf(R.string.gamecompat_mode_auto, R.string.gamecompat_mode_on, R.string.gamecompat_mode_off).map { stringResource(it) },
+                    selected = settings.packageName.ordinal,
+                    onSelect = { onPackageNameChosen(app.gameport.core.model.PackageNameMode.entries[it]) },
+                    note = stringResource(R.string.gamecompat_package_name_auto).takeIf { refusesReSignedGames && settings.packageName == app.gameport.core.model.PackageNameMode.AUTO },
+                    warning = when {
+                        refusesReSignedGames && settings.packageName == app.gameport.core.model.PackageNameMode.OFF -> stringResource(R.string.gamecompat_package_name_refused)
+                        renameNeeded -> stringResource(R.string.gamecompat_package_name_warning)
+                        else -> null
+                    },
                 )
                 if (showEyeFoveation) ChoiceBox(
                     title = stringResource(R.string.gamecompat_eye_foveation),
@@ -141,7 +158,7 @@ internal fun GameCompatContent(
 
 /** A choice among a few, always showing which is taken, with its legend. The first is the automatic one, where GamePort decides. */
 @Composable
-private fun ChoiceBox(modifier: Modifier = Modifier, title: String, legend: String, labels: List<String>, selected: Int, onSelect: (Int) -> Unit, note: String? = null) {
+private fun ChoiceBox(modifier: Modifier = Modifier, title: String, legend: String, labels: List<String>, selected: Int, onSelect: (Int) -> Unit, note: String? = null, warning: String? = null) {
     Column(
         modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -153,6 +170,12 @@ private fun ChoiceBox(modifier: Modifier = Modifier, title: String, legend: Stri
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
                 Icon(Icons.Filled.Info, contentDescription = null, tint = CompatOrange, modifier = Modifier.size(20.dp))
                 Text(note, color = CompatOrange, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        if (warning != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+                Icon(Icons.Filled.Warning, contentDescription = null, tint = CompatOrange, modifier = Modifier.size(20.dp))
+                Text(warning, color = CompatOrange, style = MaterialTheme.typography.bodySmall)
             }
         }
     }

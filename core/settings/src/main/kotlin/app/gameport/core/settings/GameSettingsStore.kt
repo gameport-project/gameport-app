@@ -5,6 +5,7 @@ import app.gameport.core.model.EyeFoveationMode
 import app.gameport.core.model.GameSettings
 import app.gameport.core.model.PlayerDefaults
 import app.gameport.core.model.PassthroughMode
+import app.gameport.core.model.PackageNameMode
 import app.gameport.core.model.RecenterMode
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -45,6 +46,7 @@ class GameSettingsStore @Inject constructor(
         openInVr = prefs.getBoolean("open_in_vr_$appId", true),
         ovrPluginStandIn = prefs.getBoolean("ovrplugin_stand_in_$appId", true),
         passthrough = passthroughOf(appId),
+        packageName = packageNameOf(appId),
         launchArguments = if (prefs.contains("launchargs_$appId")) prefs.getStringSet("launchargs_$appId", emptySet()).orEmpty().toSet() else null,
         channel = prefs.getString("channel_$appId", null)?.takeIf { it.isNotBlank() },
     )
@@ -119,6 +121,12 @@ class GameSettingsStore @Inject constructor(
             PassthroughMode.ON -> editor.putString("passthrough_$appId", "on")
             PassthroughMode.OFF -> editor.putString("passthrough_$appId", "off")
         }
+        // Automatic is the absence of a choice.
+        when (settings.packageName) {
+            PackageNameMode.AUTO -> editor.remove("package_name_$appId")
+            PackageNameMode.ON -> editor.putString("package_name_$appId", "on")
+            PackageNameMode.OFF -> editor.putString("package_name_$appId", "off")
+        }
         // The normal channel is the absence of a choice.
         settings.channel?.let { editor.putString("channel_$appId", it) } ?: editor.remove("channel_$appId")
         if (height == null) editor.remove("height_$appId") else editor.putInt("height_$appId", height.coerceIn(PlayerDefaults.HEIGHT_RANGE_CM))
@@ -144,6 +152,13 @@ class GameSettingsStore @Inject constructor(
         "on", true -> PassthroughMode.ON
         "off" -> PassthroughMode.OFF
         else -> PassthroughMode.AUTO
+    }
+
+    /** Automatic is the absence of a choice: the game is installed under GamePort's own name only where the headset refuses a re-signed one. */
+    private fun packageNameOf(appId: Int): PackageNameMode = when (prefs.all["package_name_$appId"]) {
+        "on" -> PackageNameMode.ON
+        "off" -> PackageNameMode.OFF
+        else -> PackageNameMode.AUTO
     }
 
     private fun readDefaults() = PlayerDefaults(prefs.getInt(KEY_DEFAULT_HEIGHT, PlayerDefaults.DEFAULT_HEIGHT_CM))

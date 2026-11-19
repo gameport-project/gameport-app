@@ -16,15 +16,21 @@ object ReportDiagnosis {
      */
     data class Launch(val launchedAtMillis: Long?, val dataAtMillis: Long?, val nowMillis: Long, val onPico: Boolean = false)
 
+    /** The manifest metadata a game installed under a name of GamePort's own carries, holding the package name its APK came with (see the patch `package_rename`). */
+    private const val RENAMED_PACKAGE = "app.gameport.original_package"
+
     /**
      * The checks a headset maker builds into its own store apps, found in the game's manifest and APK. GamePort re-signs the game to patch it, and such a check
-     * can refuse the re-signed game at start (Pico shows "illegal signature") without a single line in any log.
+     * can refuse the re-signed game at start, without a single line in any log: a Pico's `com.bytedance.pico.matrix` asks Pico's servers about every third-party
+     * application it sees, with the package name and the signature of the installed APK, and force-stops the ones whose signature is not the one registered for
+     * that name. Installing the game under a package name of GamePort's own takes it past that check.
      */
     fun vendorChecks(permissions: List<String>, metaKeys: List<String>, apkEntries: List<String>): List<String> = buildList {
         if (permissions.any { it.contains("tobactivate", ignoreCase = true) || it.endsWith("AUTH_CHECK") }) add("Pico: the permission ${permissions.first { it.contains("tobactivate", ignoreCase = true) || it.endsWith("AUTH_CHECK") }} (the headset checks the app with its maker)")
         if ("pvr.app.id" in metaKeys) add("Pico: the app id pvr.app.id (the app is registered with the Pico store, whose check looks at the signature)")
         if (apkEntries.any { it.endsWith("libpxrplatformloader.so") }) add("Pico: libpxrplatformloader.so (the Pico platform SDK, which can check the app's licence)")
         if (apkEntries.any { it.endsWith("libovrplatformloader.so") }) add("Meta: libovrplatformloader.so (the Meta platform SDK, which can check the app's entitlement)")
+        if (RENAMED_PACKAGE in metaKeys) add("Installed under a package name of GamePort's own, so a headset that refuses a re-signed game lets it start (the name the game came with is kept in $RENAMED_PACKAGE)")
     }
 
     fun of(libraries: String, startLog: String, previousExit: String, dataAgeSeconds: Long?, expansion: Expansion? = null, launch: Launch? = null, vendorChecks: List<String> = emptyList(), digest: String = "", steamCalls: String = "", sessionMillis: Long? = null, calls: String = "", events: String = "", blackBox: String = ""): String = buildString {
@@ -277,8 +283,8 @@ object ReportDiagnosis {
             appendLine("  The game was started and nothing came back from it: it was closed, or refused by the system, before its hook ran.")
             appendLine("  A dialog of the system leaves no line in any log; ask the player what appeared on screen." + if (hasVendorChecks) " The checks below may explain it." else "")
             if (launch.onPico) {
-                appendLine("  On a Pico, the system itself refuses a re-signed game with \"Verification failed: illegal signature\" (Cancel / Buy now), before the game runs.")
-                appendLine("  It was seen on games whose manifest carries no Pico marker, so a game without the checks below can be refused as well.")
+                appendLine("  On a Pico, the system itself refuses a re-signed game whose package name is one the Pico store knows, before the game runs: com.bytedance.pico.matrix asks Pico's servers about every third-party application it sees, sending the package name and the signature of the installed APK, and force-stops the ones whose signature is not the one registered for that name (the dialog says the entitlement check failed, and offers the store).")
+                appendLine("  It was seen on games whose manifest carries no Pico marker, so a game without the checks below can be refused as well. Installing it under a package name of GamePort's own (the package name choice of the game's compatibility page) takes it past that check.")
             }
         }
     }

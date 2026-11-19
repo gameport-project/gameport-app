@@ -179,6 +179,7 @@
     <string name="help_cover_patch">On a cover, an orange wrench means the game has a patch to apply.</string>
     <string name="help_notice_update">A new version of the game is available. A button updates it.</string>
     <string name="help_notice_patch">A newer GamePort patch exists for the game. A button patches it again.</string>
+    <string name="help_notice_refused">A device that knows a game\'s package name but not the signature of the copy installed here refuses to start it. A button installs the game again under a name of GamePort\'s own. What the game kept on this device starts fresh. The saves Steam syncs come back.</string>
     <string name="help_notice_problem">The game closed almost right away or crashed. A button prepares a report that helps find out why.</string>
     <string name="help_notice_storage">The game asks for access to files and does not have it, so it may close on its own. A button opens the permission.</string>
     <string name="help_notice_conflict">The saves on this device and on Steam differ, and a choice is needed between them.</string>

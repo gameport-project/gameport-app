@@ -2,6 +2,8 @@ package app.gameport.feature.game
 
 import app.gameport.core.model.reportable
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -91,7 +93,14 @@ enum class RepatchStage { QUEUED, DOWNLOADING, PATCHING, INSTALLING }
 sealed interface Repatch {
     data object None : Repatch
 
-    data class Running(val stage: RepatchStage, val fraction: Float? = null, val bytesPerSecond: Long = 0) : Repatch
+    data class Running(
+        val stage: RepatchStage,
+        val fraction: Float? = null,
+        val bytesPerSecond: Long = 0,
+        val step: app.gameport.core.model.InstallStep? = null,
+        /** True when the install is over and only waits for a confirmation window the player closed: it has to be asked for again, or given up. */
+        val waitingForConfirmation: Boolean = false,
+    ) : Repatch
 
     data class Failed(val error: InstallError) : Repatch
 }
@@ -161,7 +170,12 @@ class GameViewModel @Inject constructor(
             install is InstallState.Queued -> Repatch.Running(RepatchStage.QUEUED)
             install is InstallState.Downloading -> Repatch.Running(RepatchStage.DOWNLOADING, install.progress, install.bytesPerSecond)
             install is InstallState.Patching -> Repatch.Running(RepatchStage.PATCHING)
-            install is InstallState.Installing || install is InstallState.Finishing -> Repatch.Running(RepatchStage.INSTALLING)
+            install is InstallState.Installing || install is InstallState.Finishing -> Repatch.Running(
+                RepatchStage.INSTALLING,
+                step = (install as? InstallState.Installing)?.step,
+                // The window is gone (the player closed it) and nothing is running any more: the card has to offer asking for it again, or giving the install up.
+                waitingForConfirmation = (install as? InstallState.Installing)?.step == app.gameport.core.model.InstallStep.AWAITING_CONFIRMATION && !installer.hasInstallConfirmation(),
+            )
             install is InstallState.Failed -> Repatch.Failed(install.error)
             else -> Repatch.None
         }
@@ -270,6 +284,15 @@ class GameViewModel @Inject constructor(
 
     fun onRepatch() = installer.repatch(appId)
 
+    /**
+     * Installs the game again under a name of GamePort's own: what a device that refused to start it needs (see [GameIssue.RefusedByDevice]). The choice is written
+     * down as well, so the game is patched and updated that way from then on, and the patch is what puts it there.
+     */
+    fun onReinstallRenamed() {
+        gameSettingsStore.set(appId, gameSettingsStore.get(appId).copy(packageName = app.gameport.core.model.PackageNameMode.ON))
+        installer.repatch(appId)
+    }
+
     /** Downloads the game's expansion files again and places them, the APK on the device staying as it is. */
     fun onRepair() {
         (uiState.value as? GameUiState.Content)?.game?.let(installer::repair)
@@ -291,7 +314,16 @@ class GameViewModel @Inject constructor(
     fun onCancel() = installer.cancel(appId)
 
     /** Opens again the confirmation Android asked for the install: the window may have been closed, covered or lost. */
-    fun onReopenConfirmation() { installer.reopenInstallConfirmation() }
+    fun onReopenConfirmation() {
+        // The window is still there (covered, or lost behind something): it is brought back as it is, which costs nothing.
+        if (installer.reopenInstallConfirmation()) return
+        // It is gone with the session the player closed: the confirmation is asked for again, which makes a new one.
+        if (installer.installedPackage(appId) != null) {
+            installer.repatch(appId)
+        } else {
+            (baseState.value as? GameUiState.Content)?.game?.let { installer.install(it, null) }
+        }
+    }
 
     /** Whether this game looks like it had a problem (it closed at once, or crashed). */
     val suspicion: StateFlow<app.gameport.core.sync.Suspicion?> = reports.suspected
@@ -363,8 +395,28 @@ class GameViewModel @Inject constructor(
     /** The player read the notice about the controllers: it goes and does not come back. */
     fun onControllersNoticeRead() = controllerMappings.markNoticeSeen(appId)
 
-    /** Permissions are granted outside GamePort: check the game's issues again when the page is shown. */
-    fun refreshIssues() = issuesRepository.refresh()
+    /**
+     * Permissions are granted outside GamePort: check the game's issues again when the page is shown. A run started from GamePort also answers through its hook a few
+     * seconds in — a device that refuses the game never does — so the page looks again for a short while: the card of a refusal is there without the player having to
+     * leave the page and come back.
+     */
+    fun refreshIssues() {
+        issuesRepository.refresh()
+        lookAgainWhileALaunchIsAnswered()
+    }
+
+    private var answerWatch: Job? = null
+
+    /** Looks again a few times over the window in which the hook of a run started from GamePort answers, then stops. */
+    private fun lookAgainWhileALaunchIsAnswered() {
+        answerWatch?.cancel()
+        answerWatch = viewModelScope.launch {
+            repeat(LOOK_AGAIN_COUNT) {
+                delay(LOOK_AGAIN_EVERY_MS)
+                issuesRepository.refresh()
+            }
+        }
+    }
 
     fun conflictIntent() = issuesRepository.conflictIntent(appId)
 
@@ -379,5 +431,9 @@ class GameViewModel @Inject constructor(
 
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
+
+        /** How long and how often the page looks again after it is shown, while the hook of a run started from GamePort has still not answered (see [refreshIssues]). */
+        const val LOOK_AGAIN_EVERY_MS = 2_000L
+        const val LOOK_AGAIN_COUNT = 5
     }
 }

@@ -18,6 +18,7 @@ class GameIssueTest {
     @Test
     fun `a problem of the game lights the orange mark`() {
         assertTrue(GameIssue.PatchOutdated.needsAttention)
+        assertTrue(GameIssue.RefusedByDevice.needsAttention)
         assertTrue(GameIssue.SaveConflict.needsAttention)
         assertTrue(GameIssue.StoragePermissionMissing.needsAttention)
         assertTrue(GameIssue.ProblemSuspected(crash = false).needsAttention)

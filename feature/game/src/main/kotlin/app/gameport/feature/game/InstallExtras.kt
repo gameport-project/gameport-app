@@ -12,7 +12,7 @@ internal fun Repatch.Running.asInstallState(): InstallState = when (stage) {
     RepatchStage.QUEUED -> InstallState.Queued
     RepatchStage.DOWNLOADING -> InstallState.Downloading(progress = fraction ?: 0f, bytesPerSecond = bytesPerSecond)
     RepatchStage.PATCHING -> InstallState.Patching
-    RepatchStage.INSTALLING -> InstallState.Installing()
+    RepatchStage.INSTALLING -> InstallState.Installing(step = step ?: app.gameport.core.model.InstallStep.WORKING)
 }
 
 /** Where one line of the card of an install stands: not started, going on, or in place. */

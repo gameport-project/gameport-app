@@ -77,7 +77,8 @@ object CloudHookPatch : ApkPatch {
     override fun apply(session: PatchSession, context: PatchContext, assets: PatchAssets) {
         session.addFile(session.existingHookDex ?: session.nextDexName(), assets.hookDex.open().use { it.readBytes() })
 
-        val hookAuthority = "${session.packageName()}.gameporthook"
+        // The game may be installed under a name of GamePort's own (PackageRenamePatch): the hook answers on the name the game really carries.
+        val hookAuthority = "${PackageRenamePatch.installName(context, session)}.gameporthook"
         session.manifest.takeNodesEach({ named("manifest") }) {
             takeNodes {
                 // Patching a game again must not stack a second copy on the first.

@@ -47,6 +47,16 @@ data class PatchContext(
     val deviceFamily: String? = null,
     /** The Android version of this device (`Build.VERSION.SDK_INT`), null when unknown ([app.gameport.core.patch.patches.MinSdkPatch]). */
     val deviceSdk: Int? = null,
+    /**
+     * The package name to install the game under instead of the one its APK declares, or null to keep the game's own name
+     * ([app.gameport.core.patch.patches.PackageRenamePatch]).
+     */
+    val renamedPackage: String? = null,
+    /**
+     * Put the game back under the name its APK came with, which the manifest records: a repatch that only kept the name it finds would leave a game renamed
+     * earlier where it is ([app.gameport.core.patch.patches.PackageRenamePatch.META_ORIGINAL]).
+     */
+    val restorePackageName: Boolean = false,
     /** The GamePort that patches the game, by its package name: the game's hook talks to that one and to no other. */
     val owner: String = DEFAULT_OWNER,
 ) {
@@ -111,6 +121,15 @@ class PatchSession(private val apk: ApkModule, val existingHookDex: String? = nu
     fun addFile(path: String, bytes: ByteArray) {
         _additions[path] = bytes
     }
+
+    /**
+     * A file of the game to put in place of the one it has, stored uncompressed. The resource table has to be: Android refuses an APK whose
+     * `resources.arsc` is compressed.
+     */
+    fun replaceFile(path: String, bytes: ByteArray) = addFile(path, bytes)
+
+    /** The game's resource table, which names the package its resources belong to; null when the APK has none. */
+    val resources: com.reandroid.arsc.chunk.TableBlock? get() = if (apk.hasTableBlock()) apk.tableBlock else null
 }
 
 private val DEX = Regex("classes(\\d*)\\.dex")

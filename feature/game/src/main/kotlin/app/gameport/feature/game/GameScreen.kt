@@ -282,6 +282,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onPatchAndPlay = { viewModel.onPatchAndPlay { if (viewModel.storagePermissionBlocksPlay()) explainingStorage = true else play() } },
         onOpenPermissions = openPermissions,
         onRepatch = viewModel::onRepatch,
+        onReinstallRenamed = viewModel::onReinstallRenamed,
         onUpdate = viewModel::onUpdate,
         onResolveConflict = { viewModel.conflictIntent()?.let { runCatching { context.startActivity(it) } }; Unit },
         compatReports = viewModel.compatReports.collectAsStateWithLifecycle().value,
@@ -327,6 +328,7 @@ internal fun GameContent(
     onOpenPermissions: () -> Unit,
     onResolveConflict: () -> Unit,
     onRepatch: () -> Unit,
+    onReinstallRenamed: () -> Unit = {},
 
     onUpdate: () -> Unit,
     achievements: AchievementList? = null,
@@ -355,6 +357,7 @@ internal fun GameContent(
                     issues = uiState.issues,
                     repatch = uiState.repatch,
                     onRepatch = onRepatch,
+                    onReinstallRenamed = onReinstallRenamed,
                     onUpdate = onUpdate,
                     speedUnit = speedUnit,
                     onInstall = { dlc -> onInstall(uiState.game, dlc) },
@@ -431,6 +434,7 @@ private fun GameDetails(
     issues: List<GameIssue>,
     repatch: Repatch,
     onRepatch: () -> Unit,
+    onReinstallRenamed: () -> Unit = {},
     onUpdate: () -> Unit,
     speedUnit: SpeedUnit,
     onInstall: (Set<Int>?) -> Unit,
@@ -568,9 +572,11 @@ private fun GameDetails(
     // Owned extra content is offered when installing; what the account lacks cannot be installed.
     val ownedDlc = game.androidBuild?.dlc.orEmpty().filter { it.owned }
     var choosingDlc by remember { mutableStateOf(false) }
-    // What waits for the game when Play is pressed: a new version, a newer patch (not while one of them is going on).
+    // What waits for the game when Play is pressed: a new version or a newer patch (not while one of them is going on).
     val updatePending = GameIssue.UpdateAvailable in issues && repatch == Repatch.None
     val patchPending = GameIssue.PatchOutdated in issues && repatch == Repatch.None
+    // A game this device refused to start: Play is held back, and the card offers to install it again under a name the device accepts.
+    val refused = GameIssue.RefusedByDevice in issues && install is InstallState.Installed && repatch == Repatch.None
     // A game that says some of its large files are missing: the repair is offered first, in a card, and Play goes into it.
     val expansionMissing = issues.filterIsInstance<GameIssue.ExpansionMissing>().firstOrNull()?.takeIf { install is InstallState.Installed && repatch == Repatch.None }
     var choosingPlay by remember { mutableStateOf(false) }
@@ -891,7 +897,7 @@ private fun GameDetails(
                 ) {
                     Box(Modifier.tourTarget(TourIds.GAME_ACTIONS)) { InstallActions(
                         install = install,
-                        playInCard = expansionMissing != null,
+                        playInCard = expansionMissing != null || refused,
                         speedUnit = speedUnit,
                         onInstall = { if (compat?.level == app.gameport.core.model.CompatLevel.FAILS) warning = true else startInstall() },
                         onResume = { onInstall(null) },
@@ -902,7 +908,7 @@ private fun GameDetails(
                     onDuplicateChosen = onDuplicateChosen,
                         onDiscard = onDiscard,
                         onUninstall = onUninstall,
-                        // Play plays. When a new version or a newer patch is waiting, the player is asked first what to do: play as it is, update, patch again.
+                        // Play plays. When a new version, a newer patch, or a name this device refuses is waiting, the player is asked first what to do.
                         onPlay = { if (updatePending || patchPending) choosingPlay = true else onPlay() },
                         onPatchAndPlay = onPatchAndPlay,
                         patchOutdated = false,
@@ -913,7 +919,15 @@ private fun GameDetails(
                     ) }
                 }
                 // A patch or an update of the installed game goes through the steps of an install, in the same card.
-                (repatch as? Repatch.Running)?.let { Progress(state = it.asInstallState(), speedUnit = speedUnit, extras = emptyList(), onCancel = null) }
+                (repatch as? Repatch.Running)?.let { running ->
+                    Progress(
+                        state = running.asInstallState(), speedUnit = speedUnit, extras = emptyList(),
+                        // A patch waits for Android's confirmation like an install does, and the window is easily missed: it is offered again here. A window the player closed
+                        // left nothing behind, so the install can be given up as well instead of staying on the page for good.
+                        onCancel = onCancel.takeIf { running.waitingForConfirmation },
+                        onReopen = onReopenConfirmation.takeIf { running.step == app.gameport.core.model.InstallStep.AWAITING_CONFIRMATION },
+                    )
+                }
                 // A game that says some of its large files are missing cannot load its data: a card on the page says so, and offers the repair. Play stays available.
                 expansionMissing?.let {
                     ExpansionMissingCard(
@@ -922,6 +936,12 @@ private fun GameDetails(
                         onPlay = { if (updatePending || patchPending) choosingPlay = true else onPlay() },
                         busy = repatch is Repatch.Running,
                     )
+                }
+                // A game this device refused to start cannot run as it is: a card says what was seen and installs it again under a name the device accepts, and Play is held back until then.
+                if (refused) {
+                    // Installing it again under a name of GamePort's own is the way past a device that refuses the name the game carries: the button asks for that
+                    // name, and not for whatever the game's own choice of name happens to be.
+                    RefusedCard(onReinstall = onReinstallRenamed, busy = repatch is Repatch.Running)
                 }
                 // The notifications are in the card of the bell, the progress of a patch in the card of the install; what stays here is the report that can be sent, and a patch that failed.
                 val suspected = issues.filterIsInstance<GameIssue.ProblemSuspected>().firstOrNull()
@@ -1327,6 +1347,24 @@ private fun ExpansionMissingCard(missing: Int, onRepair: () -> Unit, onPlay: () 
     }
 }
 
+/** The card of a game this device refused to start: what was seen, and the button that installs it again under a name the device accepts. */
+@Composable
+private fun RefusedCard(onReinstall: () -> Unit, busy: Boolean) {
+    Column(Modifier.fillMaxWidth().glass(CardShape).padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(Icons.Filled.Warning, contentDescription = null, tint = CompatOrange, modifier = Modifier.size(26.dp))
+            Text(stringResource(R.string.game_refused_title), style = MaterialTheme.typography.titleMedium)
+        }
+        Text(stringResource(R.string.game_refused_body), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // Playing as it is is not offered: the device stops the game before it runs, so there is nothing to play.
+        Button(onClick = onReinstall, enabled = !busy) {
+            Icon(Icons.Filled.Build, contentDescription = null, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.issue_refused_action))
+        }
+    }
+}
+
 /** A rounded card with a small arrow on its top edge, [arrowFromRight] from the right edge to the arrow's centre, as one outline. */
 private class BubbleShape(private val corner: Dp, private val arrowWidth: Dp, private val arrowHeight: Dp, private val arrowFromRight: Dp) : androidx.compose.ui.graphics.Shape {
     override fun createOutline(size: Size, layoutDirection: androidx.compose.ui.unit.LayoutDirection, density: androidx.compose.ui.unit.Density): androidx.compose.ui.graphics.Outline {
@@ -1384,7 +1422,8 @@ private fun Progress(state: InstallState, speedUnit: SpeedUnit, extras: List<Ext
             // Both stay where they are for the whole install, greyed when they cannot be used in this step: the card keeps its height from one step to the next.
             val small = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 0.dp)
             if (state is InstallState.Installing) {
-                androidx.compose.material3.OutlinedButton(onClick = { onReopen?.invoke() }, enabled = onReopen != null, contentPadding = small, modifier = Modifier.height(32.dp)) {
+                // White, like the page's own main button: it is the one thing this step waits for, and it has to catch the eye when the window was missed. It greys out on its own when there is nothing to open.
+                Button(onClick = { onReopen?.invoke() }, enabled = onReopen != null, contentPadding = small, modifier = Modifier.height(32.dp)) {
                     Text(stringResource(R.string.game_reopen_confirmation), style = MaterialTheme.typography.labelLarge)
                 }
             }

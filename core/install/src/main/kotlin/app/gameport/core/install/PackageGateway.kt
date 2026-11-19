@@ -64,6 +64,20 @@ class PackageGateway @Inject constructor(
             .metaData?.takeIf { it.containsKey(key) }?.getInt(key)
     }.getOrNull()
 
+    /** A text from the package's manifest metadata, or null when it has none. */
+    fun metaDataString(packageName: String, key: String): String? = runCatching {
+        packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
+            .metaData?.takeIf { it.containsKey(key) }?.getString(key)
+    }.getOrNull()
+
+    /**
+     * The package name the game's APK declares, when GamePort installed it under a name of its own
+     * ([app.gameport.core.model.RenamedPackages]): Steam names the game's expansion files and its save folders after that one, and they have to be
+     * recognised under either. Null for a game installed under its own name.
+     */
+    fun originalPackageOf(packageName: String): String? =
+        metaDataString(packageName, app.gameport.core.patch.patches.PackageRenamePatch.META_ORIGINAL)?.takeIf { it != packageName }
+
     /**
      * The GamePort that patched [packageName], by its package name: the one written into the game, or the released one for a game patched before it was.
      * Null for a package GamePort did not patch.
@@ -172,6 +186,9 @@ class PackageGateway @Inject constructor(
         val intent = confirmation ?: return false
         return runCatching { context.startActivity(Intent(intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess
     }
+
+    /** True while the confirmation window Android asked for can still be opened again; false once it went with the session (the player closed it). */
+    fun hasConfirmationWindow(): Boolean = confirmation != null
 
     /**
      * Called with the turn held, before the session of the install is made: installs go one at a time, so every other session of GamePort is nobody's. A process that ended while a

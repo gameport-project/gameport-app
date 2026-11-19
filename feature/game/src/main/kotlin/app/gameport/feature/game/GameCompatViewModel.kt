@@ -96,6 +96,24 @@ class GameCompatViewModel @Inject constructor(
     /** True when the list, and not the player, gives this game the declaration. */
     val passthroughListed: Boolean get() = PassthroughGames.wanted(appId, deviceFamily, gameDefaults.list.passthrough)
 
+    /** True when this device refuses a game whose package name it knows but whose signature is not the one it signed (see [app.gameport.core.model.RenamedPackages]). */
+    val refusesReSignedGames: Boolean = device.vrPlatform?.refusesReSignedGames == true
+
+    /** True when the game is on the device under a name that is not the one it must have now: installing it again applies the choice. */
+    val renameNeeded: StateFlow<Boolean> = installer.observeRenameNeeded(appId)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /**
+     * Whether the game is installed under a name of GamePort's own: automatic follows this device (the ones whose store refuses a re-signed game get it), on and
+     * off are the player's choice. A change that moves the game to the other name installs it again, which leaves what it kept on this device behind.
+     */
+    fun onPackageNameChosen(mode: app.gameport.core.model.PackageNameMode) {
+        if (gameSettings.value.packageName == mode) return
+        val before = installer.renamedPackageFor(appId)
+        settings.set(appId, gameSettings.value.copy(packageName = mode))
+        if (installer.renamedPackageFor(appId) != before) installer.repatch(appId)
+    }
+
     /** Automatic gives the game the stand-in when it needs one, off takes away the one GamePort gave. Either way the game is patched again, which applies the choice. */
     fun onOvrPluginStandInChosen(automatic: Boolean) {
         if (gameSettings.value.ovrPluginStandIn == automatic) return

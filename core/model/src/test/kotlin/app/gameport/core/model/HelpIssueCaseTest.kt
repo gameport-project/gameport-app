@@ -9,6 +9,7 @@ class HelpIssueCaseTest {
         GameIssue.ControllerSilent(activated = false),
         GameIssue.UpdateAvailable,
         GameIssue.PatchOutdated,
+        GameIssue.RefusedByDevice,
         GameIssue.StoragePermissionMissing,
         GameIssue.SaveConflict,
         GameIssue.ProblemSuspected(crash = true),

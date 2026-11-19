@@ -179,6 +179,7 @@
     <string name="help_cover_patch">Sur une jaquette, une clé orange signifie que le jeu a un patch à appliquer.</string>
     <string name="help_notice_update">Une nouvelle version du jeu est disponible. Un bouton la met à jour.</string>
     <string name="help_notice_patch">Un patch GamePort plus récent existe pour le jeu. Un bouton le patche à nouveau.</string>
+    <string name="help_notice_refused">Un appareil qui connaît le nom de paquet d\'un jeu mais pas la signature de la copie installée ici refuse de le démarrer. Un bouton le réinstalle sous un nom propre à GamePort. Ce que le jeu gardait ici repart de zéro. Les sauvegardes que Steam synchronise reviennent.</string>
     <string name="help_notice_problem">Le jeu s\'est fermé presque aussitôt ou a planté. Un bouton prépare un rapport qui aide à comprendre pourquoi.</string>
     <string name="help_notice_storage">Le jeu demande l\'accès aux fichiers et ne l\'a pas, il peut donc se fermer tout seul. Un bouton ouvre la permission.</string>
     <string name="help_notice_conflict">Les sauvegardes de cet appareil et celles de Steam diffèrent, et un choix est nécessaire entre elles.</string>

@@ -38,7 +38,8 @@ object SteamFrameLoginPatch : ApkPatch {
     )
 
     override fun apply(session: PatchSession, context: PatchContext, assets: PatchAssets) {
-        val packageName = session.packageName()
+        // The sites name the game by the package its APK came with, which is what the manifest records once GamePort renamed it.
+        val packageName = PackageRenamePatch.originalName(session)
         if (SITES.none { it.packageName == packageName }) return
         val library = session.readFile(LIBRARY_PATH) ?: return
         if (patchBytes(packageName, library)) session.addFile(LIBRARY_PATH, library)

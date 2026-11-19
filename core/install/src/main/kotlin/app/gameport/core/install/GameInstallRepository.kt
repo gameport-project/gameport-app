@@ -13,9 +13,12 @@ import app.gameport.core.model.LaunchOptions
 import app.gameport.core.model.UpdateChannels
 import app.gameport.core.model.reportable
 import app.gameport.core.model.ObbNames
+import app.gameport.core.model.RenamedPackages
+import app.gameport.core.model.PackageNameMode
 import app.gameport.core.model.StorageAccess
 import app.gameport.core.model.VersionOption
 import app.gameport.core.model.AuthState
+import app.gameport.core.model.vr.VrPlatforms
 import app.gameport.core.settings.GameDefaults
 import app.gameport.core.patch.GamePatcher
 import app.gameport.core.patch.ApkPatch
@@ -23,6 +26,7 @@ import app.gameport.core.patch.PatchCatalog
 import app.gameport.core.patch.PatchContext
 import app.gameport.core.patch.PatchVersioning
 import app.gameport.core.patch.patches.GamePortRemovalPatch
+import app.gameport.core.patch.patches.PackageRenamePatch
 import app.gameport.core.patch.patches.PatchVersionPatch
 import app.gameport.core.patch.patches.VrLauncherPatch
 import app.gameport.core.steam.GameDownloader
@@ -320,7 +324,7 @@ class GameInstallRepository @Inject constructor(
                         // Written under another name and renamed when complete, so an interrupted
                         // patch is never mistaken for a finished one.
                         val partial = File(patched.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || installed.all()[game.appId]?.let(::deviceHasExpansion) == true, vrGameActivity = gameSettings.get(game.appId).openInVr, ovrPluginStandIn = gameSettings.get(game.appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(game.appId).passthrough, game.appId, packages.vrFamily, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlcOf(game), missingDlc = missingDlcOf(game), familyShared = familySharedOf(game), hasExpansionFiles = downloadHasExpansion(directory), deviceFamily = packages.vrFamily, deviceSdk = packages.deviceSdk, owner = context.packageName))
+                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || installed.all()[game.appId]?.let(::deviceHasExpansion) == true, vrGameActivity = gameSettings.get(game.appId).openInVr, ovrPluginStandIn = gameSettings.get(game.appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(game.appId).passthrough, game.appId, packages.vrFamily, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlcOf(game), missingDlc = missingDlcOf(game), familyShared = familySharedOf(game), hasExpansionFiles = downloadHasExpansion(directory), deviceFamily = packages.vrFamily, deviceSdk = packages.deviceSdk, renamedPackage = renamedPackageFor(game.appId), restorePackageName = restorePackageNameFor(game.appId), owner = context.packageName))
                         check(partial.renameTo(patched)) { "Could not finish the patched APK." }
                         // Keep only one copy of a multi-gigabyte game on disk.
                         original.delete()
@@ -350,7 +354,7 @@ class GameInstallRepository @Inject constructor(
                         // Not playable yet: the expansion files have to be in place, under the name the game looks for.
                         setState(game.appId, InstallState.Finishing)
                         // Measured before the files move: once placed, the download no longer holds them. A retry after a failed try finds them still there.
-                        val expansionBytes = ExpansionFiles.bytesToPlace(directory, packageName, PATCHED_DIR).takeIf { it > 0 } ?: handoff.staged(packageName).sumOf { it.length() }
+                        val expansionBytes = ExpansionFiles.bytesToPlace(directory, packageName, PATCHED_DIR, originalPackageOf(packageName)).takeIf { it > 0 } ?: handoff.staged(packageName).sumOf { it.length() }
                         if (!placeExpansionFiles(game.appId, directory, packageName)) {
                             // Not installed, not removed: the game is incomplete, its download is kept to place the files again, and the player chooses to try again or to remove it.
                             incomplete.put(game.appId, packageName)
@@ -385,7 +389,8 @@ class GameInstallRepository @Inject constructor(
                             }
                         }
                     }
-                    PackageGateway.Outcome.Cancelled -> clearState(game.appId)
+                    // The player closed Android's window: nothing was installed. The card stays where it was, waiting for that confirmation, so the page offers to bring it back.
+                    PackageGateway.Outcome.Cancelled -> setState(game.appId, InstallState.Installing(app.gameport.core.model.InstallStep.AWAITING_CONFIRMATION, 1f))
                     PackageGateway.Outcome.Conflict -> fail(game.appId, InstallError.VersionConflict)
                     is PackageGateway.Outcome.Failure -> fail(game.appId, InstallError.Other(outcome.reason))
                 }
@@ -499,7 +504,7 @@ class GameInstallRepository @Inject constructor(
             }
             val problems = mutableListOf<String>()
             val target = File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName")
-            val placed = withContext(Dispatchers.IO) { ExpansionFiles.place(directory, target, packageName, skipped = PATCHED_DIR, problems = problems, replaceOlder = false) }
+            val placed = withContext(Dispatchers.IO) { ExpansionFiles.place(directory, target, packageName, skipped = PATCHED_DIR, problems = problems, replaceOlder = false, original = originalPackageOf(packageName)) }
             if (problems.isNotEmpty() || placed.isEmpty()) {
                 val reason = if (problems.isNotEmpty()) problems.take(MAX_PLACED_LISTED).joinToString("; ") else "the download holds no file to place (${besidesApks(directory)})"
                 dlcError(game.appId, dlcAppId, "could not be placed: $reason")
@@ -591,11 +596,52 @@ class GameInstallRepository @Inject constructor(
             downloader.manifestFiles(declaring[depotId] ?: game.appId, depotId, manifestId) ?: return null
         }.map { it.first }
         val keptPlaced = build.dlcFiles.filterKeys { it != content.appId }.values.flatten()
-        return DlcRemoval.plan(dlcFiles, kept, keptPlaced, packageName)
+        return DlcRemoval.plan(dlcFiles, kept, keptPlaced, packageName, originalPackageOf(packageName))
     }
 
     /** The Android package of the game if it is installed on this device. */
     fun installedPackage(appId: Int): String? = if (appId in installingExtra) null else installed.all()[appId]?.takeIf(packages::isInstalled)
+
+    /**
+     * The package name this game must be installed under, or null to keep the one its APK declares: the player's choice for it, or the automatic rule of the
+     * headset it is on (see [RenamedPackages] — the headsets whose store refuses a re-signed game give the game a name of GamePort's own by themselves).
+     */
+    fun renamedPackageFor(appId: Int): String? =
+        RenamedPackages.chosen(gameSettings.get(appId).packageName, appId, VrPlatforms.refusesReSignedGames(packages.vrFamily))
+
+    /** The name the game is installed under, whether or not GamePort chose it. */
+    fun installPackageFor(appId: Int): String? = renamedPackageFor(appId) ?: installedPackage(appId)
+
+    /**
+     * True when the game must be put back under the name its APK came with: the player chose to keep the game's own name, and the copy on the device carries one
+     * GamePort gave it ([RenamedPackages]).
+     */
+    fun restorePackageNameFor(appId: Int): Boolean {
+        if (gameSettings.get(appId).packageName != PackageNameMode.OFF) return false
+        val installed = installedPackage(appId) ?: return false
+        return packages.originalPackageOf(installed) != null
+    }
+
+    /** True when the game is installed under a name GamePort chose for it. */
+    fun isRenamed(appId: Int): Boolean {
+        val packageName = installedPackage(appId) ?: return false
+        return packageName == renamedPackageFor(appId)
+    }
+
+    /**
+     * True when the game is on the device under a name that is not the one it must have now: it has to be installed again for it to start here
+     * (see [RenamedPackages]).
+     */
+    fun observeRenameNeeded(appId: Int): Flow<Boolean> = packages.packageChanges().map { needsRename(appId) }
+
+    /**
+     * True when the game is on the device under a name that is not the one it must have now: it has to be installed again for it to start here
+     * (see [RenamedPackages]).
+     */
+    fun needsRename(appId: Int): Boolean {
+        val packageName = installedPackage(appId) ?: return false
+        return renamedPackageFor(appId) != packageName
+    }
 
     /** True when the installed game was patched by an older patcher than this GamePort has. */
     fun observePatchOutdated(appId: Int): Flow<Boolean> =
@@ -747,14 +793,19 @@ class GameInstallRepository @Inject constructor(
                         val result = File(patchedDirectory(directory), original.name)
                         result.parentFile?.mkdirs()
                         val partial = File(result.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || deviceHasExpansion(packageName) || atOriginalCode(packageName), vrGameActivity = gameSettings.get(appId).openInVr, ovrPluginStandIn = gameSettings.get(appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(appId).passthrough, appId, packages.vrFamily, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = game?.let(::ownedDlcOf), missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.let(::familySharedOf) == true, hasExpansionFiles = deviceHasExpansion(packageName), deviceFamily = packages.vrFamily, deviceSdk = packages.deviceSdk, owner = context.packageName), patches)
+                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || deviceHasExpansion(packageName) || atOriginalCode(packageName), vrGameActivity = gameSettings.get(appId).openInVr, ovrPluginStandIn = gameSettings.get(appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(appId).passthrough, appId, packages.vrFamily, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = game?.let(::ownedDlcOf), missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.let(::familySharedOf) == true, hasExpansionFiles = deviceHasExpansion(packageName), deviceFamily = packages.vrFamily, deviceSdk = packages.deviceSdk, renamedPackage = renamedPackageFor(appId), restorePackageName = restorePackageNameFor(appId), owner = context.packageName), patches)
                         check(partial.renameTo(result)) { "Could not finish the patched APK." }
                         result
                     }
                 }
                 setState(appId, InstallState.Installing())
+                // The name the patched game carries: the same as the installed one, unless this GamePort installs it under a name of its own now.
+                val installName = packages.packageNameOf(patched.first()) ?: packageName
+                val renamed = installName != packageName
+                if (renamed) events.note(appId, "the game is installed as $installName, to start on this headset")
                 // Installing over the game can leave its expansion folder empty: the files wait aside, and come back whatever the outcome. Put aside when the turn of the install
                 // comes, not while it waits behind another one: the game keeps its files meanwhile.
+                var placedUnder: String? = null
                 val outcome = try {
                     packages.install(
                         patched,
@@ -762,14 +813,27 @@ class GameInstallRepository @Inject constructor(
                         confirmTimeoutMs = confirmTimeoutMs,
                         onStep = { step, progress -> setState(appId, InstallState.Installing(step, progress)) },
                         onTurn = { stashExpansionFiles(appId, packageName) },
-                    )
+                    ).also { if (it == PackageGateway.Outcome.Success) placedUnder = installName }
                 } finally {
-                    withContext(NonCancellable) { restoreExpansionFiles(appId, packageName) }
+                    // They go back under the name the game has now: the new one only when it really was installed.
+                    withContext(NonCancellable) { restoreExpansionFiles(appId, packageName, into = placedUnder ?: packageName) }
                 }
                 events.note(appId, "re-patch install outcome: $outcome")
-                if (outcome == PackageGateway.Outcome.Success) alignObbVersion(packageName)
                 when (outcome) {
-                    PackageGateway.Outcome.Success, PackageGateway.Outcome.Cancelled -> clearState(appId)
+                    PackageGateway.Outcome.Success -> {
+                        if (renamed) {
+                            // The copy under the old name goes: two of the same game would both be on the device, and GamePort follows one of them.
+                            events.note(appId, "the copy installed as $packageName is removed")
+                            val removal = packages.uninstall(packageName)
+                            if (removal != PackageGateway.Outcome.Success) events.note(appId, "$packageName could not be removed ($removal), it stays on the device")
+                            installed.put(appId, installName)
+                            incomplete.remove(appId)
+                        }
+                        alignObbVersion(installName)
+                        clearState(appId)
+                    }
+                    // The player closed Android's window: the patch was not applied. The card stays where it was, waiting for that confirmation, so the page offers to bring it back.
+                    PackageGateway.Outcome.Cancelled -> setState(appId, InstallState.Installing(app.gameport.core.model.InstallStep.AWAITING_CONFIRMATION, 1f))
                     PackageGateway.Outcome.Conflict -> fail(appId, InstallError.VersionConflict)
                     is PackageGateway.Outcome.Failure -> fail(appId, InstallError.Other(outcome.reason))
                 }
@@ -802,13 +866,19 @@ class GameInstallRepository @Inject constructor(
      */
     fun reopenInstallConfirmation(): Boolean = packages.reopenConfirmation()
 
+    /** True while the confirmation window Android asked for can still be brought back; false once the player closed it and the install has to be asked for again. */
+    fun hasInstallConfirmation(): Boolean = packages.hasConfirmationWindow()
+
     /**
      * Gives up an install that waits for its turn or for Android's confirmation. The session Android holds for it is given up with it. What was downloaded stays, so the game shows as
-     * interrupted and goes on from the install; a game being patched again is left as it was.
+     * interrupted and goes on from the install; a game being patched again is left as it was. An install whose confirmation window was closed leaves no work behind: what the page
+     * still shows of it is let go of.
      */
     fun cancelInstalling(appId: Int) {
         events.note(appId, "the install is given up from the game's page")
-        if (appId in repatching) cancel(appId) else pause(appId)
+        if (appId in repatching) return cancel(appId)
+        if (jobs[appId]?.isActive != true) return clearState(appId)
+        pause(appId)
     }
 
     /** Stops a download but keeps the files, so it can be resumed later (it then shows as interrupted). */
@@ -1197,6 +1267,13 @@ class GameInstallRepository @Inject constructor(
      */
     private suspend fun settleDuplicate(appId: Int, packageName: String): Boolean {
         if (!packages.isInstalled(packageName) || installed.all()[appId] == packageName || incomplete.all()[appId] == packageName) return true
+        // A copy this GamePort installed itself carries its name: its record may be behind (a name change it did not write down), but the copy is its own and signed the
+        // same way, so installing over it is what the record meant to say. Nothing is asked: the copy is taken back into the record.
+        if (packages.ownerOf(packageName) == context.packageName) {
+            events.note(appId, "$packageName is a copy this GamePort installed, its record was behind: it is taken back")
+            installed.put(appId, packageName)
+            return true
+        }
         // Another GamePort on the device (the released one next to a test build) keeps its games: the player is told whose it is.
         val other = packages.ownerOf(packageName)?.takeIf { it != context.packageName }
         events.note(appId, "$packageName is already on the device and was not installed by this GamePort${other?.let { " ($it did)" }.orEmpty()}: the player is asked")
@@ -1241,9 +1318,10 @@ class GameInstallRepository @Inject constructor(
     private suspend fun placeExpansionFiles(appId: Int, directory: File, packageName: String): Boolean = withContext(Dispatchers.IO) {
         if (handoff.hasStaged(packageName)) return@withContext deliverByGame(appId, packageName)
         val problems = mutableListOf<String>()
+        val original = originalPackageOf(packageName)
         val placedDirectly = runCatching {
             val target = File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName")
-            val placed = ExpansionFiles.place(directory, target, packageName, skipped = PATCHED_DIR, problems = problems)
+            val placed = ExpansionFiles.place(directory, target, packageName, skipped = PATCHED_DIR, problems = problems, original = original)
             if (placed.isNotEmpty()) {
                 events.note(appId, "placed in Android/obb/$packageName: ${placed.take(MAX_PLACED_LISTED).joinToString()}${if (placed.size > MAX_PLACED_LISTED) " and ${placed.size - MAX_PLACED_LISTED} more" else ""}")
             } else if (problems.isEmpty()) {
@@ -1258,7 +1336,7 @@ class GameInstallRepository @Inject constructor(
         if (problems.isNotEmpty()) events.note(appId, "${problems.size} expansion file(s) could NOT be placed in Android/obb/$packageName: " + problems.take(MAX_PLACED_LISTED).joinToString("; "))
         // What is left of the download is kept for the game to place in its own folder.
         val staging = mutableListOf<String>()
-        val kept = runCatching { handoff.stage(directory, packageName, PATCHED_DIR, alignedVersionCode(packageName), staging) }.getOrDefault(emptyList())
+        val kept = runCatching { handoff.stage(directory, packageName, PATCHED_DIR, alignedVersionCode(packageName), staging, original) }.getOrDefault(emptyList())
         if (kept.isEmpty()) return@withContext false
         deliverByGame(appId, packageName)
     }
@@ -1310,9 +1388,9 @@ class GameInstallRepository @Inject constructor(
     }
 
     /** Brings back the expansion files kept aside, and says what happened to each. The copy kept aside stays whenever something went wrong. */
-    private suspend fun restoreExpansionFiles(appId: Int, packageName: String) = withContext(Dispatchers.IO) {
+    private suspend fun restoreExpansionFiles(appId: Int, packageName: String, into: String = packageName) = withContext(Dispatchers.IO) {
         try {
-            val result = runCatching { ObbStash.restore(obbStash(packageName), obbFolder(packageName)) }
+            val result = runCatching { ObbStash.restore(obbStash(packageName), obbFolder(into)) }
                 .onFailure { events.failure(appId, "putting the expansion files back", it) }
                 .getOrNull() ?: return@withContext
             if (result.moved > 0) events.note(appId, "${result.moved} expansion entr${if (result.moved == 1) "y" else "ies"} checked and put back")
@@ -1335,9 +1413,15 @@ class GameInstallRepository @Inject constructor(
         runCatching {
             val installed = packages.versionCodeOf(packageName) ?: return
             val code = app.gameport.core.model.ObbNames.versionFor(installed, packages.originalVersionCodeOf(packageName), packages.isUnreal(packageName)) ?: return
-            ExpansionFiles.align(File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName"), packageName, code)
+            ExpansionFiles.align(File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName"), packageName, code, originalPackageOf(packageName))
         }
     }
+
+    /**
+     * The package name the game's APK declares, when GamePort installs it under a name of its own ([RenamedPackages]): a depot names a game's expansion files
+     * after it, and they have to be recognised under either name (see [ObbNames]). Null for a game installed under its own name.
+     */
+    private fun originalPackageOf(packageName: String): String? = packages.originalPackageOf(packageName)
 
     /** The package name of the other GamePort that patched [packageName], when it is not this one (a game belongs to one GamePort at a time). */
     fun otherGamePortOf(packageName: String): String? = packages.ownerOf(packageName)?.takeIf { it != context.packageName }

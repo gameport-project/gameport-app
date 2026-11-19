@@ -36,13 +36,19 @@ class PatchRegressionTest {
     /** What a patched APK is made of, for comparing: the manifest, one line per entry, and what is wrong with it on its own. */
     private class Summary(val manifest: List<String>, val entries: Map<String, String>, val problems: List<String>)
 
-    private fun patch(input: File, appId: Int, name: String): File {
+    private fun patch(input: File, appId: Int, name: String, renamed: Boolean = false): File {
         val output = temp.newFile()
         ApkPatchEngine(SigningKeyStore(temp.newFolder().resolve("key.p12"))).patch(
             input = input,
             output = output,
             patches = PatchCatalog.recommended,
-            context = PatchContext(steamAppId = appId, steamId = 1, personaName = "test", gameName = name),
+            context = PatchContext(
+                steamAppId = appId,
+                steamId = 1,
+                personaName = "test",
+                gameName = name,
+                renamedPackage = if (renamed) app.gameport.core.model.RenamedPackages.nameFor(appId) else null,
+            ),
             assets = patchAssets(),
         )
         return output
@@ -53,9 +59,16 @@ class PatchRegressionTest {
         // The devices GamePort targets run Android 10 or later, where the v2 and v3 signatures are enough.
         val verified = ApkVerifier.Builder(apk).setMinCheckedPlatformVersion(MIN_PLATFORM).build().verify()
         if (!verified.isVerified) problems += "signature: " + verified.errors.joinToString()
-        val manifest = runCatching {
-            ApkModule.loadApkFile(apk).androidManifest.toJson().toString(2).lines()
-        }.getOrElse { problems += "manifest unreadable: ${it.message}"; emptyList() }
+        val module = runCatching { ApkModule.loadApkFile(apk) }.getOrNull()
+        val manifest = runCatching { module?.androidManifest?.toJson()?.toString(2)?.lines() }
+            .getOrElse { problems += "manifest unreadable: ${it.message}"; null }
+            ?: emptyList()
+        // The resource table names the package the game's resources belong to, and a game that looks one of its own resources up by name with the package name
+        // it carries now (Unity does, for the strings of its own player) finds nothing while the two disagree, and dies on `Resources$NotFoundException`.
+        val declared = runCatching { module?.androidManifest?.packageName }.getOrNull()
+        val filedUnder = runCatching { module?.tableBlock?.map { it.name }.orEmpty() }
+            .getOrElse { problems += "resource table unreadable: ${it.message}"; emptyList() }
+        if (declared != null && filedUnder.isNotEmpty() && declared !in filedUnder) problems += "the resource table belongs to ${filedUnder.joinToString()} and not to $declared"
         val entries = sortedMapOf<String, String>()
         ZipFile.builder().setFile(apk).get().use { zip ->
             for (entry in zip.entries) {
@@ -117,33 +130,38 @@ class PatchRegressionTest {
         for (skeleton in skeletons) {
             val packageName = skeleton.nameWithoutExtension
             val appId = runCatching { JSONObject(File(skeleton.parentFile, "$packageName.json").readText()).getInt("appId") }.getOrDefault(1)
-            val line = try {
-                val once = patch(skeleton, appId, packageName)
-                val summary = summarize(once)
-                // Patching what is already patched must change nothing more.
-                val twice = summarize(patch(once, appId, packageName))
-                val problems = summary.problems + twice.problems.filter { it !in summary.problems } +
-                    differences(summary, twice).map { "patching twice is not stable: $it" }
-                val reference = File(golden, "$packageName.json")
-                when {
-                    bless -> {
-                        reference.writeText(toJson(summary).toString(2))
-                        if (problems.isEmpty()) "BLESSED $packageName" else "BLESSED $packageName, but: ${problems.joinToString("; ")}"
+            // Twice: as the game is installed by default, and installed under a name of GamePort's own (which a headset may ask for).
+            val lines = listOf(false, true).map { renamed ->
+                val label = packageName + if (renamed) ".renamed" else ""
+                try {
+                    val once = patch(skeleton, appId, packageName, renamed)
+                    val summary = summarize(once)
+                    // Patching what is already patched must change nothing more.
+                    val twice = summarize(patch(once, appId, packageName, renamed))
+                    val problems = summary.problems + twice.problems.filter { it !in summary.problems } +
+                        differences(summary, twice).map { "patching twice is not stable: $it" }
+                    val reference = File(golden, "$label.json")
+                    when {
+                        bless -> {
+                            reference.writeText(toJson(summary).toString(2))
+                            if (problems.isEmpty()) "BLESSED $label" else "BLESSED $label, but: ${problems.joinToString("; ")}"
+                        }
+                        !reference.isFile -> "NO REFERENCE $label: run with GAMEPORT_REGRESSION_BLESS=1 once the games are known to work" +
+                            if (problems.isEmpty()) "" else ", but: ${problems.joinToString("; ")}"
+                        else -> (problems + differences(fromJson(reference), summary)).let { found ->
+                            if (found.isEmpty()) "OK   $label" else "DIFF $label: ${found.joinToString(" | ")}"
+                        }
                     }
-                    !reference.isFile -> "NO REFERENCE $packageName: run with GAMEPORT_REGRESSION_BLESS=1 once the games are known to work"
-                    else -> (problems + differences(fromJson(reference), summary)).let { found ->
-                        if (found.isEmpty()) "OK   $packageName" else "DIFF $packageName: ${found.joinToString(" | ")}"
-                    }
+                } catch (e: Throwable) {
+                    "FAIL $label: ${e::class.simpleName}: ${e.message}"
                 }
-            } catch (e: Throwable) {
-                "FAIL $packageName: ${e::class.simpleName}: ${e.message}"
             }
-            if (!line.startsWith("OK") && !line.startsWith("BLESSED $packageName") || line.contains(", but:")) failures++
-            report += line
+            report += lines
+            failures += lines.count { (!it.startsWith("OK") && !it.startsWith("BLESSED ")) || it.contains(", but:") }
         }
         File(root, "last-report.txt").writeText(report.joinToString("\n") + "\n")
         println(report.joinToString("\n", prefix = "\nPATCH REGRESSION\n"))
-        if (failures > 0) fail("$failures of ${skeletons.size} game(s) differ or fail:\n" + report.filter { !it.startsWith("OK") }.joinToString("\n"))
+        if (failures > 0) fail("$failures of ${skeletons.size * 2} case(s) differ or fail:\n" + report.filter { !it.startsWith("OK") }.joinToString("\n"))
     }
 
     private companion object {

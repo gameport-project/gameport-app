@@ -76,6 +76,7 @@ class CloudSyncCoordinator @Inject constructor(
     private val events: app.gameport.core.install.GameEventLog,
     private val spaces: SaveSpaceStore,
     private val pcBackups: PcSaveBackups,
+    private val packages: app.gameport.core.install.PackageGateway,
 ) {
     private class Active(
         val packageName: String,
@@ -202,6 +203,16 @@ class CloudSyncCoordinator @Inject constructor(
         cloudPrefix = "",
     )
 
+    /**
+     * The game's own rules as they apply on this device: Steam writes the package name of the game's APK in them (`Android/data/<package>/…`), which is not the
+     * one the game carries when GamePort installed it under a name of its own ([app.gameport.core.model.RenamedPackages]). The saves live in the folder of the
+     * name it has now, and both GamePort and the game's hook look there.
+     */
+    private fun publishedRulesOf(game: app.gameport.core.steam.cache.CachedGame, packageName: String): List<SaveRule> {
+        val original = packages.originalPackageOf(packageName)
+        return game.saveRules.map { SaveRule(it.localDir, it.pattern, it.recursive, it.cloudPrefix, it.pcCloudPrefix).forInstalledPackage(packageName, original) }
+    }
+
     /** Looks at Steam Cloud for the saves page, without touching the game. False when offline. */
     suspend fun refreshCloudSnapshot(appId: Int): Boolean {
         val packageName = installed.all()[appId] ?: return false
@@ -210,7 +221,7 @@ class CloudSyncCoordinator @Inject constructor(
         val session = withTimeoutOrNull(SESSION_WAIT_MS) { sessions.current.filterNotNull().first() } ?: return false
         val account = (auth.authState.value as? AuthState.SignedIn)?.account ?: return false
         val game = library.load(session.accountId)?.games?.firstOrNull { it.appId == appId } ?: return false
-        val published = game.saveRules.map { SaveRule(it.localDir, it.pattern, it.recursive, it.cloudPrefix, it.pcCloudPrefix) }
+        val published = publishedRulesOf(game, packageName)
         val paths = CloudPaths(rulesFor(packageName, appId, published), account.steamId, session.accountId)
         val snapshot = runCatching { session.fetchCloud(appId) }.getOrNull() ?: return false
         snapshots.saveCloud(
@@ -247,7 +258,7 @@ class CloudSyncCoordinator @Inject constructor(
             ?: return BeginResult.Offline.also { syncStatus.record(appId, SyncStatus.OFFLINE) }
         val cache = library.load(session.accountId)
         val game = cache?.games?.firstOrNull { it.appId == appId } ?: return BeginResult.Unsupported
-        val published = game.saveRules.map { SaveRule(it.localDir, it.pattern, it.recursive, it.cloudPrefix, it.pcCloudPrefix) }
+        val published = publishedRulesOf(game, packageName)
         // The places of Steam Cloud to look at, in order: the Android saves, and the Windows ones before them when the player chose to use them.
         noticeSavesChange(appId, published, readDifferently = appId in cache.rulesChanged)
         val passes = SavePasses.of(spaces.get(appId), published.any { it.pcCloudPrefix != null }, launch, knowsPasses)
@@ -417,7 +428,7 @@ class CloudSyncCoordinator @Inject constructor(
         val packageName = installed.all()[appId] ?: return emptyList()
         val account = (auth.authState.value as? AuthState.SignedIn)?.account ?: return emptyList()
         val game = library.load(account.steamId and 0xFFFFFFFFL)?.games?.firstOrNull { it.appId == appId } ?: return emptyList()
-        return rulesFor(packageName, appId, game.saveRules.map { SaveRule(it.localDir, it.pattern, it.recursive, it.cloudPrefix, it.pcCloudPrefix) })
+        return rulesFor(packageName, appId, publishedRulesOf(game, packageName))
     }
 
     /**
@@ -463,7 +474,7 @@ class CloudSyncCoordinator @Inject constructor(
         val session = withTimeoutOrNull(SESSION_WAIT_MS) { sessions.current.filterNotNull().first() } ?: return null
         val account = (auth.authState.value as? AuthState.SignedIn)?.account ?: return null
         val game = library.load(session.accountId)?.games?.firstOrNull { it.appId == appId } ?: return null
-        val rules = game.saveRules.map { SaveRule(it.localDir, it.pattern, it.recursive, it.cloudPrefix, it.pcCloudPrefix) }
+        val rules = publishedRulesOf(game, packageName)
             .filter { it.pcCloudPrefix != null }.map(::onPcSpace)
         if (rules.isEmpty()) return null
         return Triple(session, CloudPaths(rules, account.steamId, session.accountId), packageName)

@@ -1,7 +1,9 @@
 package app.gameport.core.model.vr
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VrPlatformsTest {
@@ -38,5 +40,13 @@ class VrPlatformsTest {
             setOf("com.oculus.intent.category.VR", "com.yvr.intent.category.VR", "org.khronos.openxr.intent.category.IMMERSIVE_HMD"),
             categories.toSet(),
         )
+    }
+
+    @Test
+    fun `only the family whose store refuses a re-signed game is said to`() {
+        assertTrue(VrPlatforms.refusesReSignedGames(PicoPlatform.id))
+        assertFalse(VrPlatforms.refusesReSignedGames(MetaQuestPlatform.id))
+        assertFalse(VrPlatforms.refusesReSignedGames(OpenXrPlatform.id))
+        assertFalse(VrPlatforms.refusesReSignedGames(null))
     }
 }

@@ -32,6 +32,38 @@ object HapticsStrength {
 enum class PassthroughMode { AUTO, ON, OFF }
 
 /**
+ * Whether a game is installed under a package name of GamePort's own instead of the one its APK declares: automatic installs it that way on the headsets whose
+ * store refuses a re-signed game ([VrPlatform.refusesReSignedGames]), always does it everywhere, never keeps the game's own name.
+ */
+enum class PackageNameMode { AUTO, ON, OFF }
+
+/**
+ * The name a game takes when it is not installed under the one its APK declares.
+ *
+ * A headset can keep its own store's package names associated with the signature it signed them with, and refuse a game that carries another one: a Pico asks
+ * its servers about every third-party application it sees, with the package name and the signature of the installed APK, and force-stops the ones whose
+ * signature is not the one registered for that name. A game sold on the Pico Store and re-signed by GamePort therefore never starts, whatever it does itself.
+ * Under a name nobody knows there is nothing to compare, and the check has nothing to say.
+ *
+ * The name is built from the app id alone, so it is the same at every install and every patch: a game patched again keeps its folder, its expansion files and
+ * its saves.
+ */
+object RenamedPackages {
+    /** The name a game is installed under: unique, stable, and never one a store could know. */
+    fun nameFor(appId: Int): String = "$PREFIX$appId"
+
+    /** The name [appId] must be installed under, or null to keep the one its APK declares. */
+    fun chosen(mode: PackageNameMode, appId: Int, refusesReSigned: Boolean): String? = when (mode) {
+        PackageNameMode.ON -> nameFor(appId)
+        PackageNameMode.OFF -> null
+        PackageNameMode.AUTO -> if (refusesReSigned) nameFor(appId) else null
+    }
+
+    // A part of a package name cannot begin with a digit, so the app id follows a letter.
+    private const val PREFIX = "com.gameport.g"
+}
+
+/**
  * The games whose VR build leaves out the declaration that lets the headset show the real world behind them, though they have a setting for it (Cubism, since an
  * update of the game). Steam does not say which games use the passthrough, and nothing the game does at run time tells it apart, so this is a list kept by hand: the
  * developer adds a game to it in the relay's console as players report one whose passthrough does not work, and the app reads it ([GameDefaultsList.passthrough], passed
@@ -88,6 +120,11 @@ data class GameSettings(
     val ovrPluginStandIn: Boolean = true,
     /** The game declares that it uses the headset's passthrough, so the headset lets it show the real world behind it. A change needs the game to be patched again. */
     val passthrough: PassthroughMode = PassthroughMode.AUTO,
+    /**
+     * The game is installed under a package name of GamePort's own ([RenamedPackages]) instead of the one its APK declares, which is what gets a game past a
+     * headset that refuses a re-signed one. A change needs the game to be installed again, under the other name.
+     */
+    val packageName: PackageNameMode = PackageNameMode.AUTO,
     /** The channel (branch) of Steam this game is installed and updated from; null is the normal one ([UpdateChannels.NORMAL]). Its Android build is what an install or an update fetches. */
     val channel: String? = null,
 ) {

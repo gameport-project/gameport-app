@@ -134,6 +134,9 @@
     <string name="game_storage_later">Plus tard</string>
     <string name="issue_patch_outdated">Un patch plus récent est disponible pour ce jeu.</string>
     <string name="issue_patch_outdated_action">Re-patcher</string>
+    <string name="game_refused_title">L\'appareil a refusé de démarrer le jeu</string>
+    <string name="game_refused_body">Cet appareil refuse ce nom de paquet. Le réinstaller sous un nom propre à GamePort le fait démarrer.</string>
+    <string name="issue_refused_action">Réinstaller</string>
     <string name="issue_storage_permission">Ce jeu a besoin de l\'accès aux fichiers et ne l\'a pas. Il ne peut pas être lancé tant que cet accès n\'est pas autorisé.</string>
     <string name="issue_save_conflict">Les sauvegardes diffèrent entre cet appareil et Steam : un choix est attendu.</string>
     <string name="issue_save_conflict_action">Choisir</string>
@@ -326,6 +329,11 @@
     <string name="gamecompat_eye_foveation">Rendu qui suit les yeux</string>
     <string name="gamecompat_eye_foveation_legend">Certains jeux le demandent, et le système de certains appareils arrête le jeu quand l\'appareil n\'a pas de suivi des yeux. Automatique le garde là où l\'appareil a un suivi des yeux et l\'écarte là où il n\'en a pas. Désactivé l\'écarte pour ce jeu, activé le garde. S\'applique au prochain lancement du jeu.</string>
     <string name="gamecompat_passthrough_auto">Fait automatiquement pour ce jeu : sa version VR n\'indique pas qu\'il utilise la transparence.</string>
+    <string name="gamecompat_package_name">Installer sous un nom propre à GamePort</string>
+    <string name="gamecompat_package_name_legend">Certains appareils gardent les noms de paquet de leur propre boutique associés à la signature avec laquelle ils les ont signés, et refusent de démarrer un jeu qui en porte une autre, avant même que le jeu tourne. Installé sous un nom que personne ne connaît, le jeu démarre. Automatique le fait sur un tel appareil. Un changement réinstalle le jeu, sous l\'autre nom : ce qu\'il gardait sur cet appareil repart de zéro, et les sauvegardes que Steam synchronise reviennent.</string>
+    <string name="gamecompat_package_name_auto">Fait automatiquement pour ce jeu : cet appareil refuse un jeu dont il connaît le nom mais pas la signature.</string>
+    <string name="gamecompat_package_name_warning">Installé de nouveau sous un autre nom : ce que le jeu gardait sur cet appareil repart de zéro. Les sauvegardes que Steam synchronise reviennent.</string>
+    <string name="gamecompat_package_name_refused">Cet appareil refuse un jeu dont il connaît le nom mais pas la signature : désactivé, le jeu ne démarrera pas.</string>
     <string name="gamecompat_ovrplugin">Adoucir un jeu qui saccade</string>
     <string name="gamecompat_ovrplugin_legend">Certains jeux embarquent des scripts de réalité mixte de Meta sans la bibliothèque qu\'ils appellent, et saccadent parce qu\'ils échouent à chaque mise à jour. Par défaut le jeu reçoit un petit remplaçant qui répond à la place de la bibliothèque absente. Désactiver sert pour un jeu qui ne fonctionne pas ainsi. Un changement patche de nouveau le jeu.</string>
     <string name="gamecompat_open_in_vr">Ouvrir le jeu lui-même en VR</string>

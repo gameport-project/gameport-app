@@ -14,9 +14,9 @@ internal object DlcRemoval {
      * The files of [dlcFiles] (path in the depot, size) to take off: those that are placed on the device ([packageName] decides how), and are not placed under the same name by
      * [keptFiles] (the paths of every depot that stays) or [keptPlaced] (paths already on the device that belong to what stays).
      */
-    fun plan(dlcFiles: List<Pair<String, Long>>, keptFiles: Collection<String>, keptPlaced: Collection<String>, packageName: String): List<Planned> {
-        val kept = keptFiles.mapNotNull { ObbNames.placement(it, packageName) }.toHashSet() + keptPlaced
-        return dlcFiles.mapNotNull { (path, size) -> ObbNames.placement(path, packageName)?.let { Planned(it, size) } }
+    fun plan(dlcFiles: List<Pair<String, Long>>, keptFiles: Collection<String>, keptPlaced: Collection<String>, packageName: String, original: String? = null): List<Planned> {
+        val kept = keptFiles.mapNotNull { ObbNames.placement(it, packageName, original) }.toHashSet() + keptPlaced
+        return dlcFiles.mapNotNull { (path, size) -> ObbNames.placement(path, packageName, original)?.let { Planned(it, size) } }
             .filter { it.relativePath !in kept }
             .distinctBy { it.relativePath }
     }

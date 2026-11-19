@@ -120,4 +120,29 @@ class ObbNamesTest {
         assertTrue(ObbNames.hasVersioned(listOf("patch.12.com.example.game.obb"), "com.example.game"))
         assertFalse(ObbNames.hasVersioned(listOf("main.12.com.other.game.obb"), "com.example.game"))
     }
+
+    @Test
+    fun `an expansion file named after the package the game came with follows the one it is installed under`() {
+        val came = "com.cmgames.unloop"
+        assertEquals("main.150626.$pkg.obb", ObbNames.aligned("main.150626.$came.obb", pkg, 150626, came))
+        assertEquals("patch.150626.$pkg.obb", ObbNames.aligned("patch.150626.$came.obb", pkg, 150626, came))
+        // Already under the name it must carry: nothing to do.
+        assertNull(ObbNames.aligned("main.150626.$pkg.obb", pkg, 150626, came))
+        // A file of another game is still not this game's.
+        assertNull(ObbNames.aligned("main.150626.com.other.game.obb", pkg, 150626, came))
+    }
+
+    @Test
+    fun `a depot that spells the folder out with the old package name lands in the game's own folder`() {
+        val came = "com.cmgames.unloop"
+        assertEquals("main_assets_all.bundle", ObbNames.placement("Android/obb/$came/main_assets_all.bundle", pkg, came))
+        assertEquals("sub/data.bin", ObbNames.placement("obb/$came/sub/data.bin", pkg, came))
+        assertTrue(ObbNames.inObbFolder("Android/obb/$came/a.bundle", pkg, came))
+        assertEquals(
+            listOf("Android/obb/$came/main.1.$came.obb" to "main.1.$came.obb"),
+            ObbNames.selectPlaced(listOf("Android/obb/$came/main.1.$came.obb"), pkg, came),
+        )
+        // Without the other name, the old package is not the game's: what a depot publishes under it is not its folder.
+        assertEquals("$came/main_assets_all.bundle", ObbNames.placement("Android/obb/$came/main_assets_all.bundle", pkg))
+    }
 }

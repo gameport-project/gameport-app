@@ -60,7 +60,22 @@ data class SaveRule(
     val recursive: Boolean,
     val cloudPrefix: String,
     val pcCloudPrefix: String? = null,
-)
+) {
+    /**
+     * This rule as it applies to a game installed under [packageName]: Steam writes the package name the game's APK declares, which is not the one it
+     * carries when GamePort installed it under a name of its own ([RenamedPackages]) — and the game keeps its saves in the folder of that name.
+     * [original] is that other name; null when they are the same.
+     */
+    fun forInstalledPackage(packageName: String, original: String?): SaveRule =
+        if (original == null || original == packageName) this else copy(localDir = localDir.replacedPackage(original, packageName))
+}
+
+/** A path that begins with the game's package name (`Android/data/<package>/…`, `@internal/<package>/…`) with another one in its place. */
+private fun String.replacedPackage(from: String, to: String): String = when {
+    this == "Android/data/$from" || startsWith("Android/data/$from/") -> "Android/data/$to" + removePrefix("Android/data/$from")
+    this == "@internal/$from" || startsWith("@internal/$from/") -> "@internal/$to" + removePrefix("@internal/$from")
+    else -> this
+}
 
 data class AndroidBuild(
     val packageName: String?,

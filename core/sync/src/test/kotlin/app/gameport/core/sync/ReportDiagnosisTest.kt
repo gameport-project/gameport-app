@@ -123,11 +123,11 @@ class ReportDiagnosisTest {
     }
 
     @Test
-    fun `on a Pico a game that never answered gets the line about the illegal signature even without a marker`() {
+    fun `on a Pico a game that never answered gets the line about the store check even without a marker`() {
         val text = ReportDiagnosis.of("", "", "", null, launch = ReportDiagnosis.Launch(1_000, null, 2_000, onPico = true))
-        assertTrue(text, text.contains("Verification failed: illegal signature"))
+        assertTrue(text, text.contains("com.bytedance.pico.matrix"))
         assertTrue(text, text.contains("no Pico marker"))
-        assertTrue(text, !ReportDiagnosis.of("", "", "", null, launch = ReportDiagnosis.Launch(1_000, null, 2_000)).contains("Verification failed"))
+        assertTrue(text, !ReportDiagnosis.of("", "", "", null, launch = ReportDiagnosis.Launch(1_000, null, 2_000)).contains("com.bytedance.pico.matrix"))
     }
 
     @Test

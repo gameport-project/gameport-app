@@ -226,6 +226,7 @@ private fun ButtonRow(icon: androidx.compose.ui.graphics.vector.ImageVector, tin
 private fun noticeText(case: HelpIssueCase): Int = when (case) {
     HelpIssueCase.UPDATE -> R.string.help_notice_update
     HelpIssueCase.PATCH_OUTDATED -> R.string.help_notice_patch
+    HelpIssueCase.REFUSED_BY_DEVICE -> R.string.help_notice_refused
     HelpIssueCase.PROBLEM -> R.string.help_notice_problem
     HelpIssueCase.STORAGE -> R.string.help_notice_storage
     HelpIssueCase.SAVE_CONFLICT -> R.string.help_notice_conflict

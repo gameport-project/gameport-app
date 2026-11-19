@@ -14,6 +14,13 @@ sealed interface GameIssue {
     /** The game was patched by an older GamePort patch than the current one. */
     data object PatchOutdated : GameIssue
 
+    /**
+     * The game was started from GamePort and never answered: its hook did not run, so it was refused or closed before it began. On a device that knows a game's package
+     * name but not the signature of the copy installed here, that is what happens when it refuses to start one — and installing it again under a name of GamePort's own
+     * ([RenamedPackages]) is the way out. The page says so, and holds Play back until then.
+     */
+    data object RefusedByDevice : GameIssue
+
     /** The game asks for access to shared storage and does not have it; on a headset it may keep closing. */
     data object StoragePermissionMissing : GameIssue
 

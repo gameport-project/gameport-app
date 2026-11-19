@@ -21,6 +21,13 @@ interface VrPlatform {
 
     /** Intent categories that make this system start an activity as an immersive VR app. */
     val immersiveLauncherCategories: List<String>
+
+    /**
+     * True when this system keeps the package names of its own store's games associated with the signature it signed them with, and refuses to start a game
+     * that carries another one — before the game runs, and without a line in any log. A game installed under a name the store has never seen
+     * ([app.gameport.core.model.RenamedPackages]) has nothing to be compared with, and starts.
+     */
+    val refusesReSignedGames: Boolean get() = false
 }
 
 /** Vendor-neutral baseline: any device that reports head tracking or the OpenXR system API. */
@@ -50,6 +57,13 @@ object PicoPlatform : VrPlatform {
         device.manufacturer.equals("Pico", ignoreCase = true) || device.brand.equals("Pico", ignoreCase = true)
 
     override val immersiveLauncherCategories = listOf("com.yvr.intent.category.VR")
+
+    /**
+     * Pico's `com.bytedance.pico.matrix` asks Pico's servers about every third-party application on the headset, sending the package name and the signature of
+     * the installed APK, and force-stops the ones whose signature is not the one registered for that name (the dialog says the entitlement check failed, and
+     * offers the store). A game sold on the Pico Store and re-signed by GamePort is one of them.
+     */
+    override val refusesReSignedGames = true
 }
 
 object VrPlatforms {
@@ -58,6 +72,12 @@ object VrPlatforms {
 
     /** The platform this device belongs to, or null when it is not a headset. */
     fun detect(device: DeviceInfo): VrPlatform? = all.firstOrNull { it.matches(device) }
+
+    /**
+     * Whether the headset family [id] (as a device profile reports it) refuses a game it knows the package name of but not the signature of
+     * ([VrPlatform.refusesReSignedGames]).
+     */
+    fun refusesReSignedGames(id: String?): Boolean = all.firstOrNull { it.id == id }?.refusesReSignedGames == true
 
     /**
      * Categories a patched game gets so it starts as a VR app on any supported headset, not only

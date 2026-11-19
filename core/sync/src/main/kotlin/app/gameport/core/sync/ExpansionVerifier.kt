@@ -108,11 +108,13 @@ class ExpansionVerifier @Inject constructor(
         val updatedAt = packages.lastUpdateTimeOf(packageName) ?: 0L
         val session = sessions.current.value ?: return
         val expected = mutableListOf<Long>()
+        // A game installed under a name of GamePort's own is listed by Steam under the one its APK declares: both are recognised.
+        val original = packages.originalPackageOf(packageName)
         for ((depotId, manifestId) in build.manifests) {
             // A manifest that cannot be read leaves the game unchecked for now, rather than called complete or missing on half of what Steam says.
             val files = SteamInspector.manifestFiles(session, appId, depotId, manifestId) ?: return
             val sizes = files.associate { it.first to it.second }
-            ObbNames.selectPlaced(files.map { it.first }, packageName).forEach { (path, _) -> sizes[path]?.let(expected::add) }
+            ObbNames.selectPlaced(files.map { it.first }, packageName, original).forEach { (path, _) -> sizes[path]?.let(expected::add) }
         }
         // A game for which Steam lists no expansion has nothing to be missing: its process is not woken to ask it.
         if (expected.isEmpty()) {

@@ -25,12 +25,14 @@ internal object ExpansionFiles {
         problems: MutableList<String> = mutableListOf(),
         /** False for extra content added to a game: what it brings does not replace the game's own files. */
         replaceOlder: Boolean = true,
+        /** The package the game's APK declares, when it is installed under another name: what the depot names its files after (see [ObbNames]). */
+        original: String? = null,
     ): List<String> {
-        val files = select(downloaded, packageName, skipped)
+        val files = select(downloaded, packageName, skipped, original)
         if (files.isEmpty()) return emptyList()
         if (!target.mkdirs() && !target.isDirectory) problems += "the folder ${target.path} cannot be created (exists=${target.exists()}, parent writable=${target.parentFile?.canWrite()})"
         // A new version of the game replaces the expansion files of the old one, whatever code they were renamed to.
-        if (replaceOlder) ObbNames.superseded(target.list().orEmpty().toList(), files.map { it.second }, packageName).forEach { File(target, it).delete() }
+        if (replaceOlder) ObbNames.superseded(target.list().orEmpty().toList(), files.map { it.second }, packageName, original).forEach { File(target, it).delete() }
         val placed = mutableListOf<String>()
         for ((file, relative) in files) {
             runCatching {
@@ -51,13 +53,13 @@ internal object ExpansionFiles {
     }
 
     /** The files of [downloaded] that go to the device, each with the path it takes under the game's folder. */
-    fun select(downloaded: File, packageName: String, skipped: String): List<Pair<File, String>> {
+    fun select(downloaded: File, packageName: String, skipped: String, original: String? = null): List<Pair<File, String>> {
         val files = downloaded.walkTopDown().onEnter { it.name != skipped }.filter { it.isFile }.associateBy { it.relativeTo(downloaded).path }.filterKeys { !DepotJunk.isJunk(it) }
-        return ObbNames.selectPlaced(files.keys.toList(), packageName).map { (path, placed) -> files.getValue(path) to placed }
+        return ObbNames.selectPlaced(files.keys.toList(), packageName, original).map { (path, placed) -> files.getValue(path) to placed }
     }
 
     /** What [place] is about to put on the device, in bytes: measured before the files move, since afterwards the download no longer holds them. */
-    fun bytesToPlace(downloaded: File, packageName: String, skipped: String): Long = select(downloaded, packageName, skipped).sumOf { it.first.length() }
+    fun bytesToPlace(downloaded: File, packageName: String, skipped: String, original: String? = null): Long = select(downloaded, packageName, skipped, original).sumOf { it.first.length() }
 
     /**
      * Renames the expansion files of [directory] to follow [code], the version code of the APK installed now (see [ObbNames.aligned]).
@@ -65,10 +67,10 @@ internal object ExpansionFiles {
      * old name is removed. What is there is also opened to all, so a game that was placed before that was done can read it.
      * Returns the names it changed, and does nothing when the folder is not there.
      */
-    fun align(directory: File, packageName: String, code: Long): List<String> {
+    fun align(directory: File, packageName: String, code: Long, original: String? = null): List<String> {
         val renamed = mutableListOf<String>()
         directory.listFiles()?.forEach { file ->
-            val name = ObbNames.aligned(file.name, packageName, code) ?: return@forEach
+            val name = ObbNames.aligned(file.name, packageName, code, original) ?: return@forEach
             val destination = File(directory, name)
             when {
                 !destination.exists() -> if (file.renameTo(destination)) renamed += name

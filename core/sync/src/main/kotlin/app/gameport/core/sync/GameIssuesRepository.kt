@@ -32,6 +32,7 @@ class GameIssuesRepository @Inject constructor(
     private val device: DeviceProfile,
     private val reports: ReportStore,
     private val reinstallNotice: app.gameport.core.settings.ReinstallNoticeStore,
+    private val events: app.gameport.core.install.GameEventLog,
 ) {
     private val debuggable = context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
 
@@ -93,6 +94,29 @@ class GameIssuesRepository @Inject constructor(
     /** The player says the game works: its question and its blue mark go. */
     fun answerReinstallWorks(appId: Int) = reinstallNotice.answerWorks(appId)
 
+    /**
+     * True when the game was started from GamePort and its hook never answered: it was refused or closed before it began. On a device that refuses a game it knows the
+     * package name of but not the signature of the copy installed here, that is what a game installed under its own name comes to, and installing it again under a name
+     * of GamePort's own is the way out. Nothing is said when the game already carries that name: there would be nothing to install again under.
+     *
+     * What is judged is the copy installed now. A run that came before a change of the game — patched again, updated, or installed under another name — says nothing
+     * about it: the verdict goes, the page offers Play again, and the player tries the game as it is. Only a run made under the name the game carries now, and since it
+     * was last changed, is counted.
+     */
+    private fun refusedByDevice(appId: Int, packageName: String): Boolean {
+        if (!app.gameport.core.model.vr.VrPlatforms.refusesReSignedGames(device.vrPlatform?.id)) return false
+        val wanted = installer.renamedPackageFor(appId) ?: return false
+        if (wanted == packageName) return false
+        val launched = events.lastTimeOf(appId, app.gameport.core.install.LAUNCH_NOTE) ?: return false
+        // The game changed since that run: it was patched again, updated, or installed under another name. The run was another copy, and the player is left to try this one.
+        val installedAt = installer.installedAt(appId) ?: return false
+        if (launched < installedAt) return false
+        // Long enough for a game that does start to have answered through its hook: before that, nothing is said of a run still beginning.
+        if (System.currentTimeMillis() - launched < ANSWER_WAIT_MS) return false
+        val answered = reports.lastDataMillis(packageName)
+        return answered == null || answered < launched
+    }
+
     /** Ids of the games whose patch is older than the current one: the ones the patch button is for. */
     fun observePatchesToApply(): Flow<Set<Int>> = installer.observeOutdatedPatches()
 
@@ -116,6 +140,7 @@ class GameIssuesRepository @Inject constructor(
         return buildList {
             if (updateAvailable) add(GameIssue.UpdateAvailable)
             if (patchOutdated) add(GameIssue.PatchOutdated)
+            if (refusedByDevice(appId, packageName)) add(GameIssue.RefusedByDevice)
             // Only when the access can be given: a note that sends the player to a setting that does not exist is worse than none.
             if (installer.storagePermissionBlocksPlay(appId)) add(GameIssue.StoragePermissionMissing)
             if (appId !in reinstallAnswered && installer.reinstallMayHelp(packageName)) add(GameIssue.ReinstallMayHelp)
@@ -137,3 +162,6 @@ private class Others(
     val missing: Map<Int, Int>,
     val answered: Set<Int>,
 )
+
+/** How long after a launch from GamePort a game that does start is given to answer through its hook (it runs as its process starts, so a couple of seconds), before a run that said nothing is taken for a refusal. */
+private const val ANSWER_WAIT_MS = 5_000L

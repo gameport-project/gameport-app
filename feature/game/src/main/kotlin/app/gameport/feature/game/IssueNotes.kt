@@ -53,6 +53,8 @@ internal fun issueNotes(
 ): List<NoteItem> = issues.mapNotNull { issue ->
     when (issue) {
         GameIssue.UpdateAvailable, GameIssue.PatchOutdated, is GameIssue.ProblemSuspected -> null
+        // A game this device refused to start has a card of its own on the page, with the way out: the bell does not repeat it.
+        GameIssue.RefusedByDevice -> null
         GameIssue.ReinstallMayHelp -> NoteItem(
             stringResource(R.string.issue_reinstall_may_help), NoteColors.Question, NoteColors.InfoText,
             action = stringResource(R.string.issue_reinstall_not_working), onClick = onAskReinstall, actionEnabled = !busy,

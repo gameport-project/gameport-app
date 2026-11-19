@@ -10,6 +10,7 @@ enum class IssueTone { ATTENTION, INFO, UPDATE, QUESTION }
 enum class HelpIssueCase(val tone: IssueTone) {
     UPDATE(IssueTone.UPDATE),
     PATCH_OUTDATED(IssueTone.ATTENTION),
+    REFUSED_BY_DEVICE(IssueTone.ATTENTION),
     PROBLEM(IssueTone.ATTENTION),
     STORAGE(IssueTone.ATTENTION),
     SAVE_CONFLICT(IssueTone.ATTENTION),
@@ -28,6 +29,7 @@ enum class HelpIssueCase(val tone: IssueTone) {
             is GameIssue.ControllerSilent -> CONTROLLER_SILENT
             GameIssue.UpdateAvailable -> UPDATE
             GameIssue.PatchOutdated -> PATCH_OUTDATED
+            GameIssue.RefusedByDevice -> REFUSED_BY_DEVICE
             GameIssue.StoragePermissionMissing -> STORAGE
             GameIssue.SaveConflict -> SAVE_CONFLICT
             is GameIssue.ProblemSuspected -> PROBLEM
