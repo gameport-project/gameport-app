@@ -616,6 +616,13 @@ class GameInstallRepository @Inject constructor(
         return RenamedPackages.chosen(mode, appId, VrPlatforms.refusesReSignedGames(packages.vrFamily))
     }
 
+    /**
+     * The name a game that did not start may be installed again under, which the card on its page offers: its name of GamePort's own, or null when the player chose to keep
+     * the game's own. It does not depend on what is installed now, unlike [renamedPackageFor], which leaves a game that is there alone.
+     */
+    fun offeredRenamedPackage(appId: Int): String? =
+        if (gameSettings.get(appId).packageName == PackageNameMode.OFF) null else RenamedPackages.nameFor(appId)
+
     /** The name the game is installed under, whether or not GamePort chose it. */
     fun installPackageFor(appId: Int): String? = renamedPackageFor(appId) ?: installedPackage(appId)
 

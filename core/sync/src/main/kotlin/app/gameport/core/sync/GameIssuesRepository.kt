@@ -104,8 +104,8 @@ class GameIssuesRepository @Inject constructor(
      * was last changed, is counted.
      */
     private fun refusedByDevice(appId: Int, packageName: String): Boolean {
-        if (!app.gameport.core.model.vr.VrPlatforms.refusesReSignedGames(device.vrPlatform?.id)) return false
-        val wanted = installer.renamedPackageFor(appId) ?: return false
+        if (!app.gameport.core.model.vr.VrPlatforms.renameMayHelp(device.vrPlatform?.id)) return false
+        val wanted = installer.offeredRenamedPackage(appId) ?: return false
         if (wanted == packageName) return false
         val launched = events.lastTimeOf(appId, app.gameport.core.install.LAUNCH_NOTE) ?: return false
         // The game changed since that run: it was patched again, updated, or installed under another name. The run was another copy, and the player is left to try this one.

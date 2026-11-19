@@ -48,5 +48,10 @@ class VrPlatformsTest {
         assertFalse(VrPlatforms.refusesReSignedGames(MetaQuestPlatform.id))
         assertFalse(VrPlatforms.refusesReSignedGames(OpenXrPlatform.id))
         assertFalse(VrPlatforms.refusesReSignedGames(null))
+        // A game that did not start is worth offering a name of GamePort's own on a Quest too, though nothing renames a game there by itself.
+        assertTrue(VrPlatforms.renameMayHelp(PicoPlatform.id))
+        assertTrue(VrPlatforms.renameMayHelp(MetaQuestPlatform.id))
+        assertFalse(VrPlatforms.renameMayHelp(OpenXrPlatform.id))
+        assertFalse(VrPlatforms.renameMayHelp(null))
     }
 }

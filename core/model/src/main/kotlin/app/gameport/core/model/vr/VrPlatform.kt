@@ -28,6 +28,13 @@ interface VrPlatform {
      * ([app.gameport.core.model.RenamedPackages]) has nothing to be compared with, and starts.
      */
     val refusesReSignedGames: Boolean get() = false
+
+    /**
+     * True when a game that does not start on this system may be one the system refused because of its package name, so that installing it again under a name of GamePort's
+     * own is worth offering. A system that refuses re-signed games ([refusesReSignedGames]) does it before the game runs, and so does Meta's safety check on a game
+     * that is not from its store; the second is not made to rename every game by itself, only to offer it when a game did not start.
+     */
+    val renameMayHelp: Boolean get() = refusesReSignedGames
 }
 
 /** Vendor-neutral baseline: any device that reports head tracking or the OpenXR system API. */
@@ -48,6 +55,10 @@ object MetaQuestPlatform : VrPlatform {
         device.manufacturer.equals("Oculus", ignoreCase = true) || device.manufacturer.equals("Meta", ignoreCase = true)
 
     override val immersiveLauncherCategories = listOf("com.oculus.intent.category.VR")
+
+    // Horizon OS stops the launch of a game that is not from its store with a window saying the application is not approved (PhaAppLaunchInterceptor), and the game then
+    // never begins. Under a name of GamePort's own it starts. Nothing renames a game by itself here: the card on its page offers it.
+    override val renameMayHelp = true
 }
 
 object PicoPlatform : VrPlatform {
@@ -72,6 +83,9 @@ object VrPlatforms {
 
     /** The platform this device belongs to, or null when it is not a headset. */
     fun detect(device: DeviceInfo): VrPlatform? = all.firstOrNull { it.matches(device) }
+
+    /** Whether a game that did not start is worth offering to install again under a name of GamePort's own on the headset family [id]. */
+    fun renameMayHelp(id: String?): Boolean = all.firstOrNull { it.id == id }?.renameMayHelp == true
 
     /**
      * Whether the headset family [id] (as a device profile reports it) refuses a game it knows the package name of but not the signature of
