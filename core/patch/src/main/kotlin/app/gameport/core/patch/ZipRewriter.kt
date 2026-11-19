@@ -46,7 +46,7 @@ internal object ZipRewriter {
 
     private fun ZipArchiveOutputStream.addDeflated(name: String, bytes: ByteArray) {
         putArchiveEntry(ZipArchiveEntry(name).apply { method = ZipEntry.DEFLATED })
-        write(bytes)
+        writeInPieces(bytes)
         closeArchiveEntry()
     }
 
@@ -59,8 +59,21 @@ internal object ZipRewriter {
             setExtra(alignmentExtra(bytesWritten, name, uncompressed = true))
         }
         putArchiveEntry(entry)
-        write(bytes)
+        writeInPieces(bytes)
         closeArchiveEntry()
+    }
+
+    /**
+     * Writes [bytes] a piece at a time. One call with a big array makes the file channel copy it whole into a temporary buffer of the same size, outside the usual
+     * allocations: a resource table of ninety megabytes then asked for ninety more, and the app died of memory while patching.
+     */
+    private fun ZipArchiveOutputStream.writeInPieces(bytes: ByteArray) {
+        var offset = 0
+        while (offset < bytes.size) {
+            val length = minOf(WRITE_PIECE, bytes.size - offset)
+            write(bytes, offset, length)
+            offset += length
+        }
     }
 
     /** Padding (as a zipalign-style extra field) that puts the entry's data on an aligned offset. */
@@ -81,6 +94,7 @@ internal object ZipRewriter {
         }
     }
 
+    private const val WRITE_PIECE = 1 shl 20
     private const val LOCAL_HEADER_SIZE = 30
     private const val EXTRA_HEADER_SIZE = 4
 }

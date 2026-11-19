@@ -4,6 +4,7 @@ import app.gameport.core.patch.ApkPatch
 import app.gameport.core.patch.PatchAssets
 import app.gameport.core.patch.PatchContext
 import app.gameport.core.patch.PatchSession
+import app.gameport.core.patch.ResourceTableNames
 import app.gameport.core.patch.json.ATTR_NAME
 import app.gameport.core.patch.json.ATTR_VALUE
 import app.gameport.core.patch.json.ManifestAttr
@@ -114,15 +115,9 @@ object PackageRenamePatch : ApkPatch {
      * keeps its name.
      */
     internal fun patchResources(session: PatchSession, packageName: String) {
-        val table = session.resources ?: return
-        var renamed = 0
-        table.forEach { block ->
-            if (block.id == APP_PACKAGE_ID && block.name != packageName) {
-                block.setName(packageName)
-                renamed++
-            }
-        }
-        if (renamed > 0) session.replaceFile(RESOURCES, table.bytes)
+        // The table is changed in its bytes, never decoded: see [ResourceTableNames].
+        val table = session.readFile(RESOURCES) ?: return
+        if (ResourceTableNames.rename(table, packageName, APP_PACKAGE_ID)) session.replaceFile(RESOURCES, table)
     }
 
     /**

@@ -128,8 +128,6 @@ class PatchSession(private val apk: ApkModule, val existingHookDex: String? = nu
      */
     fun replaceFile(path: String, bytes: ByteArray) = addFile(path, bytes)
 
-    /** The game's resource table, which names the package its resources belong to; null when the APK has none. */
-    val resources: com.reandroid.arsc.chunk.TableBlock? get() = if (apk.hasTableBlock()) apk.tableBlock else null
 }
 
 private val DEX = Regex("classes(\\d*)\\.dex")
