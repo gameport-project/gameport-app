@@ -15,7 +15,7 @@
     <string name="game_error_app_updating">GamePort is updating itself. Try again once it has restarted.</string>
     <string name="game_error_no_apk">Steam\'s Android build of this game contains no APK.</string>
     <string name="game_error_unreadable">The downloaded APK could not be read.</string>
-    <string name="game_error_conflict">A different version of this game is already installed (for example the Meta Store one). Uninstall it first.</string>
+    <string name="game_error_conflict">A different version of this game is already installed (for example the one from the device\'s official store). Uninstall it first.</string>
     <string name="game_error_expansion_storage_permission">GamePort needs access to all files to place this game’s data on this device. Once it is allowed, the install can go on.</string>
     <string name="game_error_expansion_storage_open">Allow storage access</string>
     <string name="discord_join">Join the Discord</string>

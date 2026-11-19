@@ -21,3 +21,6 @@ logcat.txt
 
 __pycache__/
 
+
+# Developer-only tool: builds the problem report of a game without sending it (a debug broadcast). It does not go to the repository.
+app/src/debug/kotlin/app/gameport/debug/ReportDebugReceiver.kt

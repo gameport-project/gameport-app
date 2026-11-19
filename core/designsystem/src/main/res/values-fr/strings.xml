@@ -15,7 +15,7 @@
     <string name="game_error_app_updating">GamePort est en train de se mettre à jour. Réessaie une fois qu\'elle aura redémarré.</string>
     <string name="game_error_no_apk">La version Android de ce jeu sur Steam ne contient aucun APK.</string>
     <string name="game_error_unreadable">L\'APK téléchargé est illisible.</string>
-    <string name="game_error_conflict">Une autre version de ce jeu est déjà installée (par exemple celle du Meta Store). Désinstallez-la d\'abord.</string>
+    <string name="game_error_conflict">Une autre version de ce jeu est déjà installée (par exemple celle du store officiel de l\'appareil). Désinstallez-la d\'abord.</string>
     <string name="game_error_expansion_storage_permission">GamePort a besoin de l’accès à tous les fichiers pour placer les données de ce jeu sur cet appareil. Une fois l’accès accordé, l’installation peut reprendre.</string>
     <string name="game_error_expansion_storage_open">Autoriser l’accès au stockage</string>
     <string name="discord_join">Rejoindre le Discord</string>

@@ -281,7 +281,7 @@
     <string name="game_choose_version_message">This game comes in several versions and none fits this device on its own. Choose the one to install.</string>
     <string name="game_choose_version_waiting">Waiting for a choice…</string>
     <string name="game_duplicate_title">Already installed</string>
-    <string name="game_duplicate_message">A copy of this game is already installed on this device, probably the one from the Meta store. The two cannot be installed together. Using this version means uninstalling the other one first, and its saves on this device are lost with it.</string>
+    <string name="game_duplicate_message">A copy of this game is already installed on this device, probably the one from the device\'s official store. The two cannot be installed together. Using this version means uninstalling the other one first, and its saves on this device are lost with it.</string>
     <string name="game_other_gameport">This game belongs to another GamePort on this device (%1$s). It is started and updated from there.</string>
     <string name="game_duplicate_other_gameport">This game is already installed by another GamePort on this device (%1$s). It can stay with that one, or be uninstalled so this GamePort installs it.</string>
     <string name="game_duplicate_keep">Keep the installed copy</string>
