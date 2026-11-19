@@ -50,7 +50,7 @@ fun GameCompatScreen(onBack: () -> Unit, viewModel: GameCompatViewModel = hiltVi
     val showOpenInVr by viewModel.showOpenInVr.collectAsStateWithLifecycle()
     val showOvrPluginStandIn by viewModel.showOvrPluginStandIn.collectAsStateWithLifecycle()
     val renameNeeded by viewModel.renameNeeded.collectAsStateWithLifecycle()
-    GameCompatContent(mapping, settings, stageFallback, gameName, onBack, viewModel::onUseFrameChanged, viewModel::onRecenterChosen, showOpenInVr, viewModel::onOpenInVrChosen, showOvrPluginStandIn, viewModel::onOvrPluginStandInChosen, viewModel::onPassthroughChosen, viewModel.passthroughListed, viewModel.showEyeFoveation, viewModel::onEyeFoveationChosen, viewModel.showHaptics, viewModel::onHapticsChosen, viewModel::onPackageNameChosen, viewModel.refusesReSignedGames, renameNeeded, showPerformance = viewModel.showPerformance, onResolutionChosen = viewModel::onResolutionChosen, onRefreshRateChosen = viewModel::onRefreshRateChosen, onCpuLevelChosen = viewModel::onCpuLevelChosen, onGpuLevelChosen = viewModel::onGpuLevelChosen)
+    GameCompatContent(mapping, settings, stageFallback, gameName, onBack, viewModel::onUseFrameChanged, viewModel::onRecenterChosen, showOpenInVr, viewModel::onOpenInVrChosen, showOvrPluginStandIn, viewModel::onOvrPluginStandInChosen, viewModel::onPassthroughChosen, viewModel.passthroughListed, viewModel.showEyeFoveation, viewModel::onEyeFoveationChosen, viewModel.showHaptics, viewModel::onHapticsChosen, viewModel::onPackageNameChosen, viewModel.refusesReSignedGames, renameNeeded)
 }
 
 /** The page of the options, from what it shows: the screen feeds it from the game, the tour of the page feeds it made-up values. */
@@ -76,11 +76,6 @@ internal fun GameCompatContent(
     onPackageNameChosen: (app.gameport.core.model.PackageNameMode) -> Unit = {},
     refusesReSignedGames: Boolean = false,
     renameNeeded: Boolean = false,
-    showPerformance: Boolean = false,
-    onResolutionChosen: (Int) -> Unit = {},
-    onRefreshRateChosen: (Int) -> Unit = {},
-    onCpuLevelChosen: (Int) -> Unit = {},
-    onGpuLevelChosen: (Int) -> Unit = {},
 ) {
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp)) {
@@ -142,38 +137,6 @@ internal fun GameCompatContent(
                     selected = app.gameport.core.model.HapticsStrength.CHOICES.indexOf(settings.hapticsPercent).coerceAtLeast(0),
                     onSelect = { onHapticsChosen(app.gameport.core.model.HapticsStrength.CHOICES[it]) },
                 )
-                if (showPerformance) {
-                    val performance = app.gameport.core.model.PerformanceTuning
-                    val levelLabels = listOf(R.string.gamecompat_mode_auto, R.string.gamecompat_level_saving, R.string.gamecompat_level_low, R.string.gamecompat_level_high, R.string.gamecompat_level_boost).map { stringResource(it) }
-                    ChoiceBox(
-                        title = stringResource(R.string.gamecompat_resolution),
-                        legend = stringResource(R.string.gamecompat_resolution_legend),
-                        labels = performance.RESOLUTIONS.mapIndexed { i, percent -> if (i == 0) stringResource(R.string.gamecompat_haptics_normal) else "$percent %" },
-                        selected = performance.RESOLUTIONS.indexOf(settings.resolutionPercent).coerceAtLeast(0),
-                        onSelect = { onResolutionChosen(performance.RESOLUTIONS[it]) },
-                    )
-                    ChoiceBox(
-                        title = stringResource(R.string.gamecompat_refresh),
-                        legend = stringResource(R.string.gamecompat_refresh_legend),
-                        labels = performance.REFRESH_RATES.map { if (it == 0) stringResource(R.string.gamecompat_refresh_game) else "$it Hz" },
-                        selected = performance.REFRESH_RATES.indexOf(settings.refreshRate).coerceAtLeast(0),
-                        onSelect = { onRefreshRateChosen(performance.REFRESH_RATES[it]) },
-                    )
-                    ChoiceBox(
-                        title = stringResource(R.string.gamecompat_cpu_level),
-                        legend = stringResource(R.string.gamecompat_cpu_level_legend),
-                        labels = levelLabels,
-                        selected = performance.LEVELS.indexOf(settings.cpuLevel).coerceAtLeast(0),
-                        onSelect = { onCpuLevelChosen(performance.LEVELS[it]) },
-                    )
-                    ChoiceBox(
-                        title = stringResource(R.string.gamecompat_gpu_level),
-                        legend = stringResource(R.string.gamecompat_gpu_level_legend),
-                        labels = levelLabels,
-                        selected = performance.LEVELS.indexOf(settings.gpuLevel).coerceAtLeast(0),
-                        onSelect = { onGpuLevelChosen(performance.LEVELS[it]) },
-                    )
-                }
                 if (showOpenInVr) ChoiceBox(
                     title = stringResource(R.string.gamecompat_open_in_vr),
                     legend = stringResource(R.string.gamecompat_open_in_vr_legend),
@@ -195,7 +158,7 @@ internal fun GameCompatContent(
 
 /** A choice among a few, always showing which is taken, with its legend. The first is the automatic one, where GamePort decides. */
 @Composable
-private fun ChoiceBox(modifier: Modifier = Modifier, title: String, legend: String, labels: List<String>, selected: Int, onSelect: (Int) -> Unit, note: String? = null, warning: String? = null) {
+internal fun ChoiceBox(modifier: Modifier = Modifier, title: String, legend: String, labels: List<String>, selected: Int, onSelect: (Int) -> Unit, note: String? = null, warning: String? = null, accent: Color = CompatOrange) {
     Column(
         modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -205,14 +168,14 @@ private fun ChoiceBox(modifier: Modifier = Modifier, title: String, legend: Stri
         PillTabs(labels, selected, onSelect, Modifier.fillMaxWidth())
         if (note != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
-                Icon(Icons.Filled.Info, contentDescription = null, tint = CompatOrange, modifier = Modifier.size(20.dp))
-                Text(note, color = CompatOrange, style = MaterialTheme.typography.bodyMedium)
+                Icon(Icons.Filled.Info, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
+                Text(note, color = accent, style = MaterialTheme.typography.bodyMedium)
             }
         }
         if (warning != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
-                Icon(Icons.Filled.Warning, contentDescription = null, tint = CompatOrange, modifier = Modifier.size(20.dp))
-                Text(warning, color = CompatOrange, style = MaterialTheme.typography.bodySmall)
+                Icon(Icons.Filled.Warning, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
+                Text(warning, color = accent, style = MaterialTheme.typography.bodySmall)
             }
         }
     }

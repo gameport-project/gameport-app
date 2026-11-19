@@ -369,17 +369,19 @@
     </plurals>
     <string name="report_contents_show">Voir ce que contient le rapport</string>
     <string name="report_contents_hide">Masquer le contenu du rapport</string>
-    <string name="gamecompat_resolution">Résolution de l\'image</string>
-    <string name="gamecompat_resolution_legend">La taille de l\'image que le jeu dessine, par rapport à celle que cet appareil recommande. Plus bas est plus léger et plus flou, plus haut est plus net et plus lourd. Un jeu qui choisit sa propre taille l\'ignore. Cela s\'applique au prochain démarrage du jeu.</string>
-    <string name="gamecompat_refresh">Fréquence d\'images</string>
-    <string name="gamecompat_refresh_legend">Le nombre d\'images par seconde que l\'écran affiche. 72 ménage l\'appareil, 90 est plus fluide et demande plus. Cela s\'applique au prochain démarrage du jeu.</string>
-    <string name="gamecompat_refresh_game">Celle du jeu</string>
-    <string name="gamecompat_cpu_level">Niveau du processeur</string>
-    <string name="gamecompat_cpu_level_legend">Combien le processeur peut travailler. Un niveau plus haut aide un jeu qui peine, et consomme plus et chauffe plus. Automatique laisse le choix au système. Cela s\'applique au prochain démarrage du jeu.</string>
-    <string name="gamecompat_gpu_level">Niveau graphique</string>
-    <string name="gamecompat_gpu_level_legend">Combien la puce graphique peut travailler. Un niveau plus haut aide un jeu qui peine, et consomme plus et chauffe plus. Automatique laisse le choix au système. Cela s\'applique au prochain démarrage du jeu.</string>
-    <string name="gamecompat_level_saving">Économie</string>
-    <string name="gamecompat_level_low">Bas</string>
-    <string name="gamecompat_level_high">Haut</string>
-    <string name="gamecompat_level_boost">Boost</string>
+    <string name="gameperf_resolution">Résolution de l\'image</string>
+    <string name="gameperf_resolution_legend">La taille de l\'image que le jeu dessine, par rapport à celle que cet appareil recommande. Plus bas est plus léger et plus flou, plus haut est plus net et plus lourd. Un jeu qui choisit sa propre taille l\'ignore. Cela s\'applique au prochain démarrage du jeu.</string>
+    <string name="gameperf_refresh">Fréquence d\'images</string>
+    <string name="gameperf_refresh_legend">Le nombre d\'images par seconde que l\'écran affiche. 72 ménage l\'appareil, 90 est plus fluide et demande plus. Cela s\'applique au prochain démarrage du jeu.</string>
+    <string name="gameperf_refresh_game">Celle du jeu</string>
+    <string name="gameperf_cpu_level">Niveau du processeur</string>
+    <string name="gameperf_cpu_level_legend">Combien le processeur peut travailler. Un niveau plus haut aide un jeu qui peine, et consomme plus et chauffe plus. Automatique laisse le choix au système. Cela s\'applique au prochain démarrage du jeu.</string>
+    <string name="gameperf_gpu_level">Niveau graphique</string>
+    <string name="gameperf_gpu_level_legend">Combien la puce graphique peut travailler. Un niveau plus haut aide un jeu qui peine, et consomme plus et chauffe plus. Automatique laisse le choix au système. Cela s\'applique au prochain démarrage du jeu.</string>
+    <string name="gameperf_level_saving">Économie</string>
+    <string name="gameperf_level_low">Bas</string>
+    <string name="gameperf_level_high">Haut</string>
+    <string name="gameperf_level_boost">Boost</string>
+    <string name="gameperf_title">Performances</string>
+    <string name="gameperf_button">Performances</string>
 </resources>

@@ -47,6 +47,8 @@ import app.gameport.feature.downloads.DownloadsRoute
 import app.gameport.feature.downloads.downloadsScreen
 import app.gameport.feature.game.gameScreen
 import app.gameport.feature.game.gameCompatScreen
+import app.gameport.feature.game.gamePerformanceScreen
+import app.gameport.feature.game.navigateToGamePerformance
 import app.gameport.feature.game.gameControllersScreen
 import app.gameport.feature.game.navigateToGameCompat
 import app.gameport.feature.game.gameAchievementsScreen
@@ -137,11 +139,12 @@ private fun GamePortContent(viewModel: AppViewModel, openWorkshop: Int?, onWorks
         steamPageScreen(onBack = navController::goBack)
         settingsScreen(onBack = navController::goBack, onOpenGame = navController::navigateToGame)
         downloadsScreen(onBack = navController::goBack, onGameClick = navController::navigateToGame)
-        gameScreen(onBack = navController::goBack, onOpenSettings = navController::navigateToGameSettings, onOpenSaves = navController::navigateToGameSaves, onOpenControllers = navController::navigateToGameControllers, onOpenCompat = navController::navigateToGameCompat, onOpenComfort = { navController.navigateToGameSettings(it, comfort = true) }, onOpenAchievements = navController::navigateToGameAchievements, onOpenSteamSettings = { navController.navigate(SettingsRoute(account = true)) }, onOpenWorkshop = navController::navigateToGameWorkshop, onOpenStore = { navController.navigate(StoreGameRoute(it)) })
+        gameScreen(onBack = navController::goBack, onOpenSettings = navController::navigateToGameSettings, onOpenSaves = navController::navigateToGameSaves, onOpenControllers = navController::navigateToGameControllers, onOpenCompat = navController::navigateToGameCompat, onOpenPerformance = navController::navigateToGamePerformance, onOpenComfort = { navController.navigateToGameSettings(it, comfort = true) }, onOpenAchievements = navController::navigateToGameAchievements, onOpenSteamSettings = { navController.navigate(SettingsRoute(account = true)) }, onOpenWorkshop = navController::navigateToGameWorkshop, onOpenStore = { navController.navigate(StoreGameRoute(it)) })
         gameWorkshopScreen(onBack = navController::goBack)
         gameMockupScreen(onBack = navController::goBack)
         gameControllersScreen(onBack = navController::goBack)
         gameCompatScreen(onBack = navController::goBack)
+        gamePerformanceScreen(onBack = navController::goBack)
         gameAchievementsScreen(onBack = navController::goBack)
         gameSavesScreen(onBack = navController::goBack)
         gameSettingsScreen(onBack = navController::goBack)

@@ -58,6 +58,8 @@ sealed interface GameUiState {
         val playtime: app.gameport.core.model.Playtime = app.gameport.core.model.Playtime(),
         /** False on a device without VR: nothing that belongs to VR is shown. */
         val vrDevice: Boolean = true,
+        /** True on a device whose runtime takes the image size, the frame rate and the levels from GamePort (a Pico): the page of them is offered. */
+        val performanceDevice: Boolean = false,
         /** The game has saves and the ones on this device and on Steam do not agree. */
         val savesNotSynced: Boolean = false,
         /** What the players say about the game: null while too few of them said anything. */
@@ -180,7 +182,7 @@ class GameViewModel @Inject constructor(
             else -> Repatch.None
         }
         val shown = if (repatch != Repatch.None && installedPackage != null) InstallState.Installed(installedPackage) else install
-        game.copy(install = shown, issues = issues + listOfNotNull(GameIssue.SavesApart.takeIf { !saveMode.usesPc && game.game.androidBuild?.saveRules?.any { it.pcCloudPrefix != null } == true }), repatch = repatch, controllerProfile = device.isHeadset, controllerFrame = device.isHeadset && controllers.forced, controllerAutomatic = device.isHeadset && controllers.automatic, compatNotice = device.isHeadset && compatNotice, favorite = appId in favorites, hidden = appId in hidden, vrDevice = device.isHeadset)
+        game.copy(install = shown, issues = issues + listOfNotNull(GameIssue.SavesApart.takeIf { !saveMode.usesPc && game.game.androidBuild?.saveRules?.any { it.pcCloudPrefix != null } == true }), repatch = repatch, controllerProfile = device.isHeadset, controllerFrame = device.isHeadset && controllers.forced, controllerAutomatic = device.isHeadset && controllers.automatic, compatNotice = device.isHeadset && compatNotice, favorite = appId in favorites, hidden = appId in hidden, vrDevice = device.isHeadset, performanceDevice = device.vrPlatform?.id == app.gameport.core.model.vr.PicoPlatform.id)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), GameUiState.Loading)
 

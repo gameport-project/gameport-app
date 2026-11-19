@@ -3,6 +3,7 @@
 package app.gameport.feature.game
 
 import app.gameport.core.designsystem.TourIds
+import app.gameport.core.designsystem.PerformanceTeal
 import app.gameport.core.designsystem.tourTarget
 import app.gameport.core.designsystem.KindBlue
 import app.gameport.core.model.reportable
@@ -102,6 +103,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.ui.layout.positionInParent
@@ -184,7 +186,7 @@ import app.gameport.core.model.Ownership
 import app.gameport.core.install.ExpansionStorageAccess
 
 @Composable
-fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -> Unit, onOpenControllers: () -> Unit, onOpenCompat: () -> Unit, onOpenComfort: () -> Unit, onOpenAchievements: () -> Unit, onOpenSteamSettings: () -> Unit, onOpenWorkshop: () -> Unit = {}, onOpenStore: () -> Unit = {}, viewModel: GameViewModel = hiltViewModel()) {
+fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -> Unit, onOpenControllers: () -> Unit, onOpenCompat: () -> Unit, onOpenPerformance: () -> Unit, onOpenComfort: () -> Unit, onOpenAchievements: () -> Unit, onOpenSteamSettings: () -> Unit, onOpenWorkshop: () -> Unit = {}, onOpenStore: () -> Unit = {}, viewModel: GameViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val speedUnit by viewModel.speedUnit.collectAsStateWithLifecycle()
@@ -251,6 +253,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onOpenControllers = onOpenControllers,
         onOpenCompat = onOpenCompat,
         onOpenComfort = onOpenComfort,
+        onOpenPerformance = onOpenPerformance,
         onFamilyChosen = viewModel::onFamilyChosen,
         onActivateFrame = viewModel::onActivateFrame,
         onRepair = viewModel::onRepair,
@@ -303,6 +306,7 @@ internal fun GameContent(
     onOpenControllers: () -> Unit,
     onOpenCompat: () -> Unit,
     onOpenComfort: () -> Unit,
+    onOpenPerformance: () -> Unit,
     onFamilyChosen: (Long) -> Unit = {},
     onActivateFrame: () -> Unit,
     onRepair: () -> Unit = {},
@@ -386,9 +390,11 @@ internal fun GameContent(
                     caution = uiState.warning,
                     compatDetail = CompatDetailInfo(uiState.compatCounts, uiState.deviceKind, uiState.deviceName, uiState.appVersion, compatReports, onCompatDetailsOpened),
                     vrDevice = uiState.vrDevice,
+                    performanceDevice = uiState.performanceDevice,
                     onOpenControllers = onOpenControllers,
                     onOpenCompat = onOpenCompat,
                     onOpenComfort = onOpenComfort,
+                    onOpenPerformance = onOpenPerformance,
                     onActivateFrame = onActivateFrame,
                     onRepair = onRepair,
                     onReinstallWorks = onReinstallWorks,
@@ -469,9 +475,11 @@ private fun GameDetails(
     hidden: Boolean,
     playtime: Playtime,
     vrDevice: Boolean,
+    performanceDevice: Boolean = false,
     onOpenControllers: () -> Unit,
     onOpenCompat: () -> Unit,
     onOpenComfort: () -> Unit,
+    onOpenPerformance: () -> Unit,
     family: FamilyView?,
     onFamilyChosen: (Long) -> Unit,
     onActivateFrame: () -> Unit,
@@ -1025,7 +1033,9 @@ private fun GameDetails(
         onOpenControllers = onOpenControllers,
         onOpenCompat = { onCompatNoticeSeen(); onOpenCompat() },
         comfort = vrDevice && game.androidBuild?.isVr != false && install is InstallState.Installed,
+        performance = performanceDevice && game.androidBuild?.isVr != false && install is InstallState.Installed,
         onOpenComfort = onOpenComfort,
+        onOpenPerformance = onOpenPerformance,
         onReport = { reporting = true },
     )
     }
@@ -1170,6 +1180,8 @@ private fun GameActionsOverlay(
     onOpenCompat: () -> Unit,
     comfort: Boolean,
     onOpenComfort: () -> Unit,
+    performance: Boolean,
+    onOpenPerformance: () -> Unit,
     onReport: () -> Unit,
 ) {
     BackHandler(enabled = open, onBack = onClose)
@@ -1215,6 +1227,8 @@ private fun GameActionsOverlay(
                         if (controllerProfile) ActionRow(Icons.Filled.SportsEsports, stringResource(R.string.controllers_title), usable, { onClose(); onOpenControllers() }, tint = controllerTint)
                         // The options that make a game work: orange as the compatibility labels, with a small mark when GamePort adapted the game by itself.
                         if (compat) ActionRow(Icons.Filled.Build, stringResource(R.string.gamecompat_button), usable, { onClose(); onOpenCompat() }, tint = CompatOrange, badge = CompatOrange.takeIf { compatNotice })
+                        // The image size, the frame rate and the levels of the processor and the graphics chip, on a device that lets GamePort ask for them.
+                        if (performance) ActionRow(Icons.Filled.Speed, stringResource(R.string.gameperf_button), usable, { onClose(); onOpenPerformance() }, tint = PerformanceTeal)
                         // The seated option and the height, which sit in the settings of the game: opened straight on them.
                         if (comfort) ActionRow(Icons.Filled.EventSeat, stringResource(R.string.game_settings_comfort), usable, { onClose(); onOpenComfort() })
                         ActionRow(Icons.Filled.BugReport, stringResource(R.string.report_open), canReport, { onClose(); onReport() })

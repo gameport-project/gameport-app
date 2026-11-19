@@ -25,6 +25,9 @@ data class GameAchievementsRoute(val appId: Int)
 data class GameCompatRoute(val appId: Int)
 
 @Serializable
+data class GamePerformanceRoute(val appId: Int)
+
+@Serializable
 data class GameWorkshopRoute(val appId: Int)
 
 fun NavController.navigateToGame(appId: Int) = navigate(GameRoute(appId))
@@ -39,6 +42,8 @@ fun NavController.navigateToGameAchievements(appId: Int) = navigate(GameAchievem
 
 fun NavController.navigateToGameCompat(appId: Int) = navigate(GameCompatRoute(appId))
 
+fun NavController.navigateToGamePerformance(appId: Int) = navigate(GamePerformanceRoute(appId))
+
 fun NavController.navigateToGameWorkshop(appId: Int) = navigate(GameWorkshopRoute(appId))
 
 /** A mock-up of a game's page with fixed data, to try a layout (see [GameMockupScreen]). */
@@ -49,10 +54,10 @@ fun NavGraphBuilder.gameMockupScreen(onBack: () -> Unit) {
     composable<GameMockupRoute> { GameMockupScreen(onBack = onBack) }
 }
 
-fun NavGraphBuilder.gameScreen(onBack: () -> Unit, onOpenSettings: (Int) -> Unit, onOpenSaves: (Int) -> Unit, onOpenControllers: (Int) -> Unit, onOpenCompat: (Int) -> Unit, onOpenComfort: (Int) -> Unit, onOpenAchievements: (Int) -> Unit, onOpenSteamSettings: () -> Unit, onOpenWorkshop: (Int) -> Unit, onOpenStore: (Int) -> Unit) {
+fun NavGraphBuilder.gameScreen(onBack: () -> Unit, onOpenSettings: (Int) -> Unit, onOpenSaves: (Int) -> Unit, onOpenControllers: (Int) -> Unit, onOpenCompat: (Int) -> Unit, onOpenPerformance: (Int) -> Unit, onOpenComfort: (Int) -> Unit, onOpenAchievements: (Int) -> Unit, onOpenSteamSettings: () -> Unit, onOpenWorkshop: (Int) -> Unit, onOpenStore: (Int) -> Unit) {
     composable<GameRoute> { entry ->
         val appId = entry.toRoute<GameRoute>().appId
-        GameScreen(onBack = onBack, onOpenSettings = { onOpenSettings(appId) }, onOpenSaves = { onOpenSaves(appId) }, onOpenControllers = { onOpenControllers(appId) }, onOpenCompat = { onOpenCompat(appId) }, onOpenComfort = { onOpenComfort(appId) }, onOpenAchievements = { onOpenAchievements(appId) }, onOpenSteamSettings = onOpenSteamSettings, onOpenWorkshop = { onOpenWorkshop(appId) }, onOpenStore = { onOpenStore(appId) })
+        GameScreen(onBack = onBack, onOpenSettings = { onOpenSettings(appId) }, onOpenSaves = { onOpenSaves(appId) }, onOpenControllers = { onOpenControllers(appId) }, onOpenCompat = { onOpenCompat(appId) }, onOpenPerformance = { onOpenPerformance(appId) }, onOpenComfort = { onOpenComfort(appId) }, onOpenAchievements = { onOpenAchievements(appId) }, onOpenSteamSettings = onOpenSteamSettings, onOpenWorkshop = { onOpenWorkshop(appId) }, onOpenStore = { onOpenStore(appId) })
     }
 }
 
@@ -80,6 +85,10 @@ fun NavGraphBuilder.gameControllersScreen(onBack: () -> Unit) {
 
 fun NavGraphBuilder.gameCompatScreen(onBack: () -> Unit) {
     composable<GameCompatRoute> { GameCompatScreen(onBack = onBack) }
+}
+
+fun NavGraphBuilder.gamePerformanceScreen(onBack: () -> Unit) {
+    composable<GamePerformanceRoute> { GamePerformanceScreen(onBack = onBack) }
 }
 
 fun NavGraphBuilder.gameAchievementsScreen(onBack: () -> Unit) {
