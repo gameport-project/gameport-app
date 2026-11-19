@@ -11,6 +11,7 @@ import com.reandroid.json.JSONArray
 import com.reandroid.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -149,4 +150,22 @@ class PackageRenamePatchTest {
 
     private fun context(renamed: String?, restore: Boolean = false) =
         PatchContext(steamAppId = 1, steamId = 0, personaName = "player", renamedPackage = renamed, restorePackageName = restore)
+
+    @Test
+    fun `the path to the expansion folder in a text catalog follows the new package name`() {
+        val came = "com.NeatCorporation.BudgetCutsUltimate"
+        val catalog = """{"m_InternalIds":["/sdcard/Android/obb/$came/mainmenu_all.bundle","/sdcard/Android/obb/$came/videos_all.bundle","{Runtime}/other.bundle"]}""".toByteArray()
+        val changed = PackageRenamePatch.rewriteObbPaths(catalog, came, "com.gameport.g2221980")!!
+        val text = String(changed)
+        assertTrue(text.contains("/sdcard/Android/obb/com.gameport.g2221980/mainmenu_all.bundle"))
+        assertTrue(text.contains("/sdcard/Android/obb/com.gameport.g2221980/videos_all.bundle"))
+        assertTrue(text.contains("{Runtime}/other.bundle"))
+        assertTrue(!text.contains(came))
+    }
+
+    @Test
+    fun `a catalog with no path to the expansion folder under the old name is left alone`() {
+        val catalog = """{"m_InternalIds":["{Runtime}/a.bundle"]}""".toByteArray()
+        assertNull(PackageRenamePatch.rewriteObbPaths(catalog, "com.studio.game", "com.gameport.g1"))
+    }
 }

@@ -38,6 +38,9 @@ import com.reandroid.json.JSONObject
  * rules after it, and the game's data folder moves with the package name.
  */
 object PackageRenamePatch : ApkPatch {
+    /** The biggest catalog of asset bundles looked into: a larger file is not text a catalog would be. */
+    private const val MAX_CATALOG_BYTES = 16L * 1024 * 1024
+
     override val id = "package_rename"
     override val recommended = true
     override val locked = false
@@ -86,6 +89,30 @@ object PackageRenamePatch : ApkPatch {
         // The name the game came with is what the manifest must keep: putting a game back under its own name must not overwrite it with the GamePort one it carried.
         if (target != original) patchManifest(manifest, original, target, recorded ?: original)
         patchResources(session, target)
+        // A game that keeps its large files in the folder of expansion files may write the way to it, with its own package name, in the catalog of its asset bundles.
+        if (target != original) patchObbPaths(session, recorded ?: original, target)
+    }
+
+    /**
+     * Some games (Budget Cuts Ultimate, with Unity's Addressables) look for their scenes at a path written down when they were built,
+     * `/sdcard/Android/obb/<package the game came with>/…`, and not at the one of the package they run as: under another name the files are not found and the game
+     * stays on its title screen. When the catalog of the asset bundles is a text file (a JSON file under `assets/aa/`), the package in that path is changed to the one the game runs as.
+     * A catalog that is not text, or that holds no such path, is left alone: nothing is changed in a game that has none.
+     */
+    internal fun patchObbPaths(session: PatchSession, original: String, renamed: String) {
+        for (path in session.paths("assets/aa/")) {
+            if (!path.endsWith(".json", ignoreCase = true)) continue
+            if ((session.fileLength(path) ?: Long.MAX_VALUE) > MAX_CATALOG_BYTES) continue
+            val content = session.readFile(path) ?: continue
+            rewriteObbPaths(content, original, renamed)?.let { session.replaceFile(path, it) }
+        }
+    }
+
+    /** [content] with `obb/<original>` made `obb/<renamed>` (any slash style), or null when it holds none. */
+    internal fun rewriteObbPaths(content: ByteArray, original: String, renamed: String): ByteArray? {
+        val text = String(content, Charsets.ISO_8859_1)
+        val changed = text.replace("obb/$original", "obb/$renamed").replace("obb\\\\$original", "obb\\\\$renamed")
+        return if (changed == text) null else changed.toByteArray(Charsets.ISO_8859_1)
     }
 
     /**
