@@ -445,7 +445,7 @@ class ProblemReporter @Inject constructor(
                     zip.getEntry(EngineSettings.BOOT_CONFIG)?.takeIf { it.size in 1..EngineSettings.MAX_CONFIG_BYTES }?.let { entry ->
                         settings = EngineSettings.bootConfig(zip.getInputStream(entry).use { String(it.readBytes(), Charsets.UTF_8) })
                     }
-                    if (engine == null && zip.getEntry("lib/arm64-v8a/libUnreal.so") != null) engine = "Unreal"
+                    if (engine == null && (zip.getEntry("lib/arm64-v8a/libUnreal.so") != null || zip.getEntry("lib/arm64-v8a/libUE4.so") != null)) engine = "Unreal"
                 }
             }
         }
