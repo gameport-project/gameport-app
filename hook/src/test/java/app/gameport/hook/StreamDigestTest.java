@@ -12,6 +12,18 @@ public class StreamDigestTest {
     }
 
     @Test
+    public void aPicosLayerLinesCountLikeMetasAndTheSystemsSettingsAreKept() {
+        StreamDigest digest = new StreamDigest();
+        digest.scan(line("16:57:23.000", "I", "GPHook", "first"));
+        for (int i = 0; i < 8; i++) digest.frameRate("11-19 16:57:2" + i + ".100 1 1 I GPXR    : FPS=90/90");
+        digest.frameRate("11-19 16:57:29.100 1 1 I GPXR    : FPS=46/90");
+        digest.frameRate("11-19 16:57:20.200 1 1 E APxrRuntime:  oxr_instance_create ,package_name a.b,PxrPerformanceParams refreshRate 0,resolutionRate 0.000000, cpuLevel 0, gpuLevel 0, ffrLevel 0");
+        String text = digest.report();
+        org.junit.Assert.assertTrue(text, text.contains("median 90, lowest tenth 46, over 9 s, target 90"));
+        org.junit.Assert.assertTrue(text, text.contains("What the system set for the application (Pico; 0 is not set): refreshRate 0,resolutionRate 0.000000, cpuLevel 0, gpuLevel 0, ffrLevel 0"));
+    }
+
+    @Test
     public void a_line_repeated_many_times_is_kept_a_few_times_and_counted_after() {
         StreamDigest digest = new StreamDigest();
         int kept = 0;

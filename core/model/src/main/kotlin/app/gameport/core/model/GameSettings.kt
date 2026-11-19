@@ -28,6 +28,25 @@ object HapticsStrength {
     fun normalize(value: Int): Int = if (value in CHOICES) value else NORMAL
 }
 
+/**
+ * What the player can choose to ask of a device's graphics for one game, on the devices that let GamePort set it (a Pico for now): the size of the image the game draws as a
+ * percentage of the one the device recommends, the frame rate, and how much the processor and the graphics chip are allowed to work. The first choice of each is "leave it as it is".
+ */
+object PerformanceTuning {
+    /** The image size, as a percentage of the recommended one. */
+    val RESOLUTIONS = listOf(100, 50, 70, 80, 90, 110, 125, 150, 200)
+
+    /** The frame rates offered, 0 being the game's own. */
+    val REFRESH_RATES = listOf(0, 72, 90)
+
+    /** The levels of OpenXR's performance settings: -1 leaves them to the system, 0 saves power, 25 holds a low pace, 50 a high one, 75 is a boost that may heat the device. */
+    val LEVELS = listOf(-1, 0, 25, 50, 75)
+
+    fun resolution(value: Int): Int = if (value in RESOLUTIONS) value else RESOLUTIONS.first()
+    fun refreshRate(value: Int): Int = if (value in REFRESH_RATES) value else REFRESH_RATES.first()
+    fun level(value: Int): Int = if (value in LEVELS) value else LEVELS.first()
+}
+
 /** Whether a game declares that it uses the headset's passthrough: by itself for the games known to need it, always, or never. */
 enum class PassthroughMode { AUTO, ON, OFF }
 
@@ -106,6 +125,13 @@ data class GameSettings(
     val eyeFoveation: EyeFoveationMode = EyeFoveationMode.AUTO,
     /** How strongly the controllers vibrate in this game, as a percentage of what the game asks for ([HapticsStrength]); 100 leaves it as it is. */
     val hapticsPercent: Int = HapticsStrength.NORMAL,
+    /** The size of the image the game draws, as a percentage of the recommended one ([PerformanceTuning]); 100 leaves it as it is. */
+    val resolutionPercent: Int = 100,
+    /** The frame rate asked for ([PerformanceTuning]); 0 leaves it to the game. */
+    val refreshRate: Int = 0,
+    /** How much the processor and the graphics chip may work ([PerformanceTuning.LEVELS]); -1 leaves it to the system. */
+    val cpuLevel: Int = -1,
+    val gpuLevel: Int = -1,
     /** The arguments the player picked to start the game with; null means none was picked and the ones meant for VR are used (see [LaunchOptions.chosen]). */
     val launchArguments: Set<String>? = null,
     /**

@@ -111,8 +111,14 @@ public final class GamePortHookProvider extends ContentProvider {
 
             watchForUploads(context);
             // What the game says in the system log, for a problem report.
-            sessionLog = new SessionLog(context);
-            sessionLog.start();
+            // Not when a test file of the game's folder says the report is off (to measure what the collection costs): the game then runs without the log reader and the record.
+            if (reportOff(context)) {
+                Log.i(TAG, "the log for a report is off (test file)");
+            } else {
+                sessionLog = new SessionLog(context);
+                sessionLog.start();
+            }
+            followActivityForUnityPlayerStub(context);
             // A game that quits by itself (System.exit) leaves no activity callback: this still tells GamePort it is gone.
             final Context closing = context.getApplicationContext();
             Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
@@ -124,6 +130,44 @@ public final class GamePortHookProvider extends ContentProvider {
             }, "gameport-closed"));
         } catch (Throwable t) {
             Log.w(TAG, "save sync unavailable; the game runs without it", t);
+        }
+    }
+
+    /** True when the file `gameport/no_report.txt` of the game's folder exists: a test switch, never written by GamePort. */
+    private static boolean reportOff(Context context) {
+        try {
+            File files = context.getExternalFilesDir(null);
+            return new File(new File(files != null ? files : context.getFilesDir(), "gameport"), "no_report.txt").exists();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * An Unreal game that carries Meta's plugins can look for the current activity in Unity's player class, which it does not have: the patch gives it a class of that name
+     * with an empty field, and this fills it with the game's activity, as Unity's player would. Only for a game the patch marked, and never for one that has a Unity player of its
+     * own: the mark is only written for a game without one.
+     */
+    private static void followActivityForUnityPlayerStub(Context context) {
+        try {
+            android.content.pm.ApplicationInfo info = context.getPackageManager().getApplicationInfo(context.getPackageName(), android.content.pm.PackageManager.GET_META_DATA);
+            if (info.metaData == null || !"true".equals(String.valueOf(info.metaData.get("app.gameport.unreal_unityplayer_stub")))) return;
+            final java.lang.reflect.Field field = Class.forName("com.unity3d.player.UnityPlayer").getField("currentActivity");
+            Application application = (Application) context.getApplicationContext();
+            application.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
+                private void remember(Activity activity) {
+                    try { field.set(null, activity); } catch (Throwable ignored) { /* the field is a help, never a duty */ }
+                }
+                @Override public void onActivityCreated(Activity activity, Bundle state) { remember(activity); }
+                @Override public void onActivityStarted(Activity activity) { remember(activity); }
+                @Override public void onActivityResumed(Activity activity) { remember(activity); }
+                @Override public void onActivityPaused(Activity activity) { }
+                @Override public void onActivityStopped(Activity activity) { }
+                @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) { }
+                @Override public void onActivityDestroyed(Activity activity) { }
+            });
+        } catch (Throwable t) {
+            Log.w(TAG, "the Unity player stand-in is not followed", t);
         }
     }
 
@@ -1037,6 +1081,11 @@ public final class GamePortHookProvider extends ContentProvider {
         String localFloor = "auto";
         String eyeFov = "auto";
         String haptics = "100";
+        // What the player asked of the device's graphics for this game: image size in percent, frame rate, processor and graphics levels (100, 0, -1, -1 leave them alone).
+        String resolution = "100";
+        String refresh = "0";
+        String cpuLevel = "-1";
+        String gpuLevel = "-1";
         try {
             Bundle config = Calls.call(context, Owner.cloud(context), "config", context.getPackageName(), null);
             if (config == null) throw new java.io.IOException("no answer");
@@ -1054,11 +1103,15 @@ public final class GamePortHookProvider extends ContentProvider {
             String eyeFoveation = config.getString("xrEyeFoveation");
             eyeFov = eyeFoveation == null || eyeFoveation.isEmpty() ? "auto" : eyeFoveation;
             haptics = String.valueOf(config.getInt("xrHaptics", 100));
+            resolution = String.valueOf(config.getInt("xrResolution", 100));
+            refresh = String.valueOf(config.getInt("xrRefreshRate", 0));
+            cpuLevel = String.valueOf(config.getInt("xrCpuLevel", -1));
+            gpuLevel = String.valueOf(config.getInt("xrGpuLevel", -1));
             String mode = config.getString("returnMode");
             // A GamePort from before the choice only says whether to come back for a game it started.
             returnMode = mode != null ? mode : (config.getBoolean("returnToGamePort") ? "app" : "never");
             java.io.FileWriter out = new java.io.FileWriter(cache);
-            out.write(seated + "\n" + eyeCm + "\n" + controls + "\n" + family + "\n" + preferFrame + "\n" + localFloor + "\n" + eyeFov + "\n" + haptics + "\n");
+            out.write(seated + "\n" + eyeCm + "\n" + controls + "\n" + family + "\n" + preferFrame + "\n" + localFloor + "\n" + eyeFov + "\n" + haptics + "\n" + resolution + "\n" + refresh + "\n" + cpuLevel + "\n" + gpuLevel + "\n");
             out.close();
         } catch (Throwable t) {
             try {
@@ -1077,6 +1130,14 @@ public final class GamePortHookProvider extends ContentProvider {
                 eyeFov = fov == null || fov.isEmpty() ? "auto" : fov;
                 String strength = in.readLine();
                 haptics = strength == null || strength.isEmpty() ? "100" : strength;
+                String res = in.readLine();
+                resolution = res == null || res.isEmpty() ? "100" : res;
+                String rate = in.readLine();
+                refresh = rate == null || rate.isEmpty() ? "0" : rate;
+                String cpu = in.readLine();
+                cpuLevel = cpu == null || cpu.isEmpty() ? "-1" : cpu;
+                String gpu = in.readLine();
+                gpuLevel = gpu == null || gpu.isEmpty() ? "-1" : gpu;
                 in.close();
             } catch (Throwable ignored) {
                 // No earlier answer either: seated mode stays off.
@@ -1097,6 +1158,11 @@ public final class GamePortHookProvider extends ContentProvider {
             android.system.Os.setenv("GAMEPORT_XR_EYE_FOVEATION", eyeFov, true);
             // How strongly the controllers vibrate, as a percentage of what the game asks for.
             android.system.Os.setenv("GAMEPORT_XR_HAPTICS", haptics, true);
+            // The image size (percent of the recommended one), the frame rate and the processor and graphics levels the player chose; the layer asks the runtime for them.
+            android.system.Os.setenv("GAMEPORT_XR_RESOLUTION", resolution, true);
+            android.system.Os.setenv("GAMEPORT_XR_REFRESH", refresh, true);
+            android.system.Os.setenv("GAMEPORT_XR_CPU_LEVEL", cpuLevel, true);
+            android.system.Os.setenv("GAMEPORT_XR_GPU_LEVEL", gpuLevel, true);
             // A game whose passthrough GamePort declared (the player chose it): the layer offers the alpha blend mode that shows the real world when the headset does not.
             android.system.Os.setenv("GAMEPORT_XR_ALPHA_BLEND", hasPatchMark(context, "app.gameport.passthrough_feature") ? "1" : "0", true);
             Log.i(TAG, "seated mode " + seated + ", eye height " + eyeCm + " cm, controller overrides " + (controls.isEmpty() ? "none" : controls));

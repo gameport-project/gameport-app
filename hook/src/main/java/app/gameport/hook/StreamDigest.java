@@ -37,6 +37,8 @@ final class StreamDigest {
     private static final Pattern EXCEPTION = Pattern.compile("\\b((?:[a-z][\\w]*\\.)+[A-Z][\\w$]*(?:Exception|Error)|[A-Z][A-Za-z0-9]*(?:Exception|Error))\\b");
     private static final Pattern SESSION_STATE = Pattern.compile("session state -> (\\d)");
     private static final Pattern FPS = Pattern.compile("FPS=(\\d+)/(\\d+)");
+    /** The line a Pico's runtime prints when the game's instance is made: what the system set for this application (0 is not set). */
+    private static final Pattern PICO_PARAMS = Pattern.compile("PxrPerformanceParams (.*)$");
     private static final Pattern STALE = Pattern.compile("Stale=(\\d+)");
     /** A second counts for the stability only after this many seconds with the session in focus: the loading and the start of the menus come first. */
     static final int STABILITY_WARMUP_SECONDS = 60;
@@ -61,6 +63,8 @@ final class StreamDigest {
     private final int[] fpsHistogram = new int[1024];
     private int fpsSamples;
     private int fpsTarget;
+    /** What the system set for the application, on a Pico. */
+    private String picoParams;
     private int sessionState;
     private int focusedSeconds;
     private int countedSeconds;
@@ -110,6 +114,11 @@ final class StreamDigest {
 
     /** The frame rate lines the runtime prints once a second (read apart from the log, which leaves them out). */
     synchronized void frameRate(String line) {
+        Matcher params = PICO_PARAMS.matcher(line);
+        if (params.find()) {
+            if (picoParams == null) picoParams = params.group(1).trim();
+            return;
+        }
         Matcher m = FPS.matcher(line);
         if (!m.find()) return;
         int fps = Math.min(Integer.parseInt(m.group(1)), fpsHistogram.length - 1);
@@ -325,7 +334,9 @@ final class StreamDigest {
 
         out.append("\nFrame rate (the runtime's line, once a second): ");
         if (fpsSamples == 0) out.append("no line seen\n");
-        else out.append("median ").append(percentile(50)).append(", lowest tenth ").append(percentile(10)).append(", over ").append(fpsSamples).append(" s, target ").append(fpsTarget).append('\n');
+        else out.append("median ").append(percentile(50)).append(", lowest tenth ").append(percentile(10)).append(", over ").append(fpsSamples).append(" s, target ")
+                .append(fpsTarget).append('\n');
+        if (picoParams != null) out.append("What the system set for the application (Pico; 0 is not set): ").append(picoParams).append('\n');
         if (countedSeconds >= STABILITY_MIN_SECONDS) {
             out.append("Seconds that held the target: ").append(heldSeconds).append(" of ").append(countedSeconds).append(" (").append(heldSeconds * 100 / countedSeconds)
                     .append(" %), counted with the session in focus and after its first minute\n");

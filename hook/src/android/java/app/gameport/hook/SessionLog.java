@@ -299,6 +299,8 @@ final class SessionLog {
             while ((line = reader.readLine()) != null) {
                 box.line();
                 if (beforeThisRun(times, line)) continue;
+                // On a Pico the frame rate comes from GamePort's OpenXR layer (the same form as Meta's line), and the runtime says once what the system set for the application.
+                if ((line.contains(" GPXR") && line.contains("FPS=")) || (line.contains("PxrPerformanceParams") && line.contains("package_name " + context.getPackageName()))) digest.frameRate(line);
                 nativeGaps.scan(line);
                 // A line that came again and again is counted by the digest and not kept: it filled the kept lines in seconds and hid the rest of the run.
                 if (!digest.scan(line)) continue;

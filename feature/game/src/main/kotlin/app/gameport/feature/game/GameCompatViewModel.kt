@@ -73,6 +73,14 @@ class GameCompatViewModel @Inject constructor(
 
     fun onHapticsChosen(percent: Int) = settings.set(appId, gameSettings.value.copy(hapticsPercent = percent))
 
+    /** What GamePort can ask of the graphics is offered on a Pico: its runtime takes the image size, the frame rate and the levels. */
+    val showPerformance: Boolean = device.vrPlatform?.id == app.gameport.core.model.vr.PicoPlatform.id
+
+    fun onResolutionChosen(percent: Int) = settings.set(appId, gameSettings.value.copy(resolutionPercent = percent))
+    fun onRefreshRateChosen(rate: Int) = settings.set(appId, gameSettings.value.copy(refreshRate = rate))
+    fun onCpuLevelChosen(level: Int) = settings.set(appId, gameSettings.value.copy(cpuLevel = level))
+    fun onGpuLevelChosen(level: Int) = settings.set(appId, gameSettings.value.copy(gpuLevel = level))
+
     fun onUseFrameChanged(useFrame: Boolean) = controllers.setUseFrame(appId, useFrame)
 
     /** Automatic leaves it to GamePort; on and off are the player's choice, kept even where GamePort would have decided otherwise. */

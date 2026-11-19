@@ -144,6 +144,11 @@ class CloudProvider : ContentProvider() {
                 putInt("eyeCm", appId?.let { entryPoint.gameSettings().eyeHeightCm(it) } ?: 0)
                 // How strongly the controllers vibrate in this game, as a percentage of what the game asks for (100 leaves it as it is).
                 putInt("xrHaptics", settings?.hapticsPercent ?: app.gameport.core.model.HapticsStrength.NORMAL)
+                // What the player asked of the device's graphics for this game (image size in percent, frame rate, processor and graphics levels): what leaves them alone is 100, 0, -1, -1.
+                putInt("xrResolution", settings?.resolutionPercent ?: 100)
+                putInt("xrRefreshRate", settings?.refreshRate ?: 0)
+                putInt("xrCpuLevel", settings?.cpuLevel ?: -1)
+                putInt("xrGpuLevel", settings?.gpuLevel ?: -1)
                 // The player's controller mapping for the game, empty unless they customise it.
                 putString("xrMap", appId?.let { entryPoint.controllerMappings().layerConfig(it) }.orEmpty())
                 // The player chose the Steam Frame's controls for a game that also has its own (off by default).

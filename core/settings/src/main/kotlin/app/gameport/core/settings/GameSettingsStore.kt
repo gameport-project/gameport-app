@@ -43,6 +43,10 @@ class GameSettingsStore @Inject constructor(
         recenter = recenterOf(appId),
         eyeFoveation = eyeFoveationOf(appId),
         hapticsPercent = app.gameport.core.model.HapticsStrength.normalize(prefs.getInt("haptics_$appId", app.gameport.core.model.HapticsStrength.NORMAL)),
+        resolutionPercent = app.gameport.core.model.PerformanceTuning.resolution(prefs.getInt("perf_resolution_$appId", 100)),
+        refreshRate = app.gameport.core.model.PerformanceTuning.refreshRate(prefs.getInt("perf_refresh_$appId", 0)),
+        cpuLevel = app.gameport.core.model.PerformanceTuning.level(prefs.getInt("perf_cpu_$appId", -1)),
+        gpuLevel = app.gameport.core.model.PerformanceTuning.level(prefs.getInt("perf_gpu_$appId", -1)),
         openInVr = prefs.getBoolean("open_in_vr_$appId", true),
         ovrPluginStandIn = prefs.getBoolean("ovrplugin_stand_in_$appId", true),
         passthrough = passthroughOf(appId),
@@ -110,6 +114,11 @@ class GameSettingsStore @Inject constructor(
         }
         // The game's own strength is the absence of a choice.
         if (settings.hapticsPercent == app.gameport.core.model.HapticsStrength.NORMAL) editor.remove("haptics_$appId") else editor.putInt("haptics_$appId", settings.hapticsPercent)
+        // What leaves the graphics as they are is the absence of a choice.
+        if (settings.resolutionPercent == 100) editor.remove("perf_resolution_$appId") else editor.putInt("perf_resolution_$appId", settings.resolutionPercent)
+        if (settings.refreshRate == 0) editor.remove("perf_refresh_$appId") else editor.putInt("perf_refresh_$appId", settings.refreshRate)
+        if (settings.cpuLevel == -1) editor.remove("perf_cpu_$appId") else editor.putInt("perf_cpu_$appId", settings.cpuLevel)
+        if (settings.gpuLevel == -1) editor.remove("perf_gpu_$appId") else editor.putInt("perf_gpu_$appId", settings.gpuLevel)
         // No pick is the absence of a choice, an empty pick is a choice of none.
         settings.launchArguments?.let { editor.putStringSet("launchargs_$appId", it) } ?: editor.remove("launchargs_$appId")
         // Automatic is the absence of a choice: only a no is written.

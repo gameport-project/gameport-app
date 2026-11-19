@@ -370,4 +370,17 @@
     </plurals>
     <string name="report_contents_show">See what the report contains</string>
     <string name="report_contents_hide">Hide what the report contains</string>
+    <string name="gamecompat_resolution">Image resolution</string>
+    <string name="gamecompat_resolution_legend">The size of the image the game draws, compared with the one this device recommends. Lower is lighter and softer, higher is sharper and heavier. A game that picks its own size ignores it. It applies the next time the game starts.</string>
+    <string name="gamecompat_refresh">Frame rate</string>
+    <string name="gamecompat_refresh_legend">How many images per second the screen shows. 72 spares the device, 90 is smoother and needs more. It applies the next time the game starts.</string>
+    <string name="gamecompat_refresh_game">Game\'s own</string>
+    <string name="gamecompat_cpu_level">Processor level</string>
+    <string name="gamecompat_cpu_level_legend">How much the processor may work. A higher level helps a game that struggles, and uses more power and gives more heat. Automatic leaves the choice to the system. It applies the next time the game starts.</string>
+    <string name="gamecompat_gpu_level">Graphics level</string>
+    <string name="gamecompat_gpu_level_legend">How much the graphics chip may work. A higher level helps a game that struggles, and uses more power and gives more heat. Automatic leaves the choice to the system. It applies the next time the game starts.</string>
+    <string name="gamecompat_level_saving">Saving</string>
+    <string name="gamecompat_level_low">Low</string>
+    <string name="gamecompat_level_high">High</string>
+    <string name="gamecompat_level_boost">Boost</string>
 </resources>

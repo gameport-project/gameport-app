@@ -32,6 +32,8 @@
 #include <vector>
 
 #define XR_USE_PLATFORM_ANDROID
+#define XR_USE_GRAPHICS_API_VULKAN
+#include <vulkan/vulkan.h>
 #include <openxr/openxr.h>
 #include <openxr/openxr_loader_negotiation.h>
 #include <openxr/openxr_platform.h>
@@ -124,6 +126,10 @@ PFN_xrGetReferenceSpaceBoundsRect g_getBounds = nullptr;
 PFN_xrGetActionStateBoolean g_getActionBoolean = nullptr;
 PFN_xrGetActionStateFloat g_getActionFloat = nullptr;
 PFN_xrGetInstanceProperties g_getInstanceProperties = nullptr;
+PFN_xrGetSystemProperties g_getSystemProperties = nullptr;
+PFN_xrCreateVulkanDeviceKHR g_createVulkanDevice = nullptr;
+PFN_xrPerfSettingsSetPerformanceLevelEXT g_perfLevel = nullptr;
+PFN_xrRequestDisplayRefreshRateFB g_refreshRequest = nullptr;
 PFN_xrEnumerateViewConfigurationViews g_enumerateViews = nullptr;
 typedef XrResult (XRAPI_PTR *PFN_xrEnumerateSwapchainFormats)(XrSession, uint32_t, uint32_t*, int64_t*);
 PFN_xrEnumerateSwapchainFormats g_enumerateSwapchainFormats = nullptr;
@@ -137,6 +143,11 @@ std::atomic<int> g_dropMode{0};
 // What the compositor is given, counted for the check of the frames (see FrameCheck): frames ended, those without any layer, those the runtime said not to render, and where the head is
 // in the space the game located its views in.
 std::atomic<uint32_t> g_frameCount{0}, g_emptyFrames{0}, g_noRenderFrames{0};
+// A Pico's runtime says nothing the game's log can use of how steadily the game runs: on a Pico the layer counts the frames itself, once a second, and says them in the form
+// of Meta's line ("FPS=<frames shown>/<frames asked for>", which the hook reads); the frames asked for are those of the display period the runtime announced at the last wait.
+std::atomic<bool> g_countRate{false};
+std::atomic<int> g_displayRate{0};
+std::atomic<uint32_t> g_rateFrames{0};
 std::atomic<float> g_headX{0.0f}, g_headY{0.0f}, g_headZ{0.0f};
 std::atomic<int> g_headValid{-1}, g_headFloor{-1};
 
@@ -318,6 +329,18 @@ void FrameCheck(const XrFrameEndInfo* info) {
     g_frameCount.fetch_add(1);
     if (!info || info->layerCount == 0) g_emptyFrames.fetch_add(1);
     const int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - began).count();
+    if (g_countRate.load()) {
+        static std::atomic<int64_t> rateSince{-1};
+        g_rateFrames.fetch_add(1);
+        int64_t since = rateSince.load();
+        if (since < 0) rateSince.compare_exchange_strong(since, now);
+        else if (now - since >= 1000 && rateSince.compare_exchange_strong(since, now)) {
+            const uint32_t frames = g_rateFrames.exchange(0);
+            const int shown = (int)((frames * 1000.0) / (double)(now - since) + 0.5);
+            const int asked = g_displayRate.load();
+            if (asked > 0) LOGI("FPS=%d/%d", shown, asked);
+        }
+    }
     int64_t last = lastSaid.load();
     if (now - last < (now < 40000 ? 2000 : 30000) || !lastSaid.compare_exchange_strong(last, now)) return;
     std::string layers;
@@ -405,8 +428,57 @@ std::vector<const XrCompositionLayerBaseHeader*> Without(int mode, const std::ve
     return kept;
 }
 
+// Test files of the game's folder (see GamePortFolder), read when the layer needs them: the first line of the file, empty when there is none.
+std::string TestFileText(const char* file) {
+    std::string text;
+    FILE* in = fopen((GamePortFolder() + file).c_str(), "r");
+    if (!in) return text;
+    int c;
+    while ((c = fgetc(in)) != EOF && c != '\n' && c != '\r' && text.size() < 400) text += (char)c;
+    fclose(in);
+    return text;
+}
+
+// What the player chose for the device's graphics in this game (the hook sets the environment from GamePort's settings), or, for a test, a file of the game's folder: the image size as
+// a scale (1.0 leaves it), the frame rate in hertz (empty leaves it), and the levels of the processor and the graphics chip ("cpu=50 gpu=50", empty leaves them to the system).
+double ChosenResolutionScale() {
+    const char* chosen = getenv("GAMEPORT_XR_RESOLUTION");
+    const int percent = chosen ? atoi(chosen) : 0;
+    if (percent > 0 && percent != 100) return percent / 100.0;
+    const std::string text = TestFileText("xr_resolution_scale.txt");
+    return text.empty() ? 1.0 : atof(text.c_str());
+}
+
+std::string ChosenRefreshRate() {
+    const char* chosen = getenv("GAMEPORT_XR_REFRESH");
+    const int rate = chosen ? atoi(chosen) : 0;
+    return rate > 0 ? std::to_string(rate) : TestFileText("xr_refresh_rate.txt");
+}
+
+std::string ChosenLevels() {
+    const char* cpu = getenv("GAMEPORT_XR_CPU_LEVEL");
+    const char* gpu = getenv("GAMEPORT_XR_GPU_LEVEL");
+    const int cpuLevel = cpu ? atoi(cpu) : -1, gpuLevel = gpu ? atoi(gpu) : -1;
+    if (cpuLevel >= 0 || gpuLevel >= 0) {
+        std::string text;
+        if (cpuLevel >= 0) text += "cpu=" + std::to_string(cpuLevel) + " ";
+        if (gpuLevel >= 0) text += "gpu=" + std::to_string(gpuLevel);
+        return text;
+    }
+    return TestFileText("xr_perf_levels.txt");
+}
+
 // What the headset offers for showing the real world behind the game (1 opaque, 2 additive, 3 alpha blend): a game that wants its passthrough asks for the alpha blend one.
 XrResult XRAPI_CALL Layer_xrEnumerateEnvironmentBlendModes(XrInstance instance, XrSystemId systemId, XrViewConfigurationType type, uint32_t capacity, uint32_t* countOut, XrEnvironmentBlendMode* modes) {
+    // Test file xr_blend_opaque_only.txt: the game is told the headset has the opaque mode only.
+    if (countOut && !TestFileText("xr_blend_opaque_only.txt").empty()) {
+        static std::atomic<bool> told{false};
+        if (!told.exchange(true)) LOGI("the environment blend modes are cut to the opaque one (test file)");
+        *countOut = 1;
+        if (capacity == 0) return XR_SUCCESS;
+        if (modes) modes[0] = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+        return XR_SUCCESS;
+    }
     if (!countOut || !g_offerAlphaBlend.load()) {
         const XrResult result = g_enumerateBlendModes(instance, systemId, type, capacity, countOut, modes);
         if (XR_SUCCEEDED(result) && countOut && modes && capacity > 0) {
@@ -622,6 +694,7 @@ void Calibrate(XrTime time) {
 
 XrResult XRAPI_CALL Layer_xrWaitFrame(XrSession session, const XrFrameWaitInfo* info, XrFrameState* state) {
     XrResult result = g_waitFrame(session, info, state);
+    if (XR_SUCCEEDED(result) && state && state->predictedDisplayPeriod > 0) g_displayRate.store((int)(1e9 / (double)state->predictedDisplayPeriod + 0.5));
     if (XR_SUCCEEDED(result) && state) Calibrate(state->predictedDisplayTime);
     if (XR_SUCCEEDED(result) && state && !state->shouldRender) g_noRenderFrames.fetch_add(1);
     return result;
@@ -636,6 +709,24 @@ XrResult XRAPI_CALL Layer_xrBeginSession(XrSession session, const XrSessionBegin
         g_sum = 0.0;
         g_calibrating = g_seated;
         g_offset.store(0.0f);
+        // Test files xr_perf_levels.txt ("cpu=50 gpu=50": 0 power saving, 25 sustained low, 50 sustained high, 75 boost) and xr_refresh_rate.txt (72 or 90): asked of the runtime
+        // as the session begins, to see what they change of the picture and of the frame rate.
+        const std::string levels = ChosenLevels();
+        if (!levels.empty() && g_perfLevel) {
+            const char* cpu = strstr(levels.c_str(), "cpu=");
+            const char* gpu = strstr(levels.c_str(), "gpu=");
+            if (cpu) LOGI("performance level of the cpu set to %d (test file) -> %d", atoi(cpu + 4), (int)g_perfLevel(session, XR_PERF_SETTINGS_DOMAIN_CPU_EXT, (XrPerfSettingsLevelEXT)atoi(cpu + 4)));
+            if (gpu) LOGI("performance level of the gpu set to %d (test file) -> %d", atoi(gpu + 4), (int)g_perfLevel(session, XR_PERF_SETTINGS_DOMAIN_GPU_EXT, (XrPerfSettingsLevelEXT)atoi(gpu + 4)));
+        } else if (!levels.empty()) {
+            LOGI("performance levels asked for (test file) and the runtime has no function for them (the extension is not enabled)");
+        }
+        const std::string refresh = ChosenRefreshRate();
+        if (!refresh.empty() && g_refreshRequest) {
+            const float rate = (float)atof(refresh.c_str());
+            LOGI("display refresh rate %.1f asked for (test file) -> %d", rate, (int)g_refreshRequest(session, rate));
+        } else if (!refresh.empty()) {
+            LOGI("a refresh rate asked for (test file) and the runtime has no function for it (the extension is not enabled)");
+        }
     }
     return result;
 }
@@ -647,6 +738,20 @@ uint32_t g_lastEyeHeight = 0;
 
 XrResult XRAPI_CALL Layer_xrCreateSwapchain(XrSession session, const XrSwapchainCreateInfo* info, XrSwapchain* swapchain) {
     XrSwapchainCreateInfo fixed;
+    XrSwapchainCreateInfo masked;
+    // Test file xr_swapchain_usage_clear.txt (a hexadecimal mask): these usages are taken off every swapchain before the runtime sees it, as OVRPort's loader does for 0xdc.
+    if (info) {
+        const std::string clear = TestFileText("xr_swapchain_usage_clear.txt");
+        if (!clear.empty()) {
+            const unsigned long long mask = strtoull(clear.c_str(), nullptr, 16);
+            if (mask != 0 && (info->usageFlags & mask) != 0) {
+                masked = *info;
+                masked.usageFlags &= ~(XrSwapchainUsageFlags)mask;
+                LOGI("xrCreateSwapchain: usage 0x%llx made 0x%llx (test file, mask 0x%llx)", (unsigned long long)info->usageFlags, (unsigned long long)masked.usageFlags, mask);
+                info = &masked;
+            }
+        }
+    }
     if (info && (info->width == 0 || info->height == 0) && g_lastEyeWidth > 0 && g_lastEyeHeight > 0) {
         fixed = *info;
         fixed.width = g_lastEyeWidth;
@@ -724,6 +829,21 @@ XrResult XRAPI_CALL Layer_xrEnumerateViewConfigurationViews(XrInstance instance,
             if (first) LOGI("%s", line);
             if (views[i].recommendedImageRectWidth == 0) views[i].recommendedImageRectWidth = views[i].maxImageRectWidth;
             if (views[i].recommendedImageRectHeight == 0) views[i].recommendedImageRectHeight = views[i].maxImageRectHeight;
+            // Test file xr_resolution_scale.txt (a number, 1.0 is the size the runtime recommends): the size given to the game is the recommended one times that, never above the
+            // runtime's maximum and never odd. A game that takes the recommended size follows; one that has its own size does not.
+            const double scale = ChosenResolutionScale();
+            if (scale >= 0.25 && scale <= 4.0 && scale != 1.0) {
+                auto scaled = [scale](uint32_t recommended, uint32_t maximum) {
+                    uint32_t value = (uint32_t)(recommended * scale + 0.5);
+                    if (maximum > 0 && value > maximum) value = maximum;
+                    return std::max<uint32_t>(64, value & ~1u);
+                };
+                const uint32_t w = scaled(views[i].recommendedImageRectWidth, views[i].maxImageRectWidth), h = scaled(views[i].recommendedImageRectHeight, views[i].maxImageRectHeight);
+                static std::atomic<bool> told{false};
+                if (!told.exchange(true)) LOGI("the size given to the game is %ux%u instead of %ux%u (scale %.2f, test file)", w, h, views[i].recommendedImageRectWidth, views[i].recommendedImageRectHeight, scale);
+                views[i].recommendedImageRectWidth = w;
+                views[i].recommendedImageRectHeight = h;
+            }
         }
     }
     return result;
@@ -1403,6 +1523,49 @@ std::string SpokenRuntimeName() {
     return cached;
 }
 
+// Test file xr_system_name.txt, "name|vendor id": the game is shown another headset name and vendor (OVRPort's loader shows "Oculus Quest2", 10291).
+XrResult XRAPI_CALL Layer_xrGetSystemProperties(XrInstance instance, XrSystemId systemId, XrSystemProperties* properties) {
+    const XrResult result = g_getSystemProperties(instance, systemId, properties);
+    if (XR_SUCCEEDED(result) && properties) {
+        const std::string text = TestFileText("xr_system_name.txt");
+        if (!text.empty()) {
+            const size_t bar = text.find('|');
+            const std::string name = text.substr(0, bar);
+            const unsigned vendor = bar == std::string::npos ? properties->vendorId : (unsigned)strtoul(text.c_str() + bar + 1, nullptr, 10);
+            static std::atomic<bool> told{false};
+            if (!told.exchange(true)) LOGI("the headset is called '%s', vendor %u, to the game (it is '%s', vendor %u; test file)", name.c_str(), vendor, properties->systemName, properties->vendorId);
+            snprintf(properties->systemName, sizeof(properties->systemName), "%s", name.c_str());
+            properties->vendorId = vendor;
+        }
+    }
+    return result;
+}
+
+// Test file xr_hide_vulkan_device_extensions.txt (names separated by spaces): these extensions are not enabled on the Vulkan device the runtime creates for the game.
+XrResult XRAPI_CALL Layer_xrCreateVulkanDeviceKHR(XrInstance instance, const XrVulkanDeviceCreateInfoKHR* createInfo, VkDevice* vulkanDevice, VkResult* vulkanResult) {
+    const std::string text = TestFileText("xr_hide_vulkan_device_extensions.txt");
+    if (text.empty() || !createInfo || !createInfo->vulkanCreateInfo) return g_createVulkanDevice(instance, createInfo, vulkanDevice, vulkanResult);
+    std::set<std::string> hidden;
+    std::string word;
+    for (char ch : text + " ") {
+        if (ch == ' ' || ch == ',' || ch == ';') { if (!word.empty()) hidden.insert(word); word.clear(); } else word += ch;
+    }
+    XrVulkanDeviceCreateInfoKHR info = *createInfo;
+    VkDeviceCreateInfo device = *createInfo->vulkanCreateInfo;
+    std::vector<const char*> kept;
+    for (uint32_t i = 0; i < device.enabledExtensionCount; i++) {
+        if (hidden.count(device.ppEnabledExtensionNames[i])) {
+            LOGI("vulkan device extension %s not passed on (test file)", device.ppEnabledExtensionNames[i]);
+            continue;
+        }
+        kept.push_back(device.ppEnabledExtensionNames[i]);
+    }
+    device.enabledExtensionCount = (uint32_t)kept.size();
+    device.ppEnabledExtensionNames = kept.data();
+    info.vulkanCreateInfo = &device;
+    return g_createVulkanDevice(instance, &info, vulkanDevice, vulkanResult);
+}
+
 XrResult XRAPI_CALL Layer_xrGetInstanceProperties(XrInstance instance, XrInstanceProperties* properties) {
     const XrResult result = g_getInstanceProperties(instance, properties);
     if (XR_SUCCEEDED(result) && properties) {
@@ -1432,6 +1595,8 @@ XrResult XRAPI_CALL Layer_xrGetInstanceProcAddr(XrInstance instance, const char*
         {"xrEndFrame", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrEndFrame)},
         {"xrEnumerateEnvironmentBlendModes", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrEnumerateEnvironmentBlendModes)},
         {"xrGetInstanceProperties", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrGetInstanceProperties)},
+        {"xrGetSystemProperties", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrGetSystemProperties)},
+        {"xrCreateVulkanDeviceKHR", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrCreateVulkanDeviceKHR)},
         {"xrWaitFrame", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrWaitFrame)},
         {"xrBeginSession", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrBeginSession)},
         {"xrCreateSwapchain", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrCreateSwapchain)},
@@ -1622,7 +1787,14 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
         };
         bool dropMeta = false;
         for (uint32_t i = 0; i < info->enabledExtensionCount; i++) if (isMetaController(info->enabledExtensionNames[i])) dropMeta = true;
-        if (dropEye || hideAny || addPicoControllers || addPassthrough || dropMeta) {
+        // Test files that need an extension the game did not ask for: it is added when the runtime offers it.
+        auto gameAsked = [&](const char* name) {
+            for (uint32_t i = 0; i < info->enabledExtensionCount; i++) if (strcmp(info->enabledExtensionNames[i], name) == 0) return true;
+            return false;
+        };
+        const bool addPerf = !ChosenLevels().empty() && !gameAsked("XR_EXT_performance_settings") && RuntimeOffers(next, "XR_EXT_performance_settings");
+        const bool addRefresh = !ChosenRefreshRate().empty() && !gameAsked("XR_FB_display_refresh_rate") && RuntimeOffers(next, "XR_FB_display_refresh_rate");
+        if (dropEye || hideAny || addPicoControllers || addPassthrough || dropMeta || addPerf || addRefresh) {
             for (uint32_t i = 0; i < info->enabledExtensionCount; i++) {
                 if (isMetaController(info->enabledExtensionNames[i])) {
                     LOGI("extension %s not passed on: the runtime has none, the layer offered it", info->enabledExtensionNames[i]);
@@ -1641,6 +1813,14 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
             if (addPassthrough) {
                 kept.push_back(kFbPassthrough);
                 LOGI("extension %s added: the player chose passthrough for this game", kFbPassthrough);
+            }
+            if (addPerf) {
+                kept.push_back("XR_EXT_performance_settings");
+                LOGI("extension XR_EXT_performance_settings added (test file)");
+            }
+            if (addRefresh) {
+                kept.push_back("XR_FB_display_refresh_rate");
+                LOGI("extension XR_FB_display_refresh_rate added (test file)");
             }
             if (addPicoControllers) {
                 kept.push_back(kPicoControllers);
@@ -1687,6 +1867,10 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
     // A new run starts without the mark of the last one.
     remove((GamePortFolder() + "xr_silent.txt").c_str());
     Load("xrGetInstanceProperties", g_getInstanceProperties);
+    Load("xrGetSystemProperties", g_getSystemProperties);
+    Load("xrCreateVulkanDeviceKHR", g_createVulkanDevice);
+    Load("xrPerfSettingsSetPerformanceLevelEXT", g_perfLevel);
+    Load("xrRequestDisplayRefreshRateFB", g_refreshRequest);
 
     // Which controllers this device has: GamePort says (its VrPlatform), else the runtime's name tells.
     auto familyOf = [](const std::string& text) {
@@ -1720,6 +1904,7 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
         const char* alpha = getenv("GAMEPORT_XR_ALPHA_BLEND");
         g_offerAlphaBlend.store(alpha && alpha[0] == '1');
         g_alphaByLayerBit.store(g_offerAlphaBlend.load() && g_family == Family::Pico);
+        g_countRate.store(g_family == Family::Pico);
     }
     const char* prefer = getenv("GAMEPORT_XR_PREFER_FRAME");
     g_preferFrame = prefer && strcmp(prefer, "1") == 0;

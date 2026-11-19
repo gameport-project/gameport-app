@@ -156,6 +156,7 @@ final class BlackBox {
             int blocked = 0;
             String busiest = "";
             long busiestDelta = 0;
+            long ownDelta = 0;
             StringBuilder where = new StringBuilder();
             Map<Integer, Long> now = new HashMap<>();
             for (File task : tasks) {
@@ -171,6 +172,8 @@ final class BlackBox {
                     Long was = before.get(tid);
                     long delta = was == null ? 0 : ticks - was;
                     String name = stat.substring(open + 1, close);
+                    // What GamePort's own threads cost, in the same ticks (a hundredth of a second of one core): it says in every report whether the hook weighs on the game.
+                    if (name.startsWith("gameport")) ownDelta += delta;
                     if (delta > busiestDelta) {
                         busiestDelta = delta;
                         busiest = name;
@@ -186,7 +189,7 @@ final class BlackBox {
             }
             before.clear();
             before.putAll(now);
-            out.append(" threads=").append(threads).append(" busiest=").append(busiest.isEmpty() ? "-" : busiest + ":" + busiestDelta)
+            out.append(" threads=").append(threads).append(" busiest=").append(busiest.isEmpty() ? "-" : busiest + ":" + busiestDelta).append(" gameportTicks=").append(ownDelta)
                     .append(" blocked=").append(blocked).append(where);
             out.append(" rssMB=").append(residentMegabytes());
         } catch (Throwable t) {
