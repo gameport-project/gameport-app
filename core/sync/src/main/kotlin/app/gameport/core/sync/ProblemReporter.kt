@@ -138,6 +138,7 @@ class ProblemReporter @Inject constructor(
                 if (!lean) entry("apk-contents.txt", clean(apkContents(packageName)))
                 entry("steam-interfaces.txt", clean(steamInterfaces(packageName)))
                 entry("patch.txt", clean(patchFacts(packageName)))
+                entry("engine-settings.txt", clean(engineSettings(packageName)))
                 entry("manifest.txt", clean(manifest(packageName)))
                 entry("components.txt", clean(components(packageName)))
                 entry("launch.txt", clean(launchFacts(packageName)))
@@ -428,6 +429,29 @@ class ProblemReporter @Inject constructor(
         if (found.isEmpty()) appendLine("(no Steam library found in the APK)")
     }
 
+    /** The engine of the game and its settings (see [EngineSettings]), read from its APK. */
+    private fun engineSettings(packageName: String): String {
+        var engine: String? = null
+        var version: String? = null
+        var settings: List<String> = emptyList()
+        packages.apkFilesOf(packageName).forEach { apk ->
+            runCatching {
+                java.util.zip.ZipFile(apk).use { zip ->
+                    zip.getEntry(EngineSettings.DATA_FILE)?.let { entry ->
+                        engine = "Unity"
+                        val head = zip.getInputStream(entry).use { it.readNBytes(EngineSettings.HEAD_BYTES) }
+                        version = version ?: EngineSettings.unityVersion(head)
+                    }
+                    zip.getEntry(EngineSettings.BOOT_CONFIG)?.takeIf { it.size in 1..EngineSettings.MAX_CONFIG_BYTES }?.let { entry ->
+                        settings = EngineSettings.bootConfig(zip.getInputStream(entry).use { String(it.readBytes(), Charsets.UTF_8) })
+                    }
+                    if (engine == null && zip.getEntry("lib/arm64-v8a/libUnreal.so") != null) engine = "Unreal"
+                }
+            }
+        }
+        return EngineSettings.text(engine, version, settings)
+    }
+
     /** Which GamePort pieces the game carries (names and sizes only: nothing from the account file). */
     private fun patchFacts(packageName: String): String = buildString {
         val wanted = listOf(
@@ -495,6 +519,7 @@ class ProblemReporter @Inject constructor(
             apk-contents.txt      the native libraries and the engine's key files inside the game's APK, and one line per folder for the rest (files and bytes)
             steam-interfaces.txt  the Steam interface versions the game's libraries ask for, and the ones GamePort's stand-in does not offer
             patch.txt             which GamePort pieces the game carries (shim, OpenXR layer, hook)
+            engine-settings.txt   the game's engine (Unity with its version, or Unreal) and the text of its boot.config: the engine's graphics and XR settings
             manifest.txt          the permissions and metadata the game declares
             components.txt        the game's screens, services, providers, receivers
             launch.txt            how the game is started
