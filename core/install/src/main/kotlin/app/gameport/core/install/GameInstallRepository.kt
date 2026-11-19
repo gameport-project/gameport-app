@@ -606,8 +606,14 @@ class GameInstallRepository @Inject constructor(
      * The package name this game must be installed under, or null to keep the one its APK declares: the player's choice for it, or the automatic rule of the
      * headset it is on (see [RenamedPackages] — the headsets whose store refuses a re-signed game give the game a name of GamePort's own by themselves).
      */
-    fun renamedPackageFor(appId: Int): String? =
-        RenamedPackages.chosen(gameSettings.get(appId).packageName, appId, VrPlatforms.refusesReSignedGames(packages.vrFamily))
+    fun renamedPackageFor(appId: Int): String? {
+        val mode = gameSettings.get(appId).packageName
+        val installedNow = installedPackage(appId)
+        // Automatic decides for a game that is not on the device yet. One that is already there is left as it is, whichever name it carries: a game that works is never
+        // moved by a patch that runs by itself, and one that does not start is moved by the player's own choice (its page offers it).
+        if (mode == PackageNameMode.AUTO && installedNow != null) return installedNow.takeIf { packages.originalPackageOf(it) != null }
+        return RenamedPackages.chosen(mode, appId, VrPlatforms.refusesReSignedGames(packages.vrFamily))
+    }
 
     /** The name the game is installed under, whether or not GamePort chose it. */
     fun installPackageFor(appId: Int): String? = renamedPackageFor(appId) ?: installedPackage(appId)
@@ -640,7 +646,9 @@ class GameInstallRepository @Inject constructor(
      */
     fun needsRename(appId: Int): Boolean {
         val packageName = installedPackage(appId) ?: return false
-        return renamedPackageFor(appId) != packageName
+        // No name wanted means the game's own: a copy that carries one GamePort gave it has to go back.
+        val wanted = renamedPackageFor(appId) ?: return packages.originalPackageOf(packageName) != null
+        return wanted != packageName
     }
 
     /** True when the installed game was patched by an older patcher than this GamePort has. */
@@ -802,7 +810,7 @@ class GameInstallRepository @Inject constructor(
                 // The name the patched game carries: the same as the installed one, unless this GamePort installs it under a name of its own now.
                 val installName = packages.packageNameOf(patched.first()) ?: packageName
                 val renamed = installName != packageName
-                if (renamed) events.note(appId, "the game is installed as $installName, to start on this headset")
+                if (renamed) events.note(appId, "the game is installed as $installName, to start on this device")
                 // Installing over the game can leave its expansion folder empty: the files wait aside, and come back whatever the outcome. Put aside when the turn of the install
                 // comes, not while it waits behind another one: the game keeps its files meanwhile.
                 var placedUnder: String? = null
