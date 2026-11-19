@@ -30,11 +30,15 @@ object HapticsStrength {
 
 /**
  * What the player can choose to ask of a device's graphics for one game, on the devices that let GamePort set it (a Pico for now): the size of the image the game draws as a
- * percentage of the one the device recommends, the frame rate, and how much the processor and the graphics chip are allowed to work. The first choice of each is "leave it as it is".
+ * percentage of the one the device recommends, the frame rate, and how much the processor and the graphics chip are allowed to work. The first choice of the frame rate and of the levels is
+ * "leave it as it is"; for the image size it is 100 percent, which sits in the middle of the sizes.
  */
 object PerformanceTuning {
-    /** The image size, as a percentage of the recommended one. */
-    val RESOLUTIONS = listOf(100, 50, 70, 80, 90, 110, 125, 150, 200)
+    /** The image size the runtime recommends, which is what a game gets when nothing is chosen. */
+    const val DEFAULT_RESOLUTION = 100
+
+    /** The image size, as a percentage of the recommended one, from the smallest to the largest. */
+    val RESOLUTIONS = listOf(50, 70, 80, 90, DEFAULT_RESOLUTION, 110, 125, 150, 200)
 
     /** The frame rates offered, 0 being the game's own. */
     val REFRESH_RATES = listOf(0, 72, 90)
@@ -42,7 +46,7 @@ object PerformanceTuning {
     /** The levels of OpenXR's performance settings: -1 leaves them to the system, 0 saves power, 25 holds a low pace, 50 a high one, 75 is a boost that may heat the device. */
     val LEVELS = listOf(-1, 0, 25, 50, 75)
 
-    fun resolution(value: Int): Int = if (value in RESOLUTIONS) value else RESOLUTIONS.first()
+    fun resolution(value: Int): Int = if (value in RESOLUTIONS) value else DEFAULT_RESOLUTION
     fun refreshRate(value: Int): Int = if (value in REFRESH_RATES) value else REFRESH_RATES.first()
     fun level(value: Int): Int = if (value in LEVELS) value else LEVELS.first()
 }

@@ -59,8 +59,8 @@ internal fun GamePerformanceContent(
                 ChoiceBox(
                     title = stringResource(R.string.gameperf_resolution),
                     legend = stringResource(R.string.gameperf_resolution_legend),
-                    labels = performance.RESOLUTIONS.mapIndexed { i, percent -> if (i == 0) stringResource(R.string.gamecompat_haptics_normal) else "$percent %" },
-                    selected = performance.RESOLUTIONS.indexOf(settings.resolutionPercent).coerceAtLeast(0),
+                    labels = performance.RESOLUTIONS.map { "$it %" },
+                    selected = performance.RESOLUTIONS.indexOf(settings.resolutionPercent).takeIf { it >= 0 } ?: performance.RESOLUTIONS.indexOf(performance.DEFAULT_RESOLUTION),
                     onSelect = { onResolutionChosen(performance.RESOLUTIONS[it]) },
                     accent = PerformanceTeal,
                 )

@@ -6,7 +6,7 @@ import org.junit.Test
 class PerformanceTuningTest {
     @Test
     fun `the first choice of each setting leaves the graphics as they are`() {
-        assertEquals(100, PerformanceTuning.RESOLUTIONS.first())
+        assertEquals(100, PerformanceTuning.DEFAULT_RESOLUTION)
         assertEquals(0, PerformanceTuning.REFRESH_RATES.first())
         assertEquals(-1, PerformanceTuning.LEVELS.first())
         val untouched = GameSettings()
@@ -24,6 +24,13 @@ class PerformanceTuningTest {
         assertEquals(72, PerformanceTuning.refreshRate(72))
         assertEquals(-1, PerformanceTuning.level(12))
         assertEquals(75, PerformanceTuning.level(75))
+    }
+
+    @Test
+    fun `the resolutions are in order and the default one sits among them`() {
+        assertEquals(PerformanceTuning.RESOLUTIONS.sorted(), PerformanceTuning.RESOLUTIONS)
+        val at = PerformanceTuning.RESOLUTIONS.indexOf(PerformanceTuning.DEFAULT_RESOLUTION)
+        assertEquals(true, at > 0 && at < PerformanceTuning.RESOLUTIONS.lastIndex)
     }
 
     @Test
