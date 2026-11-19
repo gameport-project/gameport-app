@@ -152,14 +152,24 @@ object PackageRenamePatch : ApkPatch {
             val replacement = when {
                 tag == "manifest" && name == "package" -> renamed
                 name == "name" && tag in PERMISSIONS -> prefixed(value, original, renamed)
-                name in PREFIXED_ATTRIBUTES -> prefixed(value, original, renamed)
+                // Several authorities may be listed in one value, separated by semicolons: each one carries the old name.
+                name in PREFIXED_ATTRIBUTES -> value.split(';').joinToString(";") { prefixed(it, original, renamed) }
                 // A relative class name belongs to the game's own package: it must keep pointing at the same class.
-                name in CLASS_ATTRIBUTES && (name != "name" || tag in COMPONENTS) && value.startsWith(".") -> original + value
+                name in CLASS_ATTRIBUTES && (name != "name" || tag in COMPONENTS) -> qualified(value, original)
                 else -> null
             }
             if (replacement != null && replacement != value) attribute.put("data", replacement)
         }
         element.elem<JSONArray>("nodes")?.elemEach<JSONObject>()?.forEach { rewriteElement(it, original, renamed) }
+    }
+
+    /**
+     * The full name of a class written relatively: `.Name`, or `Name` with no dot at all, which Android also resolves against the package. Null for a name already in full.
+     */
+    private fun qualified(value: String, original: String): String? = when {
+        value.startsWith(".") -> original + value
+        value.isNotEmpty() && '.' !in value -> "$original.$value"
+        else -> null
     }
 
     /** [value] with the old package name in front of it replaced by the new one, or unchanged when it names something else. */

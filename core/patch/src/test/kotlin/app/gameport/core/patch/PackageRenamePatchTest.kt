@@ -74,6 +74,20 @@ class PackageRenamePatchTest {
     }
 
     @Test
+    fun `every authority of a list follows the package`() {
+        val json = manifest(original, element("application", children = listOf(element("provider", ManifestAttr("name", ATTR_NAME, "STRING", "a.B"), ManifestAttr("authorities", ATTR_AUTHORITIES, "STRING", "$original.one;$original.two;other.three")))))
+        PackageRenamePatch.patchManifest(json, original, renamed)
+        assertEquals(listOf("$renamed.one;$renamed.two;other.three"), json.all("provider").mapNotNull { it.attr("authorities") })
+    }
+
+    @Test
+    fun `a class name with no dot is written in full`() {
+        val json = manifest(original, element("application", children = listOf(element("activity", ManifestAttr("name", ATTR_NAME, "STRING", "MainActivity")))))
+        PackageRenamePatch.patchManifest(json, original, renamed)
+        assertEquals(listOf("$original.MainActivity"), json.all("activity").mapNotNull { it.attr("name") })
+    }
+
+    @Test
     fun `a class name is never renamed, and a relative one is written in full`() {
         val json = gameManifest()
         PackageRenamePatch.patchManifest(json, original, renamed)
