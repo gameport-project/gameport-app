@@ -24,11 +24,28 @@ object XrLayerPatch : ApkPatch {
         {"file_format_version":"1.0.0","api_layer":{"name":"XR_APILAYER_GAMEPORT_compat","library_path":"$LIBRARY","api_version":"1.0","implementation_version":"1","description":"GamePort OpenXR compatibility layer","disable_environment":"DISABLE_GAMEPORT_XR_LAYER"}}
     """.trimIndent()
 
+    /**
+     * The extensions of Meta's controllers that a Pico's runtime does not have: a game that carries Meta's OVRPlugin looks for them before it makes the actions of its
+     * controllers, and without them makes none. The layer offers them, and does not pass them on (they hold no function; see the layer).
+     */
+    val META_CONTROLLER_EXTENSIONS: List<String> = listOf("XR_FB_touch_controller_pro", "XR_FB_touch_controller_proximity", "XR_META_touch_controller_plus")
+
+    /** The manifest of the layer: it also offers [META_CONTROLLER_EXTENSIONS] when the game is patched on a Pico and carries Meta's OVRPlugin. Nowhere else is it changed. */
+    internal fun manifest(offersMetaControllers: Boolean): String {
+        if (!offersMetaControllers) return MANIFEST
+        val offered = META_CONTROLLER_EXTENSIONS.joinToString(",") { """{"name":"$it","extension_version":"1"}""" }
+        return MANIFEST.replace("\"disable_environment\"", "\"instance_extensions\":[$offered],\"disable_environment\"")
+    }
+
     override fun apply(session: PatchSession, context: PatchContext, assets: PatchAssets) {
         // The OpenXR layer only concerns VR games.
         if (context.isVr == false) return
         val library = runCatching { assets.xrLayer?.open()?.use { it.readBytes() } }.getOrNull() ?: return
         session.addFile(LIBRARY_PATH, library)
-        session.addFile(MANIFEST_PATH, MANIFEST.toByteArray())
+        val metaPlugin = session.hasFile(OvrPluginStandInPatch.LIBRARY_PATH) && session.readFile(OvrPluginStandInPatch.LIBRARY_PATH)?.let { it.size > MIN_REAL_PLUGIN_BYTES } == true
+        session.addFile(MANIFEST_PATH, manifest(context.deviceFamily == PicoMetadataPatch.FAMILY && metaPlugin).toByteArray())
     }
+
+    /** The stand-in GamePort gives some games weighs a few kilobytes; the real OVRPlugin, megabytes. */
+    private const val MIN_REAL_PLUGIN_BYTES = 1_000_000
 }

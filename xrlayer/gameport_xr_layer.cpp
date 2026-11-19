@@ -16,6 +16,7 @@
 //   GAMEPORT_XR_EYE_CM=<number>   standing eye height, in centimetres
 
 #include <android/log.h>
+#include <dlfcn.h>
 #include <jni.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -61,6 +62,7 @@ PFN_xrEnumerateEnvironmentBlendModes g_enumerateBlendModes = nullptr;
 // The player chose passthrough for this game: the alpha blend mode is offered to it when the runtime does not (see Layer_xrEnumerateEnvironmentBlendModes).
 std::atomic<bool> g_offerAlphaBlend{false};
 std::atomic<bool> g_alphaOffered{false};   // the runtime did not offer it and the layer did
+std::atomic<bool> g_alphaByLayerBit{false};  // Pico offers the alpha blend mode itself, but blends only the layers that say so: the player chose passthrough
 std::atomic<bool> g_alphaRefused{false};   // the runtime refused a frame in that mode: frames go out opaque from then on
 
 // The headset refuses the alpha blend mode for some apps (the runtime answers -42 to a frame in that mode, whatever the manifest says), but it shows the real world to an app
@@ -543,6 +545,22 @@ XrResult XRAPI_CALL Layer_xrEndFrame(XrSession session, const XrFrameEndInfo* en
         static std::atomic<bool> told{false};
         if (!told.exchange(true)) LOGI("passthrough: frames go out with the headset's passthrough layer under the game's (%u layer(s) in all)", (unsigned)submitted.size());
     }
+    // A Pico gives the alpha blend mode to the game itself, but takes the alpha of a layer into account only when the layer says so (the source alpha bit): Unreal's
+    // projection layer does not, so the game's real world stayed black. Only for a game the player chose the passthrough for, and only for the layers that lack the bit.
+    std::vector<XrCompositionLayerProjection> alphaProjections;
+    if (!wantsReal && g_alphaByLayerBit.load() && endInfo->environmentBlendMode == XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND) {
+        alphaProjections.reserve(submitted.size());
+        for (auto& header : submitted) {
+            if (!header || header->type != XR_TYPE_COMPOSITION_LAYER_PROJECTION) continue;
+            const auto* projection = reinterpret_cast<const XrCompositionLayerProjection*>(header);
+            if (projection->layerFlags & XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT) continue;
+            alphaProjections.push_back(*projection);
+            alphaProjections.back().layerFlags |= XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
+            header = reinterpret_cast<const XrCompositionLayerBaseHeader*>(&alphaProjections.back());
+            static std::atomic<bool> told{false};
+            if (!told.exchange(true)) LOGI("passthrough: the projection layer of the game now says it blends by its alpha (flags 0x%x -> 0x%x)", (unsigned)projection->layerFlags, (unsigned)alphaProjections.back().layerFlags);
+        }
+    }
     XrFrameEndInfo shifted = *endInfo;
     shifted.layers = submitted.data();
     shifted.layerCount = (uint32_t)submitted.size();
@@ -935,6 +953,8 @@ void WriteDetectedControls(const char* source, const std::vector<std::string>& g
     fclose(out);
 }
 
+XrResult SuggestTolerant(XrInstance instance, const XrInteractionProfileSuggestedBinding* suggested, const char* profile);
+
 // Translates the game's bindings for [source] onto the device's primary profile.
 bool EmulateFrom(XrInstance instance, const std::string& sourceProfile, const char* sourceKind, const std::vector<XrActionSuggestedBinding>& given) {
     const auto overrides = gp::ParseOverrides(getenv("GAMEPORT_XR_MAP"));
@@ -1011,7 +1031,8 @@ bool EmulateFrom(XrInstance instance, const std::string& sourceProfile, const ch
         for (const auto& item : built) if (attempt != 1 || !item.crossHand) bindings.push_back(item.binding);
         remapped.countSuggestedBindings = (uint32_t)bindings.size();
         remapped.suggestedBindings = bindings.data();
-        result = g_suggestBindings(instance, &remapped);
+        // One action the runtime no longer knows is enough for it to refuse the whole table (-12): the others are given, as for the game's own profile.
+        result = SuggestTolerant(instance, &remapped, g_family == Family::Pico ? kPicoProfiles[0] : "/interaction_profiles/oculus/touch_controller");
         LOGI("%s controls translated %s: %u binding(s) for the device (%u given, %d without an equivalent:%s) -> %d", sourceKind,
              attempt == 0 ? "with the overrides" : attempt == 1 ? "without moves between hands" : "with the defaults only",
              (unsigned)bindings.size(), (unsigned)given.size(), droppedCount, dropped.c_str(), (int)result);
@@ -1355,6 +1376,46 @@ XrResult XRAPI_CALL Layer_xrApplyHapticFeedback(XrSession session, const XrHapti
     return g_applyHaptic(session, actionInfo, reinterpret_cast<const XrHapticBaseHeader*>(&scaled));
 }
 
+// Meta's own plugins (the Unity "Meta XR" feature, OVRPlugin) switch themselves off on a runtime that is not Meta's, by its name, and the hooks they put on the game's
+// OpenXR calls then call functions that were never bound. A game can be shown the name of Meta's runtime instead (the file xr_runtime_name.txt of the game's folder, one
+// word): the layer's own decisions keep reading the real one.
+std::string SpokenRuntimeName() {
+    static std::string cached;
+    static std::atomic<int> state{-1};
+    int value = state.load();
+    if (value < 0) {
+        std::string name;
+        FILE* in = fopen((GamePortFolder() + "xr_runtime_name.txt").c_str(), "r");
+        if (in) {
+            int c;
+            while ((c = fgetc(in)) != EOF && c != '\n' && c != '\r' && name.size() < XR_MAX_RUNTIME_NAME_SIZE - 1) name += (char)c;
+            fclose(in);
+        }
+        // Without the file: a Pico shows the name of Meta's runtime to a game that carries Meta's OVRPlugin (it is loaded already, the game loads it before OpenXR).
+        const char* family = getenv("GAMEPORT_XR_FAMILY");
+        std::string lowered = family ? family : "";
+        for (char& ch : lowered) ch = (char)tolower((unsigned char)ch);
+        if (name.empty() && lowered.find("pico") != std::string::npos && dlopen("libOVRPlugin.so", RTLD_NOLOAD | RTLD_LAZY)) name = "Oculus";
+        cached = name;
+        state.store(1);
+        return cached;
+    }
+    return cached;
+}
+
+XrResult XRAPI_CALL Layer_xrGetInstanceProperties(XrInstance instance, XrInstanceProperties* properties) {
+    const XrResult result = g_getInstanceProperties(instance, properties);
+    if (XR_SUCCEEDED(result) && properties) {
+        const std::string spoken = SpokenRuntimeName();
+        if (!spoken.empty()) {
+            static std::atomic<bool> told{false};
+            if (!told.exchange(true)) LOGI("the runtime is called '%s' to the game (it is '%s')", spoken.c_str(), properties->runtimeName);
+            snprintf(properties->runtimeName, sizeof(properties->runtimeName), "%s", spoken.c_str());
+        }
+    }
+    return result;
+}
+
 XrResult XRAPI_CALL Layer_xrGetInstanceProcAddr(XrInstance instance, const char* name, PFN_xrVoidFunction* function) {
     // The loader can ask before the instance exists, or after the chain was rebuilt: nothing below us yet.
     if (!g_nextGetInstanceProcAddr) {
@@ -1370,6 +1431,7 @@ XrResult XRAPI_CALL Layer_xrGetInstanceProcAddr(XrInstance instance, const char*
         {"xrLocateViews", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrLocateViews)},
         {"xrEndFrame", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrEndFrame)},
         {"xrEnumerateEnvironmentBlendModes", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrEnumerateEnvironmentBlendModes)},
+        {"xrGetInstanceProperties", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrGetInstanceProperties)},
         {"xrWaitFrame", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrWaitFrame)},
         {"xrBeginSession", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrBeginSession)},
         {"xrCreateSwapchain", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrCreateSwapchain)},
@@ -1549,8 +1611,23 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
         for (uint32_t i = 0; i < info->enabledExtensionCount; i++) if (strcmp(info->enabledExtensionNames[i], "XR_FB_swapchain_update_state") == 0) hasUpdateState = true;
         const bool addPassthrough = chosen && chosen[0] == '1' && hasUpdateState && !hasPassthrough && RuntimeOffers(next, kFbPassthrough);
         g_passthroughAdded.store(hasPassthrough || addPassthrough);
-        if (dropEye || hideAny || addPicoControllers || addPassthrough) {
+        // The controllers' extensions of Meta that a Pico's runtime lacks are offered by the layer to a game with Meta's OVRPlugin (see the patcher): they hold no function,
+        // so they are not passed on, and the game goes on making the actions of its controllers, which the layer then translates.
+        static const char* const kMetaControllerExtensions[] = {"XR_FB_touch_controller_pro", "XR_FB_touch_controller_proximity", "XR_META_touch_controller_plus"};
+        const bool picoFamily = family && Lower(family).find("pico") != std::string::npos;
+        auto isMetaController = [&](const char* name) {
+            if (!picoFamily) return false;
+            for (const char* known : kMetaControllerExtensions) if (strcmp(name, known) == 0) return !RuntimeOffers(next, name);
+            return false;
+        };
+        bool dropMeta = false;
+        for (uint32_t i = 0; i < info->enabledExtensionCount; i++) if (isMetaController(info->enabledExtensionNames[i])) dropMeta = true;
+        if (dropEye || hideAny || addPicoControllers || addPassthrough || dropMeta) {
             for (uint32_t i = 0; i < info->enabledExtensionCount; i++) {
+                if (isMetaController(info->enabledExtensionNames[i])) {
+                    LOGI("extension %s not passed on: the runtime has none, the layer offered it", info->enabledExtensionNames[i]);
+                    continue;
+                }
                 if (hidden.count(info->enabledExtensionNames[i])) {
                     LOGI("extension %s not passed on (test file)", info->enabledExtensionNames[i]);
                     continue;
@@ -1642,6 +1719,7 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
     {
         const char* alpha = getenv("GAMEPORT_XR_ALPHA_BLEND");
         g_offerAlphaBlend.store(alpha && alpha[0] == '1');
+        g_alphaByLayerBit.store(g_offerAlphaBlend.load() && g_family == Family::Pico);
     }
     const char* prefer = getenv("GAMEPORT_XR_PREFER_FRAME");
     g_preferFrame = prefer && strcmp(prefer, "1") == 0;
