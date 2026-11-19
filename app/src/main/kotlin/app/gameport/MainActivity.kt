@@ -28,6 +28,8 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var achievements: app.gameport.core.sync.AchievementNotifier
 
+    @Inject lateinit var installer: app.gameport.core.install.GameInstallRepository
+
     /** The game whose Workshop page was asked for from outside (a game's "browse" button), until the screen has opened it. */
     private val workshopRequest = androidx.compose.runtime.mutableStateOf<Int?>(null)
 
@@ -63,6 +65,12 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // The player is here to see Android's window: the copies that renamed installs left behind are removed now, not while nobody wears the headset.
+        installer.removeLeftoverCopies()
     }
 
     override fun onNewIntent(intent: android.content.Intent) {

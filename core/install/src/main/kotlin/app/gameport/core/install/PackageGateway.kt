@@ -415,7 +415,7 @@ class PackageGateway @Inject constructor(
 /** The copy of the APKs into the install session is done in blocks of this size, and its progress is told a few times a second. */
 private const val COPY_BUFFER_BYTES = 1 shl 20
 private const val COPY_REPORT_EVERY_MS = 250L
-private const val UNINSTALL_WAIT_MS = 180_000L
+private const val UNINSTALL_WAIT_MS = 60_000L
 
 /** The facts about an APK that decide which build of a game suits a device. */
 data class ApkInfo(

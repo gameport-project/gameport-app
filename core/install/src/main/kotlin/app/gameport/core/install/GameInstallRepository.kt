@@ -885,21 +885,45 @@ class GameInstallRepository @Inject constructor(
      */
     private suspend fun removeLeftoverCopy(appId: Int, oldName: String) {
         if (!packages.isInstalled(oldName)) return
-        events.note(appId, "the copy installed as $oldName is removed")
-        val removal = packages.uninstallInTurn(oldName)
-        if (removal != PackageGateway.Outcome.Success) events.note(appId, "$oldName could not be removed ($removal), it stays on the device")
+        if (!leftoverRemovals.add(appId)) return
+        try {
+            events.note(appId, "the copy installed as $oldName is removed")
+            val removal = packages.uninstallInTurn(oldName)
+            if (removal != PackageGateway.Outcome.Success) {
+                events.note(appId, "$oldName could not be removed ($removal), it stays on the device")
+                leftoverDeclined.add(appId)
+            } else {
+                leftoverDeclined.remove(appId)
+            }
+        } finally {
+            leftoverRemovals.remove(appId)
+        }
     }
+
+    /** The games whose removal is under way, and the ones whose last try was not answered: those are not asked again by themselves, only when their page is opened. */
+    private val leftoverRemovals: MutableSet<Int> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+    private val leftoverDeclined: MutableSet<Int> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     /**
      * Looks for the copy a renamed install left behind under the game's own name, and removes it. Does nothing for a game that was never renamed, or whose old copy is gone.
+     * [asked] is true when the player opened the page of the game: a removal that was not answered before is then tried again.
      */
-    fun removeLeftoverCopy(appId: Int) {
+    fun removeLeftoverCopy(appId: Int, asked: Boolean = true) {
+        if (!asked && appId in leftoverDeclined) return
         val current = installedPackage(appId) ?: return
         val old = packages.originalPackageOf(current) ?: return
         if (old == current || !packages.isInstalled(old) || jobs[appId]?.isActive == true) return
         // Only a copy this GamePort installed goes: the same name may be the store's own copy of the game, which is not GamePort's to remove.
         if (packages.ownerOf(old) != context.packageName) return
         scope.launch { removeLeftoverCopy(appId, old) }
+    }
+
+    /**
+     * Called when GamePort comes to the front, which is when the player is there to see Android's window: a headset closes the ones opened while nobody wears it. Every game
+     * a renamed install left a copy of is looked at, one at a time through the turn of the installs.
+     */
+    fun removeLeftoverCopies() {
+        installed.all().keys.forEach { removeLeftoverCopy(it, asked = false) }
     }
 
     /**
