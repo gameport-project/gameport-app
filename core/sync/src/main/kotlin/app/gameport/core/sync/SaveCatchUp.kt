@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import app.gameport.core.install.InstalledGames
+import app.gameport.core.install.SavesBeforeRemoval
 import app.gameport.core.model.SteamConnection
 import app.gameport.core.steam.SteamAuthRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -12,11 +13,13 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The games whose saves still have to be sent: the ones whose last sync could not be made (no connection, or it failed), installed and
@@ -44,9 +47,16 @@ class SaveCatchUp @Inject constructor(
     private val installed: InstalledGames,
     private val playtime: PlaytimeTracker,
     private val coordinator: CloudSyncCoordinator,
-) {
+) : SavesBeforeRemoval {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Mutex()
+
+    /** The game is about to be installed again under another name, which removes the copy that holds its saves: they are sent first, with a wait that is bounded. */
+    override suspend fun sendBeforeRemoval(packageName: String) {
+        if (auth.connection.value != SteamConnection.ONLINE) return
+        val sending = scope.async { lock.withLock { sendSaves(packageName) } }
+        withTimeoutOrNull(BEFORE_REMOVAL_WAIT_MS) { sending.await() }
+    }
 
     /** Looks each time the connection to Steam comes (back). */
     fun start() {
@@ -93,5 +103,6 @@ class SaveCatchUp @Inject constructor(
         const val TAG = "GPCatchUp"
         const val PAUSE_BETWEEN_GAMES_MS = 3_000L
         const val AFTER_CLOSE_DELAY_MS = 6_000L
+        const val BEFORE_REMOVAL_WAIT_MS = 25_000L
     }
 }

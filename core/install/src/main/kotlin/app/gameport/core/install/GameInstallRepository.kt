@@ -87,6 +87,7 @@ class GameInstallRepository @Inject constructor(
     private val reinstallNotice: app.gameport.core.settings.ReinstallNoticeStore,
     private val userSettings: app.gameport.core.settings.UserSettings,
     private val memoryNotice: MemoryNotice,
+    private val savesBeforeRemoval: SavesBeforeRemoval,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val operations = MutableStateFlow<Map<Int, InstallState>>(emptyMap())
@@ -811,6 +812,11 @@ class GameInstallRepository @Inject constructor(
                 val installName = packages.packageNameOf(patched.first()) ?: packageName
                 val renamed = installName != packageName
                 if (renamed) events.note(appId, "the game is installed as $installName, to start on this device")
+                // The copy under the old name is removed once the new one is in: what it kept goes with it, so its saves are sent to Steam first.
+                if (renamed) {
+                    events.note(appId, "the saves of $packageName are sent before the copy is removed")
+                    savesBeforeRemoval.sendBeforeRemoval(packageName)
+                }
                 // Installing over the game can leave its expansion folder empty: the files wait aside, and come back whatever the outcome. Put aside when the turn of the install
                 // comes, not while it waits behind another one: the game keeps its files meanwhile.
                 var placedUnder: String? = null
