@@ -19,6 +19,9 @@ object ObbNames {
 
     private fun expansion(names: List<String>) = Regex("^($ROLES)\\.(\\d+)\\.(${names.joinToString("|") { Regex.escape(it) }})\\.obb$")
 
+    /** The same, with the version code left out when the game's file has none (`overflow1.<package>.obb`, as Red Matter 2 publishes it). */
+    private fun expansionOrUnversioned(names: List<String>) = Regex("^($ROLES)(?:\\.(\\d+))?\\.(${names.joinToString("|") { Regex.escape(it) }})\\.obb$")
+
     /** True when one of [names] is an expansion file named after a version code (`main.<code>.<package>.obb` and its kind): the ones that the raised version of a patched game can leave unfound. */
     fun hasVersioned(names: Collection<String>, packageName: String): Boolean {
         val pattern = expansion(listOf(packageName))
@@ -52,8 +55,16 @@ object ObbNames {
      * game, or already has that name. [original] is the package the game's APK declares, when it is installed under another name: its files are recognised
      * under either, and renamed after the installed one.
      */
-    fun aligned(fileName: String, packageName: String, code: Long, original: String? = null): String? {
-        val match = expansion(namesOf(packageName, original)).matchEntire(fileName)
+    fun aligned(fileName: String, packageName: String, code: Long, original: String? = null, keepNumbers: Boolean = false): String? {
+        val match = expansionOrUnversioned(namesOf(packageName, original)).matchEntire(fileName)
+        if (match != null) {
+            val role = match.groupValues[1]
+            val number = match.groupValues[2]
+            // A file the game publishes with no version code is looked for without one: only the package changes. With [keepNumbers] (an Unreal game, whose own code writes the
+            // version of each of its files down when it is built: `patch.0` stays `patch.0`) the number of a file is left as it is and only the package changes.
+            val name = if (number.isEmpty()) "$role.$packageName.obb" else if (keepNumbers) "$role.$number.$packageName.obb" else "$role.$code.$packageName.obb"
+            return name.takeIf { it != fileName }
+        }
         if (match == null) {
             // A depot may publish the file under a name of its own (`<game>.main.obb`, for one), which the engine never looks for.
             val role = Regex("^(?:.*[._-])?(main|patch)\\.obb$", RegexOption.IGNORE_CASE).matchEntire(fileName)?.groupValues?.get(1) ?: return null

@@ -67,10 +67,10 @@ internal object ExpansionFiles {
      * old name is removed. What is there is also opened to all, so a game that was placed before that was done can read it.
      * Returns the names it changed, and does nothing when the folder is not there.
      */
-    fun align(directory: File, packageName: String, code: Long, original: String? = null): List<String> {
+    fun align(directory: File, packageName: String, code: Long, original: String? = null, keepNumbers: Boolean = false): List<String> {
         val renamed = mutableListOf<String>()
         directory.listFiles()?.forEach { file ->
-            val name = ObbNames.aligned(file.name, packageName, code, original) ?: return@forEach
+            val name = ObbNames.aligned(file.name, packageName, code, original, keepNumbers) ?: return@forEach
             val destination = File(directory, name)
             when {
                 !destination.exists() -> if (file.renameTo(destination)) renamed += name

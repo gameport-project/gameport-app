@@ -145,4 +145,26 @@ class ObbNamesTest {
         // Without the other name, the old package is not the game's: what a depot publishes under it is not its folder.
         assertEquals("$came/main_assets_all.bundle", ObbNames.placement("Android/obb/$came/main_assets_all.bundle", pkg))
     }
+
+    @Test
+    fun `an unreal game keeps the number of each of its expansion files and only the package changes`() {
+        val came = "com.VerticalRobot.RedMatter2"
+        val pkg = "com.gameport.g2081470"
+        assertEquals("main.75.$pkg.obb", ObbNames.aligned("main.75.$came.obb", pkg, 75, came, keepNumbers = true))
+        // The patch was built as version 0: it stays 0, not 75.
+        assertEquals("patch.0.$pkg.obb", ObbNames.aligned("patch.0.$came.obb", pkg, 75, came, keepNumbers = true))
+        assertEquals("overflow1.6.$pkg.obb", ObbNames.aligned("overflow1.6.$came.obb", pkg, 75, came, keepNumbers = true))
+        // Without the flag (a Unity game, which asks Android for the version code) the numbers follow the code, as before.
+        assertEquals("patch.75.$pkg.obb", ObbNames.aligned("patch.0.$came.obb", pkg, 75, came))
+    }
+
+    @Test
+    fun `a file published without a version code gets none, whatever the engine`() {
+        val came = "com.VerticalRobot.RedMatter2"
+        val pkg = "com.gameport.g2081470"
+        assertEquals("overflow1.$pkg.obb", ObbNames.aligned("overflow1.$came.obb", pkg, 75, came))
+        assertEquals("overflow1.$pkg.obb", ObbNames.aligned("overflow1.$came.obb", pkg, 75, came, keepNumbers = true))
+        // Already under the right name: nothing to do.
+        assertNull(ObbNames.aligned("overflow1.$pkg.obb", pkg, 75, came))
+    }
 }

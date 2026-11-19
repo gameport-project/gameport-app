@@ -24,10 +24,10 @@ internal class HandoffStaging(private val root: File) {
     private fun folder(packageName: String): File? = if (SAFE_PACKAGE.matches(packageName)) File(root, packageName) else null
 
     /** Moves the expansion files of [downloaded] here, then names them for the version code [code] (see [ExpansionFiles.align]). Returns the names kept. */
-    fun stage(downloaded: File, packageName: String, skipped: String, code: Long?, problems: MutableList<String>, original: String? = null): List<String> {
+    fun stage(downloaded: File, packageName: String, skipped: String, code: Long?, problems: MutableList<String>, original: String? = null, keepNumbers: Boolean = false): List<String> {
         val target = folder(packageName) ?: return emptyList()
         val placed = ExpansionFiles.place(downloaded, target, packageName, skipped, problems, original = original)
-        if (code != null) ExpansionFiles.align(target, packageName, code, original)
+        if (code != null) ExpansionFiles.align(target, packageName, code, original, keepNumbers)
         return placed
     }
 
@@ -82,8 +82,8 @@ class ExpansionHandoff @Inject constructor(
         @Volatile var total: Long = 0
     }
 
-    internal fun stage(downloaded: File, packageName: String, skipped: String, code: Long?, problems: MutableList<String>, original: String? = null): List<String> =
-        staging.stage(downloaded, packageName, skipped, code, problems, original)
+    internal fun stage(downloaded: File, packageName: String, skipped: String, code: Long?, problems: MutableList<String>, original: String? = null, keepNumbers: Boolean = false): List<String> =
+        staging.stage(downloaded, packageName, skipped, code, problems, original, keepNumbers)
 
     fun hasStaged(packageName: String): Boolean = staging.staged(packageName).isNotEmpty()
 

@@ -1431,7 +1431,7 @@ class GameInstallRepository @Inject constructor(
         if (problems.isNotEmpty()) events.note(appId, "${problems.size} expansion file(s) could NOT be placed in Android/obb/$packageName: " + problems.take(MAX_PLACED_LISTED).joinToString("; "))
         // What is left of the download is kept for the game to place in its own folder.
         val staging = mutableListOf<String>()
-        val kept = runCatching { handoff.stage(directory, packageName, PATCHED_DIR, alignedVersionCode(packageName), staging, original) }.getOrDefault(emptyList())
+        val kept = runCatching { handoff.stage(directory, packageName, PATCHED_DIR, alignedVersionCode(packageName), staging, original, keepNumbers = packages.isUnreal(packageName)) }.getOrDefault(emptyList())
         if (kept.isEmpty()) return@withContext false
         deliverByGame(appId, packageName)
     }
@@ -1508,7 +1508,8 @@ class GameInstallRepository @Inject constructor(
         runCatching {
             val installed = packages.versionCodeOf(packageName) ?: return
             val code = app.gameport.core.model.ObbNames.versionFor(installed, packages.originalVersionCodeOf(packageName), packages.isUnreal(packageName)) ?: return
-            ExpansionFiles.align(File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName"), packageName, code, originalPackageOf(packageName))
+            // An Unreal game writes the version of each of its expansion files down when it is built: they keep their numbers, only the package part of the name follows.
+            ExpansionFiles.align(File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName"), packageName, code, originalPackageOf(packageName), keepNumbers = packages.isUnreal(packageName))
         }
     }
 
