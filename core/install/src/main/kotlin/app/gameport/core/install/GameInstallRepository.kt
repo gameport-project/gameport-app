@@ -910,12 +910,31 @@ class GameInstallRepository @Inject constructor(
      */
     fun removeLeftoverCopy(appId: Int, asked: Boolean = true) {
         if (!asked && appId in leftoverDeclined) return
+        if (jobs[appId]?.isActive == true) return
+        if (adoptRenamedCopy(appId)) return
         val current = installedPackage(appId) ?: return
         val old = packages.originalPackageOf(current) ?: return
         if (old == current || !packages.isInstalled(old) || jobs[appId]?.isActive == true) return
         // Only a copy this GamePort installed goes: the same name may be the store's own copy of the game, which is not GamePort's to remove.
         if (packages.ownerOf(old) != context.packageName) return
         scope.launch { removeLeftoverCopy(appId, old) }
+    }
+
+    /**
+     * A renamed install whose record was not written (GamePort was left before it, or an earlier version wrote it after a removal that never ended) leaves the game recorded
+     * under its old name while its copy under GamePort's name is on the device and is the one that starts. That copy is taken as the game, and the old one is removed.
+     * Returns true when it did.
+     */
+    private fun adoptRenamedCopy(appId: Int): Boolean {
+        val recorded = installed.all()[appId] ?: return false
+        val renamedName = RenamedPackages.nameFor(appId)
+        if (recorded == renamedName || gameSettings.get(appId).packageName == PackageNameMode.OFF) return false
+        if (!packages.isInstalled(renamedName) || packages.ownerOf(renamedName) != context.packageName) return false
+        if (!packages.isInstalled(recorded) || packages.ownerOf(recorded) != context.packageName) return false
+        events.note(appId, "the copy installed as $renamedName is the game: the record, still on $recorded, is corrected")
+        installed.put(appId, renamedName)
+        scope.launch { removeLeftoverCopy(appId, recorded) }
+        return true
     }
 
     /**
