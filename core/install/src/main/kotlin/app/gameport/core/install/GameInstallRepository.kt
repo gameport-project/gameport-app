@@ -835,16 +835,14 @@ class GameInstallRepository @Inject constructor(
                 events.note(appId, "re-patch install outcome: $outcome")
                 when (outcome) {
                     PackageGateway.Outcome.Success -> {
+                        // The new copy is the game from now on: it is written down before anything else, so that a removal that never finishes does not leave GamePort on the old one.
                         if (renamed) {
-                            // The copy under the old name goes: two of the same game would both be on the device, and GamePort follows one of them.
-                            events.note(appId, "the copy installed as $packageName is removed")
-                            val removal = packages.uninstall(packageName)
-                            if (removal != PackageGateway.Outcome.Success) events.note(appId, "$packageName could not be removed ($removal), it stays on the device")
                             installed.put(appId, installName)
                             incomplete.remove(appId)
                         }
                         alignObbVersion(installName)
                         clearState(appId)
+                        if (renamed) removeLeftoverCopy(appId, packageName)
                     }
                     // The player closed Android's window: the patch was not applied. The card stays where it was, waiting for that confirmation, so the page offers to bring it back.
                     PackageGateway.Outcome.Cancelled -> setState(appId, InstallState.Installing(app.gameport.core.model.InstallStep.AWAITING_CONFIRMATION, 1f))
@@ -879,6 +877,30 @@ class GameInstallRepository @Inject constructor(
      * (see [PackageGateway.reopenConfirmation]). False when there is no window to open.
      */
     fun reopenInstallConfirmation(): Boolean = packages.reopenConfirmation()
+
+    /**
+     * Removes the copy of a game that a renamed install left under its old name: two of the same game would be on the device, and the old one is the one the device refuses.
+     * It waits for the turn of the installs so its window is not lost behind another one. A removal nobody confirms is not forgotten: [removeLeftoverCopy] is asked again whenever
+     * the game's page is opened.
+     */
+    private suspend fun removeLeftoverCopy(appId: Int, oldName: String) {
+        if (!packages.isInstalled(oldName)) return
+        events.note(appId, "the copy installed as $oldName is removed")
+        val removal = packages.uninstallInTurn(oldName)
+        if (removal != PackageGateway.Outcome.Success) events.note(appId, "$oldName could not be removed ($removal), it stays on the device")
+    }
+
+    /**
+     * Looks for the copy a renamed install left behind under the game's own name, and removes it. Does nothing for a game that was never renamed, or whose old copy is gone.
+     */
+    fun removeLeftoverCopy(appId: Int) {
+        val current = installedPackage(appId) ?: return
+        val old = packages.originalPackageOf(current) ?: return
+        if (old == current || !packages.isInstalled(old) || jobs[appId]?.isActive == true) return
+        // Only a copy this GamePort installed goes: the same name may be the store's own copy of the game, which is not GamePort's to remove.
+        if (packages.ownerOf(old) != context.packageName) return
+        scope.launch { removeLeftoverCopy(appId, old) }
+    }
 
     /**
      * Brings the confirmation of the install back: the window is opened again when it still exists (covered, lost behind something), and when the player closed it, which

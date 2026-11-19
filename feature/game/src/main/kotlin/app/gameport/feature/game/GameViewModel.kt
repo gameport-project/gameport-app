@@ -393,6 +393,8 @@ class GameViewModel @Inject constructor(
      */
     fun refreshIssues() {
         issuesRepository.refresh()
+        // A renamed install whose old copy was not removed is finished when the page is opened: the player is there to confirm.
+        installer.removeLeftoverCopy(appId)
         lookAgainWhileALaunchIsAnswered()
     }
 

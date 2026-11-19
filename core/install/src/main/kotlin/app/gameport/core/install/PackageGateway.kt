@@ -320,6 +320,19 @@ class PackageGateway @Inject constructor(
     suspend fun uninstall(packageName: String): Outcome =
         awaitStatus(packageName.hashCode()) { intentSender -> packageManager.packageInstaller.uninstall(packageName, intentSender) }
 
+    /**
+     * Removes a package with the turn of the installs held: Android shows one confirmation at a time and loses the others, so a removal that opens its window while an
+     * install's is open is never seen. Gives up after [waitMs] without an answer, so a window nobody sees does not hold the other installs for ever.
+     */
+    suspend fun uninstallInTurn(packageName: String, waitMs: Long = UNINSTALL_WAIT_MS): Outcome {
+        installTurn.lock()
+        try {
+            return kotlinx.coroutines.withTimeoutOrNull(waitMs) { uninstall(packageName) } ?: Outcome.Cancelled
+        } finally {
+            installTurn.unlock()
+        }
+    }
+
     private suspend fun awaitStatus(token: Int, note: (String) -> Unit = {}, onConfirmation: ((Intent) -> Unit)? = null, start: (android.content.IntentSender) -> Unit): Outcome =
         suspendCancellableCoroutine { continuation ->
             val action = "${context.packageName}.PACKAGE_RESULT.$token"
@@ -402,6 +415,7 @@ class PackageGateway @Inject constructor(
 /** The copy of the APKs into the install session is done in blocks of this size, and its progress is told a few times a second. */
 private const val COPY_BUFFER_BYTES = 1 shl 20
 private const val COPY_REPORT_EVERY_MS = 250L
+private const val UNINSTALL_WAIT_MS = 180_000L
 
 /** The facts about an APK that decide which build of a game suits a device. */
 data class ApkInfo(
