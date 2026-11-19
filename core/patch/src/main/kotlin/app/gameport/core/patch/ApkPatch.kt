@@ -85,6 +85,9 @@ class PatchSession(private val apk: ApkModule, val existingHookDex: String? = nu
         }.bytes
     }
 
+    /** The size of a file of the APK in bytes, or null when there is none. */
+    fun fileLength(path: String): Long? = apk.zipEntryMap.getInputSource(path)?.length
+
     /** Whether the APK holds a file at [path]. */
     fun hasFile(path: String): Boolean = apk.zipEntryMap.getInputSource(path) != null
 

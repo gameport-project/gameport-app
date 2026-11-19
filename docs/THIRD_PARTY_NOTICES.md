@@ -6,7 +6,7 @@ GamePort is open source. Everything below is used under its own licence; keep th
 
 | Project | Used in | Licence | Notes |
 |---|---|---|---|
-| [ovrport](https://github.com/ovrport/app) | `core/patch` (two files adapted: `VrLauncherPatch.kt`, `JsonNav.kt`) | GPLv3 | Idea and code of the launcher patch, and the helpers walking the manifest. No fork is kept. |
+| [ovrport](https://github.com/ovrport/app) | `core/patch` (two files adapted: `VrLauncherPatch.kt`, `JsonNav.kt`; one idea: `UnrealUnityPlayerStubPatch.kt`) | GPLv3 | Idea and code of the launcher patch, and the helpers walking the manifest; the idea of giving an Unreal game the current activity in Unity's player class (OVRPort's `patch_fix_unreal_crash`), done here with a stand-in class and the hook instead of editing the game's code. The same OpenXR permissions as OVRPort's VR metadata patch are added on a Pico. No fork is kept. |
 | [Goldberg Steam Emulator](https://gitlab.com/Mr_Goldberg/goldberg_emulator) | repository `gameport-steamworks-shim` | LGPLv3 | Base of the Steamworks shim. Our changes are on branch `gameport`. |
 
 ## Code copied from other projects
