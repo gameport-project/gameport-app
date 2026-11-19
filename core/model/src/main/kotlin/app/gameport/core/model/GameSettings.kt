@@ -40,14 +40,25 @@ enum class PassthroughMode { AUTO, ON, OFF }
 object PassthroughGames {
     private val APP_IDS = setOf(804530)
 
-    /** [told]: the games the console says declare the passthrough, on top of the ones built in. */
-    fun wanted(appId: Int, told: Set<Int> = emptySet()): Boolean = appId in APP_IDS || appId in told
+    /**
+     * The headsets whose graphics stack does not take the declaration for one game, by game: on a Pico, Cubism (804530) dies in the Adreno Vulkan driver before
+     * its first frame once the extension that carries the real world is enabled in its instance, while it uses the passthrough normally on a Quest. The
+     * declaration is what lets the game's own passthrough setting work, so it is kept everywhere else.
+     */
+    private val NOT_ON: Map<Int, Set<String>> = mapOf(804530 to setOf(app.gameport.core.model.vr.PicoPlatform.id))
+
+    /**
+     * [told]: the games the console says declare the passthrough, on top of the ones built in. [deviceFamily]: the headset the game is installed on
+     * (`pico`, `meta`, `openxr`), null when it is not known.
+     */
+    fun wanted(appId: Int, deviceFamily: String? = null, told: Set<Int> = emptySet()): Boolean =
+        (appId in APP_IDS || appId in told) && deviceFamily !in NOT_ON[appId].orEmpty()
 
     /** Whether the declaration is given to [appId]: the player's choice, or the list when they left it automatic. */
-    fun declared(mode: PassthroughMode, appId: Int, told: Set<Int> = emptySet()): Boolean = when (mode) {
+    fun declared(mode: PassthroughMode, appId: Int, deviceFamily: String? = null, told: Set<Int> = emptySet()): Boolean = when (mode) {
         PassthroughMode.ON -> true
         PassthroughMode.OFF -> false
-        PassthroughMode.AUTO -> wanted(appId, told)
+        PassthroughMode.AUTO -> wanted(appId, deviceFamily, told)
     }
 }
 

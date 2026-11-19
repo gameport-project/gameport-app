@@ -35,6 +35,9 @@ class GameCompatViewModel @Inject constructor(
 ) : ViewModel() {
     private val appId = savedStateHandle.toRoute<GameCompatRoute>().appId
 
+    /** The headset family this device is (`pico`, `meta`, `openxr`), null when it is not a headset. */
+    private val deviceFamily: String? = device.vrPlatform?.id
+
     val gameName: StateFlow<String> = library.observeGame(appId)
         .map { it?.name.orEmpty() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), "")
@@ -85,13 +88,13 @@ class GameCompatViewModel @Inject constructor(
     /** Whether the game declares the headset's passthrough feature: automatic follows the list of games known to need it. A change patches the game again, which applies it. */
     fun onPassthroughChosen(mode: PassthroughMode) {
         val told = gameDefaults.list.passthrough
-        val before = PassthroughGames.declared(gameSettings.value.passthrough, appId, told)
+        val before = PassthroughGames.declared(gameSettings.value.passthrough, appId, deviceFamily, told)
         settings.set(appId, gameSettings.value.copy(passthrough = mode))
-        if (PassthroughGames.declared(mode, appId, told) != before) installer.repatch(appId)
+        if (PassthroughGames.declared(mode, appId, deviceFamily, told) != before) installer.repatch(appId)
     }
 
     /** True when the list, and not the player, gives this game the declaration. */
-    val passthroughListed: Boolean get() = PassthroughGames.wanted(appId, gameDefaults.list.passthrough)
+    val passthroughListed: Boolean get() = PassthroughGames.wanted(appId, deviceFamily, gameDefaults.list.passthrough)
 
     /** Automatic gives the game the stand-in when it needs one, off takes away the one GamePort gave. Either way the game is patched again, which applies the choice. */
     fun onOvrPluginStandInChosen(automatic: Boolean) {
