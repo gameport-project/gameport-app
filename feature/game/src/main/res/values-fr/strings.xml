@@ -370,7 +370,11 @@
     <string name="report_contents_show">Voir ce que contient le rapport</string>
     <string name="report_contents_hide">Masquer le contenu du rapport</string>
     <string name="gameperf_resolution">Résolution de l\'image</string>
-    <string name="gameperf_resolution_legend">La taille de l\'image que le jeu dessine, par rapport à celle que cet appareil recommande. Plus bas est plus léger et plus flou, plus haut est plus net et plus lourd. Un jeu qui choisit sa propre taille l\'ignore. Cela s\'applique au prochain démarrage du jeu.</string>
+    <string name="gameperf_resolution_legend">La taille de l\'image que le jeu dessine, en proportion de la résolution de l\'écran. Par défaut laisse la taille demandée par le jeu ou celle que cet appareil recommande. Le trait jaune marque la valeur par défaut. Plus bas est plus léger et plus flou, plus haut est plus net et plus lourd. Un jeu qui choisit sa propre taille l\'ignore. Cela s\'applique au prochain démarrage du jeu.</string>
+    <string name="gameperf_resolution_default">Par défaut</string>
+    <string name="gameperf_resolution_screen">Écran</string>
+    <string name="gameperf_resolution_shown">Image affichée</string>
+    <string name="gameperf_resolution_per_eye">Tailles en pixels, pour un œil.</string>
     <string name="gameperf_refresh">Fréquence d\'images</string>
     <string name="gameperf_refresh_legend">Le nombre d\'images par seconde que l\'écran affiche. 72 ménage l\'appareil, 90 est plus fluide et demande plus. Cela s\'applique au prochain démarrage du jeu.</string>
     <string name="gameperf_refresh_game">Celle du jeu</string>

@@ -441,10 +441,14 @@ std::string TestFileText(const char* file) {
 
 // What the player chose for the device's graphics in this game (the hook sets the environment from GamePort's settings), or, for a test, a file of the game's folder: the image size as
 // a scale (1.0 leaves it), the frame rate in hertz (empty leaves it), and the levels of the processor and the graphics chip ("cpu=50 gpu=50", empty leaves them to the system).
-double ChosenResolutionScale() {
+// The side of the image GamePort asks for, in pixels (0 leaves the size to the game); the hook sets it from the player's choice, a share of the screen's resolution.
+int ChosenResolutionSide() {
     const char* chosen = getenv("GAMEPORT_XR_RESOLUTION");
-    const int percent = chosen ? atoi(chosen) : 0;
-    if (percent > 0 && percent != 100) return percent / 100.0;
+    const int side = chosen ? atoi(chosen) : 0;
+    return side >= 256 && side <= 4096 ? side : 0;
+}
+
+double ChosenResolutionScale() {
     const std::string text = TestFileText("xr_resolution_scale.txt");
     return text.empty() ? 1.0 : atof(text.c_str());
 }
@@ -831,8 +835,9 @@ XrResult XRAPI_CALL Layer_xrEnumerateViewConfigurationViews(XrInstance instance,
             if (views[i].recommendedImageRectHeight == 0) views[i].recommendedImageRectHeight = views[i].maxImageRectHeight;
             // The image size given to the game is the recommended one times the player's scale (the file xr_resolution_scale.txt for a test), never odd. The maximum the runtime
             // announces is not held to: it accepted a swapchain of 3072 by 3072 in a game while announcing 2560, so only a margin of 4096 a side keeps a choice from asking for the impossible.
-            const double scale = ChosenResolutionScale();
-            if (scale >= 0.25 && scale <= 4.0 && scale != 1.0) {
+            const int chosenSide = ChosenResolutionSide();
+            const double scale = chosenSide > 0 && views[i].recommendedImageRectWidth > 0 ? chosenSide / (double)views[i].recommendedImageRectWidth : ChosenResolutionScale();
+            if (scale >= 0.1 && scale <= 8.0 && scale != 1.0) {
                 auto scaled = [scale](uint32_t recommended, uint32_t) {
                     uint32_t value = (uint32_t)(recommended * scale + 0.5);
                     if (value > 4096) value = 4096;

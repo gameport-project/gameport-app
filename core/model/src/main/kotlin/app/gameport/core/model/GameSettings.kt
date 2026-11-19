@@ -34,11 +34,22 @@ object HapticsStrength {
  * "leave it as it is"; for the image size it is 100 percent, which sits in the middle of the sizes.
  */
 object PerformanceTuning {
-    /** The image size the runtime recommends, which is what a game gets when nothing is chosen. */
-    const val DEFAULT_RESOLUTION = 100
+    /** Nothing chosen: the game gets the size it asks for or the one the device recommends. */
+    const val DEFAULT_RESOLUTION = 0
 
-    /** The image size, as a percentage of the recommended one, from the smallest to the largest. */
-    val RESOLUTIONS = listOf(50, 70, 80, 90, DEFAULT_RESOLUTION, 110, 125, 133, 150, 200)
+    /** The most a side of the image may be: what a game can be asked for without asking for the impossible. */
+    const val MAX_SIDE = 4096
+
+    /** The image size is chosen as a percentage of the device's screen resolution (100 is the screen's own), from [MIN_RESOLUTION] to [MAX_RESOLUTION] by [RESOLUTION_STEP]. */
+    const val MIN_RESOLUTION = 70
+    const val MAX_RESOLUTION = 200
+    const val RESOLUTION_STEP = 5
+
+    /** Where the slider starts when the player leaves the default: the screen's own resolution. */
+    const val CUSTOM_START = 100
+
+    /** The side, in pixels, the game is asked for with a choice of [percent] of a screen side of [screenSide]: even, between 64 and [MAX_SIDE]. */
+    fun scaledSide(screenSide: Int, percent: Int): Int = maxOf(64, minOf(MAX_SIDE, (screenSide * percent / 100.0 + 0.5).toInt()) and 1.inv())
 
     /** The frame rates offered, 0 being the game's own. */
     val REFRESH_RATES = listOf(0, 72, 90)
@@ -46,7 +57,8 @@ object PerformanceTuning {
     /** The levels of OpenXR's performance settings: -1 leaves them to the system, 0 saves power, 25 holds a low pace, 50 a high one, 75 is a boost that may heat the device. */
     val LEVELS = listOf(-1, 0, 25, 50, 75)
 
-    fun resolution(value: Int): Int = if (value in RESOLUTIONS) value else DEFAULT_RESOLUTION
+    fun resolution(value: Int): Int =
+        if (value in MIN_RESOLUTION..MAX_RESOLUTION && (value - MIN_RESOLUTION) % RESOLUTION_STEP == 0) value else DEFAULT_RESOLUTION
     fun refreshRate(value: Int): Int = if (value in REFRESH_RATES) value else REFRESH_RATES.first()
     fun level(value: Int): Int = if (value in LEVELS) value else LEVELS.first()
 }
@@ -129,8 +141,8 @@ data class GameSettings(
     val eyeFoveation: EyeFoveationMode = EyeFoveationMode.AUTO,
     /** How strongly the controllers vibrate in this game, as a percentage of what the game asks for ([HapticsStrength]); 100 leaves it as it is. */
     val hapticsPercent: Int = HapticsStrength.NORMAL,
-    /** The size of the image the game draws, as a percentage of the recommended one ([PerformanceTuning]); 100 leaves it as it is. */
-    val resolutionPercent: Int = 100,
+    /** The size of the image the game draws, as a percentage of the screen's resolution ([PerformanceTuning]); 0 leaves it as it is. */
+    val resolutionPercent: Int = PerformanceTuning.DEFAULT_RESOLUTION,
     /** The frame rate asked for ([PerformanceTuning]); 0 leaves it to the game. */
     val refreshRate: Int = 0,
     /** How much the processor and the graphics chip may work ([PerformanceTuning.LEVELS]); -1 leaves it to the system. */

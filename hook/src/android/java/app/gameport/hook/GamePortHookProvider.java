@@ -1082,7 +1082,7 @@ public final class GamePortHookProvider extends ContentProvider {
         String eyeFov = "auto";
         String haptics = "100";
         // What the player asked of the device's graphics for this game: image size in percent, frame rate, processor and graphics levels (100, 0, -1, -1 leave them alone).
-        String resolution = "100";
+        String resolution = "0";
         String refresh = "0";
         String cpuLevel = "-1";
         String gpuLevel = "-1";
@@ -1103,7 +1103,7 @@ public final class GamePortHookProvider extends ContentProvider {
             String eyeFoveation = config.getString("xrEyeFoveation");
             eyeFov = eyeFoveation == null || eyeFoveation.isEmpty() ? "auto" : eyeFoveation;
             haptics = String.valueOf(config.getInt("xrHaptics", 100));
-            resolution = String.valueOf(config.getInt("xrResolution", 100));
+            resolution = String.valueOf(config.getInt("xrResolution", 0));
             refresh = String.valueOf(config.getInt("xrRefreshRate", 0));
             cpuLevel = String.valueOf(config.getInt("xrCpuLevel", -1));
             gpuLevel = String.valueOf(config.getInt("xrGpuLevel", -1));
@@ -1131,7 +1131,7 @@ public final class GamePortHookProvider extends ContentProvider {
                 String strength = in.readLine();
                 haptics = strength == null || strength.isEmpty() ? "100" : strength;
                 String res = in.readLine();
-                resolution = res == null || res.isEmpty() ? "100" : res;
+                resolution = res == null || res.isEmpty() ? "0" : res;
                 String rate = in.readLine();
                 refresh = rate == null || rate.isEmpty() ? "0" : rate;
                 String cpu = in.readLine();

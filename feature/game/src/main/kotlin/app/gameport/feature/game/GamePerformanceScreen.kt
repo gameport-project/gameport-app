@@ -1,6 +1,27 @@
 package app.gameport.feature.game
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.OutlinedIconButton
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import kotlin.math.abs
+import kotlin.math.roundToInt
+import app.gameport.core.designsystem.glass
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -10,6 +31,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -22,6 +46,7 @@ import app.gameport.core.designsystem.PageHeader
 import app.gameport.core.designsystem.PerformanceTeal
 import app.gameport.core.model.GameSettings
 import app.gameport.core.model.PerformanceTuning
+import app.gameport.core.settings.EyeSides
 
 /**
  * What the player asks of the device's graphics for one game: the size of the image the game draws, the frame rate, and how much the processor and the graphics chip may work.
@@ -32,7 +57,7 @@ fun GamePerformanceScreen(onBack: () -> Unit, viewModel: GamePerformanceViewMode
     val settings by viewModel.gameSettings.collectAsStateWithLifecycle()
     val gameName by viewModel.gameName.collectAsStateWithLifecycle()
     GamePerformanceContent(
-        settings, gameName, onBack,
+        settings, gameName, viewModel.eyeSides, onBack,
         viewModel::onResolutionChosen, viewModel::onRefreshRateChosen, viewModel::onCpuLevelChosen, viewModel::onGpuLevelChosen,
     )
 }
@@ -41,6 +66,7 @@ fun GamePerformanceScreen(onBack: () -> Unit, viewModel: GamePerformanceViewMode
 internal fun GamePerformanceContent(
     settings: GameSettings,
     gameName: String,
+    eyeSides: EyeSides,
     onBack: () -> Unit,
     onResolutionChosen: (Int) -> Unit,
     onRefreshRateChosen: (Int) -> Unit,
@@ -56,14 +82,7 @@ internal fun GamePerformanceContent(
             }
             // The page keeps a margin at its bottom like the one at its top.
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                ChoiceBox(
-                    title = stringResource(R.string.gameperf_resolution),
-                    legend = stringResource(R.string.gameperf_resolution_legend),
-                    labels = performance.RESOLUTIONS.map { "$it %" },
-                    selected = performance.RESOLUTIONS.indexOf(settings.resolutionPercent).takeIf { it >= 0 } ?: performance.RESOLUTIONS.indexOf(performance.DEFAULT_RESOLUTION),
-                    onSelect = { onResolutionChosen(performance.RESOLUTIONS[it]) },
-                    accent = PerformanceTeal,
-                )
+                ResolutionBox(settings.resolutionPercent, eyeSides, onResolutionChosen)
                 ChoiceBox(
                     title = stringResource(R.string.gameperf_refresh),
                     legend = stringResource(R.string.gameperf_refresh_legend),
@@ -90,5 +109,88 @@ internal fun GamePerformanceContent(
                 )
             }
         }
+    }
+}
+
+/** The amber of the mark that shows the default on the slider. */
+private val DefaultMark = Color(0xFFFFC107)
+
+/** How near the mark, in percent, the thumb has to be for the default to be taken. */
+private const val DEFAULT_GRIP = 1.5f
+
+/**
+ * The image size as a slider from 70 to 200 % of the screen's resolution, with an amber mark where the default sits (the size the system recommends), a button that
+ * goes back to it, and at the bottom the screen's resolution and the one of the image shown.
+ */
+@Composable
+private fun ResolutionBox(percent: Int, eyeSides: EyeSides, onChosen: (Int) -> Unit) {
+    val custom = percent != PerformanceTuning.DEFAULT_RESOLUTION
+    val defaultPercent = eyeSides.screen?.let { screen -> eyeSides.recommended?.let { it * 100f / screen } }
+    val shown = if (custom) eyeSides.screen?.let { PerformanceTuning.scaledSide(it, percent) } else eyeSides.recommended
+    val min = PerformanceTuning.MIN_RESOLUTION.toFloat()
+    val max = PerformanceTuning.MAX_RESOLUTION.toFloat()
+    Column(
+        Modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(stringResource(R.string.gameperf_resolution), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.gameperf_resolution_legend), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Back to the default, at the left: outlined and with its icon, dimmed while the default is the choice.
+            val markColor = if (custom) DefaultMark else DefaultMark.copy(alpha = 0.3f)
+            OutlinedIconButton(onClick = { onChosen(PerformanceTuning.DEFAULT_RESOLUTION) }, enabled = custom, border = BorderStroke(1.dp, markColor)) {
+                Icon(Icons.Filled.Restore, contentDescription = stringResource(R.string.gameperf_resolution_default), tint = markColor)
+            }
+            Box(
+                Modifier.weight(1f).drawWithContent {
+                    drawContent()
+                    // The mark sits where the slider's track puts that value: the thumb's half width in from each end.
+                    defaultPercent?.takeIf { it in min..max }?.let { mark ->
+                        val inset = 10.dp.toPx()
+                        val x = inset + (mark - min) / (max - min) * (size.width - 2 * inset)
+                        drawLine(DefaultMark, Offset(x, size.height / 2 - 11.dp.toPx()), Offset(x, size.height / 2 + 11.dp.toPx()), strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
+                    }
+                },
+            ) {
+                Slider(
+                    value = if (custom) percent.toFloat() else defaultPercent ?: PerformanceTuning.CUSTOM_START.toFloat(),
+                    // Near the amber mark the default is taken, even though it is not a multiple of 5; elsewhere the value goes to the nearest multiple.
+                    onValueChange = {
+                        onChosen(
+                            if (defaultPercent != null && abs(it - defaultPercent) <= DEFAULT_GRIP) PerformanceTuning.DEFAULT_RESOLUTION
+                            else PerformanceTuning.MIN_RESOLUTION + ((it - min) / PerformanceTuning.RESOLUTION_STEP).roundToInt() * PerformanceTuning.RESOLUTION_STEP,
+                        )
+                    },
+                    valueRange = min..max,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.onSurface,
+                        activeTrackColor = MaterialTheme.colorScheme.onSurface,
+                        inactiveTrackColor = Color.White.copy(alpha = 0.25f),
+                    ),
+                )
+            }
+            Text(if (custom) "$percent %" else stringResource(R.string.gameperf_resolution_default), style = MaterialTheme.typography.titleMedium, modifier = Modifier.widthIn(min = 72.dp))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            SizeTile(Modifier.weight(1f), stringResource(R.string.gameperf_resolution_screen), eyeSides.screen, emphasised = false)
+            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            SizeTile(Modifier.weight(1f), stringResource(R.string.gameperf_resolution_shown), shown, emphasised = true)
+        }
+        Text(stringResource(R.string.gameperf_resolution_per_eye), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+/** A size in pixels under its name: the screen's quiet, the image shown lit with the amber. */
+@Composable
+private fun SizeTile(modifier: Modifier, label: String, side: Int?, emphasised: Boolean) {
+    val shape = RoundedCornerShape(12.dp)
+    Column(
+        modifier.clip(shape)
+            .background(if (emphasised) DefaultMark.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.06f))
+            .border(1.dp, if (emphasised) DefaultMark.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.16f), shape)
+            .padding(horizontal = 12.dp, vertical = 3.dp),
+    ) {
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+        Text(side?.let { "$it × $it" } ?: "—", color = if (emphasised) DefaultMark else MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall)
     }
 }

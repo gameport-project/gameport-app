@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.map
 class GameSettingsStore @Inject constructor(
     @ApplicationContext context: Context,
 ) {
+    private val appContext = context
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val changes = MutableStateFlow(0)
     private val _defaults = MutableStateFlow(readDefaults())
@@ -43,7 +44,7 @@ class GameSettingsStore @Inject constructor(
         recenter = recenterOf(appId),
         eyeFoveation = eyeFoveationOf(appId),
         hapticsPercent = app.gameport.core.model.HapticsStrength.normalize(prefs.getInt("haptics_$appId", app.gameport.core.model.HapticsStrength.NORMAL)),
-        resolutionPercent = app.gameport.core.model.PerformanceTuning.resolution(prefs.getInt("perf_resolution_$appId", 100)),
+        resolutionPercent = app.gameport.core.model.PerformanceTuning.resolution(prefs.getInt("perf_res_screen_$appId", app.gameport.core.model.PerformanceTuning.DEFAULT_RESOLUTION)),
         refreshRate = app.gameport.core.model.PerformanceTuning.refreshRate(prefs.getInt("perf_refresh_$appId", 0)),
         cpuLevel = app.gameport.core.model.PerformanceTuning.level(prefs.getInt("perf_cpu_$appId", -1)),
         gpuLevel = app.gameport.core.model.PerformanceTuning.level(prefs.getInt("perf_gpu_$appId", -1)),
@@ -56,6 +57,19 @@ class GameSettingsStore @Inject constructor(
     )
 
     fun observe(appId: Int): Flow<GameSettings> = changes.map { get(appId) }
+
+    /**
+     * What the device says about the image it shows, read from the system itself (no game has to run): the side of the screen for one eye, and the side the system
+     * recommends to a game, which the system keeps in the setting `sys_set_vrshell_eyebuffer` as "1920*1920". Null for what the device does not say.
+     */
+    fun eyeSides(): EyeSides {
+        val mode = (appContext.getSystemService(Context.DISPLAY_SERVICE) as? android.hardware.display.DisplayManager)?.getDisplay(android.view.Display.DEFAULT_DISPLAY)?.mode
+        // The screen holds both eyes side by side: one eye is half of its width when that is twice its height.
+        val screen = mode?.let { if (it.physicalWidth >= it.physicalHeight * 1.8) minOf(it.physicalWidth / 2, it.physicalHeight) else minOf(it.physicalWidth, it.physicalHeight) }
+        val recommended = runCatching { android.provider.Settings.Global.getString(appContext.contentResolver, "sys_set_vrshell_eyebuffer") }.getOrNull()
+            ?.split('*')?.firstOrNull()?.trim()?.toIntOrNull()?.takeIf { it > 0 }
+        return EyeSides(screen?.takeIf { it > 0 }, recommended)
+    }
 
     /** The layer found, the last time the game ran, that the headset has no play area and gave the game a space that follows the recentering. */
     fun stageFallback(appId: Int): Flow<Boolean> = changes.map { prefs.getBoolean("stagefallback_$appId", false) }
@@ -115,7 +129,7 @@ class GameSettingsStore @Inject constructor(
         // The game's own strength is the absence of a choice.
         if (settings.hapticsPercent == app.gameport.core.model.HapticsStrength.NORMAL) editor.remove("haptics_$appId") else editor.putInt("haptics_$appId", settings.hapticsPercent)
         // What leaves the graphics as they are is the absence of a choice.
-        if (settings.resolutionPercent == 100) editor.remove("perf_resolution_$appId") else editor.putInt("perf_resolution_$appId", settings.resolutionPercent)
+        if (settings.resolutionPercent == app.gameport.core.model.PerformanceTuning.DEFAULT_RESOLUTION) editor.remove("perf_res_screen_$appId") else editor.putInt("perf_res_screen_$appId", settings.resolutionPercent)
         if (settings.refreshRate == 0) editor.remove("perf_refresh_$appId") else editor.putInt("perf_refresh_$appId", settings.refreshRate)
         if (settings.cpuLevel == -1) editor.remove("perf_cpu_$appId") else editor.putInt("perf_cpu_$appId", settings.cpuLevel)
         if (settings.gpuLevel == -1) editor.remove("perf_gpu_$appId") else editor.putInt("perf_gpu_$appId", settings.gpuLevel)
@@ -177,3 +191,6 @@ class GameSettingsStore @Inject constructor(
         const val KEY_DEFAULT_HEIGHT = "default_height"
     }
 }
+
+/** The side, in pixels, of the screen for one eye and of the image the system recommends to a game; null when the device does not say. */
+data class EyeSides(val screen: Int?, val recommended: Int?)

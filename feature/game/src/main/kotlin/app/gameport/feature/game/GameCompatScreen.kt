@@ -158,12 +158,15 @@ internal fun GameCompatContent(
 
 /** A choice among a few, always showing which is taken, with its legend. The first is the automatic one, where GamePort decides. */
 @Composable
-internal fun ChoiceBox(modifier: Modifier = Modifier, title: String, legend: String, labels: List<String>, selected: Int, onSelect: (Int) -> Unit, note: String? = null, warning: String? = null, accent: Color = CompatOrange) {
+internal fun ChoiceBox(modifier: Modifier = Modifier, title: String, legend: String, labels: List<String>, selected: Int, onSelect: (Int) -> Unit, note: String? = null, warning: String? = null, accent: Color = CompatOrange, titleEnd: String? = null) {
     Column(
         modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            if (titleEnd != null) Text(titleEnd, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
+        }
         Text(legend, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         PillTabs(labels, selected, onSelect, Modifier.fillMaxWidth())
         if (note != null) {

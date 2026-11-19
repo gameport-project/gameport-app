@@ -371,7 +371,11 @@
     <string name="report_contents_show">See what the report contains</string>
     <string name="report_contents_hide">Hide what the report contains</string>
     <string name="gameperf_resolution">Image resolution</string>
-    <string name="gameperf_resolution_legend">The size of the image the game draws, compared with the one this device recommends. Lower is lighter and softer, higher is sharper and heavier. A game that picks its own size ignores it. It applies the next time the game starts.</string>
+    <string name="gameperf_resolution_legend">The size of the image the game draws, as a share of the screen\'s resolution. Default leaves the size the game asks for or the one this device recommends. The amber mark is the default. Lower is lighter and softer, higher is sharper and heavier. A game that picks its own size ignores it. It applies the next time the game starts.</string>
+    <string name="gameperf_resolution_default">Default</string>
+    <string name="gameperf_resolution_screen">Screen</string>
+    <string name="gameperf_resolution_shown">Image shown</string>
+    <string name="gameperf_resolution_per_eye">Sizes in pixels, for one eye.</string>
     <string name="gameperf_refresh">Frame rate</string>
     <string name="gameperf_refresh_legend">How many images per second the screen shows. 72 spares the device, 90 is smoother and needs more. It applies the next time the game starts.</string>
     <string name="gameperf_refresh_game">Game\'s own</string>

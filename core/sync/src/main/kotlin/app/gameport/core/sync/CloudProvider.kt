@@ -145,7 +145,10 @@ class CloudProvider : ContentProvider() {
                 // How strongly the controllers vibrate in this game, as a percentage of what the game asks for (100 leaves it as it is).
                 putInt("xrHaptics", settings?.hapticsPercent ?: app.gameport.core.model.HapticsStrength.NORMAL)
                 // What the player asked of the device's graphics for this game (image size in percent, frame rate, processor and graphics levels): what leaves them alone is 100, 0, -1, -1.
-                putInt("xrResolution", settings?.resolutionPercent ?: 100)
+                // The side of the image to ask for, in pixels: the choice is a share of the screen's, and 0 leaves the size to the game.
+                val screenSide = entryPoint.gameSettings().eyeSides().screen
+                val percent = settings?.resolutionPercent ?: 0
+                putInt("xrResolution", if (percent > 0 && screenSide != null) app.gameport.core.model.PerformanceTuning.scaledSide(screenSide, percent) else 0)
                 putInt("xrRefreshRate", settings?.refreshRate ?: 0)
                 putInt("xrCpuLevel", settings?.cpuLevel ?: -1)
                 putInt("xrGpuLevel", settings?.gpuLevel ?: -1)

@@ -30,6 +30,9 @@ class GamePerformanceViewModel @Inject constructor(
     val gameSettings: StateFlow<GameSettings> = settings.observe(appId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), settings.get(appId))
 
+    /** What the device says about the image it shows, read once: the screen's side for one eye and the side the system recommends. */
+    val eyeSides = settings.eyeSides()
+
     fun onResolutionChosen(percent: Int) = settings.set(appId, gameSettings.value.copy(resolutionPercent = percent))
     fun onRefreshRateChosen(rate: Int) = settings.set(appId, gameSettings.value.copy(refreshRate = rate))
     fun onCpuLevelChosen(level: Int) = settings.set(appId, gameSettings.value.copy(cpuLevel = level))
