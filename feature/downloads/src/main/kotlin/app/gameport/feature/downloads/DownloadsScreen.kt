@@ -122,13 +122,12 @@ internal fun DownloadsContent(
                 Text(stringResource(R.string.downloads_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             val waiting = entries.filter { it.appId in updatable && it.state is InstallState.Installed && it.game != null }
-            // The list is ordered by what needs doing first, and the order changes once Steam has answered about
-            // updates. A list that keeps its place on the item it showed would leave the new first row above the
-            // top, so a list still near the top follows the change.
+            // The list is ordered by what needs doing first, and the order changes when a game is done (it moves down), once Steam has answered about
+            // updates, and so on. A list that keeps its place on the item it showed follows that item down and leaves the rest of the downloads above the top,
+            // as if they had gone. The page stays at the top: whatever changes the order, it is put back there.
             val listState = rememberLazyListState()
-            LaunchedEffect(entries.firstOrNull()?.appId, waiting.size > 1) {
-                if (listState.firstVisibleItemIndex <= 2) listState.scrollToItem(0)
-            }
+            val order = entries.map { it.appId }
+            LaunchedEffect(order, waiting.size > 1) { listState.scrollToItem(0) }
             LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 // One game with an update has its own line and button below; the summary is only for several.
                 if (waiting.size > 1) {
