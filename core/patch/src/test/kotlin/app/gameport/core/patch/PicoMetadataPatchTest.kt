@@ -35,6 +35,10 @@ class PicoMetadataPatchTest {
         }.reversed()
     }
 
+    private fun permissionsOf(root: JSONObject): List<String?> =
+        root.elem<JSONArray>("nodes").elemEach<JSONObject> { named("manifest") }.single()
+            .elem<JSONArray>("nodes").elemEach<JSONObject> { named("uses-permission") }.map { it.nameAttribute() }
+
     private fun context(isVr: Boolean?, family: String?) = PatchContext(steamAppId = 1, steamId = 2, personaName = "test", isVr = isVr, deviceFamily = family)
 
     @Test
@@ -70,5 +74,20 @@ class PicoMetadataPatchTest {
         PicoMetadataPatch.patchManifest(root)
         PicoMetadataPatch.patchManifest(root)
         assertEquals(2, metaOf(root).size)
+    }
+
+    @Test
+    fun `the OpenXR permissions are added once, and one the game declares is not doubled`() {
+        val root = manifest()
+        PicoMetadataPatch.patchManifest(root)
+        PicoMetadataPatch.patchManifest(root)
+        assertEquals(setOf("org.khronos.openxr.permission.OPENXR", "org.khronos.openxr.permission.OPENXR_SYSTEM"), permissionsOf(root).toSet())
+        assertEquals(2, permissionsOf(root).size)
+
+        val declared = manifest()
+        declared.elem<JSONArray>("nodes").elemEach<JSONObject> { named("manifest") }.single().elem<JSONArray>("nodes")!!
+            .put(element("uses-permission", ManifestAttr("name", ATTR_NAME, "STRING", "org.khronos.openxr.permission.OPENXR_SYSTEM")))
+        PicoMetadataPatch.patchManifest(declared)
+        assertEquals(2, permissionsOf(declared).size)
     }
 }
