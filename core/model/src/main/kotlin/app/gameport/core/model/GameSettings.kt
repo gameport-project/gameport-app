@@ -38,7 +38,7 @@ object PerformanceTuning {
     const val DEFAULT_RESOLUTION = 100
 
     /** The image size, as a percentage of the recommended one, from the smallest to the largest. */
-    val RESOLUTIONS = listOf(50, 70, 80, 90, DEFAULT_RESOLUTION, 110, 125, 150, 200)
+    val RESOLUTIONS = listOf(50, 70, 80, 90, DEFAULT_RESOLUTION, 110, 125, 133, 150, 200)
 
     /** The frame rates offered, 0 being the game's own. */
     val REFRESH_RATES = listOf(0, 72, 90)

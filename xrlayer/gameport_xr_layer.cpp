@@ -829,18 +829,18 @@ XrResult XRAPI_CALL Layer_xrEnumerateViewConfigurationViews(XrInstance instance,
             if (first) LOGI("%s", line);
             if (views[i].recommendedImageRectWidth == 0) views[i].recommendedImageRectWidth = views[i].maxImageRectWidth;
             if (views[i].recommendedImageRectHeight == 0) views[i].recommendedImageRectHeight = views[i].maxImageRectHeight;
-            // Test file xr_resolution_scale.txt (a number, 1.0 is the size the runtime recommends): the size given to the game is the recommended one times that, never above the
-            // runtime's maximum and never odd. A game that takes the recommended size follows; one that has its own size does not.
+            // The image size given to the game is the recommended one times the player's scale (the file xr_resolution_scale.txt for a test), never odd. The maximum the runtime
+            // announces is not held to: it accepted a swapchain of 3072 by 3072 in a game while announcing 2560, so only a margin of 4096 a side keeps a choice from asking for the impossible.
             const double scale = ChosenResolutionScale();
             if (scale >= 0.25 && scale <= 4.0 && scale != 1.0) {
-                auto scaled = [scale](uint32_t recommended, uint32_t maximum) {
+                auto scaled = [scale](uint32_t recommended, uint32_t) {
                     uint32_t value = (uint32_t)(recommended * scale + 0.5);
-                    if (maximum > 0 && value > maximum) value = maximum;
+                    if (value > 4096) value = 4096;
                     return std::max<uint32_t>(64, value & ~1u);
                 };
                 const uint32_t w = scaled(views[i].recommendedImageRectWidth, views[i].maxImageRectWidth), h = scaled(views[i].recommendedImageRectHeight, views[i].maxImageRectHeight);
                 static std::atomic<bool> told{false};
-                if (!told.exchange(true)) LOGI("the size given to the game is %ux%u instead of %ux%u (scale %.2f, test file)", w, h, views[i].recommendedImageRectWidth, views[i].recommendedImageRectHeight, scale);
+                if (!told.exchange(true)) LOGI("the size given to the game is %ux%u instead of %ux%u (scale %.2f, the player's choice or a test file)", w, h, views[i].recommendedImageRectWidth, views[i].recommendedImageRectHeight, scale);
                 views[i].recommendedImageRectWidth = w;
                 views[i].recommendedImageRectHeight = h;
             }
