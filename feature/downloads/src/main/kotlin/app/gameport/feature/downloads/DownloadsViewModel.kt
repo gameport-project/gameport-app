@@ -66,7 +66,7 @@ class DownloadsViewModel @Inject constructor(
     fun onPause(appId: Int) = installer.pause(appId)
 
     /** Opens again the confirmation Android asked for the install under way. */
-    fun onReopenConfirmation() { installer.reopenInstallConfirmation() }
+    fun onReopenConfirmation(entry: DownloadEntry) = installer.askConfirmationAgain(entry.appId, entry.game)
 
     fun onDiscard(appId: Int) = installer.discard(appId)
 

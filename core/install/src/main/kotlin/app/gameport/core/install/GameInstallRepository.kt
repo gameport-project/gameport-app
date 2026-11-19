@@ -874,6 +874,15 @@ class GameInstallRepository @Inject constructor(
      */
     fun reopenInstallConfirmation(): Boolean = packages.reopenConfirmation()
 
+    /**
+     * Brings the confirmation of the install back: the window is opened again when it still exists (covered, lost behind something), and when the player closed it, which
+     * ended its session, the install is asked for again so that a new one is made. [game] is the game's entry, needed to install a game that is not on the device yet.
+     */
+    fun askConfirmationAgain(appId: Int, game: Game?) {
+        if (reopenInstallConfirmation()) return
+        if (installedPackage(appId) != null) repatch(appId) else game?.let { install(it, null) }
+    }
+
     /** True while the confirmation window Android asked for can still be brought back; false once the player closed it and the install has to be asked for again. */
     fun hasInstallConfirmation(): Boolean = packages.hasConfirmationWindow()
 

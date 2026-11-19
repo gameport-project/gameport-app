@@ -314,16 +314,7 @@ class GameViewModel @Inject constructor(
     fun onCancel() = installer.cancel(appId)
 
     /** Opens again the confirmation Android asked for the install: the window may have been closed, covered or lost. */
-    fun onReopenConfirmation() {
-        // The window is still there (covered, or lost behind something): it is brought back as it is, which costs nothing.
-        if (installer.reopenInstallConfirmation()) return
-        // It is gone with the session the player closed: the confirmation is asked for again, which makes a new one.
-        if (installer.installedPackage(appId) != null) {
-            installer.repatch(appId)
-        } else {
-            (baseState.value as? GameUiState.Content)?.game?.let { installer.install(it, null) }
-        }
-    }
+    fun onReopenConfirmation() = installer.askConfirmationAgain(appId, (baseState.value as? GameUiState.Content)?.game)
 
     /** Whether this game looks like it had a problem (it closed at once, or crashed). */
     val suspicion: StateFlow<app.gameport.core.sync.Suspicion?> = reports.suspected
