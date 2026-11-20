@@ -127,7 +127,7 @@ private fun GameDemoScreen(onBack: () -> Unit) {
                 ),
             ),
             deviceKind = "quest",
-            deviceName = "Quest 3",
+            deviceModel = "Quest 3",
             appVersion = "0.9.2",
         )
     }

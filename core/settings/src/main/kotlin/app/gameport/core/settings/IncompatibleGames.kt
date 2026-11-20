@@ -37,8 +37,8 @@ class IncompatibleGames @Inject constructor(@ApplicationContext private val cont
     internal var fetch: suspend () -> String? = { download(if (debuggable) "$RELAY/test/incompatible?v=2" else "$RELAY/incompatible?v=2") }
     internal var now: () -> Long = System::currentTimeMillis
 
-    /** What this device is called, to tell the games limited to some devices from the others: its kind, the name people know it by, what it calls itself. */
-    private val deviceNames: Set<String> by lazy { setOfNotNull(device.kind, device.friendlyName, device.model) }
+    /** What this device is called, to tell the games limited to some devices from the others: its kind, what it calls itself and its codename. The relay says which codes a named device has. */
+    private val deviceNames: Set<String> by lazy { setOfNotNull(device.kind, device.model, device.codename) }
 
     /** The list as it holds for this device: a game limited to other devices (a game that fails on a Quest only) is not in it. */
     private fun mine(list: IncompatibleList): IncompatibleList = list.forDevice(deviceNames)

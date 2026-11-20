@@ -18,7 +18,7 @@ class CompatRowsTest {
                 report("Quest 3", "Meta Quest 3", "works", "0.8.2", 3),
                 report("Quest 3", "Meta Quest 3", "fails", "0.7.0", 1),
             ),
-            counts = null, deviceKind = "pico", deviceName = null,
+            counts = null, deviceKind = "pico", deviceModel = null,
         )
         assertEquals(listOf("Quest 3S", "Quest 3", "Quest 3"), rows.map { it.name })
         assertEquals(listOf("0.9.2", "0.8.2", "0.7.0"), rows.map { it.version })
@@ -34,7 +34,7 @@ class CompatRowsTest {
                 report("Quest 3", "Meta Quest 3", "works", "0.8.2", 3),
                 report("A8110", "Pico 4", "fails", "0.8.2", 2, device = "pico"),
             ),
-            counts = null, deviceKind = "quest", deviceName = "Quest 3",
+            counts = null, deviceKind = "quest", deviceModel = "Quest 3",
         )
         assertEquals(listOf("Quest 3S", "Quest 3", "Pico 4"), rows.map { it.name })
         assertEquals(listOf(false, true, false), rows.map { it.mine })
@@ -76,7 +76,7 @@ class CompatRowsTest {
 
     @Test
     fun `a device whose name is not known counts as the device in hand when its kind is the same`() {
-        val rows = CompatRows.of(listOf(report(null, null, "works", "0.9.2", 2, device = "phone")), null, deviceKind = "phone", deviceName = null)
+        val rows = CompatRows.of(listOf(report(null, null, "works", "0.9.2", 2, device = "phone")), null, deviceKind = "phone", deviceModel = null)
         assertTrue(rows.single().mine)
         assertNull(rows.single().name)
     }
@@ -140,7 +140,7 @@ class CompatRowsTest {
                 CompatReport("quest", "Quest 3", "Meta Quest 3", "fails", "0.7.0", 2, issues = mapOf("slow" to 1, "no_sound" to 2), fixedSince = "0.9.0"),
                 CompatReport("quest", "Quest 3", "Meta Quest 3", "works", "0.9.2", 3, fixedSince = "0.9.0"),
             ),
-            counts = null, deviceKind = "quest", deviceName = "Quest 3",
+            counts = null, deviceKind = "quest", deviceModel = "Quest 3",
         )
         val failing = rows.first { it.verdict == Verdict.FAILS }
         assertEquals(listOf(Symptom.NO_SOUND, Symptom.SLOW), failing.symptoms)
@@ -179,8 +179,21 @@ class CompatRowsTest {
                 report("Quest 3", "Meta Quest 3", "works", "0.9.10", 1),
                 report("Quest 3", "Meta Quest 3", "works", "0.9.10-alpha.2", 1),
             ),
-            counts = null, deviceKind = "quest", deviceName = "Quest 3",
+            counts = null, deviceKind = "quest", deviceModel = "Quest 3",
         )
         assertEquals(listOf("0.9.10", "0.9.10-alpha.2", "0.9.9", null), rows.map { it.version })
+    }
+
+    @Test
+    fun `the line of the device in hand is the one of its model, with no name list of the app`() {
+        val rows = CompatRows.of(
+            reports = listOf(
+                report("A8110", "Pico 4", "works", "0.9.4", 2, device = "pico"),
+                report("A92Y0", "Pico 4 Ultra", "works", "0.9.4", 2, device = "pico"),
+            ),
+            counts = null, deviceKind = "pico", deviceModel = "A92Y0",
+        )
+        assertEquals(listOf("Pico 4 Ultra", "Pico 4"), rows.sortedByDescending { it.mine }.map { it.name })
+        assertEquals(listOf(true, false), rows.sortedByDescending { it.mine }.map { it.mine })
     }
 }

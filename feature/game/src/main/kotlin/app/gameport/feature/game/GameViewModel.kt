@@ -74,7 +74,7 @@ sealed interface GameUiState {
         val compatCounts: app.gameport.core.model.CompatCounts? = null,
         /** The kind of device in hand ("quest", "pico", "phone", "tablet", "other") and its name when that is known (Quest 3, Pico 4). */
         val deviceKind: String = "other",
-        val deviceName: String? = null,
+        val deviceModel: String? = null,
         /** The version of GamePort, for the details behind the label. */
         val appVersion: String = "",
         /** Whose copy of the game is used, when several people of the family have it; null when there is nothing to choose. */
@@ -210,7 +210,7 @@ class GameViewModel @Inject constructor(
     private val opinion: Flow<Opinion> = combine(compat.observe(appId), compat.observeCounts(appId), incompatibleGames.lists) { community, counts, confirmed -> Opinion(community, counts, confirmed.reasonOf(appId), confirmed.warningReasonOf(appId)) }
 
     private val deviceKind = device.kind
-    private val deviceName = device.friendlyName
+    private val deviceModel = device.model
     private val appVersion = runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }.getOrDefault("")
 
     private val _compatReports = MutableStateFlow<app.gameport.core.model.CompatReports?>(null)
@@ -260,7 +260,7 @@ class GameViewModel @Inject constructor(
                 warning = opinion.warning,
                 compatCounts = opinion.counts,
                 deviceKind = deviceKind,
-                deviceName = deviceName,
+                deviceModel = deviceModel,
                 appVersion = appVersion,
             )
         } else state

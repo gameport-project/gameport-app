@@ -49,7 +49,7 @@ private val IncompatibleRed = Color(0xFFE57373)
 /**
  * A game's label opened up: why it is known not to run when it is, then what the players reported, one line for each model of device, answer and version of GamePort
  * ("3 players, Quest 3, GamePort 0.8.2, compatible"), the lines of the device in hand first. [reports] are the lines the relay lists; until they are read, the totals of
- * each model in [counts] give the same lines without a version. [deviceModel] is the name of the device when it is known (Quest 3, Pico 4).
+ * each model in [counts] give the same lines without a version. [deviceModel] is what the device calls itself (`Build.MODEL`): its line is the one of this model, named as the relay names it.
  */
 @Composable
 fun CompatDetailDialog(
@@ -92,7 +92,7 @@ fun CompatDetailDialog(
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         FlowRow { VerdictChip(level, deviceKind, words = verdictLabel) }
                         Text(
-                            stringResource(R.string.compat_detail_device_line, deviceModel ?: deviceName(deviceKind), appVersion),
+                            stringResource(R.string.compat_detail_device_line, all.firstOrNull { it.mine && it.name != null }?.name ?: deviceName(deviceKind), appVersion),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

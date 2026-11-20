@@ -396,7 +396,7 @@ internal fun GameContent(
                     compat = uiState.compat,
                     incompatible = uiState.incompatible,
                     caution = uiState.warning,
-                    compatDetail = CompatDetailInfo(uiState.compatCounts, uiState.deviceKind, uiState.deviceName, uiState.appVersion, compatReports, onCompatDetailsOpened),
+                    compatDetail = CompatDetailInfo(uiState.compatCounts, uiState.deviceKind, uiState.deviceModel, uiState.appVersion, compatReports, onCompatDetailsOpened),
                     vrDevice = uiState.vrDevice,
                     performanceDevice = uiState.performanceDevice,
                     onOpenControllers = onOpenControllers,
@@ -555,7 +555,7 @@ private fun GameDetails(
             reports = compatDetail.reports?.reports,
             turn = compatDetail.reports?.turns?.get(compatDetail.deviceKind),
             deviceKind = compatDetail.deviceKind,
-            deviceModel = compatDetail.deviceName,
+            deviceModel = compatDetail.deviceModel,
             appVersion = compatDetail.appVersion,
             incompatibleTitle = incompatible?.title?.pick(language),
             incompatibleText = incompatible?.text?.pick(language),
@@ -1937,7 +1937,7 @@ private fun compatChipLabel(compat: app.gameport.core.model.Compat): String {
 internal data class CompatDetailInfo(
     val counts: app.gameport.core.model.CompatCounts? = null,
     val deviceKind: String = "other",
-    val deviceName: String? = null,
+    val deviceModel: String? = null,
     val appVersion: String = "",
     /** What the relay lists for the game (the lines, and what the history says by kind of device), null until it was asked for. */
     val reports: app.gameport.core.model.CompatReports? = null,

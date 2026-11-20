@@ -15,15 +15,16 @@ data class IncompatibleReason(val title: Localized, val text: Localized, val kin
 
 /**
  * A game confirmed as incompatible, found by its Steam app id. [name] is only there to read the file. [devices] limits it to some devices: kinds ("quest", "pico", "phone", "tablet",
- * "other") and model names ("Quest 3"), none meaning every device. A device is told apart by [appliesTo].
+ * "other") and model names ("Quest 3"), none meaning every device. [codes] are the model codes and codenames of the named devices, given by the relay. A device is told apart by [appliesTo].
  */
 @Serializable
-data class IncompatibleGame(val appId: Int, val name: String, val reason: String, val devices: List<String> = emptyList()) {
+data class IncompatibleGame(val appId: Int, val name: String, val reason: String, val devices: List<String> = emptyList(), val codes: List<String> = emptyList()) {
     /** Whether the game is incompatible on a device that goes by these names (its kind, the name people know it by, what it calls itself). */
     fun appliesTo(names: Set<String>): Boolean {
         if (devices.isEmpty()) return true
         val own = names.map(::plain).toSet()
-        return devices.any { plain(it) in own }
+        // The kinds and names as written, and the model codes and codenames the relay gives for each named device (the app keeps no list of names of its own).
+        return devices.any { plain(it) in own } || codes.any { plain(it) in own }
     }
 
     private fun plain(name: String): String = name.trim().lowercase().removePrefix("meta ").removePrefix("oculus ").trim()

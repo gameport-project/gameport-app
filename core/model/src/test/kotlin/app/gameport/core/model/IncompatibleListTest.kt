@@ -1,6 +1,7 @@
 package app.gameport.core.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -101,5 +102,15 @@ class IncompatibleListTest {
         assertEquals("Warned", mixed.forDevice(setOf("quest", "Quest 3")).warning(2)?.name)
         assertNull(mixed.forDevice(setOf("pico")).warning(2))
         assertTrue(mixed.problems(listOf("en", "fr")).isEmpty())
+    }
+
+    @Test
+    fun `a game limited to a named device applies to the model codes the relay gives for it`() {
+        val game = IncompatibleGame(1, "Game", "reason", devices = listOf("Pico 4"), codes = listOf("A8110", "A81E0", "PICOA8110"))
+        // The device gives its kind, its model and its codename: no name of the app's own is needed.
+        assertTrue(game.appliesTo(setOf("pico", "A81E0", "PICOA8110")))
+        assertFalse(game.appliesTo(setOf("pico", "A92Y0", "sparrow")))
+        // Without codes (an older relay), only the kind and the model as written can match.
+        assertFalse(IncompatibleGame(1, "Game", "reason", devices = listOf("Pico 4")).appliesTo(setOf("pico", "A8110", "x")))
     }
 }

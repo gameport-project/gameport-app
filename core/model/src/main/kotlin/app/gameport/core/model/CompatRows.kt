@@ -41,6 +41,8 @@ data class CompatRow(
     val count: Int,
     val kind: String,
     val name: String?,
+    /** What the device of these players calls itself (`Build.MODEL`): how the line of the device in hand is told, with no name list of the app's own. */
+    val model: String? = null,
     val verdict: Verdict,
     val version: String?,
     val mine: Boolean,
@@ -61,9 +63,9 @@ object CompatRows {
      * totals say of each model, and failing that of each kind of device: the same lines, without a version. A line with another answer than the three known, or nobody
      * behind it, is left out.
      */
-    fun of(reports: List<CompatReport>?, counts: CompatCounts?, deviceKind: String, deviceName: String?): List<CompatRow> {
+    fun of(reports: List<CompatReport>?, counts: CompatCounts?, deviceKind: String, deviceModel: String?): List<CompatRow> {
         val rows = if (!reports.isNullOrEmpty()) fromReports(reports) else fromCounts(counts)
-        val own = rows.map { it.copy(mine = isMine(it, deviceKind, deviceName)) }
+        val own = rows.map { it.copy(mine = isMine(it, deviceKind, deviceModel)) }
         // The newest version first, and in the same version the device in hand first; the rest keeps the order it came in (the most said first).
         return own.sortedWith(Comparator<CompatRow> { a, b -> newestFirst(a.version, b.version) }.thenByDescending { it.mine })
     }
@@ -77,14 +79,15 @@ object CompatRows {
         }
     }
 
-    private fun isMine(row: CompatRow, deviceKind: String, deviceName: String?): Boolean =
-        row.kind == deviceKind && (deviceName == null || row.name == null || row.name.equals(shortName(deviceName), ignoreCase = true))
+    /** The line of the device in hand: the same kind of device, and the same model as it calls itself (the relay names the models, the app keeps no list of names). */
+    private fun isMine(row: CompatRow, deviceKind: String, deviceModel: String?): Boolean =
+        row.kind == deviceKind && (deviceModel == null || row.model == null || row.model.equals(deviceModel, ignoreCase = true))
 
     private fun fromReports(reports: List<CompatReport>): List<CompatRow> = reports.mapNotNull { report ->
         val verdict = Verdict.fromWire(report.verdict) ?: return@mapNotNull null
         if (report.n <= 0) return@mapNotNull null
         CompatRow(
-            report.n, report.device, shortName(report.name), verdict, report.version?.takeIf { it.isNotBlank() }, mine = false,
+            report.n, report.device, shortName(report.name), report.model?.takeIf { it.isNotBlank() }, verdict, report.version?.takeIf { it.isNotBlank() }, mine = false,
             symptoms = symptomsOf(report.issues), fixedSince = report.fixedSince?.takeIf { it.isNotBlank() && verdict != Verdict.WORKS },
             perf = report.perf,
         )
@@ -98,9 +101,9 @@ object CompatRows {
         val rows = mutableListOf<CompatRow>()
         for ((kind, device) in counts?.devices.orEmpty()) {
             if (device.models.isNotEmpty()) {
-                device.models.values.forEach { model -> rows += linesOf(kind, shortName(model.name), model.works, model.offlineOnly, model.fails, symptomsOf(model.issues), model.perf) }
+                device.models.forEach { (code, model) -> rows += linesOf(kind, shortName(model.name), code, model.works, model.offlineOnly, model.fails, symptomsOf(model.issues), model.perf) }
             } else {
-                rows += linesOf(kind, null, device.works, device.offlineOnly, device.fails, symptomsOf(device.issues), emptyList())
+                rows += linesOf(kind, null, null, device.works, device.offlineOnly, device.fails, symptomsOf(device.issues), emptyList())
             }
         }
         // The most said first.
@@ -108,12 +111,12 @@ object CompatRows {
     }
 
     /** The totals of a model give no version, and say what was ticked for the model, not for each answer: it goes with the lines that do not work. */
-    private fun linesOf(kind: String, name: String?, works: Int, offlineOnly: Int, fails: Int, symptoms: List<Symptom>, perf: List<CompatPerf>): List<CompatRow> = listOf(
+    private fun linesOf(kind: String, name: String?, code: String?, works: Int, offlineOnly: Int, fails: Int, symptoms: List<Symptom>, perf: List<CompatPerf>): List<CompatRow> = listOf(
         Verdict.WORKS to works,
         Verdict.OFFLINE_ONLY to offlineOnly,
         Verdict.FAILS to fails,
     ).filter { it.second > 0 }.mapIndexed { index, (verdict, count) ->
         // How steadily the model ran is said for the model, not for each answer: it goes with its first line only, not repeated under each.
-        CompatRow(count, kind, name, verdict, version = null, mine = false, symptoms = if (verdict == Verdict.WORKS) emptyList() else symptoms, perf = if (index == 0) perf else emptyList())
+        CompatRow(count, kind, name, code, verdict, version = null, mine = false, symptoms = if (verdict == Verdict.WORKS) emptyList() else symptoms, perf = if (index == 0) perf else emptyList())
     }
 }
