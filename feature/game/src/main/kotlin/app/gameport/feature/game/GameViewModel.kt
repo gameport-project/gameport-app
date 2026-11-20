@@ -60,6 +60,8 @@ sealed interface GameUiState {
         val vrDevice: Boolean = true,
         /** True on a device whose runtime takes the image size, the frame rate and the levels from GamePort (a Pico): the page of them is offered. */
         val performanceDevice: Boolean = false,
+        /** What the player chose for the device's graphics in this game, when anything: the page offers to turn it off after a problem. */
+        val performanceChoices: app.gameport.core.model.GameSettings? = null,
         /** The game has saves and the ones on this device and on Steam do not agree. */
         val savesNotSynced: Boolean = false,
         /** What the players say about the game: null while too few of them said anything. */
@@ -162,7 +164,7 @@ class GameViewModel @Inject constructor(
         combine(issuesRepository.observe(appId), saveSpaces.observe(appId)) { issues, saveMode -> issues to saveMode },
         combine(controllerMappings.observe(appId), gameSettingsStore.stageNotice(appId), gameSettingsStore.observe(appId)) { mapping, fallback, own -> Triple(mapping, fallback && own.recenter == app.gameport.core.model.RecenterMode.AUTO, own) },
         combine(playHistory.favorites, playHistory.hidden) { starred, hidden -> starred to hidden },
-    ) { game, install, (issues, saveMode), (controllers, compatNotice), (favorites, hidden) ->
+    ) { game, install, (issues, saveMode), (controllers, compatNotice, own), (favorites, hidden) ->
         if (game !is GameUiState.Content) return@combine game
         // Patching or updating a game that is already installed is not a first install: the game
         // keeps its Play and uninstall buttons, and the panel shows the progress.
@@ -182,7 +184,7 @@ class GameViewModel @Inject constructor(
             else -> Repatch.None
         }
         val shown = if (repatch != Repatch.None && installedPackage != null) InstallState.Installed(installedPackage) else install
-        game.copy(install = shown, issues = issues + listOfNotNull(GameIssue.SavesApart.takeIf { !saveMode.usesPc && game.game.androidBuild?.saveRules?.any { it.pcCloudPrefix != null } == true }), repatch = repatch, controllerProfile = device.isHeadset, controllerFrame = device.isHeadset && controllers.forced, controllerAutomatic = device.isHeadset && controllers.automatic, compatNotice = device.isHeadset && compatNotice, favorite = appId in favorites, hidden = appId in hidden, vrDevice = device.isHeadset, performanceDevice = device.isHeadset)
+        game.copy(install = shown, issues = issues + listOfNotNull(GameIssue.SavesApart.takeIf { !saveMode.usesPc && game.game.androidBuild?.saveRules?.any { it.pcCloudPrefix != null } == true }), repatch = repatch, controllerProfile = device.isHeadset, controllerFrame = device.isHeadset && controllers.forced, controllerAutomatic = device.isHeadset && controllers.automatic, compatNotice = device.isHeadset && compatNotice, favorite = appId in favorites, hidden = appId in hidden, vrDevice = device.isHeadset, performanceDevice = device.isHeadset, performanceChoices = own.takeIf { device.isHeadset && (it.refreshRate != 0 || it.resolutionPercent != 0 || it.cpuLevel != -1 || it.gpuLevel != -1) })
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), GameUiState.Loading)
 
@@ -293,6 +295,24 @@ class GameViewModel @Inject constructor(
     fun onReinstallRenamed() {
         gameSettingsStore.set(appId, gameSettingsStore.get(appId).copy(packageName = app.gameport.core.model.PackageNameMode.ON))
         installer.repatch(appId)
+    }
+
+    /**
+     * Turns off every choice of the Performance page for this game: the game goes back to what it asks for itself. When GamePort added the declaration of the Quests the
+     * game is made for (for a frame rate), the game is patched again without it.
+     */
+    fun onTurnOffPerformance() {
+        val declared = installer.carriesSupportedDevicesMark(appId)
+        gameSettingsStore.set(
+            appId,
+            gameSettingsStore.get(appId).copy(
+                resolutionPercent = app.gameport.core.model.PerformanceTuning.DEFAULT_RESOLUTION,
+                refreshRate = 0,
+                cpuLevel = app.gameport.core.model.PerformanceTuning.LEVELS.first(),
+                gpuLevel = app.gameport.core.model.PerformanceTuning.LEVELS.first(),
+            ),
+        )
+        if (declared) installer.repatch(appId)
     }
 
     /** Downloads the game's expansion files again and places them, the APK on the device staying as it is. */

@@ -393,6 +393,9 @@
     <string name="gameperf_level_low">Low</string>
     <string name="gameperf_level_high">High</string>
     <string name="gameperf_level_boost">Boost</string>
+    <string name="issue_performance_crash">The game closed on its own while performance choices were on (%1$s). Turning them off may help.</string>
+    <string name="issue_performance_action">Turn them off</string>
+    <string name="issue_performance_levels">processor and graphics levels</string>
     <string name="gameperf_title">Performance</string>
     <string name="gameperf_button">Performance</string>
 </resources>

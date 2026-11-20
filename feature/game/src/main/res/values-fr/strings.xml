@@ -392,6 +392,9 @@
     <string name="gameperf_level_low">Bas</string>
     <string name="gameperf_level_high">Haut</string>
     <string name="gameperf_level_boost">Boost</string>
+    <string name="issue_performance_crash">Le jeu s\'est fermé tout seul alors que des choix de performance étaient activés (%1$s). Les désactiver peut aider.</string>
+    <string name="issue_performance_action">Les désactiver</string>
+    <string name="issue_performance_levels">niveaux du processeur et du graphique</string>
     <string name="gameperf_title">Performances</string>
     <string name="gameperf_button">Performances</string>
 </resources>

@@ -287,6 +287,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onOpenPermissions = openPermissions,
         onRepatch = viewModel::onRepatch,
         onReinstallRenamed = viewModel::onReinstallRenamed,
+        onTurnOffPerformance = viewModel::onTurnOffPerformance,
         onUpdate = viewModel::onUpdate,
         onResolveConflict = { viewModel.conflictIntent()?.let { runCatching { context.startActivity(it) } }; Unit },
         compatReports = viewModel.compatReports.collectAsStateWithLifecycle().value,
@@ -334,6 +335,7 @@ internal fun GameContent(
     onResolveConflict: () -> Unit,
     onRepatch: () -> Unit,
     onReinstallRenamed: () -> Unit = {},
+    onTurnOffPerformance: () -> Unit = {},
 
     onUpdate: () -> Unit,
     achievements: AchievementList? = null,
@@ -363,6 +365,8 @@ internal fun GameContent(
                     repatch = uiState.repatch,
                     onRepatch = onRepatch,
                     onReinstallRenamed = onReinstallRenamed,
+                    onTurnOffPerformance = onTurnOffPerformance,
+                    performanceChoices = uiState.performanceChoices,
                     onUpdate = onUpdate,
                     speedUnit = speedUnit,
                     onInstall = { dlc -> onInstall(uiState.game, dlc) },
@@ -442,6 +446,7 @@ private fun GameDetails(
     repatch: Repatch,
     onRepatch: () -> Unit,
     onReinstallRenamed: () -> Unit = {},
+    onTurnOffPerformance: () -> Unit = {},
     onUpdate: () -> Unit,
     speedUnit: SpeedUnit,
     onInstall: (Set<Int>?) -> Unit,
@@ -477,6 +482,7 @@ private fun GameDetails(
     playtime: Playtime,
     vrDevice: Boolean,
     performanceDevice: Boolean = false,
+    performanceChoices: app.gameport.core.model.GameSettings? = null,
     onOpenControllers: () -> Unit,
     onOpenCompat: () -> Unit,
     onOpenComfort: () -> Unit,
@@ -964,6 +970,8 @@ private fun GameDetails(
                         onDismissRepatchError = onDiscard,
                         onReport = { reporting = true },
                         onDismissProblem = report.onDismissProblem,
+                        performanceChoices = performanceChoices,
+                        onTurnOffPerformance = onTurnOffPerformance,
                     ) }
                 }
                 // A game without achievements, or one Steam has not answered for yet, shows nothing here.
@@ -1636,6 +1644,8 @@ private fun IssuesPanel(
     onDismissRepatchError: () -> Unit,
     onReport: () -> Unit,
     onDismissProblem: () -> Unit,
+    performanceChoices: app.gameport.core.model.GameSettings?,
+    onTurnOffPerformance: () -> Unit,
 ) {
     // As wide as the achievements card beside it in the column.
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1658,6 +1668,20 @@ private fun IssuesPanel(
                 secondAction = stringResource(R.string.issue_dismiss),
                 onSecondAction = onDismissProblem,
             )
+            // The game closed on its own while the player had choices on the Performance page: they may be the cause, and one button turns them off.
+            performanceChoices?.let { choices ->
+                val levels = stringResource(R.string.issue_performance_levels)
+                val on = buildList {
+                    if (choices.refreshRate != 0) add("${choices.refreshRate} Hz")
+                    if (choices.resolutionPercent != 0) add("${choices.resolutionPercent} %")
+                    if (choices.cpuLevel != -1 || choices.gpuLevel != -1) add(levels)
+                }.joinToString(", ")
+                IssueRow(
+                    stringResource(R.string.issue_performance_crash, on),
+                    stringResource(R.string.issue_performance_action),
+                    onTurnOffPerformance,
+                )
+            }
         }
     }
 }
