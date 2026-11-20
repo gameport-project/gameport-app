@@ -135,6 +135,12 @@ PFN_xrGetSystemProperties g_getSystemProperties = nullptr;
 PFN_xrCreateVulkanDeviceKHR g_createVulkanDevice = nullptr;
 PFN_xrPerfSettingsSetPerformanceLevelEXT g_perfLevel = nullptr;
 PFN_xrRequestDisplayRefreshRateFB g_refreshRequest = nullptr;
+PFN_xrEnumerateDisplayRefreshRatesFB g_refreshEnumerate = nullptr;
+// What the layer knows of the frame rate, for the file the app reads (see WriteRefreshReport): the rate GamePort asked for and the runtime's answer, the one the game asked for itself,
+// and when the session began.
+std::atomic<int> g_refreshAsked{0}, g_refreshResult{0}, g_refreshGameAsked{0}, g_refreshStage{0};
+std::atomic<long long> g_sessionStartMs{0};
+std::string g_refreshAccepted;  // the rates the runtime accepts, as "60,72,90" (guarded by g_mutex)
 PFN_xrEnumerateViewConfigurationViews g_enumerateViews = nullptr;
 typedef XrResult (XRAPI_PTR *PFN_xrEnumerateSwapchainFormats)(XrSession, uint32_t, uint32_t*, int64_t*);
 PFN_xrEnumerateSwapchainFormats g_enumerateSwapchainFormats = nullptr;
@@ -708,8 +714,44 @@ void Calibrate(XrTime time) {
     LOGI("seated calibration: head at %.2f m, target %.2f m, offset %.2f m", measured, g_targetEyeMeters, offset);
 }
 
+long long NowMs() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+// Leaves what is known of the frame rate in a file of the game's folder, which the hook hands to GamePort: the rate asked for, whether the runtime accepted it, the rates it
+// accepts, the rate the game asked for itself, and the one the frames really come at. Written when the session begins and again a little later, once the rate has settled.
+void WriteRefreshReport() {
+    std::string accepted;
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        accepted = g_refreshAccepted;
+    }
+    FILE* out = fopen((GamePortFolder() + "xr_refresh.txt").c_str(), "w");
+    if (!out) return;
+    fprintf(out, "asked=%d\nresult=%d\naccepted=%s\ngameasked=%d\nobserved=%d\n", g_refreshAsked.load(), g_refreshResult.load(), accepted.c_str(), g_refreshGameAsked.load(), g_displayRate.load());
+    fclose(out);
+}
+
+// A game that asks for a frame rate of its own: said, and passed on as it is.
+XrResult XRAPI_CALL Layer_xrRequestDisplayRefreshRateFB(XrSession session, float rate) {
+    if (!g_refreshRequest) return XR_ERROR_FUNCTION_UNSUPPORTED;
+    g_refreshGameAsked.store((int)(rate + 0.5f));
+    const XrResult result = g_refreshRequest(session, rate);
+    LOGI("the game asked for a display refresh rate of %.1f -> %d", rate, (int)result);
+    return result;
+}
+
 XrResult XRAPI_CALL Layer_xrWaitFrame(XrSession session, const XrFrameWaitInfo* info, XrFrameState* state) {
     XrResult result = g_waitFrame(session, info, state);
+    // The rate the frames come at is read some seconds after the session began, then once more: it says whether what was asked for held.
+    if (g_refreshAsked.load() > 0) {
+        const long long since = NowMs() - g_sessionStartMs.load();
+        const int stage = g_refreshStage.load();
+        if ((stage == 0 && since > 8000) || (stage == 1 && since > 60000)) {
+            g_refreshStage.store(stage + 1);
+            WriteRefreshReport();
+        }
+    }
     if (XR_SUCCEEDED(result) && state && state->predictedDisplayPeriod > 0) g_displayRate.store((int)(1e9 / (double)state->predictedDisplayPeriod + 0.5));
     if (XR_SUCCEEDED(result) && state) Calibrate(state->predictedDisplayTime);
     if (XR_SUCCEEDED(result) && state && !state->shouldRender) g_noRenderFrames.fetch_add(1);
@@ -739,7 +781,27 @@ XrResult XRAPI_CALL Layer_xrBeginSession(XrSession session, const XrSessionBegin
         const std::string refresh = ChosenRefreshRate();
         if (!refresh.empty() && g_refreshRequest) {
             const float rate = (float)atof(refresh.c_str());
-            LOGI("display refresh rate %.1f asked for (test file) -> %d", rate, (int)g_refreshRequest(session, rate));
+            const XrResult asked = g_refreshRequest(session, rate);
+            LOGI("display refresh rate %.1f asked for (test file) -> %d", rate, (int)asked);
+            g_refreshAsked.store((int)(rate + 0.5f));
+            g_refreshResult.store((int)asked);
+            g_sessionStartMs.store(NowMs());
+            g_refreshStage.store(0);
+            // The rates the runtime accepts: what GamePort offers the player is made of them.
+            if (g_refreshEnumerate) {
+                uint32_t count = 0;
+                if (XR_SUCCEEDED(g_refreshEnumerate(session, 0, &count, nullptr)) && count > 0 && count < 64) {
+                    std::vector<float> rates(count);
+                    if (XR_SUCCEEDED(g_refreshEnumerate(session, count, &count, rates.data()))) {
+                        std::string list;
+                        for (uint32_t i = 0; i < count && i < rates.size(); i++) list += (i ? "," : "") + std::to_string((int)(rates[i] + 0.5f));
+                        LOGI("display refresh rates the runtime accepts: %s", list.c_str());
+                        std::lock_guard<std::mutex> lock(g_mutex);
+                        g_refreshAccepted = list;
+                    }
+                }
+            }
+            WriteRefreshReport();
         } else if (!refresh.empty()) {
             LOGI("a refresh rate asked for (test file) and the runtime has no function for it (the extension is not enabled)");
         }
@@ -1760,6 +1822,7 @@ XrResult XRAPI_CALL Layer_xrGetInstanceProcAddr(XrInstance instance, const char*
         {"xrCreateVulkanDeviceKHR", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrCreateVulkanDeviceKHR)},
         {"xrWaitFrame", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrWaitFrame)},
         {"xrBeginSession", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrBeginSession)},
+        {"xrRequestDisplayRefreshRateFB", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrRequestDisplayRefreshRateFB)},
         {"xrCreateSwapchain", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrCreateSwapchain)},
         {"xrDestroySwapchain", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrDestroySwapchain)},
         {"xrEnumerateViewConfigurationViews", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrEnumerateViewConfigurationViews)},
@@ -2036,6 +2099,9 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
     Load("xrCreateVulkanDeviceKHR", g_createVulkanDevice);
     Load("xrPerfSettingsSetPerformanceLevelEXT", g_perfLevel);
     Load("xrRequestDisplayRefreshRateFB", g_refreshRequest);
+    Load("xrEnumerateDisplayRefreshRatesFB", g_refreshEnumerate);
+    // A new run starts without the report of the last one.
+    remove((GamePortFolder() + "xr_refresh.txt").c_str());
 
     // Which controllers this device has: GamePort says (its VrPlatform), else the runtime's name tells.
     auto familyOf = [](const std::string& text) {

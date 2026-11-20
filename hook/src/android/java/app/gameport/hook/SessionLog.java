@@ -399,6 +399,8 @@ final class SessionLog {
         extras.putByteArray("diagGz", gzip(diag.toString()));
         extras.putString("launch", launchInfo);
         extras.putString("nativeGaps", nativeGaps.report());
+        // What the OpenXR layer left of the frame rate (asked, answered, accepted, observed): GamePort tells the player when a rate was refused or not kept.
+        extras.putString("refreshReport", refreshReport());
         extras.putString("digest", digest.report());
         // How steady the run was, counted by the digest: the app shows it when the game closes, and sends it with the answer if the player agrees.
         extras.putInt("steadinessSeconds", digest.stabilitySeconds());
@@ -466,6 +468,17 @@ final class SessionLog {
             throw new java.io.IOException("GamePort did not answer in " + SEND_TIMEOUT_MS + " ms");
         } catch (java.util.concurrent.ExecutionException e) {
             throw e.getCause() instanceof Exception ? (Exception) e.getCause() : e;
+        }
+    }
+
+    /** The frame-rate report of the OpenXR layer (file of the game's folder), or an empty text when the layer left none. */
+    private String refreshReport() {
+        try {
+            File folder = new File(context.getExternalFilesDir(null), "gameport");
+            byte[] file = readAll(new File(folder, "xr_refresh.txt"));
+            return file == null ? "" : new String(file, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Throwable t) {
+            return "";
         }
     }
 
