@@ -376,7 +376,11 @@
     <string name="gameperf_resolution_screen">Screen</string>
     <string name="gameperf_resolution_shown">Image shown</string>
     <string name="gameperf_resolution_per_eye">Sizes in pixels, for one eye.</string>
+    <string name="gameperf_optimizer">Quest Games Optimizer is running on this device. It sets the image size, the frame rate and the levels of the games itself and takes over, so the choices of this page are not applied.</string>
+    <string name="gameperf_optimizer_properties">Another tool sets the image size, the frame rate or the levels of the games on this device, and takes over: the choices of this page are not applied.</string>
     <string name="gameperf_refresh">Frame rate</string>
+    <string name="gameperf_refresh_patch">This frame rate needs the game to be patched again: the Quest offers a game the rates of the current Quests only when the game says it is made for them.</string>
+    <string name="gameperf_refresh_patch_action">Patch again</string>
     <string name="gameperf_refresh_legend">How many images per second the screen shows. 72 spares the device, 90 is smoother and needs more. It applies the next time the game starts.</string>
     <string name="gameperf_refresh_game">Game\'s own</string>
     <string name="gameperf_cpu_level">Processor level</string>

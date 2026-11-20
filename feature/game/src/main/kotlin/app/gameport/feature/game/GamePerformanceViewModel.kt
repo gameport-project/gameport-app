@@ -11,6 +11,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
@@ -20,7 +21,11 @@ class GamePerformanceViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     library: SteamLibraryRepository,
     private val settings: GameSettingsStore,
+    private val installer: app.gameport.core.install.GameInstallRepository,
+    device: app.gameport.core.device.DeviceProfile,
 ) : ViewModel() {
+    private val platform = app.gameport.core.model.vr.VrPlatforms.byId(device.vrPlatform?.id)
+
     private val appId = savedStateHandle.toRoute<GamePerformanceRoute>().appId
 
     val gameName: StateFlow<String> = library.observeGame(appId)
@@ -31,7 +36,24 @@ class GamePerformanceViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), settings.get(appId))
 
     /** What the device says about the image it shows, read once: the screen's side for one eye and the side the system recommends. */
-    val eyeSides = settings.eyeSides()
+    val eyeSides = settings.eyeSides(platform)
+
+    /** Something else sets the graphics of this game (an app that knows it by its package name and is running, or system properties): it takes over, and the choices of this page would not be applied. */
+    val optimizerState = settings.optimizerState(platform, installer.installedPackage(appId))
+
+    /** The frame rates this device offers, the game's own (0) first. */
+    val refreshRates: List<Int> = listOf(0) + (platform?.refreshRates ?: emptyList())
+
+    /**
+     * A frame rate is chosen on a Meta headset and the installed game does not declare the Quests it is made for: the runtime would refuse the rate, so the game has to be
+     * patched again (the patch adds the declaration when a rate is chosen).
+     */
+    val refreshNeedsPatch: StateFlow<Boolean> = combine(gameSettings, installer.observeAll()) { current, _ ->
+        platform?.id == app.gameport.core.model.vr.MetaQuestPlatform.id && current.refreshRate != 0 &&
+            installer.installedPackage(appId) != null && !installer.declaresSupportedDevices(appId)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
+
+    fun onPatchAgain() = installer.repatch(appId)
 
     fun onResolutionChosen(percent: Int) = settings.set(appId, gameSettings.value.copy(resolutionPercent = percent))
     fun onRefreshRateChosen(rate: Int) = settings.set(appId, gameSettings.value.copy(refreshRate = rate))

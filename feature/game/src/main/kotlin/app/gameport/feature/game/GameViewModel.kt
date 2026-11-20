@@ -182,7 +182,7 @@ class GameViewModel @Inject constructor(
             else -> Repatch.None
         }
         val shown = if (repatch != Repatch.None && installedPackage != null) InstallState.Installed(installedPackage) else install
-        game.copy(install = shown, issues = issues + listOfNotNull(GameIssue.SavesApart.takeIf { !saveMode.usesPc && game.game.androidBuild?.saveRules?.any { it.pcCloudPrefix != null } == true }), repatch = repatch, controllerProfile = device.isHeadset, controllerFrame = device.isHeadset && controllers.forced, controllerAutomatic = device.isHeadset && controllers.automatic, compatNotice = device.isHeadset && compatNotice, favorite = appId in favorites, hidden = appId in hidden, vrDevice = device.isHeadset, performanceDevice = device.vrPlatform?.id == app.gameport.core.model.vr.PicoPlatform.id)
+        game.copy(install = shown, issues = issues + listOfNotNull(GameIssue.SavesApart.takeIf { !saveMode.usesPc && game.game.androidBuild?.saveRules?.any { it.pcCloudPrefix != null } == true }), repatch = repatch, controllerProfile = device.isHeadset, controllerFrame = device.isHeadset && controllers.forced, controllerAutomatic = device.isHeadset && controllers.automatic, compatNotice = device.isHeadset && compatNotice, favorite = appId in favorites, hidden = appId in hidden, vrDevice = device.isHeadset, performanceDevice = device.isHeadset)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), GameUiState.Loading)
 

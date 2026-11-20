@@ -145,13 +145,17 @@ class CloudProvider : ContentProvider() {
                 // How strongly the controllers vibrate in this game, as a percentage of what the game asks for (100 leaves it as it is).
                 putInt("xrHaptics", settings?.hapticsPercent ?: app.gameport.core.model.HapticsStrength.NORMAL)
                 // What the player asked of the device's graphics for this game (image size in percent, frame rate, processor and graphics levels): what leaves them alone is 100, 0, -1, -1.
-                // The side of the image to ask for, in pixels: the choice is a share of the screen's, and 0 leaves the size to the game.
-                val screenSide = entryPoint.gameSettings().eyeSides().screen
-                val percent = settings?.resolutionPercent ?: 0
-                putInt("xrResolution", if (percent > 0 && screenSide != null) app.gameport.core.model.PerformanceTuning.scaledSide(screenSide, percent) else 0)
-                putInt("xrRefreshRate", settings?.refreshRate ?: 0)
-                putInt("xrCpuLevel", settings?.cpuLevel ?: -1)
-                putInt("xrGpuLevel", settings?.gpuLevel ?: -1)
+                // The size of the image to ask for, in pixels: the choice is a share of the screen's, and 0 leaves the size to the game. An app that sets the graphics by itself takes over: nothing is asked then.
+                val platform = app.gameport.core.model.vr.VrPlatforms.byId(entryPoint.deviceProfile().vrPlatform?.id)
+                val optimized = entryPoint.gameSettings().optimizerState(platform, packageName) != app.gameport.core.settings.OptimizerState.NONE
+                val screen = entryPoint.gameSettings().eyeSides(platform).screen
+                val percent = if (optimized) 0 else settings?.resolutionPercent ?: 0
+                val sizes = if (percent > 0 && screen != null) app.gameport.core.model.PerformanceTuning.scaledSizes(screen.first, screen.second, percent) else null
+                putInt("xrResolution", sizes?.first ?: 0)
+                putInt("xrResolutionHeight", sizes?.second ?: 0)
+                putInt("xrRefreshRate", if (optimized) 0 else settings?.refreshRate ?: 0)
+                putInt("xrCpuLevel", if (optimized) -1 else settings?.cpuLevel ?: -1)
+                putInt("xrGpuLevel", if (optimized) -1 else settings?.gpuLevel ?: -1)
                 // The player's controller mapping for the game, empty unless they customise it.
                 putString("xrMap", appId?.let { entryPoint.controllerMappings().layerConfig(it) }.orEmpty())
                 // The player chose the Steam Frame's controls for a game that also has its own (off by default).

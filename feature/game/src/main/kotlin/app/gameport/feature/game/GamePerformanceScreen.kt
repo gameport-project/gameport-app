@@ -1,11 +1,16 @@
 package app.gameport.feature.game
 
 import androidx.compose.foundation.layout.Arrangement
+import app.gameport.core.designsystem.GlassButton
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.clip
 import androidx.compose.material3.OutlinedIconButton
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.foundation.layout.Box
@@ -14,6 +19,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import app.gameport.core.designsystem.CompatOrange
 import app.gameport.core.designsystem.glass
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
@@ -47,6 +53,7 @@ import app.gameport.core.designsystem.PerformanceTeal
 import app.gameport.core.model.GameSettings
 import app.gameport.core.model.PerformanceTuning
 import app.gameport.core.settings.EyeSides
+import app.gameport.core.settings.OptimizerState
 
 /**
  * What the player asks of the device's graphics for one game: the size of the image the game draws, the frame rate, and how much the processor and the graphics chip may work.
@@ -56,8 +63,9 @@ import app.gameport.core.settings.EyeSides
 fun GamePerformanceScreen(onBack: () -> Unit, viewModel: GamePerformanceViewModel = hiltViewModel()) {
     val settings by viewModel.gameSettings.collectAsStateWithLifecycle()
     val gameName by viewModel.gameName.collectAsStateWithLifecycle()
+    val refreshNeedsPatch by viewModel.refreshNeedsPatch.collectAsStateWithLifecycle()
     GamePerformanceContent(
-        settings, gameName, viewModel.eyeSides, onBack,
+        settings, gameName, viewModel.eyeSides, viewModel.optimizerState, viewModel.refreshRates, refreshNeedsPatch, viewModel::onPatchAgain, onBack,
         viewModel::onResolutionChosen, viewModel::onRefreshRateChosen, viewModel::onCpuLevelChosen, viewModel::onGpuLevelChosen,
     )
 }
@@ -67,6 +75,10 @@ internal fun GamePerformanceContent(
     settings: GameSettings,
     gameName: String,
     eyeSides: EyeSides,
+    optimizerState: OptimizerState,
+    refreshRates: List<Int>,
+    refreshNeedsPatch: Boolean,
+    onPatchAgain: () -> Unit,
     onBack: () -> Unit,
     onResolutionChosen: (Int) -> Unit,
     onRefreshRateChosen: (Int) -> Unit,
@@ -82,15 +94,21 @@ internal fun GamePerformanceContent(
             }
             // The page keeps a margin at its bottom like the one at its top.
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                if (optimizerState != OptimizerState.NONE) {
+                    // Something else sets the graphics of this game: its choices are the ones that count, and these would only be a second setting.
+                    OptimizerNotice(optimizerState)
+                    return@Column
+                }
                 ResolutionBox(settings.resolutionPercent, eyeSides, onResolutionChosen)
                 ChoiceBox(
                     title = stringResource(R.string.gameperf_refresh),
                     legend = stringResource(R.string.gameperf_refresh_legend),
-                    labels = performance.REFRESH_RATES.map { if (it == 0) stringResource(R.string.gameperf_refresh_game) else "$it Hz" },
-                    selected = performance.REFRESH_RATES.indexOf(settings.refreshRate).coerceAtLeast(0),
-                    onSelect = { onRefreshRateChosen(performance.REFRESH_RATES[it]) },
+                    labels = refreshRates.map { if (it == 0) stringResource(R.string.gameperf_refresh_game) else "$it Hz" },
+                    selected = refreshRates.indexOf(settings.refreshRate).coerceAtLeast(0),
+                    onSelect = { onRefreshRateChosen(refreshRates[it]) },
                     accent = PerformanceTeal,
                 )
+                if (refreshNeedsPatch) PatchAgainRow(onPatchAgain)
                 ChoiceBox(
                     title = stringResource(R.string.gameperf_cpu_level),
                     legend = stringResource(R.string.gameperf_cpu_level_legend),
@@ -125,8 +143,9 @@ private const val DEFAULT_GRIP = 1.5f
 @Composable
 private fun ResolutionBox(percent: Int, eyeSides: EyeSides, onChosen: (Int) -> Unit) {
     val custom = percent != PerformanceTuning.DEFAULT_RESOLUTION
-    val defaultPercent = eyeSides.screen?.let { screen -> eyeSides.recommended?.let { it * 100f / screen } }
-    val shown = if (custom) eyeSides.screen?.let { PerformanceTuning.scaledSide(it, percent) } else eyeSides.recommended
+    // The default sits where the recommended width falls on the screen's, as a percentage.
+    val defaultPercent = eyeSides.screen?.let { screen -> eyeSides.recommended?.let { it.first * 100f / screen.first } }
+    val shown = if (custom) eyeSides.screen?.let { PerformanceTuning.scaledSizes(it.first, it.second, percent) } else eyeSides.recommended
     val min = PerformanceTuning.MIN_RESOLUTION.toFloat()
     val max = PerformanceTuning.MAX_RESOLUTION.toFloat()
     Column(
@@ -182,7 +201,7 @@ private fun ResolutionBox(percent: Int, eyeSides: EyeSides, onChosen: (Int) -> U
 
 /** A size in pixels under its name: the screen's quiet, the image shown lit with the amber. */
 @Composable
-private fun SizeTile(modifier: Modifier, label: String, side: Int?, emphasised: Boolean) {
+private fun SizeTile(modifier: Modifier, label: String, size: Pair<Int, Int>?, emphasised: Boolean) {
     val shape = RoundedCornerShape(12.dp)
     Column(
         modifier.clip(shape)
@@ -191,6 +210,42 @@ private fun SizeTile(modifier: Modifier, label: String, side: Int?, emphasised: 
             .padding(horizontal = 12.dp, vertical = 3.dp),
     ) {
         Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
-        Text(side?.let { "$it × $it" } ?: "—", color = if (emphasised) DefaultMark else MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall)
+        Text(size?.let { "${it.first} × ${it.second}" } ?: "—", color = if (emphasised) DefaultMark else MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall)
+    }
+}
+
+/** Something else sets the graphics of this game: it takes over, and nothing here would be applied. */
+@Composable
+private fun OptimizerNotice(state: OptimizerState) {
+    Row(
+        Modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(Icons.Filled.Info, contentDescription = null, tint = CompatOrange, modifier = Modifier.size(24.dp))
+        Text(
+            stringResource(if (state == OptimizerState.APP) R.string.gameperf_optimizer else R.string.gameperf_optimizer_properties),
+            color = CompatOrange,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+/** A frame rate is chosen on a Quest and the game has to be patched again for the runtime to offer it: the reason, and the button that does it. */
+@Composable
+private fun PatchAgainRow(onPatchAgain: () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+            Icon(Icons.Filled.Info, contentDescription = null, tint = CompatOrange, modifier = Modifier.size(24.dp))
+            Text(stringResource(R.string.gameperf_refresh_patch), color = CompatOrange, style = MaterialTheme.typography.bodyMedium)
+        }
+        GlassButton(onClick = onPatchAgain) {
+            Icon(Icons.Filled.Build, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.gameperf_refresh_patch_action))
+        }
     }
 }

@@ -48,11 +48,19 @@ object PerformanceTuning {
     /** Where the slider starts when the player leaves the default: the screen's own resolution. */
     const val CUSTOM_START = 100
 
-    /** The side, in pixels, the game is asked for with a choice of [percent] of a screen side of [screenSide]: even, between 64 and [MAX_SIDE]. */
-    fun scaledSide(screenSide: Int, percent: Int): Int = maxOf(64, minOf(MAX_SIDE, (screenSide * percent / 100.0 + 0.5).toInt()) and 1.inv())
+    /**
+     * The width and height, in pixels, the game is asked for with a choice of [percent] of a screen of [screenWidth] by [screenHeight] for one eye: both even, between 64
+     * and [MAX_SIDE], and kept in proportion when the largest would pass it.
+     */
+    fun scaledSizes(screenWidth: Int, screenHeight: Int, percent: Int): Pair<Int, Int> {
+        val factor = percent / 100.0
+        val limit = minOf(1.0, MAX_SIDE / (maxOf(screenWidth, screenHeight) * factor))
+        fun side(screen: Int): Int = maxOf(64, (screen * factor * limit + 0.5).toInt() and 1.inv())
+        return side(screenWidth) to side(screenHeight)
+    }
 
     /** The frame rates offered, 0 being the game's own. */
-    val REFRESH_RATES = listOf(0, 72, 90)
+    val REFRESH_RATES = listOf(0, 72, 80, 90, 120)
 
     /** The levels of OpenXR's performance settings: -1 leaves them to the system, 0 saves power, 25 holds a low pace, 50 a high one, 75 is a boost that may heat the device. */
     val LEVELS = listOf(-1, 0, 25, 50, 75)
@@ -93,6 +101,9 @@ object RenamedPackages {
         PackageNameMode.OFF -> null
         PackageNameMode.AUTO -> if (refusesReSigned) nameFor(appId) else null
     }
+
+    /** True for a name GamePort gave a game: an app that knows games by their package name (Quest Games Optimizer) does not know it. */
+    fun isOurs(packageName: String): Boolean = packageName.startsWith(PREFIX)
 
     // A part of a package name cannot begin with a digit, so the app id follows a letter.
     private const val PREFIX = "com.gameport.g"

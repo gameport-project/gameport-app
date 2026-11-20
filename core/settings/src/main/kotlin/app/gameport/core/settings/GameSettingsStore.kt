@@ -59,17 +59,41 @@ class GameSettingsStore @Inject constructor(
     fun observe(appId: Int): Flow<GameSettings> = changes.map { get(appId) }
 
     /**
-     * What the device says about the image it shows, read from the system itself (no game has to run): the side of the screen for one eye, and the side the system
-     * recommends to a game, which the system keeps in the setting `sys_set_vrshell_eyebuffer` as "1920*1920". Null for what the device does not say.
+     * What the device says about the image it shows, read from the system itself (no game has to run): the size of the screen for one eye, and the size the system
+     * recommends to a game, which the platform keeps in a system setting ("1920*1920") or knows for the model. Null for what the device does not say.
      */
-    fun eyeSides(): EyeSides {
+    fun eyeSides(platform: app.gameport.core.model.vr.VrPlatform?): EyeSides {
         val mode = (appContext.getSystemService(Context.DISPLAY_SERVICE) as? android.hardware.display.DisplayManager)?.getDisplay(android.view.Display.DEFAULT_DISPLAY)?.mode
-        // The screen holds both eyes side by side: one eye is half of its width when that is twice its height.
-        val screen = mode?.let { if (it.physicalWidth >= it.physicalHeight * 1.8) minOf(it.physicalWidth / 2, it.physicalHeight) else minOf(it.physicalWidth, it.physicalHeight) }
-        val recommended = runCatching { android.provider.Settings.Global.getString(appContext.contentResolver, "sys_set_vrshell_eyebuffer") }.getOrNull()
-            ?.split('*')?.firstOrNull()?.trim()?.toIntOrNull()?.takeIf { it > 0 }
-        return EyeSides(screen?.takeIf { it > 0 }, recommended)
+        // The screen holds both eyes side by side: one eye is half of its width when that is about twice its height.
+        val screen = mode?.let {
+            if (it.physicalWidth >= it.physicalHeight * 1.8) (it.physicalWidth / 2) to it.physicalHeight else it.physicalWidth to it.physicalHeight
+        }?.takeIf { it.first > 0 && it.second > 0 }
+        val fromSystem = platform?.recommendedEyeSizeSetting?.let { name ->
+            runCatching { android.provider.Settings.Global.getString(appContext.contentResolver, name) }.getOrNull()
+                ?.split('*')?.mapNotNull { it.trim().toIntOrNull() }?.takeIf { it.size == 2 && it.all { side -> side > 0 } }?.let { it[0] to it[1] }
+        }
+        val recommended = fromSystem ?: platform?.defaultEyeSize(android.os.Build.MODEL)
+        android.util.Log.i("GPPerf", "screen for one eye $screen, recommended $recommended (${if (fromSystem != null) "from the system" else "from the model"})")
+        return EyeSides(screen?.first, screen?.second, recommended?.first, recommended?.second)
     }
+
+    /**
+     * Whether something else sets the graphics of this game: an app that does it by itself, is running (its accessibility service, which tells it a game started, is on)
+     * and knows the game by the package name it has, or system properties that hold a value (set by that app, by adb, by another tool, for every game).
+     */
+    fun optimizerState(platform: app.gameport.core.model.vr.VrPlatform?, gamePackage: String?): OptimizerState {
+        val services = runCatching { android.provider.Settings.Secure.getString(appContext.contentResolver, "enabled_accessibility_services") }.getOrNull().orEmpty()
+        // Such an app knows a game by its package name: a game installed under a name of GamePort's own is one it knows nothing of, and does not touch.
+        val known = gamePackage == null || !app.gameport.core.model.RenamedPackages.isOurs(gamePackage)
+        if (known && platform?.optimizerPackages.orEmpty().any { services.contains("$it/") }) return OptimizerState.APP
+        if (platform?.optimizerProperties.orEmpty().any { readSystemProperty(it).isNotEmpty() }) return OptimizerState.PROPERTIES
+        return OptimizerState.NONE
+    }
+
+    private fun readSystemProperty(name: String): String = runCatching {
+        val process = ProcessBuilder("getprop", name).redirectErrorStream(true).start()
+        process.inputStream.bufferedReader().use { it.readText().trim() }
+    }.getOrDefault("")
 
     /** The layer found, the last time the game ran, that the headset has no play area and gave the game a space that follows the recentering. */
     fun stageFallback(appId: Int): Flow<Boolean> = changes.map { prefs.getBoolean("stagefallback_$appId", false) }
@@ -192,5 +216,11 @@ class GameSettingsStore @Inject constructor(
     }
 }
 
-/** The side, in pixels, of the screen for one eye and of the image the system recommends to a game; null when the device does not say. */
-data class EyeSides(val screen: Int?, val recommended: Int?)
+/** The size, in pixels, of the screen for one eye and of the image the system recommends to a game; null when the device does not say. */
+data class EyeSides(val screenWidth: Int?, val screenHeight: Int?, val recommendedWidth: Int?, val recommendedHeight: Int?) {
+    val screen: Pair<Int, Int>? get() = if (screenWidth != null && screenHeight != null) screenWidth to screenHeight else null
+    val recommended: Pair<Int, Int>? get() = if (recommendedWidth != null && recommendedHeight != null) recommendedWidth to recommendedHeight else null
+}
+
+/** What sets the graphics of the games besides GamePort: nothing, an app that is running, or system properties that hold a value. */
+enum class OptimizerState { NONE, APP, PROPERTIES }
