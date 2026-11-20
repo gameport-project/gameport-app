@@ -274,6 +274,8 @@
     <string name="game_info_download">Download</string>
     <string name="game_info_installed">Installed</string>
     <string name="game_info_unknown">—</string>
+    <string name="game_info_version">Version</string>
+    <string name="game_info_version_installed">Installed</string>
     <string name="game_info_playtime">Play time</string>
     <string name="game_info_played_device">On this device</string>
     <string name="game_info_played_steam">On Steam</string>

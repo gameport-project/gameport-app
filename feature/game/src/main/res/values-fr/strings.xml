@@ -273,6 +273,8 @@
     <string name="game_info_download">Téléchargement</string>
     <string name="game_info_installed">Installé</string>
     <string name="game_info_unknown">—</string>
+    <string name="game_info_version">Version</string>
+    <string name="game_info_version_installed">Installée</string>
     <string name="game_info_playtime">Temps de jeu</string>
     <string name="game_info_played_device">Sur cet appareil</string>
     <string name="game_info_played_steam">Sur Steam</string>

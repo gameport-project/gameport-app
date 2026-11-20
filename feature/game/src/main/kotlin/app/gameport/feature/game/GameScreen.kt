@@ -101,6 +101,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Speed
@@ -971,6 +972,11 @@ private fun GameDetails(
                 media?.takeIf { !it.isEmpty }?.let { MediaCard(game.appId, it) }
             }
             val installed = install is InstallState.Installed
+            // The game's own version, as its APK says: the patches raise the version code but never touch the version name.
+            val packages = LocalContext.current.packageManager
+            val installedVersion = (install as? InstallState.Installed)?.packageName?.let { name ->
+                runCatching { packages.getPackageInfo(name, 0).versionName }.getOrNull()?.takeIf { it.isNotBlank() }
+            }
             if (compact) {
                 Column(
                     Modifier.fillMaxWidth().padding(horizontal = 20.dp),
@@ -984,7 +990,7 @@ private fun GameDetails(
                     })
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp), content = details)
                     // Size and play time are not what the player came for: after everything else.
-                    InfoCard(game, installed, playtime, Modifier.fillMaxWidth().tourTarget(TourIds.GAME_INFO))
+                    InfoCard(game, installed, installedVersion, playtime, Modifier.fillMaxWidth().tourTarget(TourIds.GAME_INFO))
                 }
             } else {
                 Row(
@@ -998,7 +1004,7 @@ private fun GameDetails(
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         cover(Modifier)
-                        InfoCard(game, installed, playtime, Modifier.fillMaxWidth().tourTarget(TourIds.GAME_INFO))
+                        InfoCard(game, installed, installedVersion, playtime, Modifier.fillMaxWidth().tourTarget(TourIds.GAME_INFO))
                     }
                     Column(Modifier.weight(1f).padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp), content = details)
                 }
@@ -1786,7 +1792,7 @@ private fun Modifier.pullUp(amount: Dp): Modifier = layout { measurable, constra
  * played (here, and on the Steam account once Steam answered). Sits under the cover.
  */
 @Composable
-private fun InfoCard(game: Game, installed: Boolean, playtime: Playtime, modifier: Modifier = Modifier) {
+private fun InfoCard(game: Game, installed: Boolean, installedVersion: String?, playtime: Playtime, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val build = game.androidBuild
     val none = stringResource(R.string.game_info_unknown)
@@ -1794,6 +1800,12 @@ private fun InfoCard(game: Game, installed: Boolean, playtime: Playtime, modifie
         InfoGroup(stringResource(R.string.game_info_size), Icons.Filled.Storage) {
             InfoItem(stringResource(R.string.game_info_download), build?.downloadBytes?.let { Formatter.formatFileSize(context, it) } ?: none)
             InfoItem(stringResource(R.string.game_info_installed), build?.installBytes?.let { Formatter.formatFileSize(context, it) } ?: none)
+        }
+        // Under the size: the version of the game that is on the device.
+        installedVersion?.let {
+            InfoGroup(stringResource(R.string.game_info_version), Icons.Filled.Info) {
+                InfoItem(stringResource(R.string.game_info_version_installed), it)
+            }
         }
         if (installed) {
             InfoGroup(stringResource(R.string.game_info_playtime), Icons.Filled.Schedule) {
