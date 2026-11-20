@@ -48,6 +48,7 @@ class GameSettingsStore @Inject constructor(
         refreshRate = app.gameport.core.model.PerformanceTuning.refreshRate(prefs.getInt("perf_refresh_$appId", 0)),
         cpuLevel = app.gameport.core.model.PerformanceTuning.level(prefs.getInt("perf_cpu_$appId", -1)),
         gpuLevel = app.gameport.core.model.PerformanceTuning.level(prefs.getInt("perf_gpu_$appId", -1)),
+        performanceChangedAt = prefs.getLong("perf_changed_$appId", 0),
         openInVr = prefs.getBoolean("open_in_vr_$appId", true),
         ovrPluginStandIn = prefs.getBoolean("ovrplugin_stand_in_$appId", true),
         passthrough = passthroughOf(appId),
@@ -75,6 +76,29 @@ class GameSettingsStore @Inject constructor(
         val recommended = fromSystem ?: platform?.defaultEyeSize(android.os.Build.MODEL)
         android.util.Log.i("GPPerf", "screen for one eye $screen, recommended $recommended (${if (fromSystem != null) "from the system" else "from the model"})")
         return EyeSides(screen?.first, screen?.second, recommended?.first, recommended?.second)
+    }
+
+    /**
+     * What the screen exposes about its frame rates, read from the system (no game has to run): every whole rate its modes give, and for each the largest picture it comes
+     * with, per eye. A rate that only comes with a smaller picture than the screen's own is the one the player is told about.
+     */
+    fun displayRates(): DisplayRates {
+        val modes = runCatching {
+            (appContext.getSystemService(Context.DISPLAY_SERVICE) as? android.hardware.display.DisplayManager)
+                ?.getDisplay(android.view.Display.DEFAULT_DISPLAY)?.supportedModes?.toList().orEmpty()
+        }.getOrDefault(emptyList())
+        // One eye is half of the width when the screen holds both side by side.
+        fun eye(mode: android.view.Display.Mode) =
+            if (mode.physicalWidth >= mode.physicalHeight * 1.8) (mode.physicalWidth / 2) to mode.physicalHeight else mode.physicalWidth to mode.physicalHeight
+        val at = HashMap<Int, Pair<Int, Int>>()
+        for (mode in modes) {
+            val rate = Math.round(mode.refreshRate)
+            val size = eye(mode)
+            val known = at[rate]
+            if (known == null || size.first * size.second > known.first * known.second) at[rate] = size
+        }
+        val best = at.values.maxByOrNull { it.first * it.second }
+        return DisplayRates(at.keys.sorted(), at, best)
     }
 
     /**
@@ -136,7 +160,11 @@ class GameSettingsStore @Inject constructor(
     fun eyeHeightCm(appId: Int): Int = get(appId).eyeHeightCm(defaults.value)
 
     fun set(appId: Int, settings: GameSettings) {
+        val before = get(appId)
         val editor = prefs.edit().putBoolean("seated_$appId", settings.seated)
+        if (before.resolutionPercent != settings.resolutionPercent || before.refreshRate != settings.refreshRate || before.cpuLevel != settings.cpuLevel || before.gpuLevel != settings.gpuLevel) {
+            editor.putLong("perf_changed_$appId", System.currentTimeMillis())
+        }
         val height = settings.heightCm
         // Automatic is the absence of a choice.
         when (settings.recenter) {
@@ -224,3 +252,13 @@ data class EyeSides(val screenWidth: Int?, val screenHeight: Int?, val recommend
 
 /** What sets the graphics of the games besides GamePort: nothing, an app that is running, or system properties that hold a value. */
 enum class OptimizerState { NONE, APP, PROPERTIES }
+
+/** The whole frame rates a screen exposes, the largest picture (per eye) each comes with, and the largest of all; empty when the device says nothing. */
+data class DisplayRates(val rates: List<Int>, val resolutionAt: Map<Int, Pair<Int, Int>>, val best: Pair<Int, Int>?) {
+    /** The picture a rate comes with when it is smaller than the best one, else null: what the player is told before choosing it. */
+    fun lowerResolutionAt(rate: Int): Pair<Int, Int>? {
+        val at = resolutionAt[rate] ?: return null
+        val top = best ?: return null
+        return at.takeIf { it.first * it.second < top.first * top.second }
+    }
+}

@@ -7,7 +7,7 @@ class PerformanceTuningTest {
     @Test
     fun `the first choice of each setting leaves the graphics as they are`() {
         assertEquals(0, PerformanceTuning.DEFAULT_RESOLUTION)
-        assertEquals(0, PerformanceTuning.REFRESH_RATES.first())
+        assertEquals(0, GameSettings().refreshRate)
         assertEquals(-1, PerformanceTuning.LEVELS.first())
         val untouched = GameSettings()
         assertEquals(0, untouched.resolutionPercent)
@@ -20,8 +20,10 @@ class PerformanceTuningTest {
     fun `a stored value that is not one of the choices means no choice was made`() {
         assertEquals(0, PerformanceTuning.resolution(333))
         assertEquals(80, PerformanceTuning.resolution(80))
-        assertEquals(0, PerformanceTuning.refreshRate(60))
+        assertEquals(0, PerformanceTuning.refreshRate(7))
+        assertEquals(0, PerformanceTuning.refreshRate(9000))
         assertEquals(72, PerformanceTuning.refreshRate(72))
+        assertEquals(144, PerformanceTuning.refreshRate(144))
         assertEquals(-1, PerformanceTuning.level(12))
         assertEquals(75, PerformanceTuning.level(75))
     }
@@ -56,9 +58,27 @@ class PerformanceTuningTest {
     }
 
     @Test
-    fun `the refresh rates of a system and the game's own are valid choices`() {
+    fun `any rate between the bounds is a valid choice, a rate that no screen has is not`() {
         assertEquals(120, PerformanceTuning.refreshRate(120))
-        assertEquals(80, PerformanceTuning.refreshRate(80))
-        assertEquals(0, PerformanceTuning.refreshRate(60))
+        assertEquals(60, PerformanceTuning.refreshRate(60))
+        assertEquals(0, PerformanceTuning.refreshRate(10))
+    }
+
+    @Test
+    fun `the rates offered are the round ones the device exposes, up to 144, and the fallback when it exposes none`() {
+        assertEquals(listOf(60, 72, 80, 90), PerformanceTuning.offeredRates((60..90).toList(), listOf(72, 90)))
+        assertEquals(listOf(72, 80, 90, 100, 120, 144), PerformanceTuning.offeredRates((72..240).toList(), listOf(72, 90)))
+        assertEquals(listOf(72, 80, 90, 120), PerformanceTuning.offeredRates(listOf(72, 80, 90, 120), listOf(72, 90)))
+        assertEquals(listOf(72, 90), PerformanceTuning.offeredRates(emptyList(), listOf(72, 90)))
+    }
+
+    @Test
+    fun `the largest image a smaller mode can show is a share of the screen, by steps`() {
+        // A Quest 3 at 240 Hz: 3104 x 1664 for both eyes is 1552 x 1664 for one, against 2064 x 2208 at the full mode.
+        assertEquals(75, PerformanceTuning.capForMode(1552 to 1664, 2064 to 2208))
+        assertEquals(100, PerformanceTuning.capForMode(2064 to 2208, 2064 to 2208))
+        assertEquals(PerformanceTuning.MIN_RESOLUTION, PerformanceTuning.capForMode(100 to 100, 2064 to 2208))
+        assertEquals(null, PerformanceTuning.capForMode(null, 2064 to 2208))
+        assertEquals(null, PerformanceTuning.capForMode(1552 to 1664, null))
     }
 }

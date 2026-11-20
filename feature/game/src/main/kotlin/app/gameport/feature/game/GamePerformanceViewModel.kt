@@ -23,6 +23,7 @@ class GamePerformanceViewModel @Inject constructor(
     private val settings: GameSettingsStore,
     private val installer: app.gameport.core.install.GameInstallRepository,
     device: app.gameport.core.device.DeviceProfile,
+    private val reports: app.gameport.core.sync.ReportStore,
 ) : ViewModel() {
     private val platform = app.gameport.core.model.vr.VrPlatforms.byId(device.vrPlatform?.id)
 
@@ -42,7 +43,22 @@ class GamePerformanceViewModel @Inject constructor(
     val optimizerState = settings.optimizerState(platform, installer.installedPackage(appId))
 
     /** The frame rates this device offers, the game's own (0) first. */
-    val refreshRates: List<Int> = listOf(0) + (platform?.refreshRates ?: emptyList())
+    val displayRates = settings.displayRates()
+
+    /** The game's own (0), then the round rates the screen exposes, whatever the device: the platform's own list stands in only when the screen says nothing. */
+    val refreshRates: List<Int> = run {
+        // Once a game's run told which rates the runtime accepts, only those among the screen's are offered; the one already chosen stays so the box can show it.
+        // What the runtime accepts, as a run of a game told (on a Quest only a game that says which Quests it is made for tells it: see ReportStore.saveGameData).
+        val accepted = reports.acceptedRates()
+        val exposed = if (accepted.isEmpty()) displayRates.rates else displayRates.rates.filter { it in accepted }.ifEmpty { accepted }
+        val chosen = settings.get(appId).refreshRate
+        (listOf(0) + app.gameport.core.model.PerformanceTuning.offeredRates(exposed, platform?.refreshRates.orEmpty())).let { if (chosen != 0 && chosen !in it) (it + chosen).sorted() else it }
+    }
+
+    /** What came of the rate chosen for this game in its last run (refused by the device, set by the game itself, not kept), or null when nothing is to be said. */
+    val refreshOutcome: StateFlow<app.gameport.core.model.RefreshOutcome?> = gameSettings.map { current ->
+        installer.installedPackage(appId)?.let(reports::refreshOutcome)?.takeIf { it.asked == current.refreshRate && it.verdict != app.gameport.core.model.RefreshOutcome.Verdict.KEPT }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     /**
      * A frame rate is chosen on a Meta headset and the installed game does not declare the Quests it is made for: the runtime would refuse the rate, so the game has to be
@@ -56,7 +72,9 @@ class GamePerformanceViewModel @Inject constructor(
     fun onPatchAgain() = installer.repatch(appId)
 
     fun onResolutionChosen(percent: Int) = settings.set(appId, gameSettings.value.copy(resolutionPercent = percent))
-    fun onRefreshRateChosen(rate: Int) = settings.set(appId, gameSettings.value.copy(refreshRate = rate))
+    /** The rate, and with it the image size when the rate only comes with a smaller picture (one change, so the second does not overwrite the first). */
+    fun onRefreshRateChosen(rate: Int, resolutionPercent: Int? = null) =
+        settings.set(appId, gameSettings.value.copy(refreshRate = rate, resolutionPercent = resolutionPercent ?: gameSettings.value.resolutionPercent))
     fun onCpuLevelChosen(level: Int) = settings.set(appId, gameSettings.value.copy(cpuLevel = level))
     fun onGpuLevelChosen(level: Int) = settings.set(appId, gameSettings.value.copy(gpuLevel = level))
 

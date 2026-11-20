@@ -148,6 +148,7 @@
     <string name="issue_patch_running">Patching the game…</string>
     <string name="issue_patch_installing">Installing the patched game… Android may ask for a confirmation.</string>
     <string name="issue_patch_failed">The patch failed: %1$s</string>
+    <string name="issue_rate_change">Change</string>
     <string name="issue_dismiss">Dismiss</string>
     <string name="issue_mark_read">Mark as read</string>
     <string name="saves_title">Saves</string>
@@ -381,9 +382,18 @@
     <string name="gameperf_optimizer">Quest Games Optimizer is running on this device. It sets the image size, the frame rate and the levels of the games itself and takes over, so the choices of this page are not applied.</string>
     <string name="gameperf_optimizer_properties">Another tool sets the image size, the frame rate or the levels of the games on this device, and takes over: the choices of this page are not applied.</string>
     <string name="gameperf_refresh">Frame rate</string>
+    <string name="gameperf_refresh_lower_title">%1$d Hz lowers the picture</string>
+    <string name="gameperf_refresh_lower_text">The screen offers %1$d Hz only with a smaller picture: %2$d × %3$d for one eye instead of %4$d × %5$d. The game looks softer, and runs at the rate it asks for.</string>
+    <string name="gameperf_refresh_lower_text_cap">The screen offers %1$d Hz only with a smaller picture: %2$d × %3$d for one eye instead of %4$d × %5$d. The image size is set to %6$d %% to match, and cannot go higher while this rate is chosen.</string>
+    <string name="gameperf_resolution_capped">At %1$d Hz the screen shows an image of %2$d %% at most: the slider stops there.</string>
+    <string name="gameperf_refresh_lower_confirm">Use %1$d Hz</string>
+    <string name="gameperf_refresh_lower_cancel">Cancel</string>
+    <string name="gameperf_refresh_refused">This device refuses %1$d Hz: the game stays at its own frame rate.</string>
+    <string name="gameperf_refresh_game_own">The game sets its own frame rate (%1$d Hz) and keeps it, whatever is chosen here.</string>
+    <string name="gameperf_refresh_not_kept">The game ran at %2$d Hz instead of the %1$d Hz chosen.</string>
     <string name="gameperf_refresh_patch">This frame rate needs the game to be patched again: the Quest offers a game the rates of the current Quests only when the game says it is made for them.</string>
     <string name="gameperf_refresh_patch_action">Patch again</string>
-    <string name="gameperf_refresh_legend">How many images per second the screen shows. 72 spares the device, 90 is smoother and needs more. It applies the next time the game starts.</string>
+    <string name="gameperf_refresh_legend">How many images per second the screen shows. A lower rate spares the device, a higher one is smoother and needs more. It applies the next time the game starts.</string>
     <string name="gameperf_refresh_game">Game\'s own</string>
     <string name="gameperf_cpu_level">Processor level</string>
     <string name="gameperf_cpu_level_legend">How much the processor may work. A higher level helps a game that struggles, and uses more power and gives more heat. Automatic leaves the choice to the system. It applies the next time the game starts.</string>
@@ -394,6 +404,7 @@
     <string name="gameperf_level_high">High</string>
     <string name="gameperf_level_boost">Boost</string>
     <string name="issue_performance_crash">The game closed on its own while performance choices were on (%1$s). Turning them off may help.</string>
+    <string name="issue_rate_reset">The frame rate was put back to the game\'s own: this device does not accept %1$d Hz. It accepts %2$s.</string>
     <string name="issue_performance_action">Turn them off</string>
     <string name="issue_performance_levels">processor and graphics levels</string>
     <string name="gameperf_title">Performance</string>

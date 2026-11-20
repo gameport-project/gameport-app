@@ -234,6 +234,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
     val reportProgress by viewModel.reportProgress.collectAsStateWithLifecycle()
     val shownGame = (uiState as? GameUiState.Content)?.game
     val discordName by viewModel.discordName.collectAsStateWithLifecycle()
+    val rateReset by viewModel.rateReset.collectAsStateWithLifecycle()
     val report = ReportActions(
         suspicion = suspicion,
         progress = reportProgress,
@@ -242,6 +243,8 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onDismissProblem = viewModel::onDismissProblem,
         onResetProgress = viewModel::onResetReport,
         discordName = discordName,
+        rateReset = rateReset,
+        onDismissRateReset = viewModel::onDismissRateReset,
     )
     GameContent(
         uiState = uiState,
@@ -960,7 +963,7 @@ private fun GameDetails(
                 }
                 // The notifications are in the card of the bell, the progress of a patch in the card of the install; what stays here is the report that can be sent, and a patch that failed.
                 val suspected = issues.filterIsInstance<GameIssue.ProblemSuspected>().firstOrNull()
-                if (install is InstallState.Installed && (suspected != null || repatch is Repatch.Failed)) {
+                if (install is InstallState.Installed && (suspected != null || repatch is Repatch.Failed || report.rateReset != null)) {
                     Box(Modifier.tourTarget(TourIds.GAME_ISSUES)) { IssuesPanel(
                         problem = suspected,
                         repatch = repatch,
@@ -972,6 +975,9 @@ private fun GameDetails(
                         onDismissProblem = report.onDismissProblem,
                         performanceChoices = performanceChoices,
                         onTurnOffPerformance = onTurnOffPerformance,
+                        rateReset = report.rateReset,
+                        onDismissRateReset = report.onDismissRateReset,
+                        onChangeRate = onOpenPerformance,
                     ) }
                 }
                 // A game without achievements, or one Steam has not answered for yet, shows nothing here.
@@ -1646,6 +1652,9 @@ private fun IssuesPanel(
     onDismissProblem: () -> Unit,
     performanceChoices: app.gameport.core.model.GameSettings?,
     onTurnOffPerformance: () -> Unit,
+    rateReset: app.gameport.core.model.RateReset? = null,
+    onDismissRateReset: () -> Unit = {},
+    onChangeRate: () -> Unit = {},
 ) {
     // As wide as the achievements card beside it in the column.
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1657,6 +1666,17 @@ private fun IssuesPanel(
                 onAction = if (updateAvailable) onUpdate else onRepatch,
                 secondAction = stringResource(R.string.issue_dismiss),
                 onSecondAction = onDismissRepatchError,
+            )
+        }
+        // The frame rate chosen was not accepted by the device: it was put back to the game's own, and the rates the device accepts are said.
+        rateReset?.let {
+            IssueRow(
+                message = stringResource(R.string.issue_rate_reset, it.asked, it.accepted.joinToString(", ") { rate -> "$rate Hz" }),
+                info = true,
+                action = stringResource(R.string.issue_rate_change),
+                onAction = { onDismissRateReset(); onChangeRate() },
+                secondAction = stringResource(R.string.issue_dismiss),
+                onSecondAction = onDismissRateReset,
             )
         }
         // A problem the game seems to have had: the report that can be sent is offered here, on the page (the rest of what is said about the game is in the notifications).
@@ -1825,16 +1845,16 @@ private fun InfoCard(game: Game, installed: Boolean, installedVersion: String?, 
             InfoItem(stringResource(R.string.game_info_download), build?.downloadBytes?.let { Formatter.formatFileSize(context, it) } ?: none)
             InfoItem(stringResource(R.string.game_info_installed), build?.installBytes?.let { Formatter.formatFileSize(context, it) } ?: none)
         }
-        // Under the size: the version of the game that is on the device.
-        installedVersion?.let {
-            InfoGroup(stringResource(R.string.game_info_version), Icons.Filled.Info) {
-                InfoItem(stringResource(R.string.game_info_version_installed), it)
-            }
-        }
         if (installed) {
             InfoGroup(stringResource(R.string.game_info_playtime), Icons.Filled.Schedule) {
                 InfoItem(stringResource(R.string.game_info_played_device), durationText((playtime.deviceMillis / 60_000L).toInt()))
                 playtime.steamMinutes?.let { InfoItem(stringResource(R.string.game_info_played_steam), durationText(it)) }
+            }
+        }
+        // Under the play time: the version of the game that is on the device.
+        installedVersion?.let {
+            InfoGroup(stringResource(R.string.game_info_version), Icons.Filled.Info) {
+                InfoItem(stringResource(R.string.game_info_version_installed), it)
             }
         }
     }
@@ -1891,7 +1911,10 @@ private fun CompatChips(compat: app.gameport.core.model.Compat?, incompatible: a
 
 /** What a verdict is about, in words: the exact model, the kind of device, or every device that was tried. */
 @Composable
-private fun compatSubject(compat: app.gameport.core.model.Compat): String = when (compat.scope) {
+private fun compatSubject(compat: app.gameport.core.model.Compat): String = if (compat.scope == app.gameport.core.model.CompatScope.ALL && compat.kinds.isNotEmpty()) {
+    // Only some kinds of device answered: they are named, never "all devices".
+    compat.kinds.map { deviceName(it) }.joinToString(", ")
+} else when (compat.scope) {
     app.gameport.core.model.CompatScope.MODEL -> compat.name ?: deviceName(compat.device)
     app.gameport.core.model.CompatScope.KIND -> deviceName(compat.device)
     app.gameport.core.model.CompatScope.ALL -> stringResource(R.string.game_compat_subject_all)
@@ -1900,7 +1923,7 @@ private fun compatSubject(compat: app.gameport.core.model.Compat): String = when
 /** The words of the verdict's label: "Works on Quest 3", "Works on Quest", or, when no one narrower said anything, "Works, all devices". */
 @Composable
 private fun compatChipLabel(compat: app.gameport.core.model.Compat): String {
-    val all = compat.scope == app.gameport.core.model.CompatScope.ALL
+    val all = compat.scope == app.gameport.core.model.CompatScope.ALL && compat.kinds.isEmpty()
     val subject = compatSubject(compat)
     return when (compat.level) {
         app.gameport.core.model.CompatLevel.WORKS -> if (all) stringResource(R.string.game_compat_works_all) else stringResource(R.string.game_compat_works, subject)

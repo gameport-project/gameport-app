@@ -89,6 +89,29 @@ internal interface CloudEntryPoint {
  * Files travel through `openFile`: `fetch` reads a cloud file, `push` writes a file to upload.
  */
 class CloudProvider : ContentProvider() {
+    /**
+     * A frame rate the runtime of this device does not accept is taken off the game (back to the game's own), and the game's page says which rates the device accepts. A Quest game that
+     * does not yet say which Quests it is made for is left as it is: the Performance page offers the patch that makes the runtime accept the rate.
+     */
+    /** A Quest game that does not say which Quests it is made for: its runtime accepts the base frame rate only, and what it lists says nothing of the other games. */
+    private fun needsSupportedDevices(appId: Int?): Boolean =
+        appId != null && entryPoint.deviceProfile().vrPlatform?.id == app.gameport.core.model.vr.MetaQuestPlatform.id && !entryPoint.installs().declaresSupportedDevices(appId)
+
+    private fun resetRefusedRate(packageName: String) {
+        val outcome = entryPoint.reports().refreshOutcome(packageName) ?: return
+        val appId = entryPoint.installedGames().all().entries.firstOrNull { it.value == packageName }?.key ?: return
+        val settings = entryPoint.gameSettings()
+        val current = settings.get(appId)
+        if (!outcome.shouldTakeOff(current.refreshRate, needsSupportedDevices(appId))) return
+        // The note first: the page reads it when the choice changes.
+        entryPoint.reports().noteRateReset(packageName, app.gameport.core.model.RateReset(outcome.asked, outcome.accepted))
+        // The image size that was lowered to match the rate's smaller picture goes back with it: nothing now asks for it.
+        val platform = app.gameport.core.model.vr.VrPlatforms.byId(entryPoint.deviceProfile().vrPlatform?.id)
+        val cap = app.gameport.core.model.PerformanceTuning.capForMode(settings.displayRates().lowerResolutionAt(outcome.asked), settings.eyeSides(platform).screen)
+        val resolution = if (cap != null && current.resolutionPercent == cap) app.gameport.core.model.PerformanceTuning.DEFAULT_RESOLUTION else current.resolutionPercent
+        settings.set(appId, current.copy(refreshRate = 0, resolutionPercent = resolution))
+    }
+
     private val entryPoint: CloudEntryPoint by lazy {
         EntryPointAccessors.fromApplication(context!!.applicationContext, CloudEntryPoint::class.java)
     }
@@ -197,7 +220,11 @@ class CloudProvider : ContentProvider() {
         // What the saves are now, whatever the connection: the page of the game's saves shows it, and what is not sent is remembered.
         "local" -> okAfter { coordinator.observeLocal(packageName, parseFiles(extras)) }
         // What the game wrote to the system log lately and how it last ended, for a problem report.
-        "log" -> okAfter { entryPoint.reports().saveGameData(packageName, extras) }
+        "log" -> okAfter {
+            val appId = entryPoint.installedGames().all().entries.firstOrNull { it.value == packageName }?.key
+            entryPoint.reports().saveGameData(packageName, extras, trustedRates = !needsSupportedDevices(appId))
+            resetRefusedRate(packageName)
+        }
         // The game unlocked achievements, which the shim recorded: they are announced with a notification.
         // They are also added to the Steam account when the player chose so (see [SteamAchievementSync]).
         "achievement" -> okAfter {

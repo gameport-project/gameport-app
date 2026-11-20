@@ -59,15 +59,34 @@ object PerformanceTuning {
         return side(screenWidth) to side(screenHeight)
     }
 
-    /** The frame rates offered, 0 being the game's own. */
-    val REFRESH_RATES = listOf(0, 72, 80, 90, 120)
+    /**
+     * The largest image size, as a percentage of the screen's (a multiple of [RESOLUTION_STEP] within the bounds), that a screen mode of [mode] pixels for one eye can show:
+     * a bigger image is drawn for nothing. Null when the mode or the screen is not known.
+     */
+    fun capForMode(mode: Pair<Int, Int>?, screen: Pair<Int, Int>?): Int? {
+        if (mode == null || screen == null || screen.first <= 0 || screen.second <= 0) return null
+        val percent = minOf(mode.first * 100 / screen.first, mode.second * 100 / screen.second)
+        val stepped = MIN_RESOLUTION + (maxOf(percent - MIN_RESOLUTION, 0) / RESOLUTION_STEP) * RESOLUTION_STEP
+        return stepped.coerceIn(MIN_RESOLUTION, MAX_RESOLUTION)
+    }
+
+    /** The bounds of a frame rate that can be kept; anything else is no choice. */
+    const val MIN_REFRESH = 30
+    const val MAX_REFRESH = 480
+
+    /** The frame rates offered, up to 144: the round ones a VR device runs at. 0 is the game's own. */
+    val COMMON_RATES = listOf(60, 72, 80, 90, 100, 120, 144)
+
+    /** The rates to offer: those of [COMMON_RATES] that the device exposes, or [fallback] when it exposes none of them. */
+    fun offeredRates(exposed: Collection<Int>, fallback: List<Int>): List<Int> =
+        COMMON_RATES.filter { it in exposed }.ifEmpty { fallback }
 
     /** The levels of OpenXR's performance settings: -1 leaves them to the system, 0 saves power, 25 holds a low pace, 50 a high one, 75 is a boost that may heat the device. */
     val LEVELS = listOf(-1, 0, 25, 50, 75)
 
     fun resolution(value: Int): Int =
         if (value in MIN_RESOLUTION..MAX_RESOLUTION && (value - MIN_RESOLUTION) % RESOLUTION_STEP == 0) value else DEFAULT_RESOLUTION
-    fun refreshRate(value: Int): Int = if (value in REFRESH_RATES) value else REFRESH_RATES.first()
+    fun refreshRate(value: Int): Int = if (value == 0 || value in MIN_REFRESH..MAX_REFRESH) value else 0
     fun level(value: Int): Int = if (value in LEVELS) value else LEVELS.first()
 }
 
@@ -159,6 +178,8 @@ data class GameSettings(
     /** How much the processor and the graphics chip may work ([PerformanceTuning.LEVELS]); -1 leaves it to the system. */
     val cpuLevel: Int = -1,
     val gpuLevel: Int = -1,
+    /** When one of the four performance choices last changed, in milliseconds (0 when none ever did): a problem older than that cannot be put down to them. Kept by the store. */
+    val performanceChangedAt: Long = 0,
     /** The arguments the player picked to start the game with; null means none was picked and the ones meant for VR are used (see [LaunchOptions.chosen]). */
     val launchArguments: Set<String>? = null,
     /**

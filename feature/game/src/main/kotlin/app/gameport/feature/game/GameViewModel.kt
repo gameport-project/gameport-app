@@ -184,7 +184,7 @@ class GameViewModel @Inject constructor(
             else -> Repatch.None
         }
         val shown = if (repatch != Repatch.None && installedPackage != null) InstallState.Installed(installedPackage) else install
-        game.copy(install = shown, issues = issues + listOfNotNull(GameIssue.SavesApart.takeIf { !saveMode.usesPc && game.game.androidBuild?.saveRules?.any { it.pcCloudPrefix != null } == true }), repatch = repatch, controllerProfile = device.isHeadset, controllerFrame = device.isHeadset && controllers.forced, controllerAutomatic = device.isHeadset && controllers.automatic, compatNotice = device.isHeadset && compatNotice, favorite = appId in favorites, hidden = appId in hidden, vrDevice = device.isHeadset, performanceDevice = device.isHeadset, performanceChoices = own.takeIf { device.isHeadset && (it.refreshRate != 0 || it.resolutionPercent != 0 || it.cpuLevel != -1 || it.gpuLevel != -1) })
+        game.copy(install = shown, issues = issues + listOfNotNull(GameIssue.SavesApart.takeIf { !saveMode.usesPc && game.game.androidBuild?.saveRules?.any { it.pcCloudPrefix != null } == true }), repatch = repatch, controllerProfile = device.isHeadset, controllerFrame = device.isHeadset && controllers.forced, controllerAutomatic = device.isHeadset && controllers.automatic, compatNotice = device.isHeadset && compatNotice, favorite = appId in favorites, hidden = appId in hidden, vrDevice = device.isHeadset, performanceDevice = device.isHeadset, performanceChoices = own.takeIf { device.isHeadset && (reports.suspectedAt(installer.installedPackage(appId).orEmpty()) ?: 0L) > it.performanceChangedAt && (it.refreshRate != 0 || it.resolutionPercent != 0 || it.cpuLevel != -1 || it.gpuLevel != -1) })
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), GameUiState.Loading)
 
@@ -342,6 +342,15 @@ class GameViewModel @Inject constructor(
     val suspicion: StateFlow<app.gameport.core.sync.Suspicion?> = reports.suspected
         .map { installer.installedPackage(appId)?.let(it::get) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    /** The frame rate that was taken off this game because the device does not accept it, until the player closes the note. */
+    val rateReset: StateFlow<app.gameport.core.model.RateReset?> = reports.rateResets
+        .map { installer.installedPackage(appId)?.let(it::get) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    fun onDismissRateReset() {
+        installer.installedPackage(appId)?.let(reports::dismissRateReset)
+    }
 
     /** The Discord name given with an earlier report: it fills the field of the report window. Empty when none. */
     internal val discordName: StateFlow<String> = verdicts.discordName

@@ -147,6 +147,7 @@
     <string name="issue_patch_running">Patch du jeu en cours…</string>
     <string name="issue_patch_installing">Installation du jeu patché… une confirmation d\'Android peut être demandée.</string>
     <string name="issue_patch_failed">Le patch a échoué : %1$s</string>
+    <string name="issue_rate_change">Changer</string>
     <string name="issue_dismiss">Fermer</string>
     <string name="issue_mark_read">Marquer comme lu</string>
     <string name="saves_title">Sauvegardes</string>
@@ -380,9 +381,18 @@
     <string name="gameperf_optimizer">Quest Games Optimizer est actif sur cet appareil. Il règle lui-même la taille de l\'image, la fréquence et les niveaux des jeux et prend le relais : les choix de cette page ne sont pas appliqués.</string>
     <string name="gameperf_optimizer_properties">Un autre outil règle la taille de l\'image, la fréquence ou les niveaux des jeux sur cet appareil et prend le relais : les choix de cette page ne sont pas appliqués.</string>
     <string name="gameperf_refresh">Fréquence d\'images</string>
+    <string name="gameperf_refresh_lower_title">%1$d Hz baisse l\'image</string>
+    <string name="gameperf_refresh_lower_text">L\'écran n\'offre %1$d Hz qu\'avec une image plus petite : %2$d × %3$d pour un œil au lieu de %4$d × %5$d. Le jeu paraît plus flou, et tourne à la fréquence qu\'il demande.</string>
+    <string name="gameperf_refresh_lower_text_cap">L\'écran n\'offre %1$d Hz qu\'avec une image plus petite : %2$d × %3$d pour un œil au lieu de %4$d × %5$d. La taille de l\'image est réglée à %6$d %% pour correspondre, et ne peut pas monter plus haut tant que cette fréquence est choisie.</string>
+    <string name="gameperf_resolution_capped">À %1$d Hz l\'écran montre une image de %2$d %% au plus : le curseur s\'arrête là.</string>
+    <string name="gameperf_refresh_lower_confirm">Utiliser %1$d Hz</string>
+    <string name="gameperf_refresh_lower_cancel">Annuler</string>
+    <string name="gameperf_refresh_refused">Cet appareil refuse %1$d Hz : le jeu reste à sa propre fréquence.</string>
+    <string name="gameperf_refresh_game_own">Le jeu fixe lui-même sa fréquence (%1$d Hz) et la garde, quel que soit le choix fait ici.</string>
+    <string name="gameperf_refresh_not_kept">Le jeu a tourné à %2$d Hz au lieu des %1$d Hz choisis.</string>
     <string name="gameperf_refresh_patch">Cette fréquence demande de patcher de nouveau le jeu : le Quest ne propose à un jeu les fréquences des Quest actuels que s\'il indique être fait pour eux.</string>
     <string name="gameperf_refresh_patch_action">Patcher de nouveau</string>
-    <string name="gameperf_refresh_legend">Le nombre d\'images par seconde que l\'écran affiche. 72 ménage l\'appareil, 90 est plus fluide et demande plus. Cela s\'applique au prochain démarrage du jeu.</string>
+    <string name="gameperf_refresh_legend">Le nombre d\'images par seconde que l\'écran affiche. Une fréquence basse ménage l\'appareil, une haute est plus fluide et demande plus. Cela s\'applique au prochain démarrage du jeu.</string>
     <string name="gameperf_refresh_game">Celle du jeu</string>
     <string name="gameperf_cpu_level">Niveau du processeur</string>
     <string name="gameperf_cpu_level_legend">Combien le processeur peut travailler. Un niveau plus haut aide un jeu qui peine, et consomme plus et chauffe plus. Automatique laisse le choix au système. Cela s\'applique au prochain démarrage du jeu.</string>
@@ -393,6 +403,7 @@
     <string name="gameperf_level_high">Haut</string>
     <string name="gameperf_level_boost">Boost</string>
     <string name="issue_performance_crash">Le jeu s\'est fermé tout seul alors que des choix de performance étaient activés (%1$s). Les désactiver peut aider.</string>
+    <string name="issue_rate_reset">La fréquence d\'images a été remise à celle du jeu : cet appareil n\'accepte pas %1$d Hz. Il accepte %2$s.</string>
     <string name="issue_performance_action">Les désactiver</string>
     <string name="issue_performance_levels">niveaux du processeur et du graphique</string>
     <string name="gameperf_title">Performances</string>

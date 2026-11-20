@@ -55,6 +55,9 @@ internal class ReportActions(
     val onResetProgress: () -> Unit,
     /** The Discord name given with an earlier report: it fills the field, so it is never asked again and can still be changed. */
     val discordName: String = "",
+    /** A frame rate the device does not accept was taken off the game: the page says so, with the rates it accepts, until the note is closed. */
+    val rateReset: app.gameport.core.model.RateReset? = null,
+    val onDismissRateReset: () -> Unit = {},
 ) {
     companion object {
         val None = ReportActions(null, ReportProgress.Idle, { _, _, _ -> }, {}, {}, {})

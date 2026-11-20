@@ -1,6 +1,12 @@
 package app.gameport.feature.game
 
 import androidx.compose.foundation.layout.Arrangement
+import app.gameport.core.settings.DisplayRates
+import app.gameport.core.designsystem.BackdropDialog
+import androidx.compose.material3.Button
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import app.gameport.core.designsystem.GlassButton
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
@@ -64,9 +70,10 @@ fun GamePerformanceScreen(onBack: () -> Unit, viewModel: GamePerformanceViewMode
     val settings by viewModel.gameSettings.collectAsStateWithLifecycle()
     val gameName by viewModel.gameName.collectAsStateWithLifecycle()
     val refreshNeedsPatch by viewModel.refreshNeedsPatch.collectAsStateWithLifecycle()
+    val refreshOutcome by viewModel.refreshOutcome.collectAsStateWithLifecycle()
     GamePerformanceContent(
-        settings, gameName, viewModel.eyeSides, viewModel.optimizerState, viewModel.refreshRates, refreshNeedsPatch, viewModel::onPatchAgain, onBack,
-        viewModel::onResolutionChosen, viewModel::onRefreshRateChosen, viewModel::onCpuLevelChosen, viewModel::onGpuLevelChosen,
+        settings, gameName, viewModel.eyeSides, viewModel.optimizerState, viewModel.refreshRates, viewModel.displayRates, refreshNeedsPatch, viewModel::onPatchAgain, onBack,
+        viewModel::onResolutionChosen, viewModel::onRefreshRateChosen, viewModel::onCpuLevelChosen, viewModel::onGpuLevelChosen, refreshOutcome,
     )
 }
 
@@ -77,15 +84,40 @@ internal fun GamePerformanceContent(
     eyeSides: EyeSides,
     optimizerState: OptimizerState,
     refreshRates: List<Int>,
+    displayRates: DisplayRates,
     refreshNeedsPatch: Boolean,
     onPatchAgain: () -> Unit,
     onBack: () -> Unit,
     onResolutionChosen: (Int) -> Unit,
-    onRefreshRateChosen: (Int) -> Unit,
+    onRefreshRateChosen: (Int, Int?) -> Unit,
     onCpuLevelChosen: (Int) -> Unit,
     onGpuLevelChosen: (Int) -> Unit,
+    refreshOutcome: app.gameport.core.model.RefreshOutcome? = null,
 ) {
     val performance = PerformanceTuning
+    var pendingRate by remember { mutableStateOf<Int?>(null) }
+    pendingRate?.let { rate ->
+        val at = displayRates.lowerResolutionAt(rate)
+        val best = displayRates.best
+        if (at != null && best != null) {
+            // The image size held to what the mode shows: lowered now when it is above, and the slider then stops there.
+            val cap = PerformanceTuning.capForMode(at, eyeSides.screen)
+            val now = currentPercent(settings.resolutionPercent, eyeSides)
+            val lowered = cap?.takeIf { now > it }
+            BackdropDialog(
+                onDismissRequest = { pendingRate = null },
+                title = { Text(stringResource(R.string.gameperf_refresh_lower_title, rate)) },
+                text = {
+                    Text(
+                        if (lowered != null) stringResource(R.string.gameperf_refresh_lower_text_cap, rate, at.first, at.second, best.first, best.second, lowered)
+                        else stringResource(R.string.gameperf_refresh_lower_text, rate, at.first, at.second, best.first, best.second),
+                    )
+                },
+                confirmButton = { Button(onClick = { onRefreshRateChosen(rate, lowered); pendingRate = null }) { Text(stringResource(R.string.gameperf_refresh_lower_confirm, rate)) } },
+                dismissButton = { GlassButton(onClick = { pendingRate = null }) { Text(stringResource(R.string.gameperf_refresh_lower_cancel)) } },
+            )
+        }
+    }
     val levelLabels = listOf(R.string.gamecompat_mode_auto, R.string.gameperf_level_saving, R.string.gameperf_level_low, R.string.gameperf_level_high, R.string.gameperf_level_boost).map { stringResource(it) }
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp)) {
@@ -99,15 +131,23 @@ internal fun GamePerformanceContent(
                     OptimizerNotice(optimizerState)
                     return@Column
                 }
-                ResolutionBox(settings.resolutionPercent, eyeSides, onResolutionChosen)
+                // At a rate that only comes with a smaller picture, the slider stops at the largest image that picture can show.
+                val resolutionCap = settings.refreshRate.takeIf { it != 0 }?.let { displayRates.lowerResolutionAt(it) }?.let { PerformanceTuning.capForMode(it, eyeSides.screen) }
+                ResolutionBox(settings.resolutionPercent, eyeSides, onResolutionChosen, resolutionCap, settings.refreshRate)
                 ChoiceBox(
                     title = stringResource(R.string.gameperf_refresh),
                     legend = stringResource(R.string.gameperf_refresh_legend),
                     labels = refreshRates.map { if (it == 0) stringResource(R.string.gameperf_refresh_game) else "$it Hz" },
                     selected = refreshRates.indexOf(settings.refreshRate).coerceAtLeast(0),
-                    onSelect = { onRefreshRateChosen(refreshRates[it]) },
+                    onSelect = {
+                        // A rate that only comes with a smaller picture than the screen's own is confirmed first.
+                        val rate = refreshRates[it]
+                        if (rate != 0 && displayRates.lowerResolutionAt(rate) != null) pendingRate = rate else onRefreshRateChosen(rate, null)
+                    },
                     accent = PerformanceTeal,
+                    fitLabels = true,
                 )
+                refreshOutcome?.let { RefreshOutcomeNotice(it) }
                 if (refreshNeedsPatch) PatchAgainRow(onPatchAgain)
                 ChoiceBox(
                     title = stringResource(R.string.gameperf_cpu_level),
@@ -141,13 +181,13 @@ private const val DEFAULT_GRIP = 1.5f
  * goes back to it, and at the bottom the screen's resolution and the one of the image shown.
  */
 @Composable
-private fun ResolutionBox(percent: Int, eyeSides: EyeSides, onChosen: (Int) -> Unit) {
+private fun ResolutionBox(percent: Int, eyeSides: EyeSides, onChosen: (Int) -> Unit, cap: Int? = null, rate: Int = 0) {
     val custom = percent != PerformanceTuning.DEFAULT_RESOLUTION
     // The default sits where the recommended width falls on the screen's, as a percentage.
     val defaultPercent = eyeSides.screen?.let { screen -> eyeSides.recommended?.let { it.first * 100f / screen.first } }
     val shown = if (custom) eyeSides.screen?.let { PerformanceTuning.scaledSizes(it.first, it.second, percent) } else eyeSides.recommended
     val min = PerformanceTuning.MIN_RESOLUTION.toFloat()
-    val max = PerformanceTuning.MAX_RESOLUTION.toFloat()
+    val max = (cap ?: PerformanceTuning.MAX_RESOLUTION).toFloat()
     Column(
         Modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -157,7 +197,9 @@ private fun ResolutionBox(percent: Int, eyeSides: EyeSides, onChosen: (Int) -> U
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             // Back to the default, at the left: outlined and with its icon, dimmed while the default is the choice.
             val markColor = if (custom) DefaultMark else DefaultMark.copy(alpha = 0.3f)
-            OutlinedIconButton(onClick = { onChosen(PerformanceTuning.DEFAULT_RESOLUTION) }, enabled = custom, border = BorderStroke(1.dp, markColor)) {
+            // While the slider is held down, the default (the system's size) is above the cap too, so it is not offered either.
+            val defaultAllowed = cap == null || (defaultPercent ?: 0f) <= cap
+            OutlinedIconButton(onClick = { onChosen(PerformanceTuning.DEFAULT_RESOLUTION) }, enabled = custom && defaultAllowed, border = BorderStroke(1.dp, markColor)) {
                 Icon(Icons.Filled.Restore, contentDescription = stringResource(R.string.gameperf_resolution_default), tint = markColor)
             }
             Box(
@@ -172,11 +214,11 @@ private fun ResolutionBox(percent: Int, eyeSides: EyeSides, onChosen: (Int) -> U
                 },
             ) {
                 Slider(
-                    value = if (custom) percent.toFloat() else defaultPercent ?: PerformanceTuning.CUSTOM_START.toFloat(),
+                    value = (if (custom) percent.toFloat() else defaultPercent ?: PerformanceTuning.CUSTOM_START.toFloat()).coerceIn(min, max),
                     // Near the amber mark the default is taken, even though it is not a multiple of 5; elsewhere the value goes to the nearest multiple.
                     onValueChange = {
                         onChosen(
-                            if (defaultPercent != null && abs(it - defaultPercent) <= DEFAULT_GRIP) PerformanceTuning.DEFAULT_RESOLUTION
+                            if (defaultPercent != null && defaultPercent <= max && abs(it - defaultPercent) <= DEFAULT_GRIP) PerformanceTuning.DEFAULT_RESOLUTION
                             else PerformanceTuning.MIN_RESOLUTION + ((it - min) / PerformanceTuning.RESOLUTION_STEP).roundToInt() * PerformanceTuning.RESOLUTION_STEP,
                         )
                     },
@@ -196,7 +238,16 @@ private fun ResolutionBox(percent: Int, eyeSides: EyeSides, onChosen: (Int) -> U
             SizeTile(Modifier.weight(1f), stringResource(R.string.gameperf_resolution_shown), shown, emphasised = true)
         }
         Text(stringResource(R.string.gameperf_resolution_per_eye), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+        if (cap != null) Text(stringResource(R.string.gameperf_resolution_capped, rate, cap), color = CompatOrange, style = MaterialTheme.typography.bodySmall)
     }
+}
+
+/** The image size now, as a percentage of the screen's: the choice, or the size the system recommends when nothing is chosen. */
+private fun currentPercent(percent: Int, eyeSides: EyeSides): Int {
+    if (percent != PerformanceTuning.DEFAULT_RESOLUTION) return percent
+    val screen = eyeSides.screen ?: return 100
+    val recommended = eyeSides.recommended ?: return 100
+    return recommended.first * 100 / screen.first
 }
 
 /** A size in pixels under its name: the screen's quiet, the image shown lit with the amber. */
@@ -215,6 +266,25 @@ private fun SizeTile(modifier: Modifier, label: String, size: Pair<Int, Int>?, e
 }
 
 /** Something else sets the graphics of this game: it takes over, and nothing here would be applied. */
+/** The frame rate chosen did not apply in the last run: the device refused it, the game sets its own, or the frames came at another rate. Doubts are told in orange under the option. */
+@Composable
+private fun RefreshOutcomeNotice(outcome: app.gameport.core.model.RefreshOutcome) {
+    val text = when (outcome.verdict) {
+        app.gameport.core.model.RefreshOutcome.Verdict.REFUSED -> stringResource(R.string.gameperf_refresh_refused, outcome.asked)
+        app.gameport.core.model.RefreshOutcome.Verdict.GAME_OWN -> stringResource(R.string.gameperf_refresh_game_own, outcome.gameAsked)
+        app.gameport.core.model.RefreshOutcome.Verdict.NOT_KEPT -> stringResource(R.string.gameperf_refresh_not_kept, outcome.asked, outcome.observed)
+        else -> return
+    }
+    Row(
+        Modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(Icons.Filled.Info, contentDescription = null, tint = CompatOrange, modifier = Modifier.size(24.dp))
+        Text(text, color = CompatOrange, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
 @Composable
 private fun OptimizerNotice(state: OptimizerState) {
     Row(

@@ -81,7 +81,7 @@ data class Release(
         const val FALLBACK_LANGUAGE = "en"
 
         /** The pictures the news window knows. Adding one is a line in the window, once. */
-        val ICONS = setOf("trophy", "cloud-sync", "key", "check", "download", "play", "warning", "build", "trash", "info")
+        val ICONS = setOf("trophy", "cloud-sync", "key", "check", "download", "play", "warning", "build", "trash", "info", "celebration", "speed", "tune", "description")
 
         private val HEADSET = Regex("headset|casque", RegexOption.IGNORE_CASE)
         private val json = Json { ignoreUnknownKeys = false }

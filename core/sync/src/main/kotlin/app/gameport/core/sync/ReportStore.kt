@@ -26,13 +26,37 @@ class ReportStore @Inject constructor(
     private val directory = File(context.filesDir, "problem-reports")
     private val prefs = context.getSharedPreferences("gameport_problems", Context.MODE_PRIVATE)
     private val launched = HashMap<String, Long>()
+    private val _rateResets = MutableStateFlow(readRateResets())
+
+    /** The games whose frame rate was taken off because the runtime refused it, by package name: the game's page says so until the player closes the note. */
+    val rateResets: StateFlow<Map<String, app.gameport.core.model.RateReset>> = _rateResets.asStateFlow()
+
+    private fun readRateResets(): Map<String, app.gameport.core.model.RateReset> =
+        prefs.all.mapNotNull { (key, value) ->
+            if (key.startsWith(RATE_RESET_PREFIX)) app.gameport.core.model.RateReset.parse(value as? String)?.let { key.removePrefix(RATE_RESET_PREFIX) to it } else null
+        }.toMap()
+
+    fun noteRateReset(packageName: String, reset: app.gameport.core.model.RateReset) {
+        prefs.edit().putString(RATE_RESET_PREFIX + packageName, reset.write()).apply()
+        _rateResets.value = _rateResets.value + (packageName to reset)
+    }
+
+    fun dismissRateReset(packageName: String) {
+        prefs.edit().remove(RATE_RESET_PREFIX + packageName).apply()
+        _rateResets.value = _rateResets.value - packageName
+    }
+
     private val _suspected = MutableStateFlow(readSuspicions())
 
     /** Games that look like they had a problem, by package, until the player acts on it. */
     val suspected: StateFlow<Map<String, Suspicion>> = _suspected.asStateFlow()
 
     /** What the patched game handed over: see `SessionLog` in the hook. Text comes gzip-compressed to fit in one call. */
-    fun saveGameData(packageName: String, extras: Bundle) {
+    /**
+     * [trustedRates]: the rates the runtime listed for this game say what the device accepts. They do not on a Quest for a game that does not say which Quests it is made for: the runtime
+     * then lists the base rate only.
+     */
+    fun saveGameData(packageName: String, extras: Bundle, trustedRates: Boolean = true) {
         val folder = File(directory, safe(packageName)).apply { mkdirs() }
         // A new run of the game: what the one before left is kept apart, as it is the run that explains how it ended and would be written over.
         RunArchive.noteRun(
@@ -50,6 +74,14 @@ class ReportStore @Inject constructor(
         extras.getByteArray("threadsGz")?.let { gunzip(it)?.let { text -> File(folder, THREADS).writeBytes(text) } }
         extras.getByteArray("diagGz")?.let { gunzip(it)?.let { text -> saveDiagnostics(folder, String(text, Charsets.UTF_8)) } }
         extras.getByteArray("engineGz")?.let { gunzip(it)?.let { text -> File(folder, ENGINE_LOG).writeBytes(text) } }
+        // What the OpenXR layer made of the frame rate asked for, replaced at every hand-over; the rates the runtime accepts are kept for the device, whichever game said them.
+        extras.getString("refreshReport")?.let { report ->
+            val outcome = app.gameport.core.model.RefreshOutcome.parse(report)
+            val edit = prefs.edit()
+            if (outcome == null) edit.remove(REFRESH_PREFIX + packageName) else edit.putString(REFRESH_PREFIX + packageName, report)
+            if (trustedRates && outcome != null && outcome.accepted.isNotEmpty()) edit.putString(ACCEPTED_RATES, outcome.accepted.joinToString(","))
+            edit.apply()
+        }
         // How steadily the run went, as the hook counted it so far: replaced at every hand-over, as it counts the run from its start.
         if (extras.containsKey("steadinessSeconds")) {
             val counted = app.gameport.core.model.Steadiness(extras.getInt("steadinessSeconds"), extras.getInt("steadinessHeld"), extras.getInt("steadinessTarget"))
@@ -74,7 +106,9 @@ class ReportStore @Inject constructor(
             val file = File(folder, PREVIOUS_EXIT)
             val changed = !file.exists() || file.readText() != previousExit
             file.writeText(previousExit.takeLast(MAX_CHARS))
-            if (changed && ExitReasons.isCrash(previousExit.lineSequence().firstOrNull().orEmpty())) suspect(packageName, Suspicion.CRASH)
+            val last = previousExit.lineSequence().firstOrNull().orEmpty()
+            // Dated by the crash itself, not by the hand-over that told of it: it may come a run later.
+            if (changed && ExitReasons.isCrash(last)) suspect(packageName, Suspicion.CRASH, Regex("^time=(\\d{10,})").find(last)?.groupValues?.get(1)?.toLongOrNull() ?: System.currentTimeMillis())
         }
     }
 
@@ -189,24 +223,37 @@ class ReportStore @Inject constructor(
     fun left(packageName: String, nowMillis: Long = System.currentTimeMillis()) {
         val start = launched.remove(packageName) ?: prefs.getLong(LAUNCH_PREFIX + packageName, -1L).takeIf { it >= 0 } ?: return
         prefs.edit().remove(LAUNCH_PREFIX + packageName).putLong(SESSION_PREFIX + packageName, nowMillis - start).apply()
-        if (nowMillis - start < SHORT_SESSION_MS) suspect(packageName, Suspicion.SHORT_SESSION)
+        when (app.gameport.core.model.ProblemRules.afterRun(nowMillis - start, packageName in _suspected.value)) {
+            app.gameport.core.model.ProblemRules.AfterRun.NOTE_SHORT_SESSION -> suspect(packageName, Suspicion.SHORT_SESSION)
+            app.gameport.core.model.ProblemRules.AfterRun.CLEAR -> dismiss(packageName)
+            app.gameport.core.model.ProblemRules.AfterRun.NOTHING -> Unit
+        }
     }
 
     /** How steadily the game's last run went, as the hook counted it, or null when nothing was handed over. It may be too short to say: see [app.gameport.core.model.Steadiness.usable]. */
     fun steadiness(packageName: String): app.gameport.core.model.Steadiness? = app.gameport.core.model.Steadiness.parse(prefs.getString(STEADINESS_PREFIX + packageName, null))
 
+    /** What came of the frame rate asked for the game in its last run, or null when none was asked or the layer said nothing. */
+    fun refreshOutcome(packageName: String): app.gameport.core.model.RefreshOutcome? = app.gameport.core.model.RefreshOutcome.parse(prefs.getString(REFRESH_PREFIX + packageName, null))
+
+    /** The frame rates the runtime of this device accepts, as a game's run last told, or empty while none did. */
+    fun acceptedRates(): List<Int> = prefs.getString(ACCEPTED_RATES, null).orEmpty().split(',').mapNotNull { it.trim().toIntOrNull() }
+
     /** How long the game's last run lasted before it left the screen or closed, in milliseconds, or null if unknown. */
     fun lastSessionMillis(packageName: String): Long? = prefs.getLong(SESSION_PREFIX + packageName, -1L).takeIf { it >= 0 }
 
+    /** When the problem noted for the game happened, in milliseconds, or null when none is noted or the time was not kept. */
+    fun suspectedAt(packageName: String): Long? = prefs.getLong(AT_PREFIX + packageName, -1L).takeIf { it >= 0 }
+
     fun dismiss(packageName: String) {
-        prefs.edit().remove(packageName).apply()
+        prefs.edit().remove(packageName).remove(AT_PREFIX + packageName).apply()
         _suspected.value = _suspected.value - packageName
     }
 
-    private fun suspect(packageName: String, suspicion: Suspicion) {
+    private fun suspect(packageName: String, suspicion: Suspicion, at: Long = System.currentTimeMillis()) {
         // A crash outranks a short session.
         if (_suspected.value[packageName] == Suspicion.CRASH && suspicion == Suspicion.SHORT_SESSION) return
-        prefs.edit().putString(packageName, suspicion.name).apply()
+        prefs.edit().putString(packageName, suspicion.name).putLong(AT_PREFIX + packageName, at).apply()
         _suspected.value = _suspected.value + (packageName to suspicion)
     }
 
@@ -243,9 +290,13 @@ class ReportStore @Inject constructor(
         const val MAX_TRACE_BYTES = 2_000_000
         const val PREVIOUS_EXIT = "previous-exit.txt"
         const val MAX_CHARS = 600_000
-        const val SHORT_SESSION_MS = 30_000L
+        const val SHORT_SESSION_MS = app.gameport.core.model.ProblemRules.SHORT_SESSION_MS
         const val SESSION_PREFIX = "session:"
         const val STEADINESS_PREFIX = "steadiness:"
+        const val REFRESH_PREFIX = "refresh:"
+        const val RATE_RESET_PREFIX = "ratereset:"
+        const val ACCEPTED_RATES = "accepted_rates"
+        const val AT_PREFIX = "suspectedat:"
         const val LAUNCH_PREFIX = "launch:"
         const val CALLRUN_PREFIX = "callrun:"
         const val LAUNCH_PID_PREFIX = "launchpid:"

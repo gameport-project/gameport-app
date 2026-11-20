@@ -2,6 +2,10 @@ package app.gameport.feature.game
 
 import app.gameport.core.designsystem.TourIds
 import app.gameport.core.designsystem.tourTarget
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -158,7 +162,7 @@ internal fun GameCompatContent(
 
 /** A choice among a few, always showing which is taken, with its legend. The first is the automatic one, where GamePort decides. */
 @Composable
-internal fun ChoiceBox(modifier: Modifier = Modifier, title: String, legend: String, labels: List<String>, selected: Int, onSelect: (Int) -> Unit, note: String? = null, warning: String? = null, accent: Color = CompatOrange, titleEnd: String? = null) {
+internal fun ChoiceBox(modifier: Modifier = Modifier, title: String, legend: String, labels: List<String>, selected: Int, onSelect: (Int) -> Unit, note: String? = null, warning: String? = null, accent: Color = CompatOrange, titleEnd: String? = null, fitLabels: Boolean = false) {
     Column(
         modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -168,7 +172,7 @@ internal fun ChoiceBox(modifier: Modifier = Modifier, title: String, legend: Str
             if (titleEnd != null) Text(titleEnd, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
         }
         Text(legend, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-        PillTabs(labels, selected, onSelect, Modifier.fillMaxWidth())
+        PillTabs(labels, selected, onSelect, Modifier.fillMaxWidth(), fitLabels = fitLabels)
         if (note != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
                 Icon(Icons.Filled.Info, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
