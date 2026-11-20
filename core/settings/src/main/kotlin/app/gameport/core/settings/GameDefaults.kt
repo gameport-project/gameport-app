@@ -47,9 +47,9 @@ class GameDefaults @Inject constructor(@ApplicationContext private val context: 
     }
 
     /** Asks the relay again when what is kept is older than [maxAgeMs] (or was never read). Safe to call whenever; one reading at a time. */
-    suspend fun refreshIfStale(maxAgeMs: Long = if (debuggable) DEBUG_REFRESH_MS else REFRESH_MS) {
+    suspend fun refreshIfStale(maxAgeMs: Long = if (debuggable) app.gameport.core.model.RelayRefresh.DEBUG_MS else app.gameport.core.model.RelayRefresh.GAME_DEFAULTS_MS) {
         lock.withLock {
-            if (kept.exists() && now() - kept.lastModified() < maxAgeMs) return
+            if (!app.gameport.core.model.RelayRefresh.due(if (kept.exists()) now() - kept.lastModified() else null, maxAgeMs)) return
             val text = fetch() ?: return
             val read = GameDefaultsList.fromRelay(text) ?: return
             runCatching { kept.writeText(text) }
@@ -76,7 +76,5 @@ class GameDefaults @Inject constructor(@ApplicationContext private val context: 
 
         private const val RELAY = "https://gameport-relay.gameport.workers.dev"
         private const val TIMEOUT_MS = 10_000
-        private const val REFRESH_MS = 24 * 60 * 60 * 1000L
-        private const val DEBUG_REFRESH_MS = 20 * 1000L
     }
 }

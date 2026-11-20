@@ -104,8 +104,10 @@ class CompatRepository @Inject constructor(@ApplicationContext private val conte
     private val reportsKept = java.util.concurrent.ConcurrentHashMap<Int, Pair<Long, CompatReports>>()
     internal var now: () -> Long = System::currentTimeMillis
 
-    // A test build asks again after seconds, so what was just sent can be seen; a release build after minutes, to spare the relay.
-    private val refreshMs = if (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) DEBUG_REFRESH_MS else REFRESH_MS
+    // A test build asks again after seconds, so what was just sent can be seen. A release build asks again for the details of a game after minutes (a player looks at them to see what others
+    // just wrote), and for the totals, which carry the names of the models, after a day: they change over days, and the relay is spared.
+    private val refreshMs = if (debuggable) app.gameport.core.model.RelayRefresh.DEBUG_MS else app.gameport.core.model.RelayRefresh.DETAILS_MS
+    private val summaryRefreshMs = if (debuggable) app.gameport.core.model.RelayRefresh.DEBUG_MS else app.gameport.core.model.RelayRefresh.SUMMARY_MS
 
     /** The verdict of the players for this device: its exact model when two or more of them answered, else its kind of device, else every device; null while nobody answered. */
     fun observe(appId: Int): Flow<Compat?> = summary.map { CompatRules.ofDevice(it?.of(appId), device.kind, device.model) }
@@ -146,16 +148,11 @@ class CompatRepository @Inject constructor(@ApplicationContext private val conte
         // The made-up totals of a debug build stay as they are.
         if (debugSummary != null) return
         lock.withLock {
-            if (now() - file.lastModified() < refreshMs && summary.value != null) return
+            if (!app.gameport.core.model.RelayRefresh.due(if (summary.value != null) now() - file.lastModified() else null, summaryRefreshMs)) return
             val text = transport.get() ?: return
             val read = CompatSummary.parse(text) ?: return
             runCatching { file.writeText(text) }
             summary.value = read
         }
-    }
-
-    private companion object {
-        const val REFRESH_MS = 10 * 60 * 1000L
-        const val DEBUG_REFRESH_MS = 20 * 1000L
     }
 }

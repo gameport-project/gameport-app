@@ -54,7 +54,7 @@ class IncompatibleGames @Inject constructor(@ApplicationContext private val cont
     /** Asks the relay again when what is kept is old (or was never read). Safe to call whenever a page opens. */
     suspend fun refreshIfStale() {
         lock.withLock {
-            if (kept.exists() && now() - kept.lastModified() < (if (debuggable) DEBUG_REFRESH_MS else REFRESH_MS)) return
+            if (!app.gameport.core.model.RelayRefresh.due(if (kept.exists()) now() - kept.lastModified() else null, if (debuggable) app.gameport.core.model.RelayRefresh.DEBUG_MS else app.gameport.core.model.RelayRefresh.INCOMPATIBLE_MS)) return
             val text = fetch() ?: return
             val read = IncompatibleList.fromRelay(text) ?: return
             runCatching { kept.writeText(text) }
@@ -98,8 +98,6 @@ class IncompatibleGames @Inject constructor(@ApplicationContext private val cont
     private companion object {
         const val RELAY = "https://gameport-relay.gameport.workers.dev"
         const val TIMEOUT_MS = 10_000
-        const val REFRESH_MS = 10 * 60 * 1000L
-        const val DEBUG_REFRESH_MS = 20 * 1000L
         const val SHOW_ANYWAY = "show_anyway"
         const val ACKNOWLEDGED = "acknowledged"
     }
