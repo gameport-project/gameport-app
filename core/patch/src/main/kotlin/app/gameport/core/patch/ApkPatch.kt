@@ -57,6 +57,11 @@ data class PatchContext(
      * earlier where it is ([app.gameport.core.patch.patches.PackageRenamePatch.META_ORIGINAL]).
      */
     val restorePackageName: Boolean = false,
+    /**
+     * The player chose a frame rate for this game (anything but the game's own): on a Meta headset the game then declares the Quests it is made for, so the runtime offers it
+     * their frame rates ([app.gameport.core.patch.patches.MetaSupportedDevicesPatch]).
+     */
+    val metaHighRefresh: Boolean = false,
     /** The GamePort that patches the game, by its package name: the game's hook talks to that one and to no other. */
     val owner: String = DEFAULT_OWNER,
 ) {

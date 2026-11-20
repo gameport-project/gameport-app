@@ -10,6 +10,7 @@ import app.gameport.core.patch.patches.XrLayerPatch
 import app.gameport.core.patch.patches.StorageTargetPatch
 import app.gameport.core.patch.patches.MinSdkPatch
 import app.gameport.core.patch.patches.UsesLibraryPatch
+import app.gameport.core.patch.patches.MetaSupportedDevicesPatch
 import app.gameport.core.patch.patches.PicoMetadataPatch
 import app.gameport.core.patch.patches.UnityMultiviewViewportsPatch
 import app.gameport.core.patch.patches.UnrealUnityPlayerStubPatch
@@ -67,7 +68,7 @@ class GamePatcher @Inject constructor(
 
 /** Every patch GamePort knows, in the order they are applied. */
 object PatchCatalog {
-    val all: List<ApkPatch> = listOf(PackageRenamePatch, VrLauncherPatch, PicoMetadataPatch, UnityMultiviewViewportsPatch, UnrealUnityPlayerStubPatch, VrGameActivityPatch, OvrPluginStandInPatch, PassthroughFeaturePatch, SteamShimPatch, CloudHookPatch, XrLayerPatch, XrLoaderPatch, MetaLoaderStubPatch, StorageTargetPatch, MinSdkPatch, UsesLibraryPatch, SteamFrameLoginPatch, AppLabelPatch, VersionCodePatch, PatchVersionPatch)
+    val all: List<ApkPatch> = listOf(PackageRenamePatch, VrLauncherPatch, PicoMetadataPatch, MetaSupportedDevicesPatch, UnityMultiviewViewportsPatch, UnrealUnityPlayerStubPatch, VrGameActivityPatch, OvrPluginStandInPatch, PassthroughFeaturePatch, SteamShimPatch, CloudHookPatch, XrLayerPatch, XrLoaderPatch, MetaLoaderStubPatch, StorageTargetPatch, MinSdkPatch, UsesLibraryPatch, SteamFrameLoginPatch, AppLabelPatch, VersionCodePatch, PatchVersionPatch)
 
     val recommended: List<ApkPatch> get() = all.filter { it.recommended }
 }

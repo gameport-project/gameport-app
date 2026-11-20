@@ -325,7 +325,7 @@ class GameInstallRepository @Inject constructor(
                         // Written under another name and renamed when complete, so an interrupted
                         // patch is never mistaken for a finished one.
                         val partial = File(patched.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || installed.all()[game.appId]?.let(::deviceHasExpansion) == true, vrGameActivity = gameSettings.get(game.appId).openInVr, ovrPluginStandIn = gameSettings.get(game.appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(game.appId).passthrough, game.appId, packages.vrFamily, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlcOf(game), missingDlc = missingDlcOf(game), familyShared = familySharedOf(game), hasExpansionFiles = downloadHasExpansion(directory), deviceFamily = packages.vrFamily, deviceSdk = packages.deviceSdk, renamedPackage = renamedPackageFor(game.appId), restorePackageName = restorePackageNameFor(game.appId), owner = context.packageName))
+                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || installed.all()[game.appId]?.let(::deviceHasExpansion) == true, vrGameActivity = gameSettings.get(game.appId).openInVr, ovrPluginStandIn = gameSettings.get(game.appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(game.appId).passthrough, game.appId, packages.vrFamily, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlcOf(game), missingDlc = missingDlcOf(game), familyShared = familySharedOf(game), hasExpansionFiles = downloadHasExpansion(directory), deviceFamily = packages.vrFamily, deviceSdk = packages.deviceSdk, metaHighRefresh = gameSettings.get(game.appId).refreshRate != 0, renamedPackage = renamedPackageFor(game.appId), restorePackageName = restorePackageNameFor(game.appId), owner = context.packageName))
                         check(partial.renameTo(patched)) { "Could not finish the patched APK." }
                         // Keep only one copy of a multi-gigabyte game on disk.
                         original.delete()
@@ -623,6 +623,17 @@ class GameInstallRepository @Inject constructor(
     fun offeredRenamedPackage(appId: Int): String? =
         if (gameSettings.get(appId).packageName == PackageNameMode.OFF) null else RenamedPackages.nameFor(appId)
 
+    /**
+     * True when the installed game declares the Quests it is made for (its own list, or the one GamePort added): a Quest then offers it the frame rates of the current ones.
+     * A game that does not is run in compatibility mode, and a frame rate asked for is refused.
+     */
+    fun declaresSupportedDevices(appId: Int): Boolean =
+        installedPackage(appId)?.let { packages.metaDataString(it, app.gameport.core.patch.patches.MetaSupportedDevicesPatch.NAME) != null } == true
+
+    /** True when GamePort added that declaration (it leaves a mark): patching the game again with the choice off takes it away. */
+    fun carriesSupportedDevicesMark(appId: Int): Boolean =
+        installedPackage(appId)?.let { packages.metaDataString(it, app.gameport.core.patch.patches.MetaSupportedDevicesPatch.MARK) != null } == true
+
     /** The name the game is installed under, whether or not GamePort chose it. */
     fun installPackageFor(appId: Int): String? = renamedPackageFor(appId) ?: installedPackage(appId)
 
@@ -809,7 +820,7 @@ class GameInstallRepository @Inject constructor(
                         val result = File(patchedDirectory(directory), original.name)
                         result.parentFile?.mkdirs()
                         val partial = File(result.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || deviceHasExpansion(packageName) || atOriginalCode(packageName), vrGameActivity = gameSettings.get(appId).openInVr, ovrPluginStandIn = gameSettings.get(appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(appId).passthrough, appId, packages.vrFamily, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = game?.let(::ownedDlcOf), missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.let(::familySharedOf) == true, hasExpansionFiles = deviceHasExpansion(packageName), deviceFamily = packages.vrFamily, deviceSdk = packages.deviceSdk, renamedPackage = renamedPackageFor(appId), restorePackageName = restorePackageNameFor(appId), owner = context.packageName), patches)
+                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || deviceHasExpansion(packageName) || atOriginalCode(packageName), vrGameActivity = gameSettings.get(appId).openInVr, ovrPluginStandIn = gameSettings.get(appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(appId).passthrough, appId, packages.vrFamily, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = game?.let(::ownedDlcOf), missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.let(::familySharedOf) == true, hasExpansionFiles = deviceHasExpansion(packageName), deviceFamily = packages.vrFamily, deviceSdk = packages.deviceSdk, metaHighRefresh = gameSettings.get(appId).refreshRate != 0, renamedPackage = renamedPackageFor(appId), restorePackageName = restorePackageNameFor(appId), owner = context.packageName), patches)
                         check(partial.renameTo(result)) { "Could not finish the patched APK." }
                         result
                     }
