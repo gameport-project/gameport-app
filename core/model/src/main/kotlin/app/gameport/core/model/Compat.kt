@@ -110,6 +110,8 @@ data class Compat(
     val worksOffline: Int,
     val scope: CompatScope = CompatScope.KIND,
     val name: String? = null,
+    /** For [CompatScope.ALL]: the kinds of device that answered (`quest`, `pico`...), so the verdict names them instead of claiming every device. */
+    val kinds: List<String> = emptyList(),
 ) {
     val players: Int get() = works + offlineOnly + fails
 
@@ -150,10 +152,11 @@ object CompatRules {
             return verdict(device, modelCounts.works, modelCounts.offlineOnly, modelCounts.fails, 0, CompatScope.MODEL, name)
         }
         of(counts, device)?.let { return it }
-        return verdict(device, counts.works, counts.offlineOnly, counts.fails, counts.worksOffline, CompatScope.ALL, null)
+        val answered = counts.devices.filterValues { it.works + it.offlineOnly + it.fails > 0 }.keys.sorted()
+        return verdict(device, counts.works, counts.offlineOnly, counts.fails, counts.worksOffline, CompatScope.ALL, null, answered)
     }
 
-    private fun verdict(device: String, works: Int, offlineOnly: Int, fails: Int, worksOffline: Int, scope: CompatScope, name: String?): Compat? {
+    private fun verdict(device: String, works: Int, offlineOnly: Int, fails: Int, worksOffline: Int, scope: CompatScope, name: String?, kinds: List<String> = emptyList()): Compat? {
         val total = works + offlineOnly + fails
         if (total == 0) return null
         // A game that works without the network works, for this: the answers "it works" and "it works offline only" are on the same side.
@@ -164,6 +167,6 @@ object CompatRules {
             share <= FAILS_SHARE -> CompatLevel.FAILS
             else -> CompatLevel.MIXED
         }
-        return Compat(level, device, works, offlineOnly, fails, worksOffline.coerceIn(0, works), scope, name)
+        return Compat(level, device, works, offlineOnly, fails, worksOffline.coerceIn(0, works), scope, name, kinds)
     }
 }

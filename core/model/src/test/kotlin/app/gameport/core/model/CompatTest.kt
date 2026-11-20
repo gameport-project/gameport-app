@@ -174,6 +174,14 @@ class CompatTest {
     }
 
     @Test
+    fun `a verdict from other devices names the kinds that answered, never every device`() {
+        val counts = CompatCounts(1, works = 4, fails = 0, devices = mapOf("quest" to DeviceCounts(4, 0)))
+        val verdict = CompatRules.ofDevice(counts, "pico", null)!!
+        assertEquals(CompatScope.ALL, verdict.scope)
+        assertEquals(listOf("quest"), verdict.kinds)
+    }
+
+    @Test
     fun `nothing is said when nobody answered, whatever the narrowing`() {
         assertNull(CompatRules.ofDevice(null, "quest", "Quest 3"))
         assertNull(CompatRules.ofDevice(CompatCounts(1, 0, 0), "quest", "Quest 3"))
