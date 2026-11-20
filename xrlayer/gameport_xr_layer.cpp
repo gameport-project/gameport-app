@@ -18,6 +18,7 @@
 #include <android/log.h>
 #include <dlfcn.h>
 #include <jni.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -125,6 +126,10 @@ PFN_xrPollEvent g_pollEvent = nullptr;
 PFN_xrGetReferenceSpaceBoundsRect g_getBounds = nullptr;
 PFN_xrGetActionStateBoolean g_getActionBoolean = nullptr;
 PFN_xrGetActionStateFloat g_getActionFloat = nullptr;
+// For the button recorder (see RecorderOn): the functions it needs beyond the ones the layer already holds.
+PFN_xrCreateActionSet g_createActionSet = nullptr;
+PFN_xrGetActionStateVector2f g_getActionVector2 = nullptr;
+PFN_xrSyncActions g_syncActions = nullptr;
 PFN_xrGetInstanceProperties g_getInstanceProperties = nullptr;
 PFN_xrGetSystemProperties g_getSystemProperties = nullptr;
 PFN_xrCreateVulkanDeviceKHR g_createVulkanDevice = nullptr;
@@ -189,6 +194,7 @@ XrPosef IdentityPose() {
 XrResult XRAPI_CALL Layer_xrCreateSession(XrInstance, const XrSessionCreateInfo*, XrSession*);
 
 std::string GamePortFolder();
+bool RecorderOn();
 // Whether a game that asks for a stage gets the play space the headset's recentering moves: 0 where the headset has no play area, 1 always, 2 never (GAMEPORT_XR_LOCAL_FLOOR).
 std::atomic<int> g_recenterMode{0};
 
@@ -446,6 +452,12 @@ int ChosenResolutionSide() {
     const char* chosen = getenv("GAMEPORT_XR_RESOLUTION");
     const int side = chosen ? atoi(chosen) : 0;
     return side >= 256 && side <= 4096 ? side : 0;
+}
+
+int ChosenResolutionHeight() {
+    const char* chosen = getenv("GAMEPORT_XR_RESOLUTION_HEIGHT");
+    const int side = chosen ? atoi(chosen) : 0;
+    return side >= 64 && side <= 4096 ? side : 0;
 }
 
 double ChosenResolutionScale() {
@@ -835,17 +847,27 @@ XrResult XRAPI_CALL Layer_xrEnumerateViewConfigurationViews(XrInstance instance,
             if (views[i].recommendedImageRectHeight == 0) views[i].recommendedImageRectHeight = views[i].maxImageRectHeight;
             // The image size given to the game is the recommended one times the player's scale (the file xr_resolution_scale.txt for a test), never odd. The maximum the runtime
             // announces is not held to: it accepted a swapchain of 3072 by 3072 in a game while announcing 2560, so only a margin of 4096 a side keeps a choice from asking for the impossible.
-            const int chosenSide = ChosenResolutionSide();
-            const double scale = chosenSide > 0 && views[i].recommendedImageRectWidth > 0 ? chosenSide / (double)views[i].recommendedImageRectWidth : ChosenResolutionScale();
-            if (scale >= 0.1 && scale <= 8.0 && scale != 1.0) {
-                auto scaled = [scale](uint32_t recommended, uint32_t) {
+            // The player's choice is an image size in pixels (the hook gives the width, and the height when GamePort knows the screen's); a test file gives a scale instead.
+            const int chosenSide = ChosenResolutionSide(), chosenHeight = ChosenResolutionHeight();
+            const double scale = chosenSide > 0 ? 1.0 : ChosenResolutionScale();
+            const uint32_t recW = views[i].recommendedImageRectWidth, recH = views[i].recommendedImageRectHeight;
+            uint32_t w = recW, h = recH;
+            if (chosenSide > 0 && recW > 0) {
+                w = std::max<uint32_t>(64, (uint32_t)chosenSide & ~1u);
+                h = chosenHeight > 0 ? (uint32_t)chosenHeight : (uint32_t)((double)recH * chosenSide / recW + 0.5);
+                h = std::min<uint32_t>(4096, std::max<uint32_t>(64, h & ~1u));
+            } else if (scale >= 0.1 && scale <= 8.0 && scale != 1.0) {
+                auto scaled = [scale](uint32_t recommended) {
                     uint32_t value = (uint32_t)(recommended * scale + 0.5);
                     if (value > 4096) value = 4096;
                     return std::max<uint32_t>(64, value & ~1u);
                 };
-                const uint32_t w = scaled(views[i].recommendedImageRectWidth, views[i].maxImageRectWidth), h = scaled(views[i].recommendedImageRectHeight, views[i].maxImageRectHeight);
+                w = scaled(recW);
+                h = scaled(recH);
+            }
+            if (w != recW || h != recH) {
                 static std::atomic<bool> told{false};
-                if (!told.exchange(true)) LOGI("the size given to the game is %ux%u instead of %ux%u (scale %.2f, the player's choice or a test file)", w, h, views[i].recommendedImageRectWidth, views[i].recommendedImageRectHeight, scale);
+                if (!told.exchange(true)) LOGI("the size given to the game is %ux%u instead of %ux%u (the player's choice or a test file)", w, h, recW, recH);
                 views[i].recommendedImageRectWidth = w;
                 views[i].recommendedImageRectHeight = h;
             }
@@ -1379,6 +1401,8 @@ XrResult XRAPI_CALL Layer_xrCreateAction(XrActionSet actionSet, const XrActionCr
 }
 
 XrResult XRAPI_CALL Layer_xrSuggestInteractionProfileBindings(XrInstance instance, const XrInteractionProfileSuggestedBinding* suggested) {
+    // The button recorder is a test run: the game's own bindings are left out, so its profile does not replace the recorder's.
+    if (RecorderOn()) return XR_SUCCESS;
     std::string profile;
     size_t actions = 0;
     if (suggested && g_pathToString) {
@@ -1470,9 +1494,141 @@ XrResult XRAPI_CALL Layer_xrPollEvent(XrInstance instance, XrEventDataBuffer* da
     return result;
 }
 
+// ---------------------------------------------------------------------------------------------------------------------------------------------------------
+// Button recorder: a test that tells which control of the device's controllers answers to each button, whatever the game binds. The file xr_record_buttons.txt in the
+// game's folder turns it on. The game's own bindings are then left out (it is a test run: the game hears nothing), and the layer makes its own actions for every
+// control of the Pico 4 controller (and the simple profile), attaches them with the game's sets, and writes a line "REC <path> = <value>" at each change.
+// ---------------------------------------------------------------------------------------------------------------------------------------------------------
+bool RecorderOn() {
+    static int on = -1;
+    if (on < 0) {
+        FILE* file = fopen((GamePortFolder() + "xr_record_buttons.txt").c_str(), "r");
+        on = file ? 1 : 0;
+        if (file) fclose(file);
+    }
+    return on == 1;
+}
+
+struct RecInput {
+    std::string path;
+    int kind;  // 0 on/off, 1 a value, 2 a stick (two values)
+    XrAction action = XR_NULL_HANDLE;
+    float last[2] = {0, 0};
+    bool seen = false;
+};
+std::vector<RecInput> g_rec;
+XrActionSet g_recSet = XR_NULL_HANDLE;
+std::atomic<bool> g_recReady{false};
+
+void SetUpRecorder(XrInstance instance) {
+    if (!g_createActionSet || !g_createAction || !g_stringToPath || !g_suggestBindings) {
+        LOGI("REC cannot start: the runtime lacks a function the recorder needs");
+        return;
+    }
+    XrActionSetCreateInfo setInfo{XR_TYPE_ACTION_SET_CREATE_INFO};
+    strcpy(setInfo.actionSetName, "gpbuttons");
+    strcpy(setInfo.localizedActionSetName, "GamePort buttons");
+    if (XR_FAILED(g_createActionSet(instance, &setInfo, &g_recSet))) {
+        LOGI("REC cannot start: the action set was refused");
+        return;
+    }
+    const char* hands[2] = {"left", "right"};
+    struct Control { const char* name; int kind; bool left; bool right; };
+    const Control controls[] = {
+        {"x/click", 0, true, false}, {"x/touch", 0, true, false}, {"y/click", 0, true, false}, {"y/touch", 0, true, false}, {"menu/click", 0, true, false},
+        {"a/click", 0, false, true}, {"a/touch", 0, false, true}, {"b/click", 0, false, true}, {"b/touch", 0, false, true}, {"system/click", 0, false, true},
+        {"squeeze/click", 0, true, true}, {"squeeze/value", 1, true, true}, {"trigger/click", 0, true, true}, {"trigger/value", 1, true, true}, {"trigger/touch", 0, true, true},
+        {"thumbstick", 2, true, true}, {"thumbstick/click", 0, true, true}, {"thumbstick/touch", 0, true, true}, {"thumbrest/touch", 0, true, true},
+    };
+    for (int hand = 0; hand < 2; hand++) {
+        for (const Control& control : controls) {
+            if ((hand == 0 && !control.left) || (hand == 1 && !control.right)) continue;
+            RecInput input;
+            input.path = std::string("/user/hand/") + hands[hand] + "/input/" + control.name;
+            input.kind = control.kind;
+            XrActionCreateInfo info{XR_TYPE_ACTION_CREATE_INFO};
+            snprintf(info.actionName, sizeof(info.actionName), "r%02d", (int)g_rec.size());
+            snprintf(info.localizedActionName, sizeof(info.localizedActionName), "%s", input.path.c_str());
+            info.actionType = control.kind == 0 ? XR_ACTION_TYPE_BOOLEAN_INPUT : control.kind == 1 ? XR_ACTION_TYPE_FLOAT_INPUT : XR_ACTION_TYPE_VECTOR2F_INPUT;
+            if (XR_FAILED(g_createAction(g_recSet, &info, &input.action))) continue;
+            g_rec.push_back(input);
+        }
+    }
+    // Bindings on the Pico 4 controller's profile, and the simple one (its menu and select), each refused path left out by SuggestTolerant.
+    const char* profiles[] = {"/interaction_profiles/bytedance/pico4_controller", "/interaction_profiles/khr/simple_controller"};
+    for (const char* profile : profiles) {
+        std::vector<XrActionSuggestedBinding> bindings;
+        for (const RecInput& input : g_rec) {
+            const bool simple = strstr(profile, "simple") != nullptr;
+            if (simple && input.path.find("/input/menu/click") == std::string::npos && input.path.find("/input/trigger/click") == std::string::npos) continue;
+            // The simple profile calls the trigger "select".
+            std::string path = input.path;
+            if (simple && path.find("/input/trigger/click") != std::string::npos) path.replace(path.find("trigger/click"), 13, "select/click");
+            XrActionSuggestedBinding binding{input.action, XR_NULL_PATH};
+            if (XR_FAILED(g_stringToPath(instance, path.c_str(), &binding.binding))) continue;
+            bindings.push_back(binding);
+        }
+        XrInteractionProfileSuggestedBinding suggestion{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
+        if (XR_FAILED(g_stringToPath(instance, profile, &suggestion.interactionProfile))) continue;
+        suggestion.countSuggestedBindings = (uint32_t)bindings.size();
+        suggestion.suggestedBindings = bindings.data();
+        LOGI("REC bindings on %s: %u asked -> %d", profile, suggestion.countSuggestedBindings, (int)SuggestTolerant(instance, &suggestion, profile));
+    }
+}
+
 XrResult XRAPI_CALL Layer_xrAttachSessionActionSets(XrSession session, const XrSessionActionSetsAttachInfo* info) {
+    if (RecorderOn() && info) {
+        SetUpRecorder(g_instance);
+        std::vector<XrActionSet> sets(info->actionSets, info->actionSets + info->countActionSets);
+        if (g_recSet != XR_NULL_HANDLE) sets.push_back(g_recSet);
+        XrSessionActionSetsAttachInfo more = *info;
+        more.countActionSets = (uint32_t)sets.size();
+        more.actionSets = sets.data();
+        const XrResult result = g_attachActionSets(session, &more);
+        g_recReady.store(XR_SUCCEEDED(result) && g_recSet != XR_NULL_HANDLE);
+        LOGI("REC attached %zu inputs with the game's %u sets -> %d", g_rec.size(), info->countActionSets, (int)result);
+        return result;
+    }
     EmulateIfNeeded(g_instance);
     return g_attachActionSets(session, info);
+}
+
+XrResult XRAPI_CALL Layer_xrSyncActions(XrSession session, const XrActionsSyncInfo* info) {
+    if (!g_recReady.load() || !info) return g_syncActions(session, info);
+    std::vector<XrActiveActionSet> sets(info->activeActionSets, info->activeActionSets + info->countActiveActionSets);
+    sets.push_back(XrActiveActionSet{g_recSet, XR_NULL_PATH});
+    XrActionsSyncInfo more = *info;
+    more.countActiveActionSets = (uint32_t)sets.size();
+    more.activeActionSets = sets.data();
+    const XrResult result = g_syncActions(session, &more);
+    if (XR_FAILED(result)) return result;
+    for (RecInput& input : g_rec) {
+        XrActionStateGetInfo get{XR_TYPE_ACTION_STATE_GET_INFO, nullptr, input.action, XR_NULL_PATH};
+        float now[2] = {0, 0};
+        bool active = false;
+        if (input.kind == 0 && g_getActionBoolean) {
+            XrActionStateBoolean state{XR_TYPE_ACTION_STATE_BOOLEAN};
+            if (XR_SUCCEEDED(g_getActionBoolean(session, &get, &state))) { active = state.isActive == XR_TRUE; now[0] = state.currentState ? 1.f : 0.f; }
+        } else if (input.kind == 1 && g_getActionFloat) {
+            XrActionStateFloat state{XR_TYPE_ACTION_STATE_FLOAT};
+            if (XR_SUCCEEDED(g_getActionFloat(session, &get, &state))) { active = state.isActive == XR_TRUE; now[0] = state.currentState; }
+        } else if (input.kind == 2 && g_getActionVector2) {
+            XrActionStateVector2f state{XR_TYPE_ACTION_STATE_VECTOR2F};
+            if (XR_SUCCEEDED(g_getActionVector2(session, &get, &state))) { active = state.isActive == XR_TRUE; now[0] = state.currentState.x; now[1] = state.currentState.y; }
+        }
+        if (!input.seen) {
+            input.seen = true;
+            LOGI("REC %s is %s", input.path.c_str(), active ? "bound" : "not bound");
+        }
+        if (!active) continue;
+        const bool changed = input.kind == 0 ? now[0] != input.last[0] : (fabsf(now[0] - input.last[0]) > 0.25f || fabsf(now[1] - input.last[1]) > 0.25f);
+        if (!changed) continue;
+        input.last[0] = now[0];
+        input.last[1] = now[1];
+        if (input.kind == 2) LOGI("REC %s = %.2f, %.2f", input.path.c_str(), now[0], now[1]);
+        else LOGI("REC %s = %.2f", input.path.c_str(), now[0]);
+    }
+    return result;
 }
 
 // While a translation is on, the game is told that the profile it knows is the one in use.
@@ -1610,6 +1766,7 @@ XrResult XRAPI_CALL Layer_xrGetInstanceProcAddr(XrInstance instance, const char*
         {"xrEnumerateSwapchainFormats", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrEnumerateSwapchainFormats)},
         {"xrGetCurrentInteractionProfile", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrGetCurrentInteractionProfile)},
         {"xrAttachSessionActionSets", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrAttachSessionActionSets)},
+        {"xrSyncActions", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrSyncActions)},
         {"xrSuggestInteractionProfileBindings", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrSuggestInteractionProfileBindings)},
         {"xrCreateAction", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrCreateAction)},
         {"xrEndSession", reinterpret_cast<PFN_xrVoidFunction>(Layer_xrEndSession)},
@@ -1869,6 +2026,9 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
     Load("xrGetReferenceSpaceBoundsRect", g_getBounds);
     Load("xrGetActionStateBoolean", g_getActionBoolean);
     Load("xrGetActionStateFloat", g_getActionFloat);
+    Load("xrCreateActionSet", g_createActionSet);
+    Load("xrGetActionStateVector2f", g_getActionVector2);
+    Load("xrSyncActions", g_syncActions);
     // A new run starts without the mark of the last one.
     remove((GamePortFolder() + "xr_silent.txt").c_str());
     Load("xrGetInstanceProperties", g_getInstanceProperties);

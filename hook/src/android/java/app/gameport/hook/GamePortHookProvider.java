@@ -1083,6 +1083,7 @@ public final class GamePortHookProvider extends ContentProvider {
         String haptics = "100";
         // What the player asked of the device's graphics for this game: image size in percent, frame rate, processor and graphics levels (100, 0, -1, -1 leave them alone).
         String resolution = "0";
+        String resolutionHeight = "0";
         String refresh = "0";
         String cpuLevel = "-1";
         String gpuLevel = "-1";
@@ -1104,6 +1105,7 @@ public final class GamePortHookProvider extends ContentProvider {
             eyeFov = eyeFoveation == null || eyeFoveation.isEmpty() ? "auto" : eyeFoveation;
             haptics = String.valueOf(config.getInt("xrHaptics", 100));
             resolution = String.valueOf(config.getInt("xrResolution", 0));
+            resolutionHeight = String.valueOf(config.getInt("xrResolutionHeight", 0));
             refresh = String.valueOf(config.getInt("xrRefreshRate", 0));
             cpuLevel = String.valueOf(config.getInt("xrCpuLevel", -1));
             gpuLevel = String.valueOf(config.getInt("xrGpuLevel", -1));
@@ -1111,7 +1113,7 @@ public final class GamePortHookProvider extends ContentProvider {
             // A GamePort from before the choice only says whether to come back for a game it started.
             returnMode = mode != null ? mode : (config.getBoolean("returnToGamePort") ? "app" : "never");
             java.io.FileWriter out = new java.io.FileWriter(cache);
-            out.write(seated + "\n" + eyeCm + "\n" + controls + "\n" + family + "\n" + preferFrame + "\n" + localFloor + "\n" + eyeFov + "\n" + haptics + "\n" + resolution + "\n" + refresh + "\n" + cpuLevel + "\n" + gpuLevel + "\n");
+            out.write(seated + "\n" + eyeCm + "\n" + controls + "\n" + family + "\n" + preferFrame + "\n" + localFloor + "\n" + eyeFov + "\n" + haptics + "\n" + resolution + "\n" + refresh + "\n" + cpuLevel + "\n" + gpuLevel + "\n" + resolutionHeight + "\n");
             out.close();
         } catch (Throwable t) {
             try {
@@ -1138,6 +1140,8 @@ public final class GamePortHookProvider extends ContentProvider {
                 cpuLevel = cpu == null || cpu.isEmpty() ? "-1" : cpu;
                 String gpu = in.readLine();
                 gpuLevel = gpu == null || gpu.isEmpty() ? "-1" : gpu;
+                String resHeight = in.readLine();
+                resolutionHeight = resHeight == null || resHeight.isEmpty() ? "0" : resHeight;
                 in.close();
             } catch (Throwable ignored) {
                 // No earlier answer either: seated mode stays off.
@@ -1160,6 +1164,7 @@ public final class GamePortHookProvider extends ContentProvider {
             android.system.Os.setenv("GAMEPORT_XR_HAPTICS", haptics, true);
             // The image size (percent of the recommended one), the frame rate and the processor and graphics levels the player chose; the layer asks the runtime for them.
             android.system.Os.setenv("GAMEPORT_XR_RESOLUTION", resolution, true);
+            android.system.Os.setenv("GAMEPORT_XR_RESOLUTION_HEIGHT", resolutionHeight, true);
             android.system.Os.setenv("GAMEPORT_XR_REFRESH", refresh, true);
             android.system.Os.setenv("GAMEPORT_XR_CPU_LEVEL", cpuLevel, true);
             android.system.Os.setenv("GAMEPORT_XR_GPU_LEVEL", gpuLevel, true);
