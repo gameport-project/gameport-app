@@ -172,6 +172,37 @@ class CloudSyncCoordinator @Inject constructor(
         }
     }
 
+    /**
+     * The real encrypted app ticket of the game (`ISteamUser::RequestEncryptedAppTicket`), for the games whose own service verifies it: mod.io answers `STEAM_APP_TICKET_INVALID` to the placeholder
+     * the game's stand-in makes. [userdata] is what the game asked to have put in it. Null when there is none (offline, signed out, another device plays, Steam answers an error, no answer in time):
+     * the game then goes on with the placeholder, as before. The cause is written in the game's events, with no value of the ticket.
+     */
+    suspend fun encryptedTicket(packageName: String, userdata: ByteArray?): ByteArray? {
+        val appId = installed.all().entries.firstOrNull { it.value == packageName }?.key ?: return null
+        runCatching { auth.restoreSession() }
+        if (auth.offline.value) return null
+        val session = withTimeoutOrNull(SESSION_WAIT_MS) { sessions.current.filterNotNull().first() } ?: return null
+        return try {
+            val asked = System.currentTimeMillis()
+            session.encryptedAppTicket(appId, userdata).also {
+                events.note(appId, "Steam encrypted app ticket given to the game (${it.size} bytes, ${System.currentTimeMillis() - asked} ms)")
+            }
+        } catch (refused: app.gameport.core.steam.session.EncryptedTicketRefusedException) {
+            events.note(appId, "no encrypted app ticket: Steam answered ${refused.reason}")
+            null
+        } catch (blocked: app.gameport.core.steam.session.PlayingBlockedException) {
+            events.note(appId, "no encrypted app ticket: Steam says another device plays (app ${blocked.other.appId})")
+            null
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            events.note(appId, "no encrypted app ticket: Steam did not answer in time, or the connection fell")
+            null
+        } catch (e: Exception) {
+            android.util.Log.w("GPSync", "no encrypted app ticket for $packageName", e)
+            events.note(appId, "no encrypted app ticket (${e::class.simpleName})")
+            null
+        }
+    }
+
     /** The connection fell as the ticket was asked for: on the next one, Steam is asked whether the account may play, and says if it may not. */
     private suspend fun retryOnNextConnection(appId: Int, lost: SteamSession): TicketOutcome {
         val next = withTimeoutOrNull(RECONNECT_WAIT_MS) { sessions.current.filterNotNull().first { it !== lost && it.isAlive } }

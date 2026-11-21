@@ -264,6 +264,15 @@ class CloudProvider : ContentProvider() {
             }
             CloudSyncCoordinator.TicketOutcome.None -> Bundle().apply { putString(STATUS, ERROR) }
         }
+        // The real encrypted app ticket, for the games whose own service verifies it (mod.io): asked by the game's stand-in with what the game wants put in it.
+        "encryptedticket" -> {
+            val ticket = if (entryPoint.playDecisions().playsWithout(packageName)) {
+                null
+            } else {
+                runBlocking { coordinator.encryptedTicket(packageName, extras.getByteArray("userdata")) }
+            }
+            if (ticket != null) Bundle().apply { putByteArray("ticket", ticket) } else Bundle().apply { putString(STATUS, ERROR) }
+        }
         // The player's answer to that question: PENDING while it is open, then QUIT, KICK or PLAY.
         "playchoice" -> Bundle().apply { putString(CHOICE, entryPoint.playDecisions().answerFor(packageName)) }
         // The game gave up waiting for the answer.

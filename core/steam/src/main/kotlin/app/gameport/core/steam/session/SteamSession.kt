@@ -216,6 +216,25 @@ class SteamSession(private val cellId: Int = 0, private val onAccountRegion: (cu
     }
 
     /**
+     * The encrypted app ticket of [appId], asked from Steam as its client does (`ISteamUser::RequestEncryptedAppTicket`): made with the signed-in account and encrypted by Steam with the key
+     * the game's publisher keeps, so that the game's own service can verify it. mod.io is one: a game that lets its players sign in there with Steam sends it, and the service answers
+     * `STEAM_APP_TICKET_INVALID` to the placeholder the game's stand-in makes on its own. [userdata] is what the game asked to have put in it (it can be empty).
+     *
+     * Returns the ticket as the game's Steam library hands it out (`GetEncryptedAppTicket`): the serialized message Steam answered with. Throws [EncryptedTicketRefusedException] when Steam
+     * answers something else than success (an app whose publisher set up no key, an account that does not own it), and [PlayingBlockedException] when another session plays, as for a session ticket.
+     */
+    suspend fun encryptedAppTicket(appId: Int, userdata: ByteArray?): ByteArray {
+        markPlaying(appId)
+        playingElsewhere.value?.takeIf { !it.kicked }?.let { throw PlayingBlockedException(it) }
+        val answer = kotlinx.coroutines.withTimeout(ENCRYPTED_TICKET_WAIT_MS) {
+            apps.requestEncryptedAppTicket(appId, userdata?.takeIf { it.isNotEmpty() }).await()
+        }
+        val ticket = answer.encryptedAppTicket
+        if (answer.result != EResult.OK || ticket == null) throw EncryptedTicketRefusedException(answer.result ?: EResult.Fail)
+        return ticket.toByteArray()
+    }
+
+    /**
      * Asks Steam whether the account may play [appId] here, for at most [waitMs]: declares it, and says what Steam answers. Null when Steam
      * says nothing against it. The playing state is released again.
      */
@@ -428,6 +447,9 @@ class SteamSession(private val cellId: Int = 0, private val onAccountRegion: (cu
     private companion object {
         const val PUMP_TIMEOUT_MS = 1_000L
         const val PLAYING_SETTLE_MS = 700L
+
+        /** How long Steam has to answer a request for an encrypted app ticket: the game waits for it, so it does not wait long. */
+        const val ENCRYPTED_TICKET_WAIT_MS = 8_000L
         const val KICK_SETTLE_MS = 1_500L
         const val REFUSAL_WINDOW_MS = 10_000L
         const val TAKE_WAIT_MS = 3_000L

@@ -531,6 +531,10 @@ public final class GamePortHookProvider extends ContentProvider {
         final File request = new File(dir, "steam_ticket.request");
         final File ticketFile = new File(dir, "steam_ticket.bin");
         final File ready = new File(dir, "steam_ticket.ready");
+        // The encrypted app ticket has files of its own: a ticket of one kind must never be taken for the other (see EncryptedTicketRequest).
+        final File encryptedRequest = new File(dir, "encrypted_ticket.request");
+        final File encryptedFile = new File(dir, "encrypted_ticket.bin");
+        final File encryptedReady = new File(dir, "encrypted_ticket.ready");
         Thread watcher = new Thread(new Runnable() {
             @Override public void run() {
                 long lastWarm = SystemClock.elapsedRealtime();
@@ -562,6 +566,28 @@ public final class GamePortHookProvider extends ContentProvider {
                                 Log.i(TAG, "no fresh Steam ticket for request " + id);
                             }
                             writeAll(ready, (id == null ? "" : id).getBytes("UTF-8"));
+                        }
+                        if (encryptedRequest.exists()) {
+                            // A game that signs in to its own service with the encrypted app ticket (mod.io) asks for it: GamePort asks Steam for the real one. The answer is the ticket, or none.
+                            String[] lines = readLines(encryptedRequest, 2);
+                            encryptedRequest.delete();
+                            long begun = SystemClock.elapsedRealtime();
+                            EncryptedTicketRequest asked = EncryptedTicketRequest.of(lines[0], lines[1]);
+                            byte[] ticket = null;
+                            if (asked != null) {
+                                Bundle extras = new Bundle();
+                                extras.putByteArray("userdata", asked.userdata);
+                                Bundle result = Calls.call(context, Owner.cloud(context), "encryptedticket", context.getPackageName(), extras);
+                                ticket = result == null ? null : result.getByteArray("ticket");
+                            }
+                            if (ticket != null && ticket.length > 0) {
+                                writeAll(encryptedFile, ticket);
+                                Log.i(TAG, "real encrypted app ticket for request " + lines[0] + " (" + ticket.length + " bytes, " + (SystemClock.elapsedRealtime() - begun) + " ms)");
+                            } else {
+                                encryptedFile.delete();
+                                Log.i(TAG, "no real encrypted app ticket for request " + lines[0]);
+                            }
+                            writeAll(encryptedReady, (lines[0] == null ? "" : lines[0].trim()).getBytes("UTF-8"));
                         }
                         Thread.sleep(80);
                     } catch (InterruptedException e) {

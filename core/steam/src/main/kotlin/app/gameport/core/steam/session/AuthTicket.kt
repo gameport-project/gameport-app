@@ -35,6 +35,12 @@ private const val TAG = "GPSteamTicket"
  */
 data class PlayingElsewhere(val appId: Int, val kicked: Boolean)
 
+/** Steam answered the request for an encrypted app ticket with something else than success ([result]): the app has no key for it, the account does not own it, and so on. */
+class EncryptedTicketRefusedException(private val result: EResult) : Exception("Steam answered $result to the request for an encrypted app ticket") {
+    /** What Steam answered, by its name, for the modules that do not know the types of Steam's library. */
+    val reason: String get() = result.name
+}
+
 /** Steam refuses the playing session of this connection because another one plays: no ticket is made until the player says what to do. */
 class PlayingBlockedException(val other: PlayingElsewhere) : Exception("another session of the account plays (app ${other.appId})")
 
