@@ -168,4 +168,49 @@ class PackageRenamePatchTest {
         val catalog = """{"m_InternalIds":["{Runtime}/a.bundle"]}""".toByteArray()
         assertNull(PackageRenamePatch.rewriteObbPaths(catalog, "com.studio.game", "com.gameport.g1"))
     }
+
+    @Test
+    fun `putting the game back under its own name moves the path in a catalog back`() {
+        val came = "com.NeatCorporation.BudgetCutsUltimate"
+        val carried = "com.gameport.g2221980"
+        val catalog = """{"m_InternalIds":["/sdcard/Android/obb/$carried/a.bundle"]}""".toByteArray()
+        val back = PackageRenamePatch.rewriteObbPaths(catalog, setOf(came, carried), came)!!
+        assertTrue(String(back).contains("/sdcard/Android/obb/$came/a.bundle"))
+        assertTrue(!String(back).contains(carried))
+    }
+
+    @Test
+    fun `a game renamed for the first time has its own name to move`() {
+        assertEquals(setOf(original), PackageRenamePatch.staleNames(current = original, recorded = null, target = renamed))
+    }
+
+    @Test
+    fun `a game renamed by an earlier GamePort and patched again under the same name still has the name it came with to move`() {
+        // The case of a game installed before the compiled code was followed: its manifest already says the new name, its paths still say the old one.
+        assertEquals(setOf(original), PackageRenamePatch.staleNames(current = renamed, recorded = original, target = renamed))
+    }
+
+    @Test
+    fun `a game put back under its own name has the name of GamePort it carries to move`() {
+        assertEquals(setOf(renamed), PackageRenamePatch.staleNames(current = renamed, recorded = original, target = original))
+    }
+
+    @Test
+    fun `a game moved from one name of GamePort to another has both names to move`() {
+        val other = "com.gameport.g42"
+        assertEquals(setOf(original, renamed), PackageRenamePatch.staleNames(current = renamed, recorded = original, target = other))
+    }
+
+    @Test
+    fun `a game that keeps its own name has nothing to move`() {
+        assertTrue(PackageRenamePatch.staleNames(current = original, recorded = null, target = original).isEmpty())
+        assertTrue(PackageRenamePatch.staleNames(current = original, recorded = original, target = original).isEmpty())
+    }
+
+    @Test
+    fun `a catalog already under the wanted name is left alone`() {
+        val carried = "com.gameport.g2221980"
+        val catalog = """{"m_InternalIds":["/sdcard/Android/obb/$carried/a.bundle"]}""".toByteArray()
+        assertNull(PackageRenamePatch.rewriteObbPaths(catalog, setOf("com.studio.game", carried), carried))
+    }
 }

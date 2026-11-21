@@ -5,6 +5,11 @@ import app.gameport.core.patch.PatchAssets
 import app.gameport.core.patch.PatchContext
 import app.gameport.core.patch.PatchSession
 import app.gameport.core.patch.ResourceTableNames
+import app.gameport.core.patch.unity.CrcCounter
+import app.gameport.core.patch.unity.UnityFs
+import app.gameport.core.patch.unity.UnityFsOutcome
+import app.gameport.core.patch.unity.UnityIdentity
+import app.gameport.core.patch.unity.UnityNames
 import app.gameport.core.patch.json.ATTR_NAME
 import app.gameport.core.patch.json.ATTR_VALUE
 import app.gameport.core.patch.json.ManifestAttr
@@ -40,6 +45,23 @@ import com.reandroid.json.JSONObject
 object PackageRenamePatch : ApkPatch {
     /** The biggest catalog of asset bundles looked into: a larger file is not text a catalog would be. */
     private const val MAX_CATALOG_BYTES = 16L * 1024 * 1024
+
+    /** The string literals of an IL2CPP Unity game, and the folder of the assemblies of a Mono one. */
+    private const val IL2CPP_METADATA = "assets/bin/Data/Managed/Metadata/global-metadata.dat"
+    private const val MANAGED = "assets/bin/Data/Managed/"
+    private const val CODE_BUFFER = 1 shl 16
+
+    /** The company and product names a Unity game was built with, written down before GamePort changed them ([UnityIdentity]). */
+    const val META_COMPANY = "app.gameport.original_company"
+    const val META_PRODUCT = "app.gameport.original_product"
+
+    /** Where a Unity game keeps its player settings: in its data archive (`globalgamemanagers` inside `data.unity3d`), or in a file of its own. */
+    private const val UNITY_ARCHIVE = "assets/bin/Data/data.unity3d"
+    private const val UNITY_SETTINGS_FILE = "assets/bin/Data/globalgamemanagers"
+    private const val UNITY_SETTINGS_NODE = "globalgamemanagers"
+
+    /** The biggest settings file looked into: it is held in memory (the one of a game is some hundreds of kilobytes). */
+    private const val MAX_SETTINGS_BYTES = 32 * 1024 * 1024
 
     override val id = "package_rename"
     override val recommended = true
@@ -89,9 +111,97 @@ object PackageRenamePatch : ApkPatch {
         // The name the game came with is what the manifest must keep: putting a game back under its own name must not overwrite it with the GamePort one it carried.
         if (target != original) patchManifest(manifest, original, target, recorded ?: original)
         patchResources(session, target)
-        // A game that keeps its large files in the folder of expansion files may write the way to it, with its own package name, in the catalog of its asset bundles.
-        if (target != original) patchObbPaths(session, recorded ?: original, target)
+        // A game that writes the way to its own folders, with its package name, in its asset catalog or in its compiled code finds nothing under another name.
+        // This runs whether or not the name changes in this pass: a game renamed by an earlier GamePort already carries its new name, and still holds the old one in its paths.
+        val stale = staleNames(original, recorded, target)
+        if (stale.isNotEmpty()) patchObbPaths(session, stale, target)
+        followUnityNames(session, manifest, came = recorded ?: original, current = original, target = target)
     }
+
+    /**
+     * Makes the company and product names a Unity game was built with follow the package it runs as, for the games that build the folder of their expansion files from them
+     * ([UnityIdentity]): their asset bundles are otherwise looked for in a folder that is not the game's own. Whether the name changes in this pass or not: a game renamed by an earlier
+     * GamePort carries its new package and still the old names. The names the game came with are written down in the manifest ([META_COMPANY], [META_PRODUCT]) the first time they
+     * are changed, so that putting the game back under its own package restores them. A game that does not hold such a pair of names, whose archive is of a kind that is not handled,
+     * or whose package does not fit in the old names, is left as it is: this only ever adds a fix, and never stops a game from being patched.
+     */
+    internal fun followUnityNames(session: PatchSession, manifest: JSONObject, came: String, current: String, target: String) {
+        if (!session.hasFile(UNITY_ARCHIVE) && !session.hasFile(UNITY_SETTINGS_FILE)) return
+        val recorded = recordedMeta(manifest, META_COMPANY)?.let { company -> recordedMeta(manifest, META_PRODUCT)?.let { product -> UnityNames(company, product) } }
+        val accepted = setOf(came, current, target)
+        var original: UnityNames? = null
+        val edit = { bytes: ByteArray ->
+            var changed = false
+            for (found in UnityIdentity.locate(bytes) { UnityIdentity.derive(it) in accepted }) {
+                val wanted = UnityIdentity.wanted(found.names, recorded, came, target) ?: continue
+                if (recorded == null && original == null) original = found.names
+                UnityIdentity.write(bytes, found, wanted)
+                changed = true
+            }
+            changed
+        }
+        val written = try {
+            if (session.hasFile(UNITY_ARCHIVE)) rewriteUnityArchive(session, edit) else rewriteUnitySettings(session, edit)
+        } catch (e: Exception) {
+            // Whatever goes wrong here (a disk that is full, an archive that is not what it seems), the game is patched without this fix, as it was before it existed.
+            false
+        }
+        original?.takeIf { written }?.let {
+            putMeta(manifest, META_COMPANY, it.company)
+            putMeta(manifest, META_PRODUCT, it.product)
+        }
+    }
+
+    /** The player settings of a game that keeps its data in an archive (`data.unity3d`, Unity 2023 and later on Android): the archive is written again from a file on the disk. */
+    private fun rewriteUnityArchive(session: PatchSession, edit: (ByteArray) -> Boolean): Boolean {
+        val file = session.tempFile("unity")
+        val outcome = UnityFs.rewriteNode({ session.openFile(UNITY_ARCHIVE) ?: throw java.io.IOException("$UNITY_ARCHIVE is gone") }, UNITY_SETTINGS_NODE, MAX_SETTINGS_BYTES, file, edit)
+        if (outcome is UnityFsOutcome.Rewritten) {
+            session.replaceFileWithFile(UNITY_ARCHIVE, file, outcome.size, outcome.crc)
+            return true
+        }
+        file.delete()
+        return false
+    }
+
+    /** The player settings of a game that keeps them in a file of their own (`globalgamemanagers`, older Unity): the file is small, edited where it is. */
+    private fun rewriteUnitySettings(session: PatchSession, edit: (ByteArray) -> Boolean): Boolean {
+        if ((session.fileLength(UNITY_SETTINGS_FILE) ?: Long.MAX_VALUE) > MAX_SETTINGS_BYTES) return false
+        val content = session.readFile(UNITY_SETTINGS_FILE) ?: return false
+        if (!edit(content)) return false
+        session.replaceFile(UNITY_SETTINGS_FILE, content)
+        return true
+    }
+
+    /** The value of the `meta-data` the manifest holds under [name], or null. */
+    internal fun recordedMeta(manifest: JSONObject, name: String): String? =
+        manifest.elem<JSONArray>("nodes").elemEach<JSONObject> { named("manifest") }
+            .flatMap { root -> root.elem<JSONArray>("nodes").elemEach<JSONObject> { named("application") } }
+            .flatMap { application -> application.elem<JSONArray>("nodes").elemEach<JSONObject> { named("meta-data") } }
+            .firstOrNull { it.nameAttribute() == name }
+            ?.let { meta -> meta.elem<JSONArray>("attributes").elemEach<JSONObject>().firstOrNull { it.named("value") }?.elem<String>("data") }
+
+    /** Writes a `meta-data` under [name] in the application element, in place of the one that is there. */
+    internal fun putMeta(manifest: JSONObject, name: String, value: String) {
+        manifest.takeNodesEach({ named("manifest") }) {
+            takeNodesEach({ named("application") }) {
+                takeNodes {
+                    val nodes = this ?: JSONArray()
+                    nodes.takeEach<JSONObject>({ named("meta-data") && nameAttribute() == name }) { null }
+                    nodes.put(element("meta-data", ManifestAttr("name", ATTR_NAME, "STRING", name), ManifestAttr("value", ATTR_VALUE, "STRING", value)))
+                    nodes
+                }
+            }
+        }
+    }
+
+    /**
+     * The names a path in the game's files may still carry when the game must run as [target]: the one it came with ([recorded], or [current] when it was never renamed) and
+     * the one it carries now ([current]), without [target] itself. Empty when there is nothing to move: a game that keeps its own name. Putting a game back under its own
+     * name gives the name of GamePort it carries; patching again a game renamed before gives the name it came with.
+     */
+    internal fun staleNames(current: String, recorded: String?, target: String): Set<String> =
+        setOfNotNull(recorded ?: current, current).filterTo(linkedSetOf()) { it != target }
 
     /**
      * Some games (Budget Cuts Ultimate, with Unity's Addressables) look for their scenes at a path written down when they were built,
@@ -99,21 +209,53 @@ object PackageRenamePatch : ApkPatch {
      * stays on its title screen. When the catalog of the asset bundles is a text file (a JSON file under `assets/aa/`), the package in that path is changed to the one the game runs as.
      * A catalog that is not text, or that holds no such path, is left alone: nothing is changed in a game that has none.
      */
-    internal fun patchObbPaths(session: PatchSession, original: String, renamed: String) {
+    internal fun patchObbPaths(session: PatchSession, names: Set<String>, renamed: String) {
         for (path in session.paths("assets/aa/")) {
             if (!path.endsWith(".json", ignoreCase = true)) continue
             if ((session.fileLength(path) ?: Long.MAX_VALUE) > MAX_CATALOG_BYTES) continue
             val content = session.readFile(path) ?: continue
-            rewriteObbPaths(content, original, renamed)?.let { session.replaceFile(path, it) }
+            rewriteObbPaths(content, names, renamed)?.let { session.replaceFile(path, it) }
         }
+        // The compiled code holds such paths too: Escape Simulator loads its asset bundles from `/storage/emulated/0/Android/obb/com.PineStudio.EscapeSimulator/assets`, a string of its
+        // IL2CPP metadata, and started without them (every text of its menu a bare key) under another package. The strings are written over where they stand ([PackagePaths]).
+        for ((path, wide) in codeFiles(session)) rewriteCode(session, path, wide, names, renamed)
     }
 
-    /** [content] with `obb/<original>` made `obb/<renamed>` (any slash style), or null when it holds none. */
-    internal fun rewriteObbPaths(content: ByteArray, original: String, renamed: String): ByteArray? {
+    /** The files of compiled code that hold a game's strings: the metadata of an IL2CPP game (UTF-8), the assemblies of the game's own scripts in a Mono one (UTF-16). */
+    private fun codeFiles(session: PatchSession): List<Pair<String, Boolean>> = buildList {
+        if (session.hasFile(IL2CPP_METADATA)) add(IL2CPP_METADATA to false)
+        session.paths(MANAGED).filter { path -> path.substringAfterLast('/').let { it.startsWith("Assembly-") && it.endsWith(".dll") } }.forEach { add(it to true) }
+    }
+
+    /**
+     * Rewrites one file of compiled code into a temporary file, a window at a time, and puts it in the place of the game's when a path was changed: the file is never held whole. A file that
+     * cannot be handled (whatever goes wrong) is left as it is, so the game is patched without this fix, as it was before it existed.
+     */
+    private fun rewriteCode(session: PatchSession, path: String, wide: Boolean, names: Set<String>, renamed: String) {
+        val file = session.tempFile("code")
+        try {
+            val counter = CrcCounter(file.outputStream().buffered(CODE_BUFFER))
+            val outcome = counter.use { out -> session.openFile(path)?.use { input -> PackagePaths.rewriteStream(input, out, names, renamed, wide) } }
+            if (outcome != null && outcome.rewritten > 0) {
+                session.replaceFileWithFile(path, file, counter.count, counter.crc.value)
+                return
+            }
+        } catch (e: Exception) {
+            // see above
+        }
+        file.delete()
+    }
+
+    /** [content] with `obb/<name>` made `obb/<renamed>` for each of [names] (any slash style), or null when it holds none. */
+    internal fun rewriteObbPaths(content: ByteArray, names: Set<String>, renamed: String): ByteArray? {
         val text = String(content, Charsets.ISO_8859_1)
-        val changed = text.replace("obb/$original", "obb/$renamed").replace("obb\\\\$original", "obb\\\\$renamed")
+        val changed = names.filter { it != renamed }.fold(text) { current, name ->
+            current.replace("obb/$name", "obb/$renamed").replace("obb\\\\$name", "obb\\\\$renamed")
+        }
         return if (changed == text) null else changed.toByteArray(Charsets.ISO_8859_1)
     }
+
+    internal fun rewriteObbPaths(content: ByteArray, original: String, renamed: String): ByteArray? = rewriteObbPaths(content, setOf(original), renamed)
 
     /**
      * The package name the game must carry after this pass: the one asked for, the one its manifest records when it is put back under its own (the player turned the
