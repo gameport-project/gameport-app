@@ -54,6 +54,18 @@ public final class GamePortHookProvider extends ContentProvider {
         if (context == null) return false;
         // The Workshop page the game opens from its own button is handed to GamePort instead of the browser.
         WorkshopRedirect.install(context);
+        // The copy Unity made of the game's code on an earlier run is dropped when the game was installed again since: it would hide what a patch changed in the code (see Il2cppCache).
+        try {
+            File external = context.getExternalFilesDir(null);
+            if (external != null) {
+                long installedAt = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).lastUpdateTime;
+                if (Il2cppCache.refresh(external, new File(context.getFilesDir(), "gameport/il2cpp_installed_at"), installedAt)) {
+                    Log.i(TAG, "the copy Unity made of the game's code was removed: the game was installed again");
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "could not check the copy Unity made of the game's code", t);
+        }
         // Where the APK is, for the Steamworks shim, which reads its config out of it. Asking the system is surer than finding the APK among
         // the memory mappings of the process, which the shim used to do alone.
         try {
