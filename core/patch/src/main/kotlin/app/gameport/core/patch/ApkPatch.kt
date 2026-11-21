@@ -3,6 +3,7 @@ package app.gameport.core.patch
 import com.reandroid.apk.ApkModule
 import com.reandroid.arsc.chunk.xml.AndroidManifestBlock
 import com.reandroid.json.JSONObject
+import java.io.File
 
 /** What a patch may know about the game and the account it is patched for. Nothing secret. */
 data class PatchContext(
@@ -71,8 +72,12 @@ data class PatchContext(
     }
 }
 
-/** The APK being patched: its manifest can be edited and files can be added. */
-class PatchSession(private val apk: ApkModule, val existingHookDex: String? = null) {
+/**
+ * The APK being patched: its manifest can be edited and files can be added.
+ *
+ * [workDir] is where a patch may keep a temporary file while it rewrites a file too large to hold in memory ([tempFile], [replaceFileWithFile]); the engine empties it when it is done.
+ */
+class PatchSession(private val apk: ApkModule, val existingHookDex: String? = null, private val workDir: File? = null) {
     private var manifestJson: JSONObject? = null
 
     /** The manifest as editable JSON; reading it marks the manifest as modified. */
@@ -103,6 +108,36 @@ class PatchSession(private val apk: ApkModule, val existingHookDex: String? = nu
     fun readFile(path: String): ByteArray? =
         apk.zipEntryMap.getInputSource(path)?.let { source -> source.openStream().use { it.readBytes() } }
 
+    /** A file of the game as a stream, read from its start each time it is opened (nothing is held in memory), or null when there is none. The caller closes it. */
+    fun openFile(path: String): java.io.InputStream? = apk.zipEntryMap.getInputSource(path)?.openStream()
+
+    /** A file of the work folder, deleted when the patching is done ([cleanUp]). */
+    fun tempFile(prefix: String): File {
+        val directory = (workDir ?: File(System.getProperty("java.io.tmpdir"))).also { it.mkdirs() }
+        return File.createTempFile(prefix, ".tmp", directory).also { temporaries += it }
+    }
+
+    /** A file that is written into the APK from a file on the disk, stored as it is: its size and its CRC-32, known by whoever wrote it. */
+    class StreamedFile(val file: File, val size: Long, val crc: Long)
+
+    private val temporaries = mutableListOf<File>()
+    private val _streamed = LinkedHashMap<String, StreamedFile>()
+
+    /** Files to put in the APK from the disk, by path. */
+    val streamed: Map<String, StreamedFile> get() = _streamed
+
+    /** Puts [file] (of [size] bytes, whose CRC-32 is [crc]) in the place of the game's file at [path], without reading it into memory. */
+    fun replaceFileWithFile(path: String, file: File, size: Long, crc: Long) {
+        _additions.remove(path)
+        _streamed[path] = StreamedFile(file, size, crc)
+    }
+
+    /** Deletes the temporary files. The engine calls it once the new APK is written. */
+    fun cleanUp() {
+        temporaries.forEach { it.delete() }
+        temporaries.clear()
+    }
+
     /** The game's package name, read from its manifest. */
     fun packageName(): String = apk.androidManifest.packageName
 
@@ -130,6 +165,7 @@ class PatchSession(private val apk: ApkModule, val existingHookDex: String? = nu
     val additions: Map<String, ByteArray> get() = _additions
 
     fun addFile(path: String, bytes: ByteArray) {
+        _streamed.remove(path)
         _additions[path] = bytes
     }
 

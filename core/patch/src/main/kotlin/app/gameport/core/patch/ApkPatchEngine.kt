@@ -21,10 +21,12 @@ class ApkPatchEngine(private val signingKeys: SigningKeyStore) {
         onStep: (String) -> Unit = {},
     ) {
         val unsigned = File(output.parentFile, output.name + ".unsigned")
+        // Where a patch keeps the temporary file of a game's data too large to hold in memory; emptied below, whatever happens.
+        val work = File(output.parentFile, output.name + ".work")
         try {
             val archive = ArchiveFile(ZipFileInput(input))
             val apk = ApkModule("base", archive.createZipEntryMap()).apply { setCloseable(archive) }
-            val session = PatchSession(apk, findHookDex(input))
+            val session = PatchSession(apk, findHookDex(input), work)
             val manifest: ByteArray?
             try {
                 patches.forEach { patch ->
@@ -44,7 +46,9 @@ class ApkPatchEngine(private val signingKeys: SigningKeyStore) {
                 stored = session.additions,
                 // The old signature is void once anything changed; the new one replaces it.
                 dropIf = { (it.startsWith("META-INF/") && SIGNATURE_FILE.matches(it)) || it in session.removals },
+                streamed = session.streamed,
             )
+            session.cleanUp()
 
             onStep("sign")
             ApkSigner.Builder(listOf(signingKeys.signerConfig()))
@@ -60,6 +64,7 @@ class ApkPatchEngine(private val signingKeys: SigningKeyStore) {
                 .sign()
         } finally {
             unsigned.delete()
+            work.deleteRecursively()
         }
     }
 

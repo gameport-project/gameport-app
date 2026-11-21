@@ -23,6 +23,8 @@ internal object ZipRewriter {
         replaced: Map<String, ByteArray>,
         stored: Map<String, ByteArray>,
         dropIf: (String) -> Boolean,
+        /** Entries written from a file on the disk, stored as they are: a game's data too large to be held in memory. */
+        streamed: Map<String, PatchSession.StreamedFile> = emptyMap(),
     ) {
         ZipFile.builder().setFile(input).get().use { source ->
             ZipArchiveOutputStream(output).use { out ->
@@ -31,7 +33,7 @@ internal object ZipRewriter {
                 while (entries.hasMoreElements()) {
                     val entry = entries.nextElement()
                     val name = entry.name
-                    if (dropIf(name) || name in replaced || name in stored || entry.isDirectory) continue
+                    if (dropIf(name) || name in replaced || name in stored || name in streamed || entry.isDirectory) continue
                     // Start from no extra fields: setExtra merges with the ones the source entry
                     // carries (its old alignment padding), which would throw the offsets off.
                     val copy = ZipArchiveEntry(entry).apply { setExtraFields(emptyArray()) }
@@ -40,8 +42,30 @@ internal object ZipRewriter {
                 }
                 replaced.forEach { (name, bytes) -> out.addDeflated(name, bytes) }
                 stored.forEach { (name, bytes) -> out.addStored(name, bytes) }
+                streamed.forEach { (name, file) -> out.addStoredFile(name, file) }
             }
         }
+    }
+
+    /** Writes [file] as a stored entry, a piece at a time: its size and CRC-32 are known, so the entry needs no second pass and nothing is held in memory. */
+    private fun ZipArchiveOutputStream.addStoredFile(name: String, file: PatchSession.StreamedFile) {
+        val entry = ZipArchiveEntry(name).apply {
+            method = ZipEntry.STORED
+            size = file.size
+            compressedSize = file.size
+            crc = file.crc
+            setExtra(alignmentExtra(bytesWritten, name, uncompressed = true))
+        }
+        putArchiveEntry(entry)
+        file.file.inputStream().use { input ->
+            val buffer = ByteArray(WRITE_PIECE)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                write(buffer, 0, read)
+            }
+        }
+        closeArchiveEntry()
     }
 
     private fun ZipArchiveOutputStream.addDeflated(name: String, bytes: ByteArray) {
