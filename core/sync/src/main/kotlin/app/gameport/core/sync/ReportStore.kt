@@ -46,6 +46,48 @@ class ReportStore @Inject constructor(
         _rateResets.value = _rateResets.value - packageName
     }
 
+    private val _sessionEnds = MutableStateFlow(0)
+
+    /** Counts the runs that ended: what is judged from a run (its duration is only known once it ended) is judged again each time it changes. */
+    val sessionEnds: StateFlow<Int> = _sessionEnds.asStateFlow()
+
+    private val _runs = MutableStateFlow(readRuns())
+
+    /** What the last run of each game measured, by package name (see [app.gameport.core.model.RunStats]): replaced at every hand-over of the running game, and kept between two runs of GamePort. */
+    val runs: StateFlow<Map<String, app.gameport.core.model.RunStats>> = _runs.asStateFlow()
+
+    private val _adviceClosed = MutableStateFlow(readAdviceClosed())
+
+    /** For each game, the measures of the run whose advice on the resolution the player closed: the same advice is not shown again for that run, and a later run is judged anew. */
+    val adviceClosed: StateFlow<Map<String, String>> = _adviceClosed.asStateFlow()
+
+    private fun readRuns(): Map<String, app.gameport.core.model.RunStats> =
+        prefs.all.mapNotNull { (key, value) ->
+            if (key.startsWith(RUNSTATS_PREFIX)) app.gameport.core.model.RunStats.parse(value as? String)?.let { key.removePrefix(RUNSTATS_PREFIX) to it } else null
+        }.toMap()
+
+    private fun readAdviceClosed(): Map<String, String> =
+        prefs.all.mapNotNull { (key, value) -> if (key.startsWith(ADVICE_CLOSED_PREFIX)) (value as? String)?.let { key.removePrefix(ADVICE_CLOSED_PREFIX) to it } else null }.toMap()
+
+    /** What the run of the game measured so far: kept in place of what the run before measured. */
+    fun noteRun(packageName: String, stats: app.gameport.core.model.RunStats) {
+        prefs.edit().putString(RUNSTATS_PREFIX + packageName, stats.write()).apply()
+        _runs.value = _runs.value + (packageName to stats)
+    }
+
+    /** Forgets what the run of the game measured and the advice the player closed for it: the card of the last run is gone until the next run measures something. */
+    fun forgetRun(packageName: String) {
+        prefs.edit().remove(RUNSTATS_PREFIX + packageName).remove(ADVICE_CLOSED_PREFIX + packageName).apply()
+        _runs.value = _runs.value - packageName
+        _adviceClosed.value = _adviceClosed.value - packageName
+    }
+
+    /** The player closed the advice on the resolution that [stats] led to. */
+    fun closeResolutionAdvice(packageName: String, stats: app.gameport.core.model.RunStats) {
+        prefs.edit().putString(ADVICE_CLOSED_PREFIX + packageName, stats.write()).apply()
+        _adviceClosed.value = _adviceClosed.value + (packageName to stats.write())
+    }
+
     private val _suspected = MutableStateFlow(readSuspicions())
 
     /** Games that look like they had a problem, by package, until the player acts on it. */
@@ -87,6 +129,8 @@ class ReportStore @Inject constructor(
             val counted = app.gameport.core.model.Steadiness(extras.getInt("steadinessSeconds"), extras.getInt("steadinessHeld"), extras.getInt("steadinessTarget"))
             prefs.edit().putString(STEADINESS_PREFIX + packageName, counted.write()).apply()
         }
+        // What the run measured so far (the size of the image, the frame rate, the memory, the start): replaced at every hand-over, as it counts the run from its start.
+        app.gameport.core.model.RunStats.fromHandOver(extras.getIntArray("runStats"))?.let { noteRun(packageName, it) }
         extras.getString("libraries")?.takeIf { it.isNotEmpty() }?.let { File(folder, LIBRARIES).writeText(it.takeLast(MAX_CHARS)) }
         extras.getString("launch")?.takeIf { it.isNotEmpty() }?.let { File(folder, LAUNCH).writeText(it.takeLast(MAX_CHARS)) }
         // Said at every hand-over, empty when the run has met none: what an earlier run found must not stay as if this one had.
@@ -223,6 +267,7 @@ class ReportStore @Inject constructor(
     fun left(packageName: String, nowMillis: Long = System.currentTimeMillis()) {
         val start = launched.remove(packageName) ?: prefs.getLong(LAUNCH_PREFIX + packageName, -1L).takeIf { it >= 0 } ?: return
         prefs.edit().remove(LAUNCH_PREFIX + packageName).putLong(SESSION_PREFIX + packageName, nowMillis - start).apply()
+        _sessionEnds.value += 1
         when (app.gameport.core.model.ProblemRules.afterRun(nowMillis - start, packageName in _suspected.value)) {
             app.gameport.core.model.ProblemRules.AfterRun.NOTE_SHORT_SESSION -> suspect(packageName, Suspicion.SHORT_SESSION)
             app.gameport.core.model.ProblemRules.AfterRun.CLEAR -> dismiss(packageName)
@@ -293,6 +338,8 @@ class ReportStore @Inject constructor(
         const val SHORT_SESSION_MS = app.gameport.core.model.ProblemRules.SHORT_SESSION_MS
         const val SESSION_PREFIX = "session:"
         const val STEADINESS_PREFIX = "steadiness:"
+        const val RUNSTATS_PREFIX = "runstats:"
+        const val ADVICE_CLOSED_PREFIX = "advice_closed:"
         const val REFRESH_PREFIX = "refresh:"
         const val RATE_RESET_PREFIX = "ratereset:"
         const val ACCEPTED_RATES = "accepted_rates"
