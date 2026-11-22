@@ -514,7 +514,7 @@ class ProblemReporter @Inject constructor(
             network.txt           how much data the game received and sent over time (tells whether a transfer moves)
             threads.txt           what each thread of the game was doing 8, 20 and 45 s after its start (waiting or working)
             diag-*.txt            diagnostics from inside the game: when its screens came and went (lifecycle), whether it can write where it keeps its data (storage),
-                                  the state of the network and whether the servers online games use can be reached (network-state, reach), what its threads were doing (stacks)
+                                  the state of the network and whether the servers online games use can be reached (network-state, reach), what its threads were doing (stacks), and at the moment the process ended, the thread that asked for it first (exit)
             files.txt             the game's APK and expansion files (names and sizes)
             apk-contents.txt      the native libraries and the engine's key files inside the game's APK, and one line per folder for the rest (files and bytes)
             steam-interfaces.txt  the Steam interface versions the game's libraries ask for, and the ones GamePort's stand-in does not offer

@@ -135,7 +135,10 @@ public final class GamePortHookProvider extends ContentProvider {
             final Context closing = context.getApplicationContext();
             Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
                 @Override public void run() {
-                    if (sessionLog != null) sessionLog.flushNow();
+                    if (sessionLog != null) {
+                        sessionLog.noteExit();
+                        sessionLog.flushNow();
+                    }
                     flushSavesBeforeExit();
                     tellGamePort(closing, "closed");
                 }

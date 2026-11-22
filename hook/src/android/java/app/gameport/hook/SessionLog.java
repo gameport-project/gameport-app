@@ -271,6 +271,15 @@ final class SessionLog {
     }
 
     /** Sends what is new on the calling thread; for the last moments of the process. */
+    /** Keeps what every thread was doing as the process begins to end (diag-exit.txt of the report). */
+    void noteExit() {
+        try {
+            putDiagnostic("exit", Diagnostics.atExit());
+        } catch (Throwable ignored) {
+            // The report simply has no such file.
+        }
+    }
+
     void flushNow() {
         flush();
     }

@@ -31,7 +31,7 @@ import java.util.Map;
  */
 final class Diagnostics {
     private static final String TAG = "GPHook";
-    private static final long[] STACK_MOMENTS_MS = {5_000, 10_000, 20_000, 40_000, 80_000};
+    private static final long[] STACK_MOMENTS_MS = {1_500, 3_000, 5_000, 10_000, 20_000, 40_000, 80_000};
     /** Servers that online games of the headsets reach: a connection to the port 443 only (no request is made), to tell a blocked or broken network from a service that refuses. */
     private static final String[] HOSTS = {"api.epicgames.dev", "api.steampowered.com", "api.gameanalytics.com", "www.google.com"};
 
@@ -242,6 +242,24 @@ final class Diagnostics {
             }
             sink.putDiagnostic("stacks", all.toString());
         }
+    }
+
+    /**
+     * Every thread of the game at the moment the process begins to end (called from the shutdown hook), the one that asked for the end first: a game that quits by itself, before the first
+     * moments above, still says who made it quit.
+     */
+    static String atExit() {
+        java.util.List<String> names = new java.util.ArrayList<>();
+        java.util.List<String> states = new java.util.ArrayList<>();
+        java.util.List<StackTraceElement[]> stacks = new java.util.ArrayList<>();
+        for (Map.Entry<Thread, StackTraceElement[]> entry : Thread.getAllStackTraces().entrySet()) {
+            Thread thread = entry.getKey();
+            if (thread.getName().equals("gameport-closed")) continue;
+            names.add(thread.getName());
+            states.add(thread.getState().toString());
+            stacks.add(entry.getValue());
+        }
+        return ExitStacks.format(names, states, stacks, 30);
     }
 
     private static void appendFrames(StringBuilder out, StackTraceElement[] frames, int limit) {
