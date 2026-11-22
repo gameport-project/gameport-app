@@ -409,4 +409,25 @@
     <string name="issue_performance_levels">processor and graphics levels</string>
     <string name="gameperf_title">Performance</string>
     <string name="gameperf_button">Performance</string>
+
+    <!-- The card of the last run, under the one of the size and the version -->
+    <string name="game_run_title">Last session</string>
+    <string name="game_run_performance">Performance</string>
+    <string name="game_run_memory_free_short">%1$s free</string>
+    <string name="game_run_tip_image">Size of the image the game drew for one eye, then its share of the screen\'s resolution</string>
+    <string name="game_run_tip_rate">Frames per second kept, out of the ones asked for</string>
+    <string name="game_run_tip_memory">Memory the game used at most, then the memory left on the device at the lowest</string>
+    <string name="game_run_tip_duration">How long the session lasted</string>
+    <string name="game_run_tip_start">Time before the first image</string>
+    <string name="game_run_tip_end">How the session ended</string>
+    <string name="game_run_duration">Duration</string>
+    <string name="game_run_start">Start</string>
+    <string name="game_run_seconds">%1$d s</string>
+    <string name="game_run_image_plain">%1$d × %2$d</string>
+    <string name="game_run_rate_value">%1$d / %2$d Hz</string>
+    <string name="game_run_end_crash">The game crashed</string>
+    <string name="game_run_end_silent">The game stopped answering after %1$d s</string>
+    <string name="issue_resolution_slow">The game could not keep up, with an image much larger than usual for this device (%1$d × %2$d). A lower resolution often helps, mostly when another tool sets a high resolution for every game.</string>
+    <string name="game_run_mb">%1$d MB</string>
+    <string name="game_run_gb">%1$.1f GB</string>
 </resources>

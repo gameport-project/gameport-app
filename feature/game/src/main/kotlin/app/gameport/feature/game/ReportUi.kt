@@ -58,6 +58,9 @@ internal class ReportActions(
     /** A frame rate the device does not accept was taken off the game: the page says so, with the rates it accepts, until the note is closed. */
     val rateReset: app.gameport.core.model.RateReset? = null,
     val onDismissRateReset: () -> Unit = {},
+    /** What the game's last run measured (null when it measured nothing), and the way to close the advice on the resolution it may lead to. */
+    val lastRun: LastRun? = null,
+    val onCloseResolutionAdvice: () -> Unit = {},
 ) {
     companion object {
         val None = ReportActions(null, ReportProgress.Idle, { _, _, _ -> }, {}, {}, {})

@@ -71,9 +71,10 @@ fun GamePerformanceScreen(onBack: () -> Unit, viewModel: GamePerformanceViewMode
     val gameName by viewModel.gameName.collectAsStateWithLifecycle()
     val refreshNeedsPatch by viewModel.refreshNeedsPatch.collectAsStateWithLifecycle()
     val refreshOutcome by viewModel.refreshOutcome.collectAsStateWithLifecycle()
+    val lastRun by viewModel.lastRun.collectAsStateWithLifecycle()
     GamePerformanceContent(
         settings, gameName, viewModel.eyeSides, viewModel.optimizerState, viewModel.refreshRates, viewModel.displayRates, refreshNeedsPatch, viewModel::onPatchAgain, onBack,
-        viewModel::onResolutionChosen, viewModel::onRefreshRateChosen, viewModel::onCpuLevelChosen, viewModel::onGpuLevelChosen, refreshOutcome,
+        viewModel::onResolutionChosen, viewModel::onRefreshRateChosen, viewModel::onCpuLevelChosen, viewModel::onGpuLevelChosen, refreshOutcome, lastRun,
     )
 }
 
@@ -93,6 +94,7 @@ internal fun GamePerformanceContent(
     onCpuLevelChosen: (Int) -> Unit,
     onGpuLevelChosen: (Int) -> Unit,
     refreshOutcome: app.gameport.core.model.RefreshOutcome? = null,
+    lastRun: LastRun? = null,
 ) {
     val performance = PerformanceTuning
     var pendingRate by remember { mutableStateOf<Int?>(null) }
@@ -126,6 +128,8 @@ internal fun GamePerformanceContent(
             }
             // The page keeps a margin at its bottom like the one at its top.
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // What the last run of the game made of these choices comes first.
+                lastRun?.let { LastRunPerformanceRow(it, Modifier.fillMaxWidth()) }
                 if (optimizerState != OptimizerState.NONE) {
                     // Something else sets the graphics of this game: its choices are the ones that count, and these would only be a second setting.
                     OptimizerNotice(optimizerState)

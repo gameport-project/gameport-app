@@ -408,4 +408,25 @@
     <string name="issue_performance_levels">niveaux du processeur et du graphique</string>
     <string name="gameperf_title">Performances</string>
     <string name="gameperf_button">Performances</string>
+
+    <!-- La carte de la dernière partie, sous celle de la taille et de la version -->
+    <string name="game_run_title">Dernière session</string>
+    <string name="game_run_performance">Performances</string>
+    <string name="game_run_memory_free_short">%1$s libre</string>
+    <string name="game_run_tip_image">Taille de l\'image dessinée par le jeu pour un œil, puis sa part de la résolution de l\'écran</string>
+    <string name="game_run_tip_rate">Images par seconde tenues, sur celles demandées</string>
+    <string name="game_run_tip_memory">Mémoire utilisée par le jeu au plus, puis mémoire restante sur l\'appareil au plus bas</string>
+    <string name="game_run_tip_duration">Durée de la session</string>
+    <string name="game_run_tip_start">Temps avant la première image</string>
+    <string name="game_run_tip_end">Comment la session s\'est terminée</string>
+    <string name="game_run_duration">Durée</string>
+    <string name="game_run_start">Démarrage</string>
+    <string name="game_run_seconds">%1$d s</string>
+    <string name="game_run_image_plain">%1$d × %2$d</string>
+    <string name="game_run_rate_value">%1$d / %2$d Hz</string>
+    <string name="game_run_end_crash">Le jeu a planté</string>
+    <string name="game_run_end_silent">Le jeu a cessé de répondre après %1$d s</string>
+    <string name="issue_resolution_slow">Le jeu n\'a pas pu suivre, avec une image bien plus grande que d\'habitude pour cet appareil (%1$d × %2$d). Une résolution plus basse aide souvent, surtout quand un autre outil impose une résolution élevée à tous les jeux.</string>
+    <string name="game_run_mb">%1$d Mo</string>
+    <string name="game_run_gb">%1$.1f Go</string>
 </resources>

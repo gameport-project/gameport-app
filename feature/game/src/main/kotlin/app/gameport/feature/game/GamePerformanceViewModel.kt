@@ -69,6 +69,10 @@ class GamePerformanceViewModel @Inject constructor(
             installer.installedPackage(appId) != null && !installer.declaresSupportedDevices(appId)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
 
+    /** What the last run of this game measured, shown at the top of the page. */
+    internal val lastRun: StateFlow<LastRun?> = lastRunFlow(appId, reports, settings, installer, device.model)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
     fun onPatchAgain() = installer.repatch(appId)
 
     fun onResolutionChosen(percent: Int) = settings.set(appId, gameSettings.value.copy(resolutionPercent = percent))

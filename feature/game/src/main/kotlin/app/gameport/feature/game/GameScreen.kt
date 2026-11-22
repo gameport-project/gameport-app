@@ -235,6 +235,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
     val shownGame = (uiState as? GameUiState.Content)?.game
     val discordName by viewModel.discordName.collectAsStateWithLifecycle()
     val rateReset by viewModel.rateReset.collectAsStateWithLifecycle()
+    val lastRun by viewModel.lastRun.collectAsStateWithLifecycle()
     val report = ReportActions(
         suspicion = suspicion,
         progress = reportProgress,
@@ -245,6 +246,8 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         discordName = discordName,
         rateReset = rateReset,
         onDismissRateReset = viewModel::onDismissRateReset,
+        lastRun = lastRun,
+        onCloseResolutionAdvice = viewModel::onCloseResolutionAdvice,
     )
     GameContent(
         uiState = uiState,
@@ -963,7 +966,7 @@ private fun GameDetails(
                 }
                 // The notifications are in the card of the bell, the progress of a patch in the card of the install; what stays here is the report that can be sent, and a patch that failed.
                 val suspected = issues.filterIsInstance<GameIssue.ProblemSuspected>().firstOrNull()
-                if (install is InstallState.Installed && (suspected != null || repatch is Repatch.Failed || report.rateReset != null)) {
+                if (install is InstallState.Installed && (suspected != null || repatch is Repatch.Failed || report.rateReset != null || report.lastRun?.adviseLowerResolution == true)) {
                     Box(Modifier.tourTarget(TourIds.GAME_ISSUES)) { IssuesPanel(
                         problem = suspected,
                         repatch = repatch,
@@ -978,6 +981,8 @@ private fun GameDetails(
                         rateReset = report.rateReset,
                         onDismissRateReset = report.onDismissRateReset,
                         onChangeRate = onOpenPerformance,
+                        lowerResolution = report.lastRun?.takeIf { it.adviseLowerResolution },
+                        onCloseResolutionAdvice = report.onCloseResolutionAdvice,
                     ) }
                 }
                 // A game without achievements, or one Steam has not answered for yet, shows nothing here.
@@ -1005,6 +1010,7 @@ private fun GameDetails(
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp), content = details)
                     // Size and play time are not what the player came for: after everything else.
                     InfoCard(game, installed, installedVersion, playtime, Modifier.fillMaxWidth().tourTarget(TourIds.GAME_INFO))
+                    report.lastRun?.let { LastRunCard(it, Modifier.fillMaxWidth()) }
                 }
             } else {
                 Row(
@@ -1019,6 +1025,7 @@ private fun GameDetails(
                     ) {
                         cover(Modifier)
                         InfoCard(game, installed, installedVersion, playtime, Modifier.fillMaxWidth().tourTarget(TourIds.GAME_INFO))
+                        report.lastRun?.let { LastRunCard(it, Modifier.fillMaxWidth()) }
                     }
                     Column(Modifier.weight(1f).padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp), content = details)
                 }
@@ -1655,6 +1662,8 @@ private fun IssuesPanel(
     rateReset: app.gameport.core.model.RateReset? = null,
     onDismissRateReset: () -> Unit = {},
     onChangeRate: () -> Unit = {},
+    lowerResolution: LastRun? = null,
+    onCloseResolutionAdvice: () -> Unit = {},
 ) {
     // As wide as the achievements card beside it in the column.
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1677,6 +1686,17 @@ private fun IssuesPanel(
                 onAction = { onDismissRateReset(); onChangeRate() },
                 secondAction = stringResource(R.string.issue_dismiss),
                 onSecondAction = onDismissRateReset,
+            )
+        }
+        // The last run could not keep up with an image much larger than usual for this device: a lower resolution often helps, and the Performance page is one tap away.
+        lowerResolution?.let {
+            val image = it.stats.shownImage
+            IssueRow(
+                message = stringResource(R.string.issue_resolution_slow, image?.first ?: 0, image?.second ?: 0),
+                action = stringResource(R.string.issue_rate_change),
+                onAction = { onCloseResolutionAdvice(); onChangeRate() },
+                secondAction = stringResource(R.string.issue_dismiss),
+                onSecondAction = onCloseResolutionAdvice,
             )
         }
         // A problem the game seems to have had: the report that can be sent is offered here, on the page (the rest of what is said about the game is in the notifications).
@@ -1860,6 +1880,11 @@ private fun InfoCard(game: Game, installed: Boolean, installedVersion: String?, 
     }
 }
 
+/** A memory in megabytes of 1024 kilobytes, as the log of the game counts it (the system's own formatter counts in thousands), in gigabytes from a thousand of them. */
+@Composable
+internal fun megabytes(value: Int): String =
+    if (value >= 1000) stringResource(R.string.game_run_gb, value / 1024.0) else stringResource(R.string.game_run_mb, value)
+
 @Composable
 private fun InfoGroup(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, content: @Composable ColumnScope.() -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -1881,7 +1906,7 @@ private fun InfoItem(label: String, value: String) {
 }
 
 @Composable
-private fun durationText(minutes: Int): String = when {
+internal fun durationText(minutes: Int): String = when {
     minutes <= 0 -> stringResource(R.string.game_duration_none)
     minutes < 60 -> stringResource(R.string.game_duration_minutes, minutes)
     else -> stringResource(R.string.game_duration_hours, minutes / 60, minutes % 60)

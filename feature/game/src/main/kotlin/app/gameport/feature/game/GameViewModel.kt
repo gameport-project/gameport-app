@@ -343,6 +343,15 @@ class GameViewModel @Inject constructor(
         .map { installer.installedPackage(appId)?.let(it::get) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
+    internal val lastRun: StateFlow<LastRun?> = lastRunFlow(appId, reports, gameSettingsStore, installer, deviceModel)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    /** The player closed the advice on the resolution: it is not shown again for this run. */
+    fun onCloseResolutionAdvice() {
+        val packageName = installer.installedPackage(appId) ?: return
+        reports.runs.value[packageName]?.let { reports.closeResolutionAdvice(packageName, it) }
+    }
+
     /** The frame rate that was taken off this game because the device does not accept it, until the player closes the note. */
     val rateReset: StateFlow<app.gameport.core.model.RateReset?> = reports.rateResets
         .map { installer.installedPackage(appId)?.let(it::get) }
@@ -461,3 +470,4 @@ class GameViewModel @Inject constructor(
         const val LOOK_AGAIN_COUNT = 5
     }
 }
+
