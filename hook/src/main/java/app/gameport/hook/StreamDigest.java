@@ -40,6 +40,13 @@ final class StreamDigest {
     /** The line a Pico's runtime prints when the game's instance is made: what the system set for this application (0 is not set). */
     private static final Pattern PICO_PARAMS = Pattern.compile("PxrPerformanceParams (.*)$");
     private static final Pattern STALE = Pattern.compile("Stale=(\\d+)");
+    /** The size of image the runtime recommends for an eye, as the OpenXR layer of GamePort logs it before the game or the player's scale touch it. */
+    private static final Pattern RECOMMENDED = Pattern.compile("view configuration \\d+ view 0: recommended (\\d+)x(\\d+)");
+    /** The size of image the game really gives the runtime for an eye (the first frame the layer checks). */
+    private static final Pattern FRAME_IMAGE = Pattern.compile("frame check, view 0: .*? image (\\d+)x(\\d+)");
+    /** A second of the run is slow when the game hands over fewer than half of the frames the screen asks for: this many in a row is a game that cannot keep up, not a loading. */
+    private static final int SLOW_NUMERATOR = 1;
+    private static final int SLOW_DENOMINATOR = 2;
     /** A second counts for the stability only after this many seconds with the session in focus: the loading and the start of the menus come first. */
     static final int STABILITY_WARMUP_SECONDS = 60;
     /** Fewer counted seconds than this say nothing about a game, and no number is given. */
@@ -63,6 +70,15 @@ final class StreamDigest {
     private final int[] fpsHistogram = new int[1024];
     private int fpsSamples;
     private int fpsTarget;
+    private int slowRun;
+    private int longestSlowRun;
+    private int recommendedWidth;
+    private int recommendedHeight;
+    private int imageWidth;
+    private int imageHeight;
+    private long firstFrameMillis = -1;
+    private long peakResidentKb;
+    private long minAvailableKb = -1;
     /** What the system set for the application, on a Pico. */
     private String picoParams;
     private int sessionState;
@@ -125,6 +141,11 @@ final class StreamDigest {
         fpsHistogram[fps]++;
         fpsSamples++;
         fpsTarget = Integer.parseInt(m.group(2));
+        if (fpsTarget > 0 && fps * SLOW_DENOMINATOR < fpsTarget * SLOW_NUMERATOR) {
+            if (++slowRun > longestSlowRun) longestSlowRun = slowRun;
+        } else {
+            slowRun = 0;
+        }
         countStability(fps, line);
     }
 
@@ -157,8 +178,55 @@ final class StreamDigest {
         return fpsTarget;
     }
 
+    /** The median of the frame rate the runtime printed, 0 when no line was seen. */
+    synchronized int fpsMedian() {
+        return fpsSamples == 0 ? 0 : percentile(50);
+    }
+
+    /** The frame rate that the slowest tenth of the seconds stayed under, 0 when no line was seen. */
+    synchronized int fpsLowTenth() {
+        return fpsSamples == 0 ? 0 : percentile(10);
+    }
+
+    /** How many seconds of the runtime's frame rate line were seen. */
+    synchronized int fpsSamples() {
+        return fpsSamples;
+    }
+
+    /** The longest run of seconds in a row that the game handed over fewer than half of the frames the screen asked for. */
+    synchronized int longestSlowStretch() {
+        return longestSlowRun;
+    }
+
+    /** The image the runtime recommends for an eye, as {width, height}, or {0, 0} when the layer said nothing. */
+    synchronized int[] recommendedImage() {
+        return new int[] {recommendedWidth, recommendedHeight};
+    }
+
+    /** The image the game really uses for an eye, as {width, height}, or {0, 0} when the layer checked no frame. */
+    synchronized int[] frameImage() {
+        return new int[] {imageWidth, imageHeight};
+    }
+
+    /** Seconds from the first line of the log to the first frame handed to the runtime, -1 when none was. */
+    synchronized int startupSeconds() {
+        return firstFrameMillis < 0 || firstMillis < 0 ? -1 : (int) ((firstFrameMillis - firstMillis) / 1000);
+    }
+
+    /** The most the game held at once, in megabytes, 0 when no reading was taken. */
+    synchronized int peakResidentMb() {
+        return (int) (peakResidentKb / 1024);
+    }
+
+    /** The least memory the device had free, in megabytes, -1 when no reading was taken. */
+    synchronized int minAvailableMb() {
+        return minAvailableKb < 0 ? -1 : (int) (minAvailableKb / 1024);
+    }
+
     /** A memory reading of the game (resident set, and what the device still has free), kept when it moved or a minute went by. */
     synchronized boolean memory(long nowMillis, long startMillis, long residentKb, long availableKb) {
+        if (residentKb > peakResidentKb) peakResidentKb = residentKb;
+        if (availableKb > 0 && (minAvailableKb < 0 || availableKb < minAvailableKb)) minAvailableKb = availableKb;
         if (lastMemoryAt >= 0 && Math.abs(residentKb - lastMemoryKb) < MEMORY_STEP_KB && nowMillis - lastMemoryAt < MEMORY_EVERY_MS) return false;
         if (memory.size() >= MAX_MEMORY_LINES) return false;
         lastMemoryAt = nowMillis;
@@ -174,8 +242,24 @@ final class StreamDigest {
         } else if (line.indexOf("GPSteam") >= 0) {
             if (line.contains("launcher config read")) milestone("Steam stand-in started in the game", millis);
         } else if (line.indexOf("GPXR") >= 0) {
-            if (line.contains("frame check at")) milestone("first frame handed to the runtime", millis);
-            else if (line.contains("GamePort OpenXR layer active")) milestone("OpenXR layer active", millis);
+            if (line.contains("frame check at")) {
+                milestone("first frame handed to the runtime", millis);
+                if (firstFrameMillis < 0) firstFrameMillis = millis;
+            } else if (line.contains("GamePort OpenXR layer active")) {
+                milestone("OpenXR layer active", millis);
+            } else if (recommendedWidth == 0 && line.contains("view configuration")) {
+                Matcher size = RECOMMENDED.matcher(line);
+                if (size.find()) {
+                    recommendedWidth = Integer.parseInt(size.group(1));
+                    recommendedHeight = Integer.parseInt(size.group(2));
+                }
+            } else if (imageWidth == 0 && line.contains("frame check, view 0")) {
+                Matcher size = FRAME_IMAGE.matcher(line);
+                if (size.find()) {
+                    imageWidth = Integer.parseInt(size.group(1));
+                    imageHeight = Integer.parseInt(size.group(2));
+                }
+            }
         } else if (line.contains("Fatal signal ")) {
             milestone("native crash", millis);
         }

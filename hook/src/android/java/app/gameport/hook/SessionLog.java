@@ -209,7 +209,11 @@ final class SessionLog {
             long lastTx = TrafficStats.getUidTxBytes(uid);
             if (lastRx == TrafficStats.UNSUPPORTED || lastTx == TrafficStats.UNSUPPORTED) {
                 synchronized (network) { network.addLast("the system does not count this game's traffic"); networkVersion++; }
-                return;
+                // The memory is read from /proc, not from the traffic counters: it is still followed.
+                while (true) {
+                    Thread.sleep(NETWORK_EVERY_MS);
+                    sampleMemory(started);
+                }
             }
             long lastWritten = 0;
             while (true) {
@@ -406,6 +410,16 @@ final class SessionLog {
         extras.putInt("steadinessSeconds", digest.stabilitySeconds());
         extras.putInt("steadinessHeld", digest.stabilityHeldSeconds());
         extras.putInt("steadinessTarget", digest.stabilityTarget());
+        // What the run measured, for the card of the game's page and the advice on the resolution: the size of image, the frame rate, the memory, how long the start took, and how long
+        // the run had lasted when this was handed over (a game that stops answering leaves the last of these behind while the run goes on).
+        int[] recommended = digest.recommendedImage();
+        int[] image = digest.frameImage();
+        extras.putIntArray("runStats", new int[] {
+            recommended[0], recommended[1], image[0], image[1],
+            digest.fpsMedian(), digest.fpsLowTenth(), digest.fpsSamples(), digest.stabilityTarget(), digest.longestSlowStretch(),
+            digest.peakResidentMb(), digest.minAvailableMb(), digest.startupSeconds(),
+            (int) ((System.currentTimeMillis() - processStartMs) / 1000),
+        });
         extras.putString("steamCalls", steamCalls);
         extras.putString("libraries", libraries);
         // Which run this is: GamePort keeps the log of the run before when a new one begins.

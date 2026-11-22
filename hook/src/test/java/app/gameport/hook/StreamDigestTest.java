@@ -153,4 +153,82 @@ public class StreamDigestTest {
         assertFalse(report, report.contains("6 s: the game holds"));
         assertTrue(report, report.contains("11 s: the game holds 1171 MB"));
     }
+
+    @Test
+    public void theImageTheRuntimeRecommendsAndTheOneTheGameUsesAreKeptFromTheLayersLines() {
+        StreamDigest digest = new StreamDigest();
+        digest.scan(line("16:57:20.000", "I", "GPHook", "first"));
+        digest.scan(line("16:57:21.100", "I", "GPXR", "view configuration 2 view 0: recommended 2800x2933, max 8192x8192, samples 1/1"));
+        digest.scan(line("16:57:21.100", "I", "GPXR", "view configuration 2 view 1: recommended 2800x2933, max 8192x8192, samples 1/1"));
+        digest.scan(line("16:57:24.200", "I", "GPXR", "frame check, view 0: at 0.1 1.2 0.3, turned 0 0 0 1, field of view -0.9 0.9 0.8 -0.9, image 3640x3813 at 0,0 (array index 0), swapchain 1"));
+        digest.scan(line("16:57:24.200", "I", "GPXR", "frame check, view 1: at 0.1 1.2 0.3, turned 0 0 0 1, field of view -0.9 0.9 0.8 -0.9, image 1x1 at 0,0 (array index 1), swapchain 1"));
+        assertEquals(2800, digest.recommendedImage()[0]);
+        assertEquals(2933, digest.recommendedImage()[1]);
+        assertEquals(3640, digest.frameImage()[0]);
+        assertEquals(3813, digest.frameImage()[1]);
+    }
+
+    @Test
+    public void onlyTheFirstViewConfigurationOfTheFirstEyeCounts() {
+        StreamDigest digest = new StreamDigest();
+        digest.scan(line("16:57:20.000", "I", "GPHook", "first"));
+        digest.scan(line("16:57:21.100", "I", "GPXR", "view configuration 2 view 0: recommended 2064x2208, max 8192x8192, samples 1/1"));
+        digest.scan(line("16:57:22.100", "I", "GPXR", "view configuration 2 view 0: recommended 100x100, max 8192x8192, samples 1/1"));
+        assertEquals(2064, digest.recommendedImage()[0]);
+    }
+
+    @Test
+    public void noImageIsReportedWhenTheLayerSaidNothing() {
+        StreamDigest digest = new StreamDigest();
+        digest.scan(line("16:57:20.000", "I", "GPHook", "first"));
+        assertEquals(0, digest.recommendedImage()[0]);
+        assertEquals(0, digest.frameImage()[0]);
+    }
+
+    @Test
+    public void theStartIsCountedFromTheFirstLineToTheFirstFrame() {
+        StreamDigest digest = new StreamDigest();
+        digest.scan(line("16:57:20.000", "I", "GPHook", "first"));
+        assertEquals(-1, digest.startupSeconds());
+        digest.scan(line("16:57:24.600", "I", "GPXR", "frame check at 0 s: 1 frames, 0 without a layer"));
+        digest.scan(line("16:57:40.000", "I", "GPXR", "frame check at 15 s: 900 frames, 0 without a layer"));
+        assertEquals(4, digest.startupSeconds());
+    }
+
+    @Test
+    public void theLongestStretchOfSlowSecondsIsKeptNotTheCountOfThem() {
+        StreamDigest digest = new StreamDigest();
+        digest.scan(line("16:57:20.000", "I", "GPHook", "first"));
+        for (int i = 0; i < 3; i++) digest.frameRate("11-19 16:57:2" + i + ".100 1 1 I VrApi   : FPS=1/72,Prd=0ms");
+        digest.frameRate("11-19 16:57:23.100 1 1 I VrApi   : FPS=72/72,Prd=0ms");
+        for (int i = 0; i < 6; i++) digest.frameRate("11-19 16:57:3" + i + ".100 1 1 I VrApi   : FPS=30/72,Prd=0ms");
+        digest.frameRate("11-19 16:57:40.100 1 1 I VrApi   : FPS=72/72,Prd=0ms");
+        assertEquals(6, digest.longestSlowStretch());
+        assertEquals(11, digest.fpsSamples());
+        assertEquals(30, digest.fpsMedian());
+        assertEquals(1, digest.fpsLowTenth());
+    }
+
+    @Test
+    public void aRunAtItsTargetHasNoSlowStretch() {
+        StreamDigest digest = new StreamDigest();
+        digest.scan(line("16:57:20.000", "I", "GPHook", "first"));
+        for (int i = 0; i < 10; i++) digest.frameRate("11-19 16:57:2" + i + ".100 1 1 I VrApi   : FPS=72/72,Prd=0ms");
+        assertEquals(0, digest.longestSlowStretch());
+        assertEquals(72, digest.fpsMedian());
+    }
+
+    @Test
+    public void theMemoryPeakAndTheLeastFreeMemoryAreKeptEvenForReadingsThatAreNotWrittenDown() {
+        StreamDigest digest = new StreamDigest();
+        digest.scan(line("16:57:20.000", "I", "GPHook", "first"));
+        assertEquals(0, digest.peakResidentMb());
+        assertEquals(-1, digest.minAvailableMb());
+        digest.memory(1_000L, 0L, 420L * 1024, 3000L * 1024);
+        digest.memory(3_000L, 0L, 825L * 1024, 1680L * 1024);
+        // Close to the one before and soon after: not written down, but it still counts.
+        digest.memory(4_000L, 0L, 365L * 1024, 900L * 1024);
+        assertEquals(825, digest.peakResidentMb());
+        assertEquals(900, digest.minAvailableMb());
+    }
 }
