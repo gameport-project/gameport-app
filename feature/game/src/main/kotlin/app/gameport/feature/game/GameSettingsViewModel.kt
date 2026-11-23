@@ -29,6 +29,8 @@ class GameSettingsViewModel @Inject constructor(
     private val installer: GameInstallRepository,
     device: DeviceProfile,
     private val launchOptionsRepository: app.gameport.core.steam.LaunchOptionsRepository,
+    private val librarySender: app.gameport.core.sync.LibrarySender,
+    verdicts: app.gameport.core.settings.GameVerdicts,
 ) : ViewModel() {
     private val route = savedStateHandle.toRoute<GameSettingsRoute>()
     private val appId = route.appId
@@ -121,6 +123,39 @@ class GameSettingsViewModel @Inject constructor(
     fun onDismissDlcError() = installer.clearDlcError(appId)
 
     fun onRepatch() = installer.repatch(appId)
+
+    /** The Discord name given with an earlier report: it fills the field of the page that sends the game's libraries. Empty when none. */
+    val discordName: StateFlow<String> = verdicts.discordName
+
+    private val _librarySend = kotlinx.coroutines.flow.MutableStateFlow<LibrarySend>(LibrarySend.Idle)
+
+    /** Where the sending of the game's libraries stands, for its page and the window that asks first. */
+    internal val librarySend: StateFlow<LibrarySend> = _librarySend
+
+    /** The player asks to send the libraries: the window lists the files that would go. */
+    internal fun onAskLibraries() {
+        if (_librarySend.value is LibrarySend.Working) return
+        viewModelScope.launch {
+            val game = library.observeGame(appId).first() ?: return@launch
+            _librarySend.value = LibrarySend.Asking(librarySender.plan(game))
+        }
+    }
+
+    /** The player agreed: the report is made with the libraries and sent, and the window follows both steps. */
+    internal fun onSendLibraries(discord: String) {
+        if (_librarySend.value is LibrarySend.Working) return
+        viewModelScope.launch {
+            val game = library.observeGame(appId).first() ?: return@launch
+            _librarySend.value = LibrarySend.Working(app.gameport.core.sync.LibraryProgress(app.gameport.core.sync.LibraryStage.PREPARING, 0f))
+            val result = librarySender.send(game, discord) { _librarySend.value = LibrarySend.Working(it) }
+            _librarySend.value = LibrarySend.Done(result)
+        }
+    }
+
+    /** The window is closed (not while the sending goes on). */
+    internal fun onCloseLibraries() {
+        if (_librarySend.value !is LibrarySend.Working) _librarySend.value = LibrarySend.Idle
+    }
 
     fun onRemovePatch() = installer.removePatch(appId)
 

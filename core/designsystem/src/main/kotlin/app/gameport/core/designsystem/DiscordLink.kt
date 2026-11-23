@@ -65,12 +65,12 @@ fun DiscordRoundButton(modifier: Modifier = Modifier, size: Dp = 40.dp) {
  * them about it on its Discord. The caller keeps the text; what is typed is cut at [app.gameport.core.model.DiscordName.MAX_LENGTH].
  */
 @Composable
-fun DiscordNameField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+fun DiscordNameField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier, @androidx.annotation.StringRes why: Int = R.string.discord_name_why, @androidx.annotation.StringRes label: Int = R.string.discord_name_label) {
     androidx.compose.material3.OutlinedTextField(
         value = value,
         onValueChange = { onValueChange(it.take(app.gameport.core.model.DiscordName.MAX_LENGTH)) },
-        label = { Text(stringResource(R.string.discord_name_label)) },
-        supportingText = { Text(stringResource(R.string.discord_name_why)) },
+        label = { Text(stringResource(label)) },
+        supportingText = { Text(stringResource(why)) },
         leadingIcon = { Icon(painterResource(R.drawable.ic_discord), contentDescription = null, tint = DiscordBlurple, modifier = Modifier.size(22.dp)) },
         singleLine = true,
         shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),

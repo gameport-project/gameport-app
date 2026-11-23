@@ -20,6 +20,7 @@
     <string name="game_error_expansion_storage_open">Allow storage access</string>
     <string name="discord_join">Join the Discord</string>
     <string name="discord_name_label">Discord name (optional)</string>
+    <string name="discord_name_label_required">Discord name</string>
     <string name="discord_name_why">Sent with the answers, only to talk about them on the Discord. Kept for next time.</string>
     <string name="game_error_expansion_files">This game’s data could not be placed on this device. The game stays incomplete, and the downloaded data is kept to try again.</string>
     <string name="game_install_failed">Install failed: %1$s</string>
@@ -78,4 +79,9 @@
     <string name="symptom_picker_label">What goes wrong?</string>
     <string name="symptom_picker_hint">Choose one or more</string>
     <string name="report_sent_big">Report sent</string>
+    <string name="libraries_tick_title">Send the game\'s libraries too</string>
+    <string name="libraries_tick_summary">%1$d files, about %2$s, go in the same report. A Discord name is then required.</string>
+    <string name="libraries_tick_privacy">The files are the game\'s own, kept privately only to look for the cause of the problem, then removed.</string>
+    <string name="libraries_tick_size_kb">%1$d KB</string>
+    <string name="libraries_tick_size_mb">%1$.1f MB</string>
 </resources>

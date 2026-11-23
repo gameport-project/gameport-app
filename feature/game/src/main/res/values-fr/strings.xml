@@ -429,4 +429,24 @@
     <string name="issue_resolution_slow">Le jeu n\'a pas pu suivre, avec une image bien plus grande que d\'habitude pour cet appareil (%1$d × %2$d). Une résolution plus basse aide souvent, surtout quand un autre outil impose une résolution élevée à tous les jeux.</string>
     <string name="game_run_mb">%1$d Mo</string>
     <string name="game_run_gb">%1$.1f Go</string>
+
+    <!-- Envoi des bibliothèques d'un jeu, depuis ses réglages -->
+    <string name="game_settings_libraries">Aider à corriger ce jeu</string>
+    <string name="libraries_description">Les bibliothèques des fichiers du jeu peuvent être envoyées avec un rapport, pour aider à trouver pourquoi il ne fonctionne pas. Seuls les fichiers listés avant l\'envoi partent, avec le rapport habituel, qui ne contient aucune donnée personnelle.</string>
+    <string name="libraries_name_why">Obligatoire, pour pouvoir en parler sur le Discord du projet. Retenu pour la prochaine fois.</string>
+    <string name="libraries_send">Envoyer les bibliothèques du jeu</string>
+    <string name="libraries_ask_title">Envoyer ces fichiers ?</string>
+    <string name="libraries_ask_summary">%1$d fichiers, environ %2$s, partent avec le rapport.</string>
+    <string name="libraries_ask_left">%1$d fichiers plus volumineux sont seulement nommés dans le rapport.</string>
+    <string name="libraries_ask_none">Ce jeu ne contient aucune bibliothèque à envoyer.</string>
+    <string name="libraries_ask_privacy">Les fichiers sont ceux du jeu, gardés en privé sur le serveur du projet uniquement pour chercher la cause du problème, puis supprimés. Ils ne sont jamais partagés.</string>
+    <string name="libraries_size_kb">%1$d Ko</string>
+    <string name="libraries_size_mb">%1$.1f Mo</string>
+    <string name="libraries_preparing">Préparation du rapport</string>
+    <string name="libraries_sending">Envoi</string>
+    <string name="libraries_done_sent">Envoyé au projet.</string>
+    <string name="libraries_done_later">Non envoyé : pas de connexion, ou le serveur est occupé. Un nouvel essai est possible plus tard.</string>
+    <string name="libraries_done_refused">Non envoyé : le serveur n\'a pas accepté les fichiers.</string>
+    <string name="libraries_done_unavailable">Rien à envoyer : le jeu n\'est pas installé, ou ses bibliothèques sont trop volumineuses.</string>
+    <string name="libraries_done_noname">Un pseudo Discord est nécessaire.</string>
 </resources>

@@ -368,7 +368,10 @@ class GameViewModel @Inject constructor(
     internal val reportProgress: StateFlow<ReportProgress> = _reportProgress
 
     /** The report is made now and sent to the project, even when the automatic sending is off: the player asked. */
-    internal fun onSendReport(game: Game, description: String? = null, symptoms: Set<app.gameport.core.model.Symptom> = emptySet(), discord: String? = null) {
+    /** The libraries that would go with a report of this game. */
+    internal suspend fun librariesPlan(game: Game) = reportSender.librariesPlan(game)
+
+    internal fun onSendReport(game: Game, description: String? = null, symptoms: Set<app.gameport.core.model.Symptom> = emptySet(), discord: String? = null, withLibraries: Boolean = false) {
         if (_reportProgress.value == ReportProgress.Working) return
         // The Discord name is kept for the next report, so the field is filled in and never asked again; what is typed now replaces it, and an emptied field removes it.
         if (discord != null) verdicts.setDiscordName(discord)
@@ -379,7 +382,7 @@ class GameViewModel @Inject constructor(
         viewModelScope.launch {
             _reportProgress.value = ReportProgress.Working
             val failure = ((uiState.value as? GameUiState.Content)?.install as? InstallState.Failed)?.error?.takeIf { it.reportable }?.toString()
-            val status = reportSender.sendByHand(game, failure, description, symptoms)
+            val status = reportSender.sendByHand(game, failure, description, symptoms, withLibraries)
             // The answer says what became of the report; it goes again when that changed.
             verdicts.reportStated(appId, status.state())
             _reportProgress.value = ReportProgress.Done(status)

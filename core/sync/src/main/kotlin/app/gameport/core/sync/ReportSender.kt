@@ -64,30 +64,49 @@ fun interface ReportTransport {
     suspend fun post(meta: ReportMeta, zip: ByteArray): Delivery
 }
 
+/**
+ * Posts a zip to [url] and tells what became of it. [onProgress], when given, is told how many bytes went, as the body is written by pieces, so a bar can follow it. A refusal (the relay will
+ * never take it) is told apart from a failure that may pass (no network, a relay that is busy).
+ */
+internal fun postZip(url: String, zip: ByteArray, readTimeoutMs: Int, onProgress: ((Long) -> Unit)? = null): Delivery {
+    val connection = URL(url).openConnection() as HttpURLConnection
+    return try {
+        connection.requestMethod = "POST"
+        connection.connectTimeout = 20_000
+        connection.readTimeout = readTimeoutMs
+        connection.doOutput = true
+        connection.setFixedLengthStreamingMode(zip.size)
+        connection.setRequestProperty("Content-Type", "application/zip")
+        connection.outputStream.use { out ->
+            var at = 0
+            while (at < zip.size) {
+                val piece = minOf(PIECE_BYTES, zip.size - at)
+                out.write(zip, at, piece)
+                at += piece
+                onProgress?.invoke(at.toLong())
+            }
+        }
+        when (connection.responseCode) {
+            HttpURLConnection.HTTP_NO_CONTENT -> Delivery.SENT
+            HttpURLConnection.HTTP_BAD_REQUEST, HttpURLConnection.HTTP_ENTITY_TOO_LARGE -> Delivery.REFUSED
+            else -> Delivery.LATER
+        }
+    } catch (e: java.io.IOException) {
+        Delivery.LATER
+    } finally {
+        connection.disconnect()
+    }
+}
+
+private const val PIECE_BYTES = 32 * 1024
+
+internal fun urlEncode(text: String): String = URLEncoder.encode(text, "UTF-8")
+
 /** The relay of the project (see its README). The reports go to the test route in a debug build, as the votes do. */
 class HttpReportTransport(private val address: String) : ReportTransport {
     override suspend fun post(meta: ReportMeta, zip: ByteArray): Delivery = withContext(Dispatchers.IO) {
-        fun q(text: String) = URLEncoder.encode(text, "UTF-8")
-        val url = "$address?appId=${meta.appId}&app=${q(meta.appVersion)}&device=${q(meta.device)}&voter=${q(meta.voter)}${meta.answer?.let { "&answer=${q(it)}" }.orEmpty()}"
-        val connection = URL(url).openConnection() as HttpURLConnection
-        try {
-            connection.requestMethod = "POST"
-            connection.connectTimeout = TIMEOUT_MS
-            connection.readTimeout = TIMEOUT_MS
-            connection.doOutput = true
-            connection.setFixedLengthStreamingMode(zip.size)
-            connection.setRequestProperty("Content-Type", "application/zip")
-            connection.outputStream.use { it.write(zip) }
-            when (connection.responseCode) {
-                HttpURLConnection.HTTP_NO_CONTENT -> Delivery.SENT
-                HttpURLConnection.HTTP_BAD_REQUEST, HttpURLConnection.HTTP_ENTITY_TOO_LARGE -> Delivery.REFUSED
-                else -> Delivery.LATER
-            }
-        } catch (e: java.io.IOException) {
-            Delivery.LATER
-        } finally {
-            connection.disconnect()
-        }
+        fun q(text: String) = urlEncode(text)
+        postZip("$address?appId=${meta.appId}&app=${q(meta.appVersion)}&device=${q(meta.device)}&voter=${q(meta.voter)}${meta.answer?.let { "&answer=${q(it)}" }.orEmpty()}", zip, TIMEOUT_MS)
     }
 
     companion object {
@@ -153,6 +172,7 @@ class ReportSender @Inject constructor(
     private val reporter: ProblemReporter,
     private val verdicts: GameVerdicts,
     private val device: DeviceProfile,
+    private val libraries: LibrarySender,
 ) {
     private val lock = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -194,8 +214,29 @@ class ReportSender @Inject constructor(
         true
     }
 
-    /** The player asked from the game's page: the report is made now and sent, even when the automatic sending is off. */
-    suspend fun sendByHand(game: Game, installFailure: String? = null, description: String? = null, symptoms: Set<app.gameport.core.model.Symptom> = emptySet()): ReportStatus = lock.withLock {
+    /** The libraries that would go with a report of this game, for the line that tells the player what ticking the box sends. Null when the game is not installed. */
+    suspend fun librariesPlan(game: Game): app.gameport.core.model.LibraryChoice.Pick? = libraries.plan(game)
+
+    /**
+     * The player asked from the game's page: the report is made now and sent, even when the automatic sending is off. With [withLibraries] the game's libraries go in the same zip (the
+     * Discord name kept in the settings goes with them, the project needs it to talk about them); when they cannot go (no network, refused, too large) the plain report goes as usual.
+     */
+    suspend fun sendByHand(
+        game: Game,
+        installFailure: String? = null,
+        description: String? = null,
+        symptoms: Set<app.gameport.core.model.Symptom> = emptySet(),
+        withLibraries: Boolean = false,
+    ): ReportStatus = lock.withLock {
+        if (withLibraries && installFailure == null) {
+            val result = libraries.send(game, verdicts.discordName.value, description, symptoms, trigger = "game-page", answer = meta(game.appId).answer) {}
+            Log.i(TAG, "${game.appId}: the report went with the libraries: $result")
+            if (result == LibraryResult.SENT) {
+                // The zip that went holds the report: the one kept for the answer must not go a second time.
+                outbox.remove(game.appId)
+                return ReportStatus.SENT
+            }
+        }
         val zip = reporter.bytes(game, installFailure = installFailure, description = description, symptoms = symptoms, trigger = if (installFailure != null) "install-failure" else "game-page") ?: return ReportStatus.UNAVAILABLE
         runCatching { outbox.put(game.appId, zip) }.onFailure {
             Log.w(TAG, "${game.appId}: the report could not be kept", it)

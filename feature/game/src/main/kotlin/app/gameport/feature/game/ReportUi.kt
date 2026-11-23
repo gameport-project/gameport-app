@@ -18,6 +18,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.Text
@@ -48,8 +49,8 @@ internal sealed interface ReportProgress {
 internal class ReportActions(
     val suspicion: Suspicion?,
     val progress: ReportProgress,
-    /** The description, what was ticked, and the Discord name (empty for none). */
-    val onSend: (String, Set<Symptom>, String) -> Unit,
+    /** The description, what was ticked, the Discord name (empty for none), and whether the game's libraries go with the report. */
+    val onSend: (String, Set<Symptom>, String, Boolean) -> Unit,
     val onTicket: () -> Unit,
     val onDismissProblem: () -> Unit,
     val onResetProgress: () -> Unit,
@@ -61,9 +62,11 @@ internal class ReportActions(
     /** What the game's last run measured (null when it measured nothing), and the way to close the advice on the resolution it may lead to. */
     val lastRun: LastRun? = null,
     val onCloseResolutionAdvice: () -> Unit = {},
+    /** The libraries that would go with the report (null while not known, or when the game is not installed). */
+    val librariesPlan: suspend () -> app.gameport.core.model.LibraryChoice.Pick? = { null },
 ) {
     companion object {
-        val None = ReportActions(null, ReportProgress.Idle, { _, _, _ -> }, {}, {}, {})
+        val None = ReportActions(null, ReportProgress.Idle, { _, _, _, _ -> }, {}, {}, {})
     }
 }
 
@@ -74,6 +77,11 @@ internal fun ReportDialog(gameName: String, report: ReportActions, onClose: () -
     val symptoms = Symptom.parse(codes)
     // The name is filled in from the last report, so it is never asked again; what is typed here replaces it when the report is sent.
     var discord by rememberSaveable(report.discordName) { mutableStateOf(report.discordName) }
+    // The game's libraries can go in the same report; the project then needs a Discord name to talk about them.
+    val plan by produceState<app.gameport.core.model.LibraryChoice.Pick?>(null) { value = report.librariesPlan() }
+    var withLibraries by rememberSaveable { mutableStateOf(false) }
+    val libraries = withLibraries && plan?.included?.isNotEmpty() == true
+    val nameMissing = libraries && app.gameport.core.model.DiscordName.clean(discord).isEmpty()
     // Once the report has reached the project the window stays, so the Discord button can be reached: the close button ends it.
     val progress = report.progress
     val sent = progress is ReportProgress.Done && progress.status == ReportStatus.SENT
@@ -110,7 +118,9 @@ internal fun ReportDialog(gameName: String, report: ReportActions, onClose: () -
                     modifier = Modifier.fillMaxWidth(),
                 )
                 // Optional, and kept for the next time: the way for the project to talk to the player about their answers.
-                app.gameport.core.designsystem.DiscordNameField(discord, { discord = it })
+                app.gameport.core.designsystem.LibrariesTick(plan, withLibraries, onCheckedChange = { withLibraries = it })
+                if (libraries) app.gameport.core.designsystem.DiscordNameField(discord, { discord = it }, label = app.gameport.core.designsystem.R.string.discord_name_label_required)
+                else app.gameport.core.designsystem.DiscordNameField(discord, { discord = it })
                 when (val progress = report.progress) {
                     ReportProgress.Idle -> Unit
                     ReportProgress.Working -> {
@@ -125,7 +135,7 @@ internal fun ReportDialog(gameName: String, report: ReportActions, onClose: () -
                 }
                 // The two buttons share the width of the window.
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                    Button(onClick = { report.onSend(description, symptoms, discord) }, enabled = report.progress != ReportProgress.Working, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.report_send)) }
+                    Button(onClick = { report.onSend(description, symptoms, discord, libraries) }, enabled = report.progress != ReportProgress.Working && !nameMissing, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.report_send)) }
                     OutlinedButton(onClick = report.onTicket, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.report_ticket)) }
                 }
             }

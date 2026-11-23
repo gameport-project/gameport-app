@@ -78,6 +78,8 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
     val extraContent by viewModel.extraContent.collectAsStateWithLifecycle()
     val channels by viewModel.channels.collectAsStateWithLifecycle()
     val channelInUse by viewModel.channelInUse.collectAsStateWithLifecycle()
+    val librarySend by viewModel.librarySend.collectAsStateWithLifecycle()
+    val discordName by viewModel.discordName.collectAsStateWithLifecycle()
     var pendingChannel by remember { mutableStateOf<String?>(null) }
     pendingChannel?.let { name ->
         BackdropDialog(
@@ -133,6 +135,8 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
         if (UpdateChannels.hasOthers(channels)) add(GameCategory.CHANNELS)
         if (launchOptions.isNotEmpty()) add(GameCategory.LAUNCH)
         if (viewModel.isHeadset && isVrGame) add(GameCategory.COMFORT)
+        // Only for a game that is on the device: its libraries are read from the installed files.
+        if (installedNow) add(GameCategory.LIBRARIES)
         if (installedNow) add(GameCategory.UNINSTALL)
     }
     var chosen by rememberSaveable { mutableStateOf<String?>(if (viewModel.opensOnComfort) GameCategory.COMFORT.name else null) }
@@ -210,6 +214,13 @@ fun GameSettingsScreen(onBack: () -> Unit, viewModel: GameSettingsViewModel = hi
                                     effective = LaunchOptions.chosen(launchOptions, settings.launchArguments, isVrGame).toSet(),
                                     onPicked = viewModel::onLaunchArgumentsChanged,
                                 )
+                                GameCategory.LIBRARIES -> LibrariesSection(
+                                    state = librarySend,
+                                    savedName = discordName,
+                                    onAsk = viewModel::onAskLibraries,
+                                    onSend = viewModel::onSendLibraries,
+                                    onClose = viewModel::onCloseLibraries,
+                                )
                                 GameCategory.UNINSTALL -> {
                                     Text(stringResource(R.string.game_settings_uninstall), style = MaterialTheme.typography.headlineSmall)
                                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -282,6 +293,7 @@ private enum class GameCategory(val title: Int) {
     EXTRA(R.string.extra_title),
     CHANNELS(R.string.game_settings_channels),
     LAUNCH(R.string.game_settings_launch),
+    LIBRARIES(R.string.game_settings_libraries),
     COMFORT(R.string.game_settings_comfort),
     UNINSTALL(R.string.game_settings_uninstall),
 }

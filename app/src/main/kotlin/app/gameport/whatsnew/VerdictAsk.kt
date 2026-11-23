@@ -101,6 +101,8 @@ data class ReportFollowUp(
     val ready: Boolean = false,
     /** The report and the answer have gone (or are kept for the next start): closing the window sends nothing more. */
     val delivered: Boolean = false,
+    /** The box that adds the game's libraries to the report is ticked. */
+    val withLibraries: Boolean = false,
 )
 
 /**
@@ -139,6 +141,15 @@ class VerdictAskViewModel @Inject constructor(
     val discordName: StateFlow<String> = verdicts.discordName
 
     fun onDiscordName(typed: String) = verdicts.setDiscordName(typed)
+
+    /** The libraries that would go with the report of this game (null when it is not installed). */
+    suspend fun librariesPlan(appId: Int) = gameOf(appId)?.let { reports.librariesPlan(it) }
+
+    /** The box that adds the game's libraries to the report was ticked or cleared. */
+    fun onLibraries(on: Boolean) = _followUp.update { it?.copy(withLibraries = on) }
+
+    /** Whether the libraries go: the box is ticked and a Discord name is there, which the project needs to talk about them. */
+    private fun librariesGo(current: ReportFollowUp) = current.withLibraries && app.gameport.core.model.DiscordName.clean(verdicts.discordName.value).isNotEmpty()
 
     fun onAnswer(verdict: Verdict) {
         val asked = question.value ?: return
@@ -180,10 +191,11 @@ class VerdictAskViewModel @Inject constructor(
         _followUp.value = current.copy(busy = true)
         // What went wrong goes with the answer itself, so that it can be counted (the report keeps the detail).
         verdicts.setIssues(current.appId, symptoms)
-        val detailed = ReportDescription.of(description) != null || symptoms.isNotEmpty()
+        val libraries = librariesGo(current)
+        val detailed = ReportDescription.of(description) != null || symptoms.isNotEmpty() || libraries
         viewModelScope.launch {
             val status = if (!detailed) reports.sendNow(current.appId)
-            else gameOf(current.appId)?.let { reports.sendByHand(it, description = description, symptoms = symptoms) } ?: ReportStatus.UNAVAILABLE
+            else gameOf(current.appId)?.let { reports.sendByHand(it, description = description, symptoms = symptoms, withLibraries = libraries) } ?: ReportStatus.UNAVAILABLE
             // The answer, held until now, leaves with what became of the report: one answer, once.
             verdicts.reportStated(current.appId, status.state())
             _followUp.update { it?.copy(status = status, busy = false, delivered = true, describedAndSent = it.describedAndSent || (detailed && (status == ReportStatus.SENT || status == ReportStatus.WAITING))) }
@@ -209,11 +221,12 @@ class VerdictAskViewModel @Inject constructor(
         _followUp.value = null
         if (current == null || current.delivered) return
         verdicts.setIssues(current.appId, symptoms)
-        val written = ReportDescription.of(description) != null || symptoms.isNotEmpty()
+        val libraries = librariesGo(current)
+        val written = ReportDescription.of(description) != null || symptoms.isNotEmpty() || libraries
         viewModelScope.launch {
             val status = when {
                 !verdicts.share.value -> ReportStatus.OFF
-                written -> gameOf(current.appId)?.let { reports.sendByHand(it, description = description, symptoms = symptoms) } ?: ReportStatus.UNAVAILABLE
+                written -> gameOf(current.appId)?.let { reports.sendByHand(it, description = description, symptoms = symptoms, withLibraries = libraries) } ?: ReportStatus.UNAVAILABLE
                 current.ready -> reports.sendNow(current.appId)
                 else -> ReportStatus.UNAVAILABLE
             }
@@ -233,7 +246,8 @@ fun VerdictAskHost(viewModel: VerdictAskViewModel = hiltViewModel()) {
     val asked by viewModel.question.collectAsStateWithLifecycle()
     val followUp by viewModel.followUp.collectAsStateWithLifecycle()
     val discordName by viewModel.discordName.collectAsStateWithLifecycle()
-    followUp?.let { ReportFollowUpDialog(it, discordName, viewModel::onDiscordName, viewModel::onDownloadReport, viewModel::onSendReport, viewModel::onCloseReport) }
+    val plan by androidx.compose.runtime.produceState<app.gameport.core.model.LibraryChoice.Pick?>(null, followUp?.appId) { value = followUp?.appId?.let { viewModel.librariesPlan(it) } }
+    followUp?.let { ReportFollowUpDialog(it, discordName, viewModel::onDiscordName, plan, viewModel::onLibraries, viewModel::onDownloadReport, viewModel::onSendReport, viewModel::onCloseReport) }
     // The question waits behind the window that follows an answer: only one of the two is on screen.
     if (followUp != null) return
     val question = asked ?: return
@@ -283,7 +297,7 @@ fun VerdictAskHost(viewModel: VerdictAskViewModel = hiltViewModel()) {
 
 /** After "it did not work": the report that goes with the answer, what became of it, and the two ways to take it by hand. Closed by its button only. */
 @Composable
-private fun ReportFollowUpDialog(state: ReportFollowUp, discordName: String, onDiscordName: (String) -> Unit, onDownload: (String, Set<Symptom>) -> Unit, onSend: (String, Set<Symptom>) -> Unit, onClose: (String, Set<Symptom>) -> Unit) {
+private fun ReportFollowUpDialog(state: ReportFollowUp, discordName: String, onDiscordName: (String) -> Unit, plan: app.gameport.core.model.LibraryChoice.Pick?, onLibraries: (Boolean) -> Unit, onDownload: (String, Set<Symptom>) -> Unit, onSend: (String, Set<Symptom>) -> Unit, onClose: (String, Set<Symptom>) -> Unit) {
     // What the player writes goes in the report, in their own words: the files show how the game ran, not what was seen.
     var description by rememberSaveable { mutableStateOf("") }
     // The Discord name is kept as it is typed, so the answer that leaves when the window closes carries it; it is filled in from the last time, and never asked again.
@@ -291,7 +305,10 @@ private fun ReportFollowUpDialog(state: ReportFollowUp, discordName: String, onD
     // What was ticked as going wrong goes in the report as fixed codes, which the project can count.
     var codes by rememberSaveable { mutableStateOf(emptyList<String>()) }
     val symptoms = Symptom.parse(codes)
-    val written = ReportDescription.of(description) != null || symptoms.isNotEmpty()
+    // The libraries go when the box is ticked, and a Discord name is then required: without one, nothing is sent.
+    val libraries = state.withLibraries && plan?.included?.isNotEmpty() == true
+    val nameMissing = libraries && app.gameport.core.model.DiscordName.clean(discord).isEmpty()
+    val written = ReportDescription.of(description) != null || symptoms.isNotEmpty() || libraries
     val ready = state.ready || (state.status != null && state.status != ReportStatus.UNAVAILABLE)
     // The report is sent by itself when the window opens; only a send the player asked for closes the window, once the project has it (with the description, if one was written).
     var sentByHand by rememberSaveable { mutableStateOf(false) }
@@ -350,7 +367,9 @@ private fun ReportFollowUpDialog(state: ReportFollowUp, discordName: String, onD
                     colors = app.gameport.core.designsystem.glassTextFieldColors(),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                app.gameport.core.designsystem.DiscordNameField(discord, { discord = it; onDiscordName(it) })
+                app.gameport.core.designsystem.LibrariesTick(plan, state.withLibraries, onLibraries)
+                if (libraries) app.gameport.core.designsystem.DiscordNameField(discord, { discord = it; onDiscordName(it) }, label = app.gameport.core.designsystem.R.string.discord_name_label_required)
+                else app.gameport.core.designsystem.DiscordNameField(discord, { discord = it; onDiscordName(it) })
                 state.savedName?.let { Text(stringResource(R.string.report_saved, it), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
                 if (state.saveFailed) Text(stringResource(R.string.report_save_failed), color = FailsRed, style = MaterialTheme.typography.bodySmall)
             }
@@ -361,7 +380,7 @@ private fun ReportFollowUpDialog(state: ReportFollowUp, discordName: String, onD
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     // The send is not offered once the relay has the report, unless there is a description it does not have yet.
                     if (state.status != ReportStatus.SENT || (written && !state.describedAndSent)) {
-                        GlassButton(onClick = { sentByHand = true; onSend(description, symptoms) }, enabled = ready && !state.busy, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)) {
+                        GlassButton(onClick = { sentByHand = true; onSend(description, symptoms) }, enabled = ready && !state.busy && !nameMissing, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)) {
                             Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(stringResource(R.string.report_send), maxLines = 1)

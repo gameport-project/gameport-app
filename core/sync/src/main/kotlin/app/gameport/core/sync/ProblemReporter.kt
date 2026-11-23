@@ -108,7 +108,23 @@ class ProblemReporter @Inject constructor(
             .build()
     }
 
-    private fun writeZip(game: Game, packageName: String?, installFailure: String?, target: java.io.OutputStream, lean: Boolean = false, description: String? = null, symptoms: Set<app.gameport.core.model.Symptom> = emptySet(), trigger: String? = null) {
+    /**
+     * The report with more entries added to it by [extras] (the game's libraries, when the player chose to send them), as bytes. There is none when the game is not installed or the zip comes out
+     * larger than [maxBytes]: the caller then asks for fewer entries.
+     */
+    suspend fun bytesWith(
+        game: Game,
+        maxBytes: Int,
+        trigger: String,
+        description: String? = null,
+        symptoms: Set<app.gameport.core.model.Symptom> = emptySet(),
+        extras: (ZipOutputStream) -> Unit,
+    ): ByteArray? = withContext(Dispatchers.IO) {
+        val packageName = installed.all()[game.appId]?.takeIf(packages::isInstalled) ?: return@withContext null
+        java.io.ByteArrayOutputStream().also { writeZip(game, packageName, null, it, description = description, symptoms = symptoms, trigger = trigger, extras = extras) }.toByteArray().takeIf { it.size <= maxBytes }
+    }
+
+    private fun writeZip(game: Game, packageName: String?, installFailure: String?, target: java.io.OutputStream, lean: Boolean = false, description: String? = null, symptoms: Set<app.gameport.core.model.Symptom> = emptySet(), trigger: String? = null, extras: ((ZipOutputStream) -> Unit)? = null) {
         val names = (auth.authState.value as? AuthState.SignedIn)?.account?.displayName?.let(::listOf).orEmpty()
         fun clean(text: String) = ReportRedactor.clean(text, names)
         ZipOutputStream(target, Charsets.UTF_8).use { zip ->
@@ -165,6 +181,7 @@ class ProblemReporter @Inject constructor(
             entry("gameport-log.txt", clean(ownLog(packageName ?: "", events.lastTimeOf(game.appId, app.gameport.core.install.LAUNCH_NOTE)?.minus(60_000L))))
             // How GamePort's own process ended lately: a headset stops GamePort while a game runs, and what the game handed over to it is lost with it.
             entry("gameport-exits.txt", clean(ownExits()))
+            extras?.invoke(zip)
         }
     }
 
@@ -517,6 +534,7 @@ class ProblemReporter @Inject constructor(
                                   the state of the network and whether the servers online games use can be reached (network-state, reach), what its threads were doing (stacks), and at the moment the process ended, the thread that asked for it first (exit)
             files.txt             the game's APK and expansion files (names and sizes)
             apk-contents.txt      the native libraries and the engine's key files inside the game's APK, and one line per folder for the rest (files and bytes)
+            libraries.txt         only when the player chose to send the game's libraries: each one that is in the libraries/ folder, with its size and its SHA-256, and the ones left out
             steam-interfaces.txt  the Steam interface versions the game's libraries ask for, and the ones GamePort's stand-in does not offer
             patch.txt             which GamePort pieces the game carries (shim, OpenXR layer, hook)
             engine-settings.txt   the game's engine (Unity with its version, or Unreal) and the text of its boot.config: the engine's graphics and XR settings

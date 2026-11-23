@@ -239,7 +239,8 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
     val report = ReportActions(
         suspicion = suspicion,
         progress = reportProgress,
-        onSend = { text, symptoms, discord -> shownGame?.let { viewModel.onSendReport(it, text, symptoms, discord) } },
+        onSend = { text, symptoms, discord, libraries -> shownGame?.let { viewModel.onSendReport(it, text, symptoms, discord, libraries) } },
+        librariesPlan = { shownGame?.let { viewModel.librariesPlan(it) } },
         onTicket = { shownGame?.let { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, viewModel.ticketUri(it))) } } },
         onDismissProblem = viewModel::onDismissProblem,
         onResetProgress = viewModel::onResetReport,

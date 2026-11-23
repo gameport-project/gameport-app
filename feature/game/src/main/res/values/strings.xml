@@ -430,4 +430,24 @@
     <string name="issue_resolution_slow">The game could not keep up, with an image much larger than usual for this device (%1$d × %2$d). A lower resolution often helps, mostly when another tool sets a high resolution for every game.</string>
     <string name="game_run_mb">%1$d MB</string>
     <string name="game_run_gb">%1$.1f GB</string>
+
+    <!-- Sending the libraries of a game, from its settings -->
+    <string name="game_settings_libraries">Help fix this game</string>
+    <string name="libraries_description">The libraries of the game\'s files can be sent with a report, to help find why it does not work. Only the files listed before sending go, with the usual report, which holds no personal data.</string>
+    <string name="libraries_name_why">Required, so the project can talk about it on its Discord. Kept for next time.</string>
+    <string name="libraries_send">Send the game\'s libraries</string>
+    <string name="libraries_ask_title">Send these files?</string>
+    <string name="libraries_ask_summary">%1$d files, about %2$s, go with the report.</string>
+    <string name="libraries_ask_left">%1$d larger files are only named in the report.</string>
+    <string name="libraries_ask_none">This game holds no library to send.</string>
+    <string name="libraries_ask_privacy">The files are the game\'s own, kept privately on the project\'s server only to look for the cause of the problem, then removed. They are never shared.</string>
+    <string name="libraries_size_kb">%1$d KB</string>
+    <string name="libraries_size_mb">%1$.1f MB</string>
+    <string name="libraries_preparing">Preparing the report</string>
+    <string name="libraries_sending">Sending</string>
+    <string name="libraries_done_sent">Sent to the project.</string>
+    <string name="libraries_done_later">Not sent: no connection, or the server is busy. Trying again later is possible.</string>
+    <string name="libraries_done_refused">Not sent: the server did not take the files.</string>
+    <string name="libraries_done_unavailable">Nothing to send: the game is not installed, or its libraries are too large.</string>
+    <string name="libraries_done_noname">A Discord name is needed.</string>
 </resources>
