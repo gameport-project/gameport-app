@@ -85,6 +85,9 @@ The Workshop of a game opens inside GamePort, already signed in with your accoun
 <p align="center">
   <img src="docs/screenshots/game-actions.png" alt="The menu of a game page: saves, Workshop, controllers, store page and more" width="49%">
 </p>
+<p align="center">
+  <img src="docs/screenshots/performance.png" alt="The Performance page of a game: the size of the image, the frame rate and the levels of the processor and the graphics" width="49%">
+</p>
 </details>
 
 ## What it does
@@ -96,6 +99,7 @@ The Workshop of a game opens inside GamePort, already signed in with your accoun
 - **One page per game.** A bell gathers what wants a look (a new version, a newer patch, saves that do not match Steam), each with its button. A menu holds every action: saves, Workshop, controllers, compatibility options, reporting a problem, the store page, favorite, hide, uninstall. The pictures and the trailer of the game are on its page.
 - **Your Steam account, your saves.** Games run under your own account. Saves are kept in sync with Steam Cloud, and a page per game lets you choose what to restore or send.
 - **Play time that counts.** The time you play is added to your Steam account, and only while the game is really on screen: not while the device sleeps.
+- **Performance, game by game.** A page per game sets the size of the image (a share of the screen's resolution, with its size in pixels), the frame rate and the levels of the processor and the graphics. If a game closes on its own while a choice is on, its page offers to turn them off.
 - **Your controllers, your way.** Games made for the Steam Frame controllers get translated onto yours. You can change the mapping game by game.
 - **Made for headsets, friendly to phones and tablets.** On a phone or a tablet, everything that belongs to VR simply disappears.
 

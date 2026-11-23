@@ -85,6 +85,9 @@ Le Workshop d'un jeu s'ouvre dans GamePort, déjà connecté avec ton compte, et
 <p align="center">
   <img src="docs/screenshots/game-actions.png" alt="Le menu d'une page de jeu : sauvegardes, Workshop, manettes, page du store et plus" width="49%">
 </p>
+<p align="center">
+  <img src="docs/screenshots/performance.png" alt="La page Performance d'un jeu : la taille de l'image, la fréquence d'images et les niveaux du processeur et du graphique" width="49%">
+</p>
 </details>
 
 ## Ce qu'elle fait
@@ -96,6 +99,7 @@ Le Workshop d'un jeu s'ouvre dans GamePort, déjà connecté avec ton compte, et
 - **Une page par jeu.** Une cloche réunit ce qui demande un coup d'œil (une nouvelle version, un patch plus récent, des sauvegardes qui ne correspondent pas à Steam), chacun avec son bouton. Un menu réunit toutes les actions : sauvegardes, atelier, manettes, options de compatibilité, signalement d'un problème, page du magasin, favori, masquer, désinstaller. Les images et la bande-annonce du jeu sont sur sa page.
 - **Ton compte Steam, tes sauvegardes.** Les jeux tournent sous ton propre compte. Les sauvegardes restent synchronisées avec le cloud Steam, et une page par jeu permet de choisir quoi restaurer ou envoyer.
 - **Un temps de jeu qui compte.** Le temps passé s'ajoute à ton compte Steam, et seulement quand le jeu est réellement à l'écran : pas quand l'appareil est en veille.
+- **Les performances, jeu par jeu.** Une page par jeu règle la taille de l'image (une part de la résolution de l'écran, avec sa taille en pixels), la fréquence d'images et les niveaux du processeur et du graphique. Si un jeu se ferme tout seul alors qu'un choix est activé, sa page propose de les désactiver.
 - **Tes manettes, à ta façon.** Les jeux conçus pour les manettes de la Steam Frame sont traduits sur les tiennes, et le mappage se change jeu par jeu.
 - **Pensée pour les casques, sympa sur téléphone et tablette.** Sur un téléphone ou une tablette, tout ce qui touche à la VR disparaît simplement.
 

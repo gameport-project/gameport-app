@@ -47,5 +47,11 @@
       "docs/screenshots/game-compatibility-details.png"
     ],
     "intro": "Games that lack large files are told and offered the repair first, the label of a game gives the verdict for the exact model of the device, and reports say more about what goes wrong, with tickets and account numbers hidden. The details of a game and the compatibility page also tell how steadily a game runs, by model and frame rate (the pictures show example values)."
+  },
+  "0.9.5": {
+    "images": [
+      "docs/screenshots/performance.png"
+    ],
+    "intro": "Pico games are no longer closed by the license check window, installs are no longer lost when a Pico goes to sleep, and a new Performance page sets the image size, the frame rate and the processor and graphics levels of each game."
   }
 }

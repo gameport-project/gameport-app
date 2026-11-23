@@ -40,7 +40,7 @@ def release_file(version):
 
 
 # The pictures the news window can show (WindowIcon in WhatsNew.kt), as the emoji closest to each on Discord, which cannot draw the app's own.
-EMOJI = {"trophy": "🏆", "cloud-sync": "☁️", "key": "🔑", "check": "✅", "download": "⬇️", "play": "▶️", "warning": "⚠️", "build": "🔧", "trash": "🗑️", "info": "ℹ️"}
+EMOJI = {"trophy": "🏆", "cloud-sync": "☁️", "key": "🔑", "check": "✅", "download": "⬇️", "play": "▶️", "warning": "⚠️", "build": "🔧", "trash": "🗑️", "info": "ℹ️", "celebration": "🎉", "speed": "⏱️", "tune": "🎚️", "description": "📝"}
 
 
 def bullets(release, lang):

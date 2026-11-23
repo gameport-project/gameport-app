@@ -1,0 +1,250 @@
+{
+  "version": "0.9.5",
+  "previous": "0.9.4",
+  "code": 905,
+  "patchNeeded": true,
+  "window": {
+    "items": [
+      {
+        "id": "pico-license",
+        "icon": "celebration",
+        "text": {
+          "en": "Pico no longer closes games with its license check window. Games that were closed a few seconds after their start now run, because GamePort installs them under a name of its own.",
+          "fr": "La fenêtre de vérification de licence de Pico ne ferme plus les jeux. Les jeux fermés quelques secondes après leur démarrage tournent maintenant, car GamePort les installe sous un nom qui lui est propre."
+        }
+      },
+      {
+        "id": "pico-installs",
+        "icon": "download",
+        "text": {
+          "en": "Installs are no longer lost on a Pico. The confirmation window of Android closed when the device went to sleep. Games now install one at a time, and a button opens the confirmation again.",
+          "fr": "Les installations ne se perdent plus sur Pico. La fenêtre de confirmation d'Android se fermait quand l'appareil passait en veille. Les jeux s'installent maintenant un par un, et un bouton rouvre la confirmation."
+        }
+      },
+      {
+        "id": "pico-start",
+        "icon": "play",
+        "text": {
+          "en": "More games start on a Pico: the graphics driver of the Pico 4 Ultra, the OpenXR permissions, the controllers with Meta's plugin and the memory used by a patch are fixed.",
+          "fr": "Plus de jeux démarrent sur Pico : le pilote graphique du Pico 4 Ultra, les permissions OpenXR, les manettes avec le plugin de Meta et la mémoire utilisée par un patch sont corrigés."
+        }
+      },
+      {
+        "id": "performance",
+        "icon": "speed",
+        "text": {
+          "en": "Performance page. Each game has a page for the image size, the frame rate and the processor and graphics levels, with how the last session went. A note suggests a lower resolution after a slow session on a very large image.",
+          "fr": "Page Performance. Chaque jeu a une page pour la taille de l'image, la fréquence d'images et les niveaux du processeur et du processeur graphique, avec le déroulement de la dernière session. Une note suggère une résolution plus basse après une session lente avec une très grande image."
+        }
+      },
+      {
+        "id": "meta-license",
+        "icon": "key",
+        "text": {
+          "en": "Quest: \"This app is not approved for use\". With the latest system, some games never begin. Installing them under a name of GamePort's own fixes it, and it has to be turned on for those games.",
+          "fr": "Quest : « Cette application n'est pas approuvée pour être utilisée ». Avec le dernier système, certains jeux ne commencent jamais. Les installer sous un nom propre à GamePort règle le problème, et cela est à activer pour ces jeux."
+        }
+      },
+      {
+        "id": "reports",
+        "icon": "description",
+        "text": {
+          "en": "Reports that say more. A report gives the engine of the game, its settings and the measured frame rate, and can carry the game's native libraries when a box is ticked. A Discord name is then needed.",
+          "fr": "Des rapports plus parlants. Un rapport donne le moteur du jeu, ses réglages et la fréquence d'images mesurée, et peut emporter les bibliothèques natives du jeu quand une case est cochée. Un pseudo Discord est alors nécessaire."
+        }
+      },
+      {
+        "id": "smaller",
+        "icon": "build",
+        "text": {
+          "en": "Small improvements. Higher frame rates can be chosen for games held to the lowest one, mod.io sign-in works, the number of simultaneous downloads can be set from 1 to 10, and a Discord button is in the settings and the report windows.",
+          "fr": "Petites améliorations. Des fréquences plus hautes peuvent être choisies pour les jeux limités à la plus basse, la connexion à mod.io fonctionne, le nombre de téléchargements simultanés se règle de 1 à 10, et un bouton Discord figure dans les réglages et dans les fenêtres de rapport."
+        }
+      }
+    ]
+  },
+  "notes": [
+    {
+      "id": "section-0",
+      "title": {
+        "en": "Pico",
+        "fr": "Pico"
+      },
+      "items": [
+        {
+          "id": "item-0-0",
+          "text": {
+            "en": "**Pico's license check window no longer closes games.** Pico checks every game it knows against its store, and closes a few seconds after their start the ones that GamePort re-signed, without a line in any log. GamePort now installs a game under a name of GamePort's own on a Pico, so the check has nothing to compare it with and lets it run. New installs do it by themselves, and a game that is already installed and closes right after its start is offered the same install again by a card on its page. The saves of a game are sent to Steam before the old copy is removed, and the copy left behind is removed when GamePort comes to the front.",
+            "fr": "**La fenêtre de vérification de licence de Pico ne ferme plus les jeux.** Pico compare chaque jeu qu'il connaît à son magasin, et ferme quelques secondes après leur démarrage ceux que GamePort a re-signés, sans une ligne dans aucun journal. GamePort installe maintenant un jeu sous un nom propre à GamePort sur un Pico, si bien que la vérification n'a rien à comparer et le laisse tourner. Les nouvelles installations le font toutes seules, et un jeu déjà installé qui se ferme juste après son démarrage se voit proposer la même installation par une carte de sa page. Les sauvegardes d'un jeu sont envoyées à Steam avant que l'ancienne copie soit retirée, et la copie laissée derrière est retirée quand GamePort revient au premier plan."
+          }
+        },
+        {
+          "id": "item-0-1",
+          "text": {
+            "en": "**Installs lost when the device sleeps: fixed.** A Pico closes the confirmation window of Android when it goes to sleep, so an install waiting for it was lost. Games now install one at a time, the downloads page shows where each one is, and a button opens the confirmation again or gives the install up. The new copy of a game is written down before the old one is removed, and its saves are sent to Steam first.",
+            "fr": "**Les installations perdues quand l'appareil passe en veille : réglé.** Un Pico ferme la fenêtre de confirmation d'Android quand il passe en veille, et une installation qui l'attendait était perdue. Les jeux s'installent maintenant un par un, la page des téléchargements montre où en est chacun, et un bouton rouvre la confirmation ou abandonne l'installation. La nouvelle copie d'un jeu est notée avant que l'ancienne soit retirée, et ses sauvegardes sont envoyées à Steam d'abord."
+          }
+        },
+        {
+          "id": "item-0-2",
+          "text": {
+            "en": "**Games that did not start on a Pico now start.** The per-view viewports of Unity that the graphics driver of a Pico 4 Ultra cannot take are turned off, the OpenXR permissions are given so the loader may read the runtime, Meta's plugin and the Pico's controllers work together, an Unreal game gets a stand-in for Unity's player class, and a patch no longer runs out of memory on a game with a large resource table.",
+            "fr": "**Des jeux qui ne démarraient pas sur Pico démarrent maintenant.** Les fenêtres par vue d'Unity que le pilote graphique d'un Pico 4 Ultra ne supporte pas sont désactivées, les permissions OpenXR sont données pour que le chargeur lise le runtime, le plugin de Meta et les manettes du Pico fonctionnent ensemble, un jeu Unreal reçoit un substitut de la classe de lecteur d'Unity, et un patch ne manque plus de mémoire sur un jeu à grande table de ressources."
+          }
+        }
+      ]
+    },
+    {
+      "id": "section-1",
+      "title": {
+        "en": "New features",
+        "fr": "Nouvelles fonctionnalités"
+      },
+      "items": [
+        {
+          "id": "item-1-0",
+          "text": {
+            "en": "**Performance page.** The page of a game sets the size of the image as a share of the screen's resolution, from 70 to 200 percent, with a mark on the default and the size in pixels, the frame rate, and the processor and graphics levels. Each choice applies the next time the game starts, and nothing is changed for a game left on its own.",
+            "fr": "**Page Performance.** La page d'un jeu règle la taille de l'image en proportion de la résolution de l'écran, de 70 à 200 %, avec un repère sur la valeur par défaut et la taille en pixels, la fréquence d'images, et les niveaux du processeur et du processeur graphique. Chaque choix s'applique au prochain démarrage du jeu, et rien ne change pour un jeu laissé tel quel."
+          },
+          "image": {
+            "src": "screenshots/performance.png",
+            "alt": {
+              "en": "The Performance page of a game, with the image size, the frame rate and the levels",
+              "fr": "La page Performance d'un jeu, avec la taille de l'image, la fréquence d'images et les niveaux"
+            },
+            "width": 640
+          }
+        },
+        {
+          "id": "item-1-1",
+          "text": {
+            "en": "**The same message on a Quest, with the latest system.** On the latest version of Meta's system, some games meet a similar refusal: the Quest answers \"This app is not approved for use\" and the game never begins. The same install under a name of GamePort's own fixes them, but it is not done automatically on a Quest: it has to be turned on for those games, from the Compatibility options of the game, or from the card that now appears on its page when it closed before it began.",
+            "fr": "**Le même message sur Quest, avec le dernier système.** Sur la dernière version du système de Meta, certains jeux rencontrent un refus semblable : le Quest répond « Cette application n'est pas approuvée pour être utilisée » et le jeu ne commence jamais. La même installation sous un nom propre à GamePort les répare, mais elle n'est pas faite automatiquement sur Quest : il faut l'activer pour ces jeux, depuis les options de compatibilité du jeu, ou depuis la carte qui apparaît maintenant sur sa page quand il s'est fermé avant d'avoir commencé."
+          }
+        },
+        {
+          "id": "item-1-2",
+          "text": {
+            "en": "**Higher frame rates.** A game that does not say which devices it is made for runs in compatibility mode on a Meta system, and is held to the lowest rate. When a higher frame rate is chosen, the game is patched to say so, and a button on the page patches it again when that is still to do. Without a choice, the game is left as it is.",
+            "fr": "**Fréquences plus hautes.** Un jeu qui ne dit pas pour quels appareils il est fait tourne en mode de compatibilité sur un système Meta, et reste limité à la fréquence la plus basse. Quand une fréquence plus haute est choisie, le jeu est patché pour le dire, et un bouton de la page le patche de nouveau quand cela reste à faire. Sans choix, le jeu reste tel quel."
+          }
+        },
+        {
+          "id": "item-1-3",
+          "text": {
+            "en": "**Another app that sets the graphics.** When Quest Games Optimizer runs and knows a game by its name, or when system properties already set the graphics, the page says so and sends nothing to the game. A game installed under a name of GamePort's own is not known to it, and keeps the choices of the page.",
+            "fr": "**Une autre application qui règle les graphismes.** Quand Quest Games Optimizer tourne et connaît un jeu par son nom, ou que des propriétés du système règlent déjà les graphismes, la page le dit et n'envoie rien au jeu. Un jeu installé sous un nom propre à GamePort ne lui est pas connu, et garde les choix de la page."
+          }
+        },
+        {
+          "id": "item-1-4",
+          "text": {
+            "en": "**Turn off what may close a game.** When a game closes on its own while choices of the Performance page are on, its page says which ones and a button turns them all off, patching the game again when GamePort had added the Quest declaration.",
+            "fr": "**Désactiver ce qui peut fermer un jeu.** Quand un jeu se ferme tout seul alors que des choix de la page Performance sont activés, sa page dit lesquels et un bouton les désactive tous, en patchant de nouveau le jeu si GamePort y avait ajouté la déclaration pour Quest."
+          }
+        },
+        {
+          "id": "item-1-5",
+          "text": {
+            "en": "**Installed version.** The page of a game shows the version of the installed game under its size, the one its APK carries and not the number the patches raise.",
+            "fr": "**Version installée.** La page d'un jeu montre la version du jeu installé sous sa taille, celle que porte son APK et non le numéro que les patchs augmentent."
+          }
+        },
+        {
+          "id": "item-1-6",
+          "text": {
+            "en": "**Downloads.** The number of games that download at once is a choice from 1 to 10, 2 by default.",
+            "fr": "**Téléchargements.** Le nombre de jeux qui téléchargent en même temps se choisit de 1 à 10, 2 par défaut."
+          }
+        },
+        {
+          "id": "item-1-7",
+          "text": {
+            "en": "**Reports that say more.** A report gives the engine of the game and its settings, the measured frame rate, and which process and which launch each thing comes from. It also names the thread that asked for the end of a game that quit by itself, and a long run is no longer taken for a game that closed.",
+            "fr": "**Des rapports plus parlants.** Un rapport donne le moteur du jeu et ses réglages, la fréquence d'images mesurée, et de quel processus et de quel lancement vient chaque chose. Il indique aussi quel thread a demandé la fin d'un jeu qui s'est fermé tout seul, et une longue partie n'est plus prise pour celle d'un jeu qui s'est fermé."
+          }
+        },
+        {
+          "id": "item-1-8",
+          "text": {
+            "en": "**Small improvements.** A game that declares a system library the device lacks can still be installed. Access to all files is asked before an install when a game has files to place, and a Discord button is in the settings and the report windows. A game that may close on some devices is flagged, and a blocked game is shown only on the devices it concerns.",
+            "fr": "**Petites améliorations.** Un jeu qui déclare une bibliothèque système absente de l'appareil peut quand même s'installer. L'accès à tous les fichiers est demandé avant l'installation quand un jeu a des fichiers à placer, et un bouton Discord figure dans les réglages et dans les fenêtres de rapport. Un jeu qui peut se fermer sur certains appareils est signalé, et un jeu bloqué n'apparaît que sur les appareils concernés."
+          }
+        },
+        {
+          "id": "item-1-9",
+          "text": {
+            "en": "**Last session.** The page of a game shows how the last session went: its duration, the time before the first image, the size of the image the game drew, the frame rate kept out of the one asked for, and the memory the game held with what the device still had free. The same figures sit at the top of the Performance page. After a slow session on a very large image, a note on the game's page suggests a lower resolution, which the player can close.",
+            "fr": "**Dernière session.** La page d'un jeu montre comment s'est passée la dernière session : sa durée, le temps avant la première image, la taille de l'image dessinée par le jeu, la fréquence d'images tenue sur celle demandée, et la mémoire utilisée par le jeu avec ce qu'il restait de libre sur l'appareil. Les mêmes chiffres figurent en haut de la page Performance. Après une session lente avec une très grande image, une note sur la page du jeu suggère une résolution plus basse, que le joueur peut fermer."
+          }
+        },
+        {
+          "id": "item-1-10",
+          "text": {
+            "en": "**Libraries with a report.** The window of a report and the one that follows \"it did not work\" hold a box that adds the game's libraries to the report: how many files and about how much are shown, only the files listed go, and a Discord name is required. The libraries of the platform and of Steam come first, GamePort's own are never sent, and a game's page also has a button to send them alone. When they cannot go, the report goes without them.",
+            "fr": "**Les bibliothèques avec un rapport.** La fenêtre d'un rapport et celle qui suit « ça ne marche pas » portent une case qui ajoute les bibliothèques du jeu au rapport : le nombre de fichiers et leur taille approximative sont montrés, seuls les fichiers listés partent, et un pseudo Discord est obligatoire. Les bibliothèques de la plateforme et de Steam passent en premier, celles de GamePort ne sont jamais envoyées, et la page d'un jeu a aussi un bouton pour les envoyer seules. Quand elles ne peuvent pas partir, le rapport part sans elles."
+          }
+        }
+      ]
+    },
+    {
+      "id": "section-2",
+      "title": {
+        "en": "Fixes",
+        "fr": "Corrections"
+      },
+      "items": [
+        {
+          "id": "item-2-0",
+          "text": {
+            "en": "The expansion files of an Unreal game keep the number each of them was built with (`patch.0` stays `patch.0`), and a file published without a number gets none, so games such as Red Matter 2 find their data under the name GamePort gives them.",
+            "fr": "Les fichiers d'extension d'un jeu Unreal gardent le numéro avec lequel chacun a été construit (`patch.0` reste `patch.0`), et un fichier publié sans numéro n'en reçoit pas, si bien que des jeux comme Red Matter 2 retrouvent leurs données sous le nom que GamePort leur donne."
+          }
+        },
+        {
+          "id": "item-2-1",
+          "text": {
+            "en": "The downloads page stays at its top when the order of the games changes, and a report recognises Unreal Engine 4 games.",
+            "fr": "La page des téléchargements reste en haut quand l'ordre des jeux change, et un rapport reconnaît les jeux Unreal Engine 4."
+          }
+        },
+        {
+          "id": "item-2-2",
+          "text": {
+            "en": "The large files kept in sub-folders are counted, and the check looks again after a game is patched.",
+            "fr": "Les gros fichiers rangés dans des sous-dossiers sont comptés, et la vérification reprend après le patch d'un jeu."
+          }
+        },
+        {
+          "id": "item-2-3",
+          "text": {
+            "en": "A game installed under another name is taken as the game even when its record was left on the old name.",
+            "fr": "Un jeu installé sous un autre nom est pris pour le jeu même quand son enregistrement était resté sur l'ancien nom."
+          }
+        },
+        {
+          "id": "item-2-4",
+          "text": {
+            "en": "A Unity game that wrote its own name in its data (Escape Simulator loads its texts from a folder named after it) follows the name GamePort installs it under: its menus no longer show bare keys, and an old copy of its code left by an earlier install is dropped when the game starts.",
+            "fr": "Un jeu Unity qui a écrit son propre nom dans ses données (Escape Simulator charge ses textes depuis un dossier qui porte son nom) suit le nom sous lequel GamePort l'installe : ses menus ne montrent plus de clés brutes, et une ancienne copie de son code laissée par une installation précédente est écartée au démarrage du jeu."
+          }
+        },
+        {
+          "id": "item-2-5",
+          "text": {
+            "en": "A game that asks Steam for an encrypted app ticket now gets the real one, asked from Steam, instead of a made-up one, so the sign-in with mod.io works.",
+            "fr": "Un jeu qui demande à Steam un ticket d'application chiffré reçoit maintenant le vrai, demandé à Steam, au lieu d'un ticket fabriqué, si bien que la connexion à mod.io fonctionne."
+          }
+        },
+        {
+          "id": "item-2-6",
+          "text": {
+            "en": "A game flagged as one that may close, but not blocked, has its Play button inside the card that tells so, instead of above it.",
+            "fr": "Un jeu signalé comme pouvant se fermer, mais non bloqué, a son bouton Jouer dans la carte qui le dit, au lieu d'au-dessus."
+          }
+        }
+      ]
+    }
+  ]
+}

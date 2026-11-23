@@ -16,6 +16,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Celebration
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudSync
@@ -221,6 +225,10 @@ private fun WindowIcon(name: String) {
         "warning" -> Icon(Icons.Filled.Warning, contentDescription = null, tint = Color(0xFFFFB74D), modifier = size)
         "build" -> Icon(Icons.Filled.Build, contentDescription = null, tint = tint, modifier = size)
         "trash" -> Icon(Icons.Filled.Delete, contentDescription = null, tint = HideRed, modifier = size)
+        "celebration" -> Icon(Icons.Filled.Celebration, contentDescription = null, tint = Color(0xFFFFB300), modifier = size)
+        "speed" -> Icon(Icons.Filled.Speed, contentDescription = null, tint = app.gameport.core.designsystem.PerformanceTeal, modifier = size)
+        "tune" -> Icon(Icons.Filled.Tune, contentDescription = null, tint = app.gameport.core.designsystem.PerformanceTeal, modifier = size)
+        "description" -> Icon(Icons.Filled.Description, contentDescription = null, tint = tint, modifier = size)
         else -> Icon(Icons.Filled.Info, contentDescription = null, tint = tint, modifier = size)
     }
 }
