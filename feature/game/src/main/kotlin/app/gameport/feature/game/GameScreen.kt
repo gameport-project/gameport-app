@@ -909,7 +909,15 @@ private fun GameDetails(
                     }
                     CompatChips(compat, incompatible, onClick = { showingCompat = true })
                 }
-                CompatDetails(compat, incompatible, caution)
+                // A game that is on the list but not blocked, and that can be played, has its Play button in the card of the warning (unless a card of missing files or of a refusal already holds it).
+                val playChannel = channelInUse.takeIf { name -> name != UpdateChannels.NORMAL && game.androidBuild?.channels?.any { it.name == name } == true }
+                val playInCaution = caution != null && expansionMissing == null && !refused && (install as? InstallState.Installed)?.let { it.otherGamePort == null } == true
+                CompatDetails(
+                    compat, incompatible, caution,
+                    onPlay = if (playInCaution) ({ if (updatePending || patchPending) choosingPlay = true else onPlay() }) else null,
+                    playLabel = if (playChannel != null) stringResource(R.string.game_play_channel, playChannel) else stringResource(R.string.game_play),
+                    playEnabled = repatch !is Repatch.Running,
+                )
                 FlowRow(
                     // While an install goes on, the card is taller than the buttons: the cover keeps the place it has with the buttons (one row high), it does not follow the card.
                     modifier = Modifier.onGloballyPositioned { alignment.actionsPlaced(it, if (install.stage != null) with(density) { ACTION_HEIGHT.toPx() } else null) },
@@ -918,7 +926,7 @@ private fun GameDetails(
                 ) {
                     Box(Modifier.tourTarget(TourIds.GAME_ACTIONS)) { InstallActions(
                         install = install,
-                        playInCard = expansionMissing != null || refused,
+                        playInCard = expansionMissing != null || refused || playInCaution,
                         speedUnit = speedUnit,
                         onInstall = { if (compat?.level == app.gameport.core.model.CompatLevel.FAILS) warning = true else startInstall() },
                         onResume = { onInstall(null) },
@@ -933,7 +941,7 @@ private fun GameDetails(
                         onPlay = { if (updatePending || patchPending) choosingPlay = true else onPlay() },
                         onPatchAndPlay = onPatchAndPlay,
                         patchOutdated = false,
-                        channel = channelInUse.takeIf { name -> name != UpdateChannels.NORMAL && game.androidBuild?.channels?.any { it.name == name } == true },
+                        channel = playChannel,
                         busy = repatch is Repatch.Running,
                         onReport = { reporting = true },
                         extras = extras,
@@ -1982,7 +1990,15 @@ private const val CAPITAL_HEIGHT = 0.72f
 
 /** What stands behind the label: why the game is incompatible, that players tried it with the offline mode, or that few answered so far. No numbers: the label says it. */
 @Composable
-private fun CompatDetails(compat: app.gameport.core.model.Compat?, incompatible: app.gameport.core.model.IncompatibleReason?, warning: app.gameport.core.model.IncompatibleReason?) {
+private fun CompatDetails(
+    compat: app.gameport.core.model.Compat?,
+    incompatible: app.gameport.core.model.IncompatibleReason?,
+    warning: app.gameport.core.model.IncompatibleReason?,
+    // When the game can be played, the button is in the card of the warning, under what it says.
+    onPlay: (() -> Unit)? = null,
+    playLabel: String = "",
+    playEnabled: Boolean = true,
+) {
     val language = LocalConfiguration.current.locales[0].language
     val style = MaterialTheme.typography.bodySmall
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1992,12 +2008,12 @@ private fun CompatDetails(compat: app.gameport.core.model.Compat?, incompatible:
         // (A result with few answers is not told here: it is not taken into account.)
     }
     // A warning is told whatever else the page says, and stays: nothing to open, switch or close.
-    warning?.let { WarningNote(it.title.pick(language), it.text.pick(language)) }
+    warning?.let { WarningNote(it.title.pick(language), it.text.pick(language), onPlay, playLabel, playEnabled) }
 }
 
 /** What is to be known about a game that runs: in orange, with a warning sign, always on the page of the game it is about. */
 @Composable
-private fun WarningNote(title: String, text: String) {
+private fun WarningNote(title: String, text: String, onPlay: (() -> Unit)? = null, playLabel: String = "", playEnabled: Boolean = true) {
     val shape = RoundedCornerShape(16.dp)
     Row(
         Modifier.fillMaxWidth().glass(shape).border(1.dp, CompatOrange.copy(alpha = 0.7f), shape).padding(horizontal = 14.dp, vertical = 12.dp),
@@ -2008,6 +2024,14 @@ private fun WarningNote(title: String, text: String) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = CompatOrange)
             Text(text.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodyMedium)
+            // The game can be played as it is: the button stands here, in the card that says what to know first.
+            if (onPlay != null) {
+                Button(onClick = onPlay, enabled = playEnabled, modifier = Modifier.padding(top = 8.dp).height(ACTION_HEIGHT)) {
+                    Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(playLabel)
+                }
+            }
         }
     }
 }
