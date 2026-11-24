@@ -9,8 +9,8 @@ android {
 
     defaultConfig {
         applicationId = "app.gameport"
-        versionCode = 904
-        versionName = "0.9.4"
+        versionCode = 905
+        versionName = "0.9.5"
         // The CI names an alpha build "<version>-alpha.<n>": the number stays the release's, the name tells the build apart in a report.
         (findProperty("versionNameSuffix") as String?)?.let { versionName += it }
     }
