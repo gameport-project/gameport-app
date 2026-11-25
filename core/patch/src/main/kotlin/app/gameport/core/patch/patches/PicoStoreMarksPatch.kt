@@ -20,16 +20,13 @@ import com.reandroid.json.JSONObject
  * The permissions are matched by their namespace and not by their last word, so a permission of another maker that happens to end the same way is never touched.
  * The metadata is matched by its exact name.
  *
- * Only on a Pico, only for a VR game, and only for the games listed in [APP_IDS]: a game that runs today with its marks is left as it is. The list holds the games
- * whose report says the Pico closed them before they ran.
+ * Only on a Pico and only for a VR game, for every game: a manifest without the marks is left exactly as it is, so nothing has to be listed, and a game that carries them
+ * is found by what its manifest holds, not by a list that would always be one game behind.
  */
 object PicoStoreMarksPatch : ApkPatch {
     override val id = "pico_store_marks"
     override val recommended = true
     override val locked = false
-
-    /** The games this is done for (Steam app ids): Vacation Simulator. */
-    val APP_IDS: Set<Int> = setOf(726830)
 
     /** The namespace of the permissions of the Pico store's activation service. */
     const val PERMISSION_NAMESPACE = "com.pvr.tobactivate."
@@ -38,7 +35,7 @@ object PicoStoreMarksPatch : ApkPatch {
     const val APP_ID_METADATA = "pvr.app.id"
 
     internal fun wanted(context: PatchContext): Boolean =
-        context.isVr != false && context.deviceFamily == PicoMetadataPatch.FAMILY && context.steamAppId in APP_IDS
+        context.isVr != false && context.deviceFamily == PicoMetadataPatch.FAMILY
 
     override fun apply(session: PatchSession, context: PatchContext, assets: PatchAssets) {
         if (!wanted(context)) return

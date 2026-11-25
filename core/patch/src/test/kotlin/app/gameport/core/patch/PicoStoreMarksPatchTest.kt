@@ -84,13 +84,11 @@ class PicoStoreMarksPatchTest {
     }
 
     @Test
-    fun `it is wanted for a listed game on a Pico only, VR or unknown`() {
-        val listed = PicoStoreMarksPatch.APP_IDS.first()
-        assertTrue(PicoStoreMarksPatch.wanted(context(listed, isVr = true, family = "pico")))
-        assertTrue(PicoStoreMarksPatch.wanted(context(listed, isVr = null, family = "pico")))
-        assertFalse(PicoStoreMarksPatch.wanted(context(listed, isVr = false, family = "pico")))
-        assertFalse(PicoStoreMarksPatch.wanted(context(listed, isVr = true, family = "meta")))
-        assertFalse(PicoStoreMarksPatch.wanted(context(listed, isVr = true, family = null)))
-        assertFalse(PicoStoreMarksPatch.wanted(context(1, isVr = true, family = "pico")))
+    fun `it is wanted for any VR game on a Pico, and not on another device or for a flat game`() {
+        assertTrue(PicoStoreMarksPatch.wanted(context(1, isVr = true, family = "pico")))
+        assertTrue(PicoStoreMarksPatch.wanted(context(2897700, isVr = null, family = "pico")))
+        assertFalse(PicoStoreMarksPatch.wanted(context(1, isVr = false, family = "pico")))
+        assertFalse(PicoStoreMarksPatch.wanted(context(1, isVr = true, family = "meta")))
+        assertFalse(PicoStoreMarksPatch.wanted(context(1, isVr = true, family = null)))
     }
 }
