@@ -365,6 +365,27 @@
     <string name="repair_text">Les gros fichiers du jeu sont téléchargés à nouveau et remis en place, ce qui peut prendre du temps et consommer des données mobiles. Le jeu reste installé et ses sauvegardes ne sont pas touchées. Il ne peut pas être lancé tant que ce n\'est pas fini.</string>
     <string name="repair_confirm">Réparer</string>
     <string name="repair_cancel">Annuler</string>
+    <string name="troubleshoot_button">Dépanner</string>
+    <string name="troubleshoot_title">Dépannage</string>
+    <string name="troubleshoot_checking">Vérification des fichiers du jeu…</string>
+    <string name="troubleshoot_nothing">Rien d\'anormal n\'a été trouvé dans les fichiers du jeu.</string>
+    <string name="troubleshoot_nothing_by_itself">Rien n\'a pu être remis en ordre automatiquement.</string>
+    <string name="troubleshoot_fixed">Des fichiers ont été remis en ordre. Le jeu peut être relancé.</string>
+    <string name="troubleshoot_needs_files">Le jeu doit recevoir de nouveau ses fichiers.</string>
+    <plurals name="troubleshoot_fixed_files">
+        <item quantity="one">%1$d fichier d\'extension a été renommé comme le jeu le demande.</item>
+        <item quantity="other">%1$d fichiers d\'extension ont été renommés comme le jeu le demande.</item>
+    </plurals>
+    <string name="troubleshoot_reason_no_main">Le jeu a des fichiers d\'extension, et le principal n\'est pas sur cet appareil.</string>
+    <string name="troubleshoot_reason_empty">Un fichier d\'extension du jeu est vide.</string>
+    <string name="troubleshoot_reason_reported">Le jeu a signalé que certains de ses fichiers manquent.</string>
+    <string name="troubleshoot_advice_patch">Le patch du jeu est plus ancien que le patch actuel.</string>
+    <string name="troubleshoot_advice_storage">Le jeu demande l\'accès au stockage et ne l\'a pas.</string>
+    <string name="troubleshoot_advice_not_writable">GamePort ne peut pas écrire dans le dossier des fichiers d\'extension du jeu. L\'accès à tous les fichiers est nécessaire.</string>
+    <string name="troubleshoot_repair">Télécharger de nouveau les fichiers</string>
+    <string name="troubleshoot_reinstall">Réinstaller</string>
+    <string name="troubleshoot_play">Jouer</string>
+    <string name="troubleshoot_close">Fermer</string>
     <string name="game_expansion_play_anyway">Jouer quand même</string>
     <string name="game_expansion_title">Gros fichiers à vérifier</string>
     <plurals name="issue_expansion_missing">

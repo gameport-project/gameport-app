@@ -320,6 +320,26 @@ class GameViewModel @Inject constructor(
         (uiState.value as? GameUiState.Content)?.game?.let(installer::repair)
     }
 
+    private val _troubleshoot = MutableStateFlow<TroubleshootUi>(TroubleshootUi.Closed)
+
+    /** The troubleshooting window: closed, checking, or showing what the checks came to. */
+    val troubleshoot: StateFlow<TroubleshootUi> = _troubleshoot
+
+    /** Runs the checks on the installed game (nothing is removed), and opens the window on what they found. */
+    fun onTroubleshoot() {
+        if (_troubleshoot.value != TroubleshootUi.Closed) return
+        _troubleshoot.value = TroubleshootUi.Checking
+        viewModelScope.launch {
+            // A check that could not run says nothing: the window closes instead of telling the game is fine.
+            val result = runCatching { installer.troubleshoot(appId) }.getOrNull()
+            _troubleshoot.value = if (result == null) TroubleshootUi.Closed else TroubleshootUi.Done(result)
+        }
+    }
+
+    fun onTroubleshootClose() {
+        _troubleshoot.value = TroubleshootUi.Closed
+    }
+
     /** The player says the game works: the question about its expansion files, and its blue mark, go. */
     fun onReinstallWorks() = issuesRepository.answerReinstallWorks(appId)
 

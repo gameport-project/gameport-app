@@ -69,6 +69,7 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Healing
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material3.Button
@@ -268,6 +269,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         onReinstallWorks = viewModel::onReinstallWorks,
         onControllersRead = viewModel::onControllersNoticeRead,
         onReinstallFromScratch = viewModel::onReinstallFromScratch,
+        troubleshoot = TroubleshootActions(viewModel.troubleshoot.collectAsStateWithLifecycle().value, viewModel::onTroubleshoot, viewModel::onTroubleshootClose),
         achievements = achievements,
         onOpenAchievements = onOpenAchievements,
         onOpenWorkshop = onOpenWorkshop,
@@ -322,6 +324,7 @@ internal fun GameContent(
     onReinstallWorks: () -> Unit = {},
     onControllersRead: () -> Unit = {},
     onReinstallFromScratch: () -> Unit = {},
+    troubleshoot: TroubleshootActions = TroubleshootActions(),
     onToggleFavorite: () -> Unit,
     onSetHidden: (Boolean) -> Unit,
     onBack: () -> Unit,
@@ -412,6 +415,7 @@ internal fun GameContent(
                     onReinstallWorks = onReinstallWorks,
                     onControllersRead = onControllersRead,
                     onReinstallFromScratch = onReinstallFromScratch,
+                    troubleshoot = troubleshoot,
                     onToggleFavorite = onToggleFavorite,
                     onSetHidden = onSetHidden,
                     hidden = uiState.hidden,
@@ -501,6 +505,7 @@ private fun GameDetails(
     onReinstallWorks: () -> Unit = {},
     onControllersRead: () -> Unit = {},
     onReinstallFromScratch: () -> Unit = {},
+    troubleshoot: TroubleshootActions = TroubleshootActions(),
     onToggleFavorite: () -> Unit,
     onSetHidden: (Boolean) -> Unit,
     onOpenPermissions: () -> Unit,
@@ -544,6 +549,8 @@ private fun GameDetails(
             dismissButton = { GlassButton(onClick = { confirmingRepair = false }) { Text(stringResource(R.string.repair_cancel)) } },
         )
     }
+    // The troubleshooting the player asks for: its window, and the two questions it can lead to (the same as the notifications lead to).
+    TroubleshootDialog(troubleshoot, onPlay = onPlay, onAskRepair = { confirmingRepair = true }, onAskReinstall = { confirmingReinstall = true })
     // The details behind the compatibility label, opened by touching it.
     var showingCompat by rememberSaveable { mutableStateOf(false) }
     if (showingCompat) {
@@ -998,6 +1005,7 @@ private fun GameDetails(
                         onUpdate = onUpdate,
                         onDismissRepatchError = onDiscard,
                         onReport = { reporting = true },
+                        onTroubleshoot = troubleshoot.onStart,
                         onDismissProblem = report.onDismissProblem,
                         performanceChoices = performanceChoices,
                         onTurnOffPerformance = onTurnOffPerformance,
@@ -1087,6 +1095,9 @@ private fun GameDetails(
         onOpenComfort = onOpenComfort,
         onOpenPerformance = onOpenPerformance,
         onReport = { reporting = true },
+        // A flat game has no VR patches to check, and a game that is not installed has no files: neither has the button.
+        troubleshoot = game.androidBuild?.isVr != false && install is InstallState.Installed,
+        onTroubleshoot = troubleshoot.onStart,
     )
     }
 }
@@ -1233,6 +1244,8 @@ private fun GameActionsOverlay(
     performance: Boolean,
     onOpenPerformance: () -> Unit,
     onReport: () -> Unit,
+    troubleshoot: Boolean = false,
+    onTroubleshoot: () -> Unit = {},
 ) {
     BackHandler(enabled = open, onBack = onClose)
     Box(Modifier.fillMaxSize()) {
@@ -1281,6 +1294,8 @@ private fun GameActionsOverlay(
                         if (performance) ActionRow(Icons.Filled.Speed, stringResource(R.string.gameperf_button), usable, { onClose(); onOpenPerformance() }, tint = PerformanceTeal)
                         // The seated option and the height, which sit in the settings of the game: opened straight on them.
                         if (comfort) ActionRow(Icons.Filled.EventSeat, stringResource(R.string.game_settings_comfort), usable, { onClose(); onOpenComfort() })
+                        // Checks the files of the game and puts right what can be, asking before anything is installed again.
+                        if (troubleshoot) ActionRow(Icons.Filled.Healing, stringResource(R.string.troubleshoot_button), usable, { onClose(); onTroubleshoot() })
                         ActionRow(Icons.Filled.BugReport, stringResource(R.string.report_open), canReport, { onClose(); onReport() })
                         Spacer(Modifier.height(8.dp))
                     }
@@ -1688,6 +1703,7 @@ private fun IssuesPanel(
     onChangeRate: () -> Unit = {},
     lowerResolution: LastRun? = null,
     onCloseResolutionAdvice: () -> Unit = {},
+    onTroubleshoot: () -> Unit = {},
 ) {
     // As wide as the achievements card beside it in the column.
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1731,6 +1747,9 @@ private fun IssuesPanel(
                 onReport,
                 secondAction = stringResource(R.string.issue_dismiss),
                 onSecondAction = onDismissProblem,
+                // The game closed within seconds or crashed: the same checks as the menu's entry, in the same window.
+                troubleshootAction = stringResource(R.string.troubleshoot_button),
+                onTroubleshootAction = onTroubleshoot,
             )
             // The game closed on its own while the player had choices on the Performance page: they may be the cause, and one button turns them off.
             performanceChoices?.let { choices ->
@@ -1766,6 +1785,9 @@ private fun IssueRow(
     question: Boolean = false,
     secondAction: String? = null,
     onSecondAction: () -> Unit = {},
+    /** The troubleshooting, offered beside the other buttons with its own icon (the same as in the menu of the page). */
+    troubleshootAction: String? = null,
+    onTroubleshootAction: () -> Unit = {},
 ) {
     Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(16.dp)).padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -1778,6 +1800,16 @@ private fun IssueRow(
                 }
             }
             val buttons: @Composable () -> Unit = {
+                // Orange and filled, so the troubleshooting stands out from the two glass buttons beside it.
+                if (troubleshootAction != null) Button(
+                    onClick = onTroubleshootAction,
+                    enabled = enabled,
+                    colors = ButtonDefaults.buttonColors(containerColor = app.gameport.core.designsystem.CompatOrange, contentColor = Color.Black),
+                ) {
+                    Icon(Icons.Filled.Healing, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(troubleshootAction)
+                }
                 if (secondAction != null) GlassButton(onClick = onSecondAction) { Text(secondAction) }
                 if (action != null) GlassButton(onClick = onAction, enabled = enabled) { Text(action) }
             }
@@ -1788,7 +1820,7 @@ private fun IssueRow(
                         badge()
                         Text(message, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                     }
-                    if (secondAction != null || action != null) {
+                    if (secondAction != null || action != null || troubleshootAction != null) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) { buttons() }
                     }
                 }

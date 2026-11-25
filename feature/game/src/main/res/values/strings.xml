@@ -366,6 +366,27 @@
     <string name="repair_text">The game\'s large files are downloaded again and put back in place, which can take a while and use mobile data. The game stays installed and its saves are not touched. It cannot be played until this is done.</string>
     <string name="repair_confirm">Repair</string>
     <string name="repair_cancel">Cancel</string>
+    <string name="troubleshoot_button">Troubleshoot</string>
+    <string name="troubleshoot_title">Troubleshooting</string>
+    <string name="troubleshoot_checking">Checking the files of the game…</string>
+    <string name="troubleshoot_nothing">Nothing wrong was found in the files of the game.</string>
+    <string name="troubleshoot_nothing_by_itself">Nothing could be put right by itself.</string>
+    <string name="troubleshoot_fixed">Some files were put right. The game can be started again.</string>
+    <string name="troubleshoot_needs_files">The game has to be given its files again.</string>
+    <plurals name="troubleshoot_fixed_files">
+        <item quantity="one">%1$d expansion file was put under the name the game asks for.</item>
+        <item quantity="other">%1$d expansion files were put under the names the game asks for.</item>
+    </plurals>
+    <string name="troubleshoot_reason_no_main">The game has expansion files, and its main one is not on this device.</string>
+    <string name="troubleshoot_reason_empty">An expansion file of the game is empty.</string>
+    <string name="troubleshoot_reason_reported">The game said that some of its files are missing.</string>
+    <string name="troubleshoot_advice_patch">The patch of the game is older than the current one.</string>
+    <string name="troubleshoot_advice_storage">The game asks for access to storage and does not have it.</string>
+    <string name="troubleshoot_advice_not_writable">The folder of the expansion files of the game cannot be written by GamePort. The access to all files is needed.</string>
+    <string name="troubleshoot_repair">Download the files again</string>
+    <string name="troubleshoot_reinstall">Install again</string>
+    <string name="troubleshoot_play">Play</string>
+    <string name="troubleshoot_close">Close</string>
     <string name="game_expansion_play_anyway">Play anyway</string>
     <string name="game_expansion_title">Large files to check</string>
     <plurals name="issue_expansion_missing">
