@@ -199,6 +199,40 @@ class ExpansionFilesTest {
     }
 
     @Test
+    fun `an Unreal game whose patch an earlier GamePort named after the version gets patch 0 back, once`() {
+        val target = File(folder.root, "obb/$pkg").apply { mkdirs() }
+        File(target, "main.75.$pkg.obb").writeText("main")
+        File(target, "overflow1.$pkg.obb").writeText("overflow")
+        File(target, "patch.75.$pkg.obb").writeText("patch")
+        assertEquals(listOf("patch.0.$pkg.obb"), ExpansionFiles.align(target, pkg, 75, keepNumbers = true, installedCode = 75))
+        assertFalse(File(target, "patch.75.$pkg.obb").exists())
+        assertEquals("patch", File(target, "patch.0.$pkg.obb").readText())
+        // Run again, nothing is left to do.
+        assertEquals(emptyList<String>(), ExpansionFiles.align(target, pkg, 75, keepNumbers = true, installedCode = 75))
+    }
+
+    @Test
+    fun `an Unreal game that has a patch 0 already is left as it is, and nothing is overwritten`() {
+        val target = File(folder.root, "obb/$pkg").apply { mkdirs() }
+        File(target, "main.75.$pkg.obb").writeText("main")
+        File(target, "patch.0.$pkg.obb").writeText("the game's")
+        File(target, "patch.75.$pkg.obb").writeText("other")
+        assertEquals(emptyList<String>(), ExpansionFiles.align(target, pkg, 75, keepNumbers = true, installedCode = 75))
+        assertEquals("the game's", File(target, "patch.0.$pkg.obb").readText())
+        assertEquals("other", File(target, "patch.75.$pkg.obb").readText())
+    }
+
+    @Test
+    fun `a game that is not Unreal keeps its patch under the name it has`() {
+        val target = File(folder.root, "obb/$pkg").apply { mkdirs() }
+        File(target, "main.75.$pkg.obb").writeText("main")
+        File(target, "patch.75.$pkg.obb").writeText("patch")
+        assertEquals(emptyList<String>(), ExpansionFiles.align(target, pkg, 75, keepNumbers = false, installedCode = 75))
+        assertTrue(File(target, "patch.75.$pkg.obb").exists())
+        assertFalse(File(target, "patch.0.$pkg.obb").exists())
+    }
+
+    @Test
     fun `files placed before they were opened to all are opened when aligned`() {
         val target = File(folder.root, "obb/$pkg").apply { mkdirs() }
         val file = File(target, "assets/a.bundle").apply { parentFile.mkdirs(); writeText("x"); setReadable(false, false); setReadable(true, true) }

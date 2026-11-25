@@ -1,6 +1,7 @@
 package app.gameport.core.install
 
 import app.gameport.core.model.ObbNames
+import app.gameport.core.model.ObbTroubleshoot
 import java.io.File
 
 /**
@@ -67,7 +68,7 @@ internal object ExpansionFiles {
      * old name is removed. What is there is also opened to all, so a game that was placed before that was done can read it.
      * Returns the names it changed, and does nothing when the folder is not there.
      */
-    fun align(directory: File, packageName: String, code: Long, original: String? = null, keepNumbers: Boolean = false): List<String> {
+    fun align(directory: File, packageName: String, code: Long, original: String? = null, keepNumbers: Boolean = false, installedCode: Long? = null): List<String> {
         val renamed = mutableListOf<String>()
         directory.listFiles()?.forEach { file ->
             val name = ObbNames.aligned(file.name, packageName, code, original, keepNumbers) ?: return@forEach
@@ -77,8 +78,20 @@ internal object ExpansionFiles {
                 file.length() == destination.length() -> file.delete()
             }
         }
+        // An Unreal game ([keepNumbers]) keeps the numbers it was built with, [code] being the version it came with: the files an earlier GamePort named after another version
+        // go back (see [ObbTroubleshoot.renames]). A name that is already taken is never overwritten.
+        if (keepNumbers) renamed += putBack(directory, packageName, original, installedCode, code).map { it.to }
         openToAll(directory)
         return renamed
+    }
+
+    /** The renamings of [ObbTroubleshoot.renames] made in [directory] (a name that exists is left alone); the ones that were done. */
+    fun putBack(directory: File, packageName: String, original: String?, installedCode: Long?, originalCode: Long?): List<ObbTroubleshoot.Rename> {
+        val files = directory.listFiles()?.filter { it.isFile }?.associate { it.name to it.length() } ?: return emptyList()
+        return ObbTroubleshoot.renames(files, packageName, original, installedCode, originalCode, unreal = true).filter { rename ->
+            val destination = File(directory, rename.to)
+            !destination.exists() && File(directory, rename.from).renameTo(destination)
+        }
     }
 
     /**

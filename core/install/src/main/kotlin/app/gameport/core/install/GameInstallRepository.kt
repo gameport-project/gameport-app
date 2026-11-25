@@ -13,6 +13,9 @@ import app.gameport.core.model.LaunchOptions
 import app.gameport.core.model.UpdateChannels
 import app.gameport.core.model.reportable
 import app.gameport.core.model.ObbNames
+import app.gameport.core.model.ObbTroubleshoot
+import app.gameport.core.model.TroubleshootAdvice
+import app.gameport.core.model.Troubleshooting
 import app.gameport.core.model.RenamedPackages
 import app.gameport.core.model.PackageNameMode
 import app.gameport.core.model.StorageAccess
@@ -1257,6 +1260,43 @@ class GameInstallRepository @Inject constructor(
         install(game, builds.get(game.appId)?.dlc.orEmpty())
     }
 
+    /**
+     * The checks the player asks for on an installed game, one after the other: its expansion files under the names an Unreal game asks for (put right on the spot, and said in the
+     * game's events), the files it should have and does not, the patch left behind by a newer one, the access to storage that holds Play back, and the files the game itself said
+     * are missing. Nothing is uninstalled or deleted: a game that needs its files again is only said to, and the page offers the repair or the reinstallation, each after a question.
+     * The same renaming runs by itself whenever the installed games are looked at (see [alignObbVersion]), so what is found here is what it could not do.
+     */
+    suspend fun troubleshoot(appId: Int): Troubleshooting = withContext(Dispatchers.IO) {
+        val packageName = installed.all()[appId]?.takeIf(packages::isInstalled) ?: return@withContext Troubleshooting()
+        val folder = obbFolder(packageName)
+        val unreal = packages.isUnreal(packageName)
+        val original = originalPackageOf(packageName)
+        val advice = mutableListOf<TroubleshootAdvice>()
+        var fixed = emptyList<ObbTroubleshoot.Rename>()
+        if (unreal && !belongsToOtherGamePort(packageName)) {
+            val pending = ObbTroubleshoot.renames(filesOf(folder), packageName, original, packages.versionCodeOf(packageName), packages.originalVersionCodeOf(packageName), unreal = true)
+            if (pending.isNotEmpty()) {
+                if (canWriteObbFolder(packageName)) {
+                    fixed = ExpansionFiles.putBack(folder, packageName, original, packages.versionCodeOf(packageName), packages.originalVersionCodeOf(packageName))
+                    ExpansionFiles.openToAll(folder)
+                } else {
+                    advice += TroubleshootAdvice.EXPANSION_NOT_WRITABLE
+                }
+            }
+        }
+        val expectsExpansion = (builds.get(appId)?.expansionBytes ?: 0L) > 0L
+        val reason = ObbTroubleshoot.reinstallReason(filesOf(folder), packageName, original, unreal, expectsExpansion)
+            ?: ObbTroubleshoot.ReinstallReason.REPORTED_MISSING.takeIf { appId in expansionMissing.first() }
+        if (observePatchOutdated(appId).first()) advice += TroubleshootAdvice.PATCH_OUTDATED
+        if (storagePermissionBlocksPlay(appId)) advice += TroubleshootAdvice.STORAGE_PERMISSION
+        val result = Troubleshooting(fixed, advice, reason)
+        events.note(appId, "troubleshooting: ${result.outcome}, ${fixed.size} file(s) renamed${fixed.joinToString(prefix = " (", postfix = ")") { "${it.from} to ${it.to}" }.takeIf { fixed.isNotEmpty() }.orEmpty()}, advice ${advice.joinToString()}, reinstall reason $reason")
+        result
+    }
+
+    /** The files of a game's expansion folder, name to size (the ones at its top). */
+    private fun filesOf(folder: File): Map<String, Long> = folder.listFiles()?.filter { it.isFile }?.associate { it.name to it.length() }.orEmpty()
+
     /** The DLC of [game] the library lists and the account does not have. */
     private fun missingDlcOf(game: Game): List<Int> = game.androidBuild?.dlc?.filter { !it.owned }?.map { it.appId }.orEmpty()
 
@@ -1533,9 +1573,16 @@ class GameInstallRepository @Inject constructor(
             val installed = packages.versionCodeOf(packageName) ?: return
             val code = app.gameport.core.model.ObbNames.versionFor(installed, packages.originalVersionCodeOf(packageName), packages.isUnreal(packageName)) ?: return
             // An Unreal game writes the version of each of its expansion files down when it is built: they keep their numbers, only the package part of the name follows.
-            ExpansionFiles.align(File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName"), packageName, code, originalPackageOf(packageName), keepNumbers = packages.isUnreal(packageName))
+            val renamed = ExpansionFiles.align(
+                File(Environment.getExternalStorageDirectory(), "Android/obb/$packageName"), packageName, code, originalPackageOf(packageName),
+                keepNumbers = packages.isUnreal(packageName), installedCode = installed,
+            )
+            // Said once, when the renaming is done: the next run finds nothing to do.
+            if (renamed.isNotEmpty()) installedPackages().entries.firstOrNull { it.value == packageName }?.key?.let { events.note(it, "expansion files put under the names the game asks for: ${renamed.joinToString()}") }
         }
     }
+
+    private fun installedPackages() = this.installed.all()
 
     /**
      * The package name the game's APK declares, when GamePort installs it under a name of its own ([RenamedPackages]): a depot names a game's expansion files
