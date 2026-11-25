@@ -71,4 +71,26 @@ class AppLabelPatchTest {
         AppLabelPatch.patchManifest(root, "Steam Name")
         assertEquals(1, application(root).elem<JSONArray>("attributes").elemEach<JSONObject> { named("label") }.size)
     }
+
+    private fun context(disguise: Boolean, family: String?) =
+        PatchContext(steamAppId = 1, steamId = 2, personaName = "test", deviceFamily = family, picoStoreDisguise = disguise)
+
+    @Test
+    fun `the disguise adds GamePort to the label, on a Pico only`() {
+        assertEquals("Ancient Dungeon VR · GamePort", AppLabelPatch.displayName("Ancient Dungeon VR", context(disguise = true, family = "pico")))
+        // The flag off (the default everywhere but the debug receiver): the plain Steam name.
+        assertEquals("Ancient Dungeon VR", AppLabelPatch.displayName("Ancient Dungeon VR", context(disguise = false, family = "pico")))
+        // The disguise asked for on another headset: still the plain name, the model only runs on a Pico.
+        assertEquals("Ancient Dungeon VR", AppLabelPatch.displayName("Ancient Dungeon VR", context(disguise = true, family = "meta")))
+    }
+
+    @Test
+    fun `the disguise builds from the Steam name, so patching again never stacks the suffix`() {
+        val disguised = context(disguise = true, family = "pico")
+        val once = AppLabelPatch.displayName("Steam Name", disguised)
+        // A repatch starts from the clean Steam name again, not from the label already in the APK.
+        val twice = AppLabelPatch.displayName("Steam Name", disguised)
+        assertEquals("Steam Name · GamePort", once)
+        assertEquals(once, twice)
+    }
 }

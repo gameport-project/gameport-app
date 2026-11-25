@@ -769,7 +769,7 @@ class GameInstallRepository @Inject constructor(
      * Patches an installed game again with the current patcher and installs the result over it.
      * It starts from the installed APK, so nothing is downloaded and the saves stay where they are.
      */
-    fun repatch(appId: Int) = reinstall(appId, PatchCatalog.recommended)
+    fun repatch(appId: Int, disguise: Boolean = false) = reinstall(appId, PatchCatalog.recommended, disguise = disguise)
 
     private fun repatchInRun(appId: Int) = reinstall(appId, PatchCatalog.recommended, confirmTimeoutMs = RUN_CONFIRM_TIMEOUT_MS)
 
@@ -783,20 +783,22 @@ class GameInstallRepository @Inject constructor(
      * Development: takes GamePort's patch off first, then applies only the named patches, to find
      * which one a game does not get along with.
      */
-    fun repatchWith(appId: Int, patchIds: Set<String>) = reinstall(
+    fun repatchWith(appId: Int, patchIds: Set<String>, disguise: Boolean = false) = reinstall(
         appId,
         listOf(VrLauncherPatch, GamePortRemovalPatch) +
             PatchCatalog.all.filter { it.id in patchIds && it !== VrLauncherPatch && it !== PatchVersionPatch } +
             PatchVersionPatch,
+        disguise = disguise,
     )
 
     /**
      * [confirmTimeoutMs], when given, bounds the wait for the player to confirm the update: a game left unconfirmed is given up (and counts as
      * not patched), so the ones after it are not held up by a window nobody answers.
      */
-    private fun reinstall(appId: Int, patches: List<ApkPatch>, confirmTimeoutMs: Long? = null) = synchronized(jobs) { reinstallUnlocked(appId, patches, confirmTimeoutMs) }
+    private fun reinstall(appId: Int, patches: List<ApkPatch>, confirmTimeoutMs: Long? = null, disguise: Boolean = false) =
+        synchronized(jobs) { reinstallUnlocked(appId, patches, confirmTimeoutMs, disguise) }
 
-    private fun reinstallUnlocked(appId: Int, patches: List<ApkPatch>, confirmTimeoutMs: Long?) {
+    private fun reinstallUnlocked(appId: Int, patches: List<ApkPatch>, confirmTimeoutMs: Long?, disguise: Boolean) {
         if (jobs[appId]?.isActive == true) return
         if (gate.updating.value) return fail(appId, InstallError.AppUpdating)
         val packageName = installed.all()[appId]?.takeIf(packages::isInstalled) ?: return
@@ -826,7 +828,7 @@ class GameInstallRepository @Inject constructor(
                         val result = File(patchedDirectory(directory), original.name)
                         result.parentFile?.mkdirs()
                         val partial = File(result.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || deviceHasExpansion(packageName) || atOriginalCode(packageName), vrGameActivity = gameSettings.get(appId).openInVr, ovrPluginStandIn = gameSettings.get(appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(appId).passthrough, appId, packages.vrFamily, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlc, missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.let(::familySharedOf) == true, hasExpansionFiles = deviceHasExpansion(packageName), deviceFamily = packages.vrFamily, deviceSdk = packages.deviceSdk, metaHighRefresh = gameSettings.get(appId).refreshRate != 0, renamedPackage = renamedPackageFor(appId), restorePackageName = restorePackageNameFor(appId), owner = context.packageName), patches)
+                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || deviceHasExpansion(packageName) || atOriginalCode(packageName), vrGameActivity = gameSettings.get(appId).openInVr, ovrPluginStandIn = gameSettings.get(appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(appId).passthrough, appId, packages.vrFamily, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlc, missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.let(::familySharedOf) == true, hasExpansionFiles = deviceHasExpansion(packageName), deviceFamily = packages.vrFamily, deviceSdk = packages.deviceSdk, metaHighRefresh = gameSettings.get(appId).refreshRate != 0, renamedPackage = renamedPackageFor(appId), restorePackageName = restorePackageNameFor(appId), owner = context.packageName, picoStoreDisguise = disguise), patches)
                         check(partial.renameTo(result)) { "Could not finish the patched APK." }
                         result
                     }

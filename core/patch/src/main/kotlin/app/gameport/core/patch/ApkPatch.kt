@@ -46,6 +46,11 @@ data class PatchContext(
     val hasExpansionFiles: Boolean = false,
     /** The headset family of this device (`meta`, `pico`, `openxr`), null when unknown or not a headset ([app.gameport.core.patch.patches.MetaLoaderStubPatch]). */
     val deviceFamily: String? = null,
+    /**
+     * On a Pico, disguise the game so the store's local recognition model does not take it for a title it sells: GamePort is added to the label
+     * ([app.gameport.core.patch.patches.AppLabelPatch]) and its logo is inset into the icon ([app.gameport.core.patch.patches.PicoDisguisePatch]). False everywhere else.
+     */
+    val picoStoreDisguise: Boolean = false,
     /** The Android version of this device (`Build.VERSION.SDK_INT`), null when unknown ([app.gameport.core.patch.patches.MinSdkPatch]). */
     val deviceSdk: Int? = null,
     /**
@@ -141,6 +146,21 @@ class PatchSession(private val apk: ApkModule, val existingHookDex: String? = nu
     /** The game's package name, read from its manifest. */
     fun packageName(): String = apk.androidManifest.packageName
 
+    /**
+     * The paths of the image files of the game's icon, one per density, from both its icon and its round-icon resources. Empty when the game declares no icon
+     * or its resource table cannot be read. The caller reads and rewrites each one with [readFile]/[addFile].
+     */
+    fun iconResPaths(): List<String> {
+        val manifest = apk.androidManifest
+        val ids = listOfNotNull(
+            manifest.iconResourceId.takeIf { it != 0 },
+            manifest.roundIconResourceId.takeIf { it != 0 },
+        )
+        return ids.flatMap { id ->
+            runCatching { apk.listResFiles(id, null).map { it.filePath } }.getOrDefault(emptyList())
+        }.distinct()
+    }
+
     /** Path of the next free `classesN.dex`, so an added dex never replaces one of the game's. */
     fun nextDexName(): String {
         val highest = apk.zipEntryMap.toArray().mapNotNull { DEX.matchEntire(it.name)?.groupValues?.get(1) }
@@ -205,4 +225,6 @@ class PatchAssets(
     val xrLoader: BinarySource? = null,
     /** The stand-in for Meta's OVRPlugin ([app.gameport.core.patch.patches.OvrPluginStandInPatch]). */
     val ovrPlugin: BinarySource? = null,
+    /** GamePort's logo, inset into the game's icon on a Pico ([app.gameport.core.patch.patches.PicoDisguisePatch]). */
+    val gamePortIcon: BinarySource? = null,
 )

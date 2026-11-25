@@ -24,10 +24,20 @@ object AppLabelPatch : ApkPatch {
 
     private const val ATTR_LABEL = 16842753
 
+    /** Added to the label when the game is disguised for the Pico store, so its name no longer matches a title the store sells. */
+    const val DISGUISE_SUFFIX = " · GamePort"
+
     override fun apply(session: PatchSession, context: PatchContext, assets: PatchAssets) {
         val name = context.gameName?.trim()?.takeIf { it.isNotEmpty() } ?: return
-        patchManifest(session.manifest, name)
+        patchManifest(session.manifest, displayName(name, context))
     }
+
+    /**
+     * The label the game is shown under: its Steam name, with GamePort added when the game is disguised for the Pico store ([PicoDisguisePatch]). The Steam
+     * name is always the base, so patching a disguised game again never stacks the suffix.
+     */
+    internal fun displayName(name: String, context: PatchContext): String =
+        if (context.picoStoreDisguise && context.deviceFamily == PicoMetadataPatch.FAMILY) name + DISGUISE_SUFFIX else name
 
     internal fun patchManifest(manifest: JSONObject, name: String) {
         manifest.takeNodesEach({ named("manifest") }) {
