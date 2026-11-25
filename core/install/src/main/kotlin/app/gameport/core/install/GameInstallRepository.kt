@@ -82,6 +82,7 @@ class GameInstallRepository @Inject constructor(
     private val gate: UpdateGate,
     private val events: GameEventLog,
     private val launchOptions: app.gameport.core.steam.LaunchOptionsRepository,
+    private val shopDlc: app.gameport.core.steam.ShopDlcIds,
     private val gameSettings: app.gameport.core.settings.GameSettingsStore,
     private val gameDefaults: GameDefaults,
     private val reinstallNotice: app.gameport.core.settings.ReinstallNoticeStore,
@@ -316,6 +317,7 @@ class GameInstallRepository @Inject constructor(
                     events.note(game.appId, "patching ${downloaded.size} file(s)")
                     // Read before waiting for the lock, so the network is never asked while another game is being patched.
                     val shimFiles = shimAchievements(game.appId)
+                    val ownedDlc = ownedDlcOf(game)
                     runCatching { gameDefaults.refreshIfStale(GameDefaults.FOR_A_PATCH_MS) }
                     // Patching rewrites multi-gigabyte files, so one game at a time.
                     patchedDirectory(directory).deleteRecursively()
@@ -325,7 +327,7 @@ class GameInstallRepository @Inject constructor(
                         // Written under another name and renamed when complete, so an interrupted
                         // patch is never mistaken for a finished one.
                         val partial = File(patched.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || installed.all()[game.appId]?.let(::deviceHasExpansion) == true, vrGameActivity = gameSettings.get(game.appId).openInVr, ovrPluginStandIn = gameSettings.get(game.appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(game.appId).passthrough, game.appId, packages.vrFamily, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlcOf(game), missingDlc = missingDlcOf(game), familyShared = familySharedOf(game), hasExpansionFiles = downloadHasExpansion(directory), deviceFamily = packages.vrFamily, deviceSdk = packages.deviceSdk, metaHighRefresh = gameSettings.get(game.appId).refreshRate != 0, renamedPackage = renamedPackageFor(game.appId), restorePackageName = restorePackageNameFor(game.appId), owner = context.packageName))
+                        patcher.patch(original, partial, PatchContext(game.appId, account.steamId, account.displayName, game.androidBuild?.isVr?.let { it && packages.isHeadset }, gameName = game.name, installedVersionCode = installed.all()[game.appId]?.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || installed.all()[game.appId]?.let(::deviceHasExpansion) == true, vrGameActivity = gameSettings.get(game.appId).openInVr, ovrPluginStandIn = gameSettings.get(game.appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(game.appId).passthrough, game.appId, packages.vrFamily, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlc, missingDlc = missingDlcOf(game), familyShared = familySharedOf(game), hasExpansionFiles = downloadHasExpansion(directory), deviceFamily = packages.vrFamily, deviceSdk = packages.deviceSdk, metaHighRefresh = gameSettings.get(game.appId).refreshRate != 0, renamedPackage = renamedPackageFor(game.appId), restorePackageName = restorePackageNameFor(game.appId), owner = context.packageName))
                         check(partial.renameTo(patched)) { "Could not finish the patched APK." }
                         // Keep only one copy of a multi-gigabyte game on disk.
                         original.delete()
@@ -813,6 +815,7 @@ class GameInstallRepository @Inject constructor(
                 val game = kotlinx.coroutines.withTimeoutOrNull(3_000) { library.observeGame(appId).first() }
                 val isVr = game?.androidBuild?.isVr?.let { it && packages.isHeadset }
                 val shimFiles = shimAchievements(appId)
+                val ownedDlc = game?.let { ownedDlcOf(it) }
                 runCatching { gameDefaults.refreshIfStale(GameDefaults.FOR_A_PATCH_MS) }
                 val patched = patchLock.withLock {
                     patchedDirectory(directory).deleteRecursively()
@@ -820,7 +823,7 @@ class GameInstallRepository @Inject constructor(
                         val result = File(patchedDirectory(directory), original.name)
                         result.parentFile?.mkdirs()
                         val partial = File(result.parentFile, original.name + ".part")
-                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || deviceHasExpansion(packageName) || atOriginalCode(packageName), vrGameActivity = gameSettings.get(appId).openInVr, ovrPluginStandIn = gameSettings.get(appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(appId).passthrough, appId, packages.vrFamily, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = game?.let(::ownedDlcOf), missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.let(::familySharedOf) == true, hasExpansionFiles = deviceHasExpansion(packageName), deviceFamily = packages.vrFamily, deviceSdk = packages.deviceSdk, metaHighRefresh = gameSettings.get(appId).refreshRate != 0, renamedPackage = renamedPackageFor(appId), restorePackageName = restorePackageNameFor(appId), owner = context.packageName), patches)
+                        patcher.patch(original, partial, PatchContext(appId, account.steamId, account.displayName, isVr, gameName = game?.name, installedVersionCode = packageName.let(packages::versionCodeOf), keepVersionCode = downloadHasExpansion(directory) || deviceHasExpansion(packageName) || atOriginalCode(packageName), vrGameActivity = gameSettings.get(appId).openInVr, ovrPluginStandIn = gameSettings.get(appId).ovrPluginStandIn, allowPassthrough = app.gameport.core.model.PassthroughGames.declared(gameSettings.get(appId).passthrough, appId, packages.vrFamily, gameDefaults.list.passthrough), achievementDefinitions = shimFiles.first, achievementsEarned = shimFiles.second, ownedDlc = ownedDlc, missingDlc = game?.let(::missingDlcOf).orEmpty(), familyShared = game?.let(::familySharedOf) == true, hasExpansionFiles = deviceHasExpansion(packageName), deviceFamily = packages.vrFamily, deviceSdk = packages.deviceSdk, metaHighRefresh = gameSettings.get(appId).refreshRate != 0, renamedPackage = renamedPackageFor(appId), restorePackageName = restorePackageNameFor(appId), owner = context.packageName), patches)
                         check(partial.renameTo(result)) { "Could not finish the patched APK." }
                         result
                     }
@@ -1199,7 +1202,17 @@ class GameInstallRepository @Inject constructor(
         return patched != familySharedNow(game)
     }
 
-    private fun ownedDlcOf(game: Game): List<Int>? = game.androidBuild?.dlc?.filter { it.owned }?.map { it.appId }
+    /**
+     * The DLC the account has, as the shim is told: the ones with files for Android, and every other one the shop lists for the game that the account owns (a game that sells unlocks as DLC
+     * counts them one by one, and one that is told of none offers to buy what the account already has). The shop is asked once and kept; when it cannot be reached only the first kind goes.
+     * Null for a game with no Android build: the shim then keeps saying yes to every DLC.
+     */
+    private suspend fun ownedDlcOf(game: Game): List<Int>? {
+        val withFiles = game.androidBuild?.dlc?.filter { it.owned }?.map { it.appId } ?: return null
+        val account = runCatching { library.observeLibrary().first().ownedAppIds }.getOrDefault(emptySet())
+        val unlocks = runCatching { shopDlc.of(game.appId) }.getOrDefault(emptyList()).filter { it in account }
+        return (withFiles + unlocks).distinct()
+    }
 
     /**
      * The installed games that may be missing their expansion files (see [ExpansionCheck]): GamePort cannot look in Android/obb, so it compares what Steam says the game
