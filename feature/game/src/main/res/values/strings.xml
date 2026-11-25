@@ -7,6 +7,7 @@
     <string name="game_resume">Resume download</string>
     <string name="game_discard">Discard</string>
     <string name="game_play">Play</string>
+    <string name="game_play_anyway">Play anyway</string>
     <string name="game_patch_and_play">Patch and play</string>
     <string name="game_retry">Try again</string>
     <string name="game_compat_works">Works on %1$s</string>

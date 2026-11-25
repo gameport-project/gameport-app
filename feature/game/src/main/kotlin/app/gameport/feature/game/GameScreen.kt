@@ -912,14 +912,24 @@ private fun GameDetails(
                 }
                 // A game that is on the list but not blocked, and that can be played, has its Play button in the card of the warning (unless a card of missing files or of a refusal already holds it).
                 val playChannel = channelInUse.takeIf { name -> name != UpdateChannels.NORMAL && game.androidBuild?.channels?.any { it.name == name } == true }
-                val playInCaution = caution != null && expansionMissing == null && !refused && (install as? InstallState.Installed)?.let { it.otherGamePort == null } == true
-                CompatDetails(
-                    compat, incompatible, caution,
-                    onPlay = if (playInCaution) ({ if (updatePending || patchPending) choosingPlay = true else onPlay() }) else null,
-                    playLabel = if (playChannel != null) stringResource(R.string.game_play_channel, playChannel) else stringResource(R.string.game_play),
-                    playEnabled = repatch !is Repatch.Running,
-                )
-                FlowRow(
+                val canPlayHere = expansionMissing == null && !refused && (install as? InstallState.Installed)?.let { it.otherGamePort == null } == true
+                // A game on the list of incompatible games that is installed anyway has its button in the red card, "Play anyway"; the orange card holds it only when there is no red one.
+                val playInRed = incompatible != null && canPlayHere
+                val playInCaution = caution != null && incompatible == null && canPlayHere
+                val playInCard = expansionMissing != null || refused || playInCaution || playInRed
+                // Play is in a card and nothing else is drawn here: the row is left out, an empty one would still add its own gap between the two cards around it.
+                // The step of the tour about the buttons then points at the card that holds Play.
+                val actionsEmpty = playInCard && (install as? InstallState.Installed)?.let { it.otherGamePort == null } == true
+                val compatCards: @Composable () -> Unit = {
+                    CompatDetails(
+                        compat, incompatible, caution,
+                        onPlay = if (playInCaution || playInRed) ({ if (updatePending || patchPending) choosingPlay = true else onPlay() }) else null,
+                        playLabel = if (playChannel != null) stringResource(R.string.game_play_channel, playChannel) else stringResource(R.string.game_play),
+                        playEnabled = repatch !is Repatch.Running,
+                    )
+                }
+                if (playInRed || playInCaution) Column(Modifier.tourTarget(TourIds.GAME_ACTIONS), verticalArrangement = Arrangement.spacedBy(14.dp)) { compatCards() } else compatCards()
+                if (!actionsEmpty) FlowRow(
                     // While an install goes on, the card is taller than the buttons: the cover keeps the place it has with the buttons (one row high), it does not follow the card.
                     modifier = Modifier.onGloballyPositioned { alignment.actionsPlaced(it, if (install.stage != null) with(density) { ACTION_HEIGHT.toPx() } else null) },
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -927,7 +937,7 @@ private fun GameDetails(
                 ) {
                     Box(Modifier.tourTarget(TourIds.GAME_ACTIONS)) { InstallActions(
                         install = install,
-                        playInCard = expansionMissing != null || refused || playInCaution,
+                        playInCard = playInCard,
                         speedUnit = speedUnit,
                         onInstall = { if (compat?.level == app.gameport.core.model.CompatLevel.FAILS) warning = true else startInstall() },
                         onResume = { onInstall(null) },
@@ -960,18 +970,22 @@ private fun GameDetails(
                 }
                 // A game that says some of its large files are missing cannot load its data: a card on the page says so, and offers the repair. Play stays available.
                 expansionMissing?.let {
-                    ExpansionMissingCard(
-                        it.missing,
-                        onRepair = { confirmingRepair = true },
-                        onPlay = { if (updatePending || patchPending) choosingPlay = true else onPlay() },
-                        busy = repatch is Repatch.Running,
-                    )
+                    Box(if (actionsEmpty) Modifier.tourTarget(TourIds.GAME_ACTIONS) else Modifier) {
+                        ExpansionMissingCard(
+                            it.missing,
+                            onRepair = { confirmingRepair = true },
+                            onPlay = { if (updatePending || patchPending) choosingPlay = true else onPlay() },
+                            busy = repatch is Repatch.Running,
+                        )
+                    }
                 }
                 // A game this device refused to start cannot run as it is: a card says what was seen and installs it again under a name the device accepts, and Play is held back until then.
                 if (refused) {
                     // Installing it again under a name of GamePort's own is the way past a device that refuses the name the game carries: the button asks for that
                     // name, and not for whatever the game's own choice of name happens to be.
-                    RefusedCard(onReinstall = onReinstallRenamed, busy = repatch is Repatch.Running)
+                    Box(if (actionsEmpty && expansionMissing == null) Modifier.tourTarget(TourIds.GAME_ACTIONS) else Modifier) {
+                        RefusedCard(onReinstall = onReinstallRenamed, busy = repatch is Repatch.Running)
+                    }
                 }
                 // The notifications are in the card of the bell, the progress of a patch in the card of the install; what stays here is the report that can be sent, and a patch that failed.
                 val suspected = issues.filterIsInstance<GameIssue.ProblemSuspected>().firstOrNull()
@@ -1467,16 +1481,17 @@ private fun Progress(state: InstallState, speedUnit: SpeedUnit, extras: List<Ext
     val shown = pending.take(EXTRAS_SHOWN)
     val gameInPlace = state is InstallState.ExtraContent
     Column(Modifier.fillMaxWidth().glass(CardShape).padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        val small = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 0.dp)
+        // Only while Android waits for the confirmation, and on a line of its own above the two others, so the steps keep their width.
+        // White, like the page's own main button: it is the one thing this step waits for, and it has to catch the eye when the window was missed.
+        if (state is InstallState.Installing && onReopen != null) {
+            Button(onClick = onReopen, contentPadding = small, modifier = Modifier.height(32.dp).align(Alignment.End)) {
+                Text(stringResource(R.string.game_reopen_confirmation), style = MaterialTheme.typography.labelLarge)
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             InstallStepper(stage, Modifier.weight(1f))
             // Both stay where they are for the whole install, greyed when they cannot be used in this step: the card keeps its height from one step to the next.
-            val small = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 0.dp)
-            if (state is InstallState.Installing) {
-                // White, like the page's own main button: it is the one thing this step waits for, and it has to catch the eye when the window was missed. It greys out on its own when there is nothing to open.
-                Button(onClick = { onReopen?.invoke() }, enabled = onReopen != null, contentPadding = small, modifier = Modifier.height(32.dp)) {
-                    Text(stringResource(R.string.game_reopen_confirmation), style = MaterialTheme.typography.labelLarge)
-                }
-            }
             androidx.compose.material3.OutlinedButton(onClick = { onPause?.invoke() }, enabled = onPause != null, contentPadding = small, modifier = Modifier.height(32.dp)) {
                 Text(stringResource(R.string.game_pause), style = MaterialTheme.typography.labelLarge)
             }
@@ -2004,12 +2019,12 @@ private fun CompatDetails(
     val style = MaterialTheme.typography.bodySmall
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     when {
-        incompatible != null -> IncompatibleNote(incompatible.title.pick(language), incompatible.text.pick(language))
+        incompatible != null -> IncompatibleNote(incompatible.title.pick(language), incompatible.text.pick(language), onPlay, playEnabled)
         compat != null && compat.offlineTested -> Text(stringResource(R.string.game_compat_offline), style = style, color = muted)
         // (A result with few answers is not told here: it is not taken into account.)
     }
     // A warning is told whatever else the page says, and stays: nothing to open, switch or close.
-    warning?.let { WarningNote(it.title.pick(language), it.text.pick(language), onPlay, playLabel, playEnabled) }
+    warning?.let { WarningNote(it.title.pick(language), it.text.pick(language), onPlay.takeIf { incompatible == null }, playLabel, playEnabled) }
 }
 
 /** What is to be known about a game that runs: in orange, with a warning sign, always on the page of the game it is about. */
@@ -2037,9 +2052,12 @@ private fun WarningNote(title: String, text: String, onPlay: (() -> Unit)? = nul
     }
 }
 
-/** Why the game cannot run: in red, with a cross, so it is the first thing seen on the page of a game that cannot be played. */
+/**
+ * Why the game cannot run: in red, with a cross, so it is the first thing seen on the page of a game that cannot be played. When the game is installed anyway, "Play anyway" stands
+ * at the right of the card: the button keeps its size and the words give way to it.
+ */
 @Composable
-private fun IncompatibleNote(title: String, text: String) {
+private fun IncompatibleNote(title: String, text: String, onPlay: (() -> Unit)? = null, playEnabled: Boolean = true) {
     val shape = RoundedCornerShape(16.dp)
     val capitals = with(LocalDensity.current) { (MaterialTheme.typography.titleSmall.fontSize * CAPITAL_HEIGHT).toDp() }
     Row(
@@ -2048,9 +2066,16 @@ private fun IncompatibleNote(title: String, text: String) {
         verticalAlignment = Alignment.Top,
     ) {
         Box(Modifier.padding(top = 3.dp)) { CompatGlyph(Glyph.CROSS, CompatRed, capitals) }
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = CompatRed)
             Text(text.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodyMedium)
+        }
+        if (onPlay != null) {
+            Button(onClick = onPlay, enabled = playEnabled, modifier = Modifier.align(Alignment.CenterVertically).height(ACTION_HEIGHT)) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.game_play_anyway), maxLines = 1, softWrap = false)
+            }
         }
     }
 }
