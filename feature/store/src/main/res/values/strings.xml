@@ -61,6 +61,12 @@
     <string name="storegame_add_not_connected">Not connected to Steam.</string>
     <string name="storegame_add_failed">Steam did not answer. Try again in a moment.</string>
     <string name="storegame_add_already">The account already has it.</string>
+    <string name="storegame_wish">Add to the wishlist</string>
+    <string name="storegame_unwish">Remove from the wishlist</string>
+    <string name="storegame_removing">Removing…</string>
+    <string name="storegame_wish_checking">Checking…</string>
+    <string name="storegame_unwish_failed">Steam did not take it off the wishlist. Try again in a moment.</string>
+    <string name="storegame_wish_failed">Steam did not add it to the wishlist. Try again in a moment.</string>
     <string name="storegame_details">Details</string>
     <string name="storegame_developer">Developer</string>
     <string name="storegame_publisher">Publisher</string>

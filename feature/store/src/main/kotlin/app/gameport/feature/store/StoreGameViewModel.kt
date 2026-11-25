@@ -76,6 +76,7 @@ class StoreGameViewModel @Inject constructor(
     private val priceRepository: PriceRepository,
     private val accountRegion: AccountRegion,
     private val freeLicenses: FreeLicenseRepository,
+    private val wishlist: app.gameport.core.steam.WishlistRepository,
     private val mediaRepository: app.gameport.core.sync.MediaRepository,
     private val dlcRepository: app.gameport.core.sync.StoreDlcRepository,
 ) : ViewModel() {
@@ -118,6 +119,40 @@ class StoreGameViewModel @Inject constructor(
         viewModelScope.launch {
             val outcome = freeLicenses.add(appId)
             adding.value = Adding(outcome = outcome)
+        }
+    }
+
+    /** The wishlist of the account for this game: the request running, whether the game is on it, and what Steam said when it did not take it. */
+    data class Wish(val running: Boolean = false, val wished: Boolean = false, val outcome: app.gameport.core.steam.WishlistOutcome? = null, val checking: Boolean = false)
+
+    // The button is greyed while Steam is asked whether the game is on the wishlist: that answer is slow.
+    private val _wish = MutableStateFlow(Wish(checking = true))
+    val wish: StateFlow<Wish> = _wish.asStateFlow()
+
+    /**
+     * Asks Steam to put the game on the wishlist of the account, or to take it off when it is on it, one request at a time. The only thing written to the account is that line,
+     * and only on the player's tap. When Steam does not take the change, the page keeps showing what it was.
+     */
+    fun onToggleWishlist() {
+        val now = _wish.value
+        if (now.running) return
+        val removing = now.wished
+        _wish.value = now.copy(running = true, outcome = null)
+        viewModelScope.launch {
+            val outcome = if (removing) wishlist.remove(appId) else wishlist.add(appId)
+            _wish.value = when (outcome) {
+                app.gameport.core.steam.WishlistOutcome.Added -> Wish(wished = true)
+                app.gameport.core.steam.WishlistOutcome.Removed -> Wish(wished = false)
+                else -> Wish(wished = removing, outcome = outcome)
+            }
+        }
+    }
+
+    init {
+        // The game may be on the wishlist already: read in the background, and only a clear yes changes what the page shows.
+        viewModelScope.launch {
+            val on = runCatching { wishlist.contains(appId) }.getOrNull() == true
+            _wish.value = _wish.value.copy(checking = false, wished = _wish.value.wished || on)
         }
     }
 

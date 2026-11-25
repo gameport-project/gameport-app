@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.shape.CircleShape
@@ -33,6 +34,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BookmarkAdd
+import androidx.compose.material.icons.filled.BookmarkRemove
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.LibraryAdd
@@ -112,7 +115,8 @@ fun StoreGameScreen(onBack: () -> Unit, onGameClick: (Int) -> Unit, onOpenSteam:
     val media by viewModel.media.collectAsStateWithLifecycle()
     val dlc by viewModel.dlc.collectAsStateWithLifecycle()
     val dlcAdds by viewModel.dlcAdds.collectAsStateWithLifecycle()
-    StoreGameContent(state, onBack, onGameClick, viewModel::onAddToLibrary, media, dlc, dlcAdds, viewModel::onAddDlc, onOpenSteam)
+    val wish by viewModel.wish.collectAsStateWithLifecycle()
+    StoreGameContent(state, onBack, onGameClick, viewModel::onAddToLibrary, media, dlc, dlcAdds, viewModel::onAddDlc, onOpenSteam, wish, viewModel::onToggleWishlist)
 }
 
 /** The page of a game on Steam's shop, which the buttons of this page open inside GamePort. */
@@ -130,6 +134,8 @@ internal fun StoreGameContent(
     dlcAdds: Map<Int, StoreGameViewModel.DlcAdd> = emptyMap(),
     onAddDlc: (Int) -> Unit = {},
     onOpenSteam: (url: String, title: String) -> Unit = { _, _ -> },
+    wish: StoreGameViewModel.Wish = StoreGameViewModel.Wish(),
+    onWish: () -> Unit = {},
 ) {
     val context = LocalContext.current
     Scaffold { padding ->
@@ -156,7 +162,7 @@ internal fun StoreGameContent(
                     Text(stringResource(R.string.storegame_not_listed), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     SteamButton(null) { onOpenSteam(steamStoreUrl(content.appId), content.app?.name ?: "Steam") }
                 }
-                else -> Details(content, content.app, onGameClick, onAddToLibrary, context, media, dlc, dlcAdds, onAddDlc, onOpenSteam)
+                else -> Details(content, content.app, onGameClick, onAddToLibrary, context, media, dlc, dlcAdds, onAddDlc, onOpenSteam, wish, onWish)
             }
         }
     }
@@ -182,6 +188,8 @@ private fun Details(
     dlcAdds: Map<Int, StoreGameViewModel.DlcAdd>,
     onAddDlc: (Int) -> Unit,
     onOpenSteam: (url: String, title: String) -> Unit,
+    wish: StoreGameViewModel.Wish,
+    onWish: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(Modifier.fillMaxWidth().widthIn(max = CONTENT_WIDTH)) {
@@ -207,7 +215,7 @@ private fun Details(
                 )
                 Column(Modifier.weight(1f).height(COVER_WIDTH * 1.5f), verticalArrangement = Arrangement.Bottom) {
                     FlowRow(Modifier.tourTarget(TourIds.STOREGAME_BUTTONS), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
-                        Buttons(content, app, onAdd, onOpenSteam)
+                        Buttons(content, app, onAdd, onOpenSteam, wish, onWish)
                     }
                 }
             }
@@ -257,8 +265,9 @@ private fun Details(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Buttons(content: StoreGameUiState.Content, app: AndroidApp, onAdd: () -> Unit, onOpenSteam: (url: String, title: String) -> Unit) {
+private fun FlowRowScope.Buttons(content: StoreGameUiState.Content, app: AndroidApp, onAdd: () -> Unit, onOpenSteam: (url: String, title: String) -> Unit, wish: StoreGameViewModel.Wish, onWish: () -> Unit) {
     // The button with its note under it, then the figures of the history, each as high as the button and centred on it.
     Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -270,6 +279,35 @@ private fun Buttons(content: StoreGameUiState.Content, app: AndroidApp, onAdd: (
     }
     if (!content.owned && content.price == StorePrice.Free) {
         AddToLibrary(content, app, onAdd)
+    }
+    // A game the account does not have can be put on its wishlist, and taken off it again; one it has needs no wish. The button sits at the right of the line.
+    if (!content.owned) WishlistButton(wish, onWish, Modifier.weight(1f))
+}
+
+/**
+ * Puts the game on the wishlist of the signed-in account, or takes it off when it is on it, in one tap and without leaving the page. What Steam said when it did not take
+ * the change is under the button, in orange.
+ */
+@Composable
+private fun WishlistButton(wish: StoreGameViewModel.Wish, onWish: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier, contentAlignment = Alignment.CenterEnd) {
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            GlassButton(onClick = onWish, enabled = !wish.running && !wish.checking, modifier = Modifier.height(ROW_HEIGHT), contentPadding = BUTTON_PADDING) {
+                if (wish.running || wish.checking) {
+                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(if (wish.wished) Icons.Filled.BookmarkRemove else Icons.Filled.BookmarkAdd, contentDescription = null, modifier = Modifier.size(20.dp))
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(if (wish.checking) R.string.storegame_wish_checking else if (wish.running) (if (wish.wished) R.string.storegame_removing else R.string.storegame_adding) else if (wish.wished) R.string.storegame_unwish else R.string.storegame_wish))
+            }
+            val note = when (wish.outcome) {
+                app.gameport.core.steam.WishlistOutcome.NotConnected -> R.string.storegame_add_not_connected
+                app.gameport.core.steam.WishlistOutcome.Failed -> if (wish.wished) R.string.storegame_unwish_failed else R.string.storegame_wish_failed
+                else -> null
+            }
+            note?.let { Text(stringResource(it), style = MaterialTheme.typography.labelMedium, color = StoreOrange) }
+        }
     }
 }
 

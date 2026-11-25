@@ -37,4 +37,7 @@ abstract class SteamModule {
 
     @Binds
     abstract fun bindFreeLicenseRepository(impl: JavaSteamFreeLicenseRepository): FreeLicenseRepository
+
+    @Binds
+    abstract fun bindWishlistRepository(impl: app.gameport.core.steam.WebWishlistRepository): app.gameport.core.steam.WishlistRepository
 }

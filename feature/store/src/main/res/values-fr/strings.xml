@@ -55,6 +55,12 @@
     <string name="storegame_add_not_connected">Pas connecté à Steam.</string>
     <string name="storegame_add_failed">Steam n\'a pas répondu. Réessayer dans un instant.</string>
     <string name="storegame_add_already">Le compte l\'a déjà.</string>
+    <string name="storegame_wish">Ajouter à la liste de souhaits</string>
+    <string name="storegame_unwish">Retirer de la liste de souhaits</string>
+    <string name="storegame_removing">Retrait…</string>
+    <string name="storegame_wish_checking">Vérification…</string>
+    <string name="storegame_unwish_failed">Steam ne l\'a pas retiré de la liste de souhaits. Réessayer dans un instant.</string>
+    <string name="storegame_wish_failed">Steam ne l\'a pas ajouté à la liste de souhaits. Réessayer dans un instant.</string>
     <string name="storegame_open_library">Voir dans la bibliothèque</string>
     <string name="storegame_dlc_title">Contenu additionnel</string>
     <string name="storegame_dlc_owned">Dans la bibliothèque</string>
