@@ -45,7 +45,9 @@ class ControllerMappingStore @Inject constructor(
         used: String? = null,
         presentedResult: String? = null,
         present: String? = null,
-    ) = update(appId) { it.withDetected(controls, source, both, silent, profiles, used, presentedResult, present) }
+        table: String? = null,
+        tableControls: List<ControlRef>? = null,
+    ) = update(appId) { it.withDetected(controls, source, both, silent, profiles, used, presentedResult, present, table, tableControls) }
 
     /** Customising starts from what the game does now, so a later change of the defaults does not move a control the player did not touch. */
     fun setEnabled(appId: Int, enabled: Boolean) = update(appId) { if (enabled && !it.enabled) it.frozenAsNow().copy(enabled = true) else it.copy(enabled = enabled) }

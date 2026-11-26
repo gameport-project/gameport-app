@@ -209,6 +209,8 @@ data class VerdictBook(
      */
     fun reportStated(appId: Int, state: String?, send: Boolean): VerdictBook {
         val game = games[appId] ?: return this
+        // A game that works but whose controls do not sends a report too, and its answer waits for it. The relay keeps no state of the report for "it worked", so the answer is only let go.
+        if (game.verdict == Verdict.WORKS.wire && Symptom.NO_CONTROLS.code in game.issues) return if (game.holding) copy(games = games + (appId to game.copy(holding = false))) else this
         if (game.verdict != Verdict.FAILS.wire && game.verdict != Verdict.OFFLINE_ONLY.wire) return this
         val kept = state?.takeIf { it in ReportStates.ALL }
         if (!game.holding && game.report == kept) return this

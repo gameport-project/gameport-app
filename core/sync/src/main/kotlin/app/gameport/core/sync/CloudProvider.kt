@@ -203,7 +203,7 @@ class CloudProvider : ContentProvider() {
             if (appId != null) {
                 // What a newer hook adds (the profiles the game proposed, which table was used, what became of the player's choice) is optional and read apart: a malformed extra is ignored.
                 val extra = runCatching { ControllerProfileExtras.read(extras) }.getOrDefault(ControllerProfileExtras())
-                entryPoint.controllerMappings().setDetected(appId, controls, extras.getString("source").orEmpty(), extras.getBoolean("both"), extras.getBoolean("silent"), extra.profiles, extra.used, extra.presented, extra.present)
+                entryPoint.controllerMappings().setDetected(appId, controls, extras.getString("source").orEmpty(), extras.getBoolean("both"), extras.getBoolean("silent"), extra.profiles, extra.used, extra.presented, extra.present, extra.table, extra.tableControls)
             }
             Bundle().apply { putString(STATUS, OK) }
         }

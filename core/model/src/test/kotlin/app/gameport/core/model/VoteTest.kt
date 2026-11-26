@@ -179,6 +179,20 @@ class VoteTest {
     }
 
     @Test
+    fun `a game that works but not its controls waits for its report, and is let go once the report has been dealt with, without the state of it`() {
+        val held = VerdictBook().answered(1, Verdict.WORKS, "0.9.5", day1, send = true, holdForReport = true, noControls = true)
+        assertTrue(held.games.getValue(1).holding)
+        assertTrue(held.unsent().isEmpty())
+        val let = held.reportStated(1, ReportStates.SENT, send = true)
+        assertFalse(let.games.getValue(1).holding)
+        assertNull(let.games.getValue(1).report)
+        assertEquals(listOf(Answer(1, Verdict.WORKS, false, issues = listOf(Symptom.NO_CONTROLS.code))), let.unsent())
+        // Said again, or with no state at all (the report could not be made), nothing more changes and the answer is let go all the same.
+        assertEquals(let, let.reportStated(1, ReportStates.SENT, send = true))
+        assertFalse(held.reportStated(1, null, send = true).games.getValue(1).holding)
+    }
+
+    @Test
     fun `a state the relay does not know is never kept, and one for an answer that worked, or a game without an answer, changes nothing`() {
         val book = VerdictBook().answered(1, Verdict.FAILS, "0.9.1", day1, send = true, holdForReport = true)
         assertNull(book.reportStated(1, "lost", send = true).games.getValue(1).report)

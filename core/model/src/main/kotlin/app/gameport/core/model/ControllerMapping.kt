@@ -47,8 +47,9 @@ object ControllerLayout {
         "right:x" to listOf("left:x", "left:y"),
         "right:y" to listOf("left:y", "left:x"),
         "right:menu" to listOf("left:menu"),
-        // Some games bind their menu to the view button as well as to the menu button: it shares the menu's control, the same action being bound to both.
-        "left:view" to listOf("left:menu"),
+        // The view button takes the menu's control when nothing else has it. When the right menu has it, the view button takes a face button the game does not use
+        // (a game that binds both has two controls to give, and the device has free buttons for them); only when there is none does it share the menu's control.
+        "left:view" to listOf("left:menu", "left:y", "left:x"),
         // Valve relates the Touch's top button to the Frame's left, up and right and its bottom one to down; the other way round, by what the game uses.
         "left:dpad_up" to listOf("left:y", "left:x"),
         "left:dpad_down" to listOf("left:x", "left:y"),
@@ -139,6 +140,10 @@ data class ControllerMapping(
     val silent: Boolean = false,
     /** The key of the ready-made preset the player chose, or empty (automatic, or a mix made by hand). */
     val preset: String = "",
+    /** The profile of the table the game was read through at its last start when it is not the Steam Frame's (its own for the device, or the Touch's); empty when none. */
+    val table: String = "",
+    /** The controls that table binds: what the game really uses on this device, shown when nothing is translated. */
+    val tableControls: List<ControlRef> = emptyList(),
 ) {
     /** The ready-made preset the player chose, or empty (automatic, or a mix made by hand). It drives the menu's label; the overrides carry the real links. */
     val chosenPreset: ControllerPreset? get() = ControllerPreset.entries.firstOrNull { it.key == preset }
@@ -203,7 +208,13 @@ data class ControllerMapping(
         used: String? = null,
         result: String? = null,
         present: String? = null,
+        table: String? = null,
+        tableControls: List<ControlRef>? = null,
     ): ControllerMapping = copy(
+        // The table in use goes with the word that says which table it is: when the layer says one, what it says of the table replaces what was kept (nothing, when it is the Steam Frame's);
+        // an old hook or layer that says nothing leaves it alone.
+        table = if (used.isNullOrEmpty()) this.table else table.orEmpty(),
+        tableControls = if (used.isNullOrEmpty()) this.tableControls else ControllerProfile.cleanTableControls(tableControls.orEmpty()),
         detected = controls.sortedBy { it.key },
         source = source,
         both = both,
@@ -220,10 +231,22 @@ data class ControllerMapping(
     val noFrameControls: Boolean get() = source == "none"
 
     /** The game only has the Steam Frame's controls, and GamePort puts them on this device's controllers by itself. */
-    val automatic: Boolean get() = !useFrame && !both && source == "valve" && detected.isNotEmpty()
+    val automatic: Boolean get() = presented == PresentedControllers.AUTO && (!both || used == "frame") && source == "valve" && detected.isNotEmpty() && used != "touch"
 
     /** The Steam Frame's controls are on this device's controllers, by themselves or by the player's choice: they can be remapped. */
     val translated: Boolean get() = forced || automatic
+
+    /**
+     * The game was read through its own table at its last start and that table is known: what it binds can be shown. A choice of the Steam Frame's controls that the layer could
+     * not follow (it fell back to the game's table) still shows it; a choice made since and not tried yet does not.
+     */
+    val showsRealTable: Boolean get() = tableControls.isNotEmpty() && when (presented) {
+        // Automatic: whichever of its own tables the game was read through. The Quest's: only if that is the table it was read through (a table read in another mode is not the choice).
+        PresentedControllers.AUTO -> used == "native" || used == "touch"
+        PresentedControllers.TOUCH -> used == "touch"
+        // The Steam Frame's: only when the layer could not follow the choice and gave the game its own table; the page then says so instead of showing the mapping.
+        PresentedControllers.FRAME -> presentedResult == "fallback" && (used == "native" || used == "touch")
+    }
 
     /** Where [source] goes now. */
     fun targetsFor(source: ControlRef): List<ControlRef> = allocation()[source].orEmpty()
@@ -273,6 +296,18 @@ data class ControllerProfile(val path: String, val bindings: Int) {
             if (trimmed.any { it == '|' || it == ',' || it == '=' || it.isISOControl() }) return null
             return ControllerProfile(trimmed, bindings)
         }
+
+        /** The most controls of the table a game is read through that are kept. */
+        const val MAX_TABLE_CONTROLS = 40
+
+        /** The path of the profile of the table in use, as it can be kept in a record: it starts with a slash, is not too long and holds none of the record's separators; else empty. */
+        fun cleanTable(path: String): String {
+            val trimmed = path.trim()
+            return if (trimmed.isEmpty() || trimmed[0] != '/' || trimmed.length > MAX_LENGTH || trimmed.any { it == '|' || it == ',' || it == '=' || it.isISOControl() }) "" else trimmed
+        }
+
+        /** The controls of the table in use: no repeats, capped. */
+        fun cleanTableControls(controls: List<ControlRef>): List<ControlRef> = controls.distinct().take(MAX_TABLE_CONTROLS)
 
         /** The profiles of a list, cleaned, without repeats and capped. */
         fun cleanAll(profiles: List<ControllerProfile>): List<ControllerProfile> =

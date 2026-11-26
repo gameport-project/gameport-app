@@ -75,11 +75,20 @@ class ControllerMappingTest {
     }
 
     @Test
-    fun `the right menu goes to the left one, and so does the left view button, the right view and unknown controls go nowhere`() {
+    fun `the right menu goes to the left one, the view button takes a free face button, the right view and unknown controls go nowhere`() {
         val a = allocate(set("right:menu", "left:view", "right:view", "left:steam"))
         assertEquals(list("left:menu"), a[c("right:menu")])
-        assertEquals(list("left:menu"), a[c("left:view")])
+        // Red Matter binds only these two: X and Y of the device are free, so the view button gets its own instead of sharing the menu's.
+        assertEquals(list("left:y"), a[c("left:view")])
         assertTrue(a.getValue(c("right:view")).isEmpty() && a.getValue(c("left:steam")).isEmpty())
+    }
+
+    @Test
+    fun `the view button shares the menu when the game uses both face buttons it could have taken, and goes to the menu alone when nothing else has it`() {
+        val busy = allocate(set("right:menu", "left:view", "right:x", "right:y"))
+        assertEquals(list("left:menu"), busy[c("right:menu")])
+        assertEquals(list("left:menu"), busy[c("left:view")])
+        assertEquals(list("left:menu"), allocate(set("left:view"))[c("left:view")])
     }
 
     @Test
@@ -196,6 +205,59 @@ class ControllerMappingTest {
         assertEquals(list("left:y"), faces.targetsFor(c("right:y")))
         assertTrue(faces.targetsFor(c("left:dpad_left")).isEmpty())
         assertTrue(faces.targetsFor(c("left:dpad_right")).isEmpty())
+    }
+
+    @Test
+    fun `the table in use is replaced when the layer says which table was used, and left alone when it says nothing`() {
+        val first = ControllerMapping().withDetected(emptyList(), "none", false, false, used = "native", table = "/interaction_profiles/bytedance/pico4_controller", tableControls = listOf(c("left:x")))
+        assertEquals("/interaction_profiles/bytedance/pico4_controller", first.table)
+        assertEquals(listOf(c("left:x")), first.tableControls)
+        // An older hook or layer says no table and no table word: what was kept stays.
+        val silent = first.withDetected(emptyList(), "none", false, false)
+        assertEquals(first.table, silent.table)
+        assertEquals(first.tableControls, silent.tableControls)
+        // The layer says the Steam Frame's table was used, with no table of the other kind: what was kept goes.
+        val frame = first.withDetected(listOf(c("right:a")), "valve", false, false, used = "frame")
+        assertEquals("", frame.table)
+        assertTrue(frame.tableControls.isEmpty())
+    }
+
+    @Test
+    fun `the table the game really reads is shown only when it was read through its own, whatever is asked since`() {
+        val table = listOf(c("left:x"), c("right:a"))
+        val native = ControllerMapping(used = "native", table = "/interaction_profiles/bytedance/pico4_controller", tableControls = table)
+        assertTrue(native.showsRealTable)
+        assertTrue(native.copy(used = "touch").showsRealTable)
+        // Nothing known, or the Steam Frame's table was used: nothing to show.
+        assertTrue(!native.copy(tableControls = emptyList()).showsRealTable)
+        assertTrue(!native.copy(used = "frame").showsRealTable)
+        assertTrue(!native.copy(used = "").showsRealTable)
+        // The Steam Frame's controls were asked for and not tried yet: the page shows what they will be, not the old table.
+        assertTrue(!native.copy(presented = PresentedControllers.FRAME).showsRealTable)
+        // They were asked for and the layer fell back to the game's table: that table is what is read.
+        assertTrue(native.copy(presented = PresentedControllers.FRAME, presentedResult = "fallback").showsRealTable)
+        // The Quest's controls are chosen: only a table that was read as the Quest's counts, not the one of an earlier run in automatic.
+        assertTrue(!native.copy(presented = PresentedControllers.TOUCH).showsRealTable)
+        assertTrue(native.copy(presented = PresentedControllers.TOUCH, used = "touch").showsRealTable)
+        assertTrue(!native.copy(presented = PresentedControllers.TOUCH, used = "frame").showsRealTable)
+    }
+
+    @Test
+    fun `choosing the Quest's controls takes the Steam Frame's mapping away, nothing of it is automatic, translated or forced`() {
+        val frameOnly = ControllerMapping(detected = listOf(c("right:a")), source = "valve")
+        assertTrue(frameOnly.automatic && frameOnly.translated)
+        val touch = frameOnly.withPresented(PresentedControllers.TOUCH)
+        assertTrue(!touch.automatic && !touch.translated && !touch.forced)
+        // A game the layer read through the Quest's controls by itself (nobody chose) is not mapped from the Steam Frame's either.
+        assertTrue(!frameOnly.copy(used = "touch").automatic && !frameOnly.copy(used = "touch").translated)
+        assertTrue(frameOnly.copy(used = "frame").automatic)
+        // A game with both tables whose Quest controls the runtime refused, and that fell back to the Steam Frame's: that mapping is what is in effect, so it is shown as automatic.
+        assertTrue(frameOnly.copy(both = true, used = "frame").automatic && frameOnly.copy(both = true, used = "frame").translated)
+        // With both tables and the game read through its own, nothing of the Steam Frame's is automatic.
+        assertTrue(!frameOnly.copy(both = true, used = "native").automatic && !frameOnly.copy(both = true).automatic)
+        // Choosing the Steam Frame's controls puts the mapping back, as forced.
+        val frame = frameOnly.withPresented(PresentedControllers.FRAME)
+        assertTrue(!frame.automatic && frame.forced && frame.translated)
     }
 
     @Test

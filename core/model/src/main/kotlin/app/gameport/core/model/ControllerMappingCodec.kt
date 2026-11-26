@@ -29,6 +29,9 @@ object ControllerMappingCodec {
         mapping.presentedResult.takeIf { it in RESULTS }.orEmpty(),
         // 13 the ready-made preset the player chose (empty for automatic or a mix made by hand).
         mapping.preset.takeIf { it in PRESETS }.orEmpty(),
+        // 14 the profile of the table the game is read through when it is not the Steam Frame's, 15 the controls that table binds.
+        ControllerProfile.cleanTable(mapping.table),
+        ControllerProfile.cleanTableControls(mapping.tableControls).joinToString(",") { it.key },
     ).joinToString("|")
 
     /** True when the record carries the current version mark: otherwise reading it freezes a customised mapping as it worked before. */
@@ -60,5 +63,7 @@ object ControllerMappingCodec {
         used = parts.getOrNull(11).orEmpty().takeIf { it in USED }.orEmpty(),
         presentedResult = parts.getOrNull(12).orEmpty().takeIf { it in RESULTS }.orEmpty(),
         preset = parts.getOrNull(13).orEmpty().takeIf { it in PRESETS }.orEmpty(),
+        table = ControllerProfile.cleanTable(parts.getOrNull(14).orEmpty()),
+        tableControls = ControllerProfile.cleanTableControls(parts.getOrNull(15).orEmpty().split(',').mapNotNull(ControlRef::parse)),
     )
 }

@@ -26,6 +26,23 @@ class ControllerProfileExtrasTest {
     }
 
     @Test
+    fun `the table in use and its controls are read, the bad ones dropped and the list capped`() {
+        val controls = arrayOf("left:x", " right:a ", "left:x", "nobody:x", "", "left") + (1..60).map { "left:c$it" }
+        val e = ControllerProfileExtras.of(null, null, null, "native", "/interaction_profiles/bytedance/pico4_controller", controls)
+        assertEquals("/interaction_profiles/bytedance/pico4_controller", e.table)
+        assertEquals(listOf("left:x", "right:a"), e.tableControls?.take(2)?.map { it.key })
+        assertEquals(ControllerProfile.MAX_TABLE_CONTROLS, e.tableControls?.size)
+    }
+
+    @Test
+    fun `a call with no table, or a bad one, gives none`() {
+        assertNull(ControllerProfileExtras.of(null, null, null, "frame").table)
+        assertNull(ControllerProfileExtras.of(null, null, null, "frame").tableControls)
+        assertNull(ControllerProfileExtras.of(null, null, null, "native", "no-slash|here", null).table)
+        assertNull(ControllerProfileExtras.of(null, null, null, "native", "", null).table)
+    }
+
+    @Test
     fun `an unknown word is ignored`() {
         val e = ControllerProfileExtras.of(arrayOf(), "banana", "maybe", "everything")
         assertNull(e.profiles)

@@ -541,6 +541,8 @@ public final class GamePortHookProvider extends ContentProvider {
             if (report.present != null) extras.putString("present", report.present);
             if (report.presented != null) extras.putString("presented", report.presented);
             if (report.used != null) extras.putString("used", report.used);
+            if (report.table != null) extras.putString("table", report.table);
+            if (!report.controls.isEmpty()) extras.putStringArray("tableControls", report.controls.toArray(new String[0]));
         } catch (Throwable t) {
             Log.w(TAG, "could not read the controller profiles", t);
         }

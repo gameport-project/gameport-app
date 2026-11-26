@@ -15,6 +15,10 @@ data class ControllerProfileExtras(
     val presented: String? = null,
     /** The table that was translated or used: `frame`, `touch`, `native` or `none`, or null. */
     val used: String? = null,
+    /** The profile of the table the game is read through when it is not the Steam Frame's, or null. */
+    val table: String? = null,
+    /** The controls that table binds; null when the hook did not send any. */
+    val tableControls: List<app.gameport.core.model.ControlRef>? = null,
 ) {
     companion object {
         private val PRESENT = setOf("auto", "frame", "touch")
@@ -22,14 +26,19 @@ data class ControllerProfileExtras(
         private val USED = setOf("frame", "touch", "native", "none")
 
         /** From the raw values of the call: entries that are malformed are dropped, an unknown word is null, the list is capped. */
-        fun of(profiles: Array<String>?, present: String?, presented: String?, used: String?) = ControllerProfileExtras(
+        fun of(profiles: Array<String>?, present: String?, presented: String?, used: String?, table: String? = null, tableControls: Array<String>? = null) = ControllerProfileExtras(
             profiles = profiles?.mapNotNull(ControllerProfile::parseEntry)?.let(ControllerProfile::cleanAll)?.takeIf { it.isNotEmpty() },
             present = present?.trim()?.takeIf { it in PRESENT },
             presented = presented?.trim()?.takeIf { it in PRESENTED },
             used = used?.trim()?.takeIf { it in USED },
+            table = table?.let(ControllerProfile::cleanTable)?.takeIf { it.isNotEmpty() },
+            tableControls = tableControls?.mapNotNull { app.gameport.core.model.ControlRef.parse(it.trim()) }?.let(ControllerProfile::cleanTableControls),
         )
 
-        fun read(extras: android.os.Bundle) = of(extras.getStringArray("profiles"), extras.getString("present"), extras.getString("presented"), extras.getString("used"))
+        fun read(extras: android.os.Bundle) = of(
+            extras.getStringArray("profiles"), extras.getString("present"), extras.getString("presented"), extras.getString("used"),
+            extras.getString("table"), extras.getStringArray("tableControls"),
+        )
     }
 }
 

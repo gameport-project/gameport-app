@@ -20,6 +20,26 @@ public class ControllerProfilesTest {
         assertEquals("touch", r.used);
     }
 
+    @Test public void theTableInUseAndItsControlsAreRead() {
+        ControllerProfiles.Report r = ControllerProfiles.parse(Arrays.asList(
+                "used=native", "table=/interaction_profiles/bytedance/pico4_controller", "control=left:x", "control=right:a", "control=left:x", "control=left:thumbstick"));
+        assertEquals("/interaction_profiles/bytedance/pico4_controller", r.table);
+        assertEquals(Arrays.asList("left:x", "right:a", "left:thumbstick"), r.controls);
+    }
+
+    @Test public void aBadTableOrControlIsLeftOut() {
+        ControllerProfiles.Report r = ControllerProfiles.parse(Arrays.asList(
+                "table=interaction_profiles/x", "table=/a b", "table=/a|b", "control=up:x", "control=left:", "control=left:X", "control=left:a-b", "control=left", "control=", "control=right:y"));
+        assertNull(r.table);
+        assertEquals(Arrays.asList("right:y"), r.controls);
+    }
+
+    @Test public void noMoreThanTheCapOfControlsIsKept() {
+        List<String> lines = new ArrayList<String>();
+        for (int i = 0; i < 60; i++) lines.add("control=left:c" + i);
+        assertEquals(ControllerProfiles.MAX_CONTROLS, ControllerProfiles.parse(lines).controls.size());
+    }
+
     @Test public void noFileOrNothingChangesNothing() {
         ControllerProfiles.Report r = ControllerProfiles.parse(null);
         assertTrue(r.profiles.isEmpty());

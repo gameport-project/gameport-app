@@ -8,12 +8,15 @@ namespace {
 
 using namespace fixture;
 
-std::vector<std::string> g_files;  // what the layer would have written to xr_profiles.txt, each time it writes it
+std::vector<std::string> g_files;         // what the layer would have written to xr_profiles.txt, each time it writes it
+std::vector<std::string> g_controlFiles;  // and to xr_controls.txt (the controls the page is told the game uses)
 
 void Start(Family family, Present present) {
     Reset(family);
     g_files.clear();
+    g_controlFiles.clear();
     g_writeProfilesText = [](const std::string& text) { g_files.push_back(text); };
+    g_writeControlsText = [](const std::string& text) { g_controlFiles.push_back(text); };
     g_present = static_cast<int>(present);
     // What the layer's start does for "frame": the existing preference.
     g_preferFrame = present == Present::Frame;
@@ -106,7 +109,7 @@ void PresentFrameMetaBothTablesUsesPreferPath() {
     CHECK(FileHas("present=frame") && FileHas("presented=applied") && FileHas("used=frame"));
 }
 
-void PresentFramePicoNoNativeSameAsAuto() {
+void PresentFramePicoNoNativeKeepsTheFrame() {
     Start(Family::Pico, Present::Frame);
     Game(kTouch, TouchVocab(), 30, 1000);
     Game(kFrame, FrameVocab(), 33, 2000);
@@ -212,9 +215,89 @@ void ProfilesFileWrittenOnceAndListsAllTables() {
     std::string expected;
     const std::map<std::string, int> counts = {{kGaze, 1}, {kSimple, 6}, {kTouch, 30}, {kFrame, 33}, {kIndex, 8}};
     for (const std::string& n : names) expected += "profile=" + n + "|" + std::to_string(counts.at(n)) + "\n";
-    expected += "present=auto\npresented=applied\nused=frame\n";
+    // Nobody chose: a Pico reads the Quest's controls of a game that has them, so the table in use is the Touch's, with the controls it binds (sorted).
+    expected += "present=auto\npresented=applied\nused=touch\ntable=" + std::string(kTouch) + "\n";
+    for (const char* control : {"left:menu", "left:squeeze", "left:thumbstick", "left:trigger", "left:x", "left:y", "right:a", "right:b", "right:squeeze", "right:thumbstick", "right:trigger"}) {
+        expected += std::string("control=") + control + "\n";
+    }
     CHECK(g_files.size() == 1 && g_files[0] == expected);
     CHECK(Summaries() == 4);
+}
+
+void AutoPicoUsesTheQuestControlsOfAGameThatHasThem() {
+    Start(Family::Pico, Present::Auto);
+    Game(kTouch, TouchVocab(), 30, 1000);
+    Game(kFrame, FrameVocab(), 33, 2000);
+    EmulateIfNeeded(nullptr);
+    CHECK(g_emulating.load() && g_rt.names[g_emulatedSourcePath] == kTouch);
+    CHECK(Has("the game has the Quest's controls and this device has none of its own for them: they are used, as on a Quest"));
+    CHECK(Has("touch controls translated with the overrides"));
+    CHECK(!Has("valve controls translated"));
+    CHECK(!Has("as the player asked"));
+    CHECK(FileHas("present=auto") && FileHas("presented=applied") && FileHas("used=touch"));
+}
+
+void AutoPicoQuestControlsRefusedFallsBackToTheFrame() {
+    Start(Family::Pico, Present::Auto);
+    Game(kTouch, TouchVocab(), 30, 1000);
+    Game(kFrame, FrameVocab(), 33, 2000);
+    Refuse(1000, 30);
+    EmulateIfNeeded(nullptr);
+    CHECK(Has("the Quest's controls could not be translated: the game's tables are given back to the runtime and the Steam Frame's are tried"));
+    CHECK(g_rt.names[g_emulatedSourcePath] == kFrame);
+    CHECK(FileHas("used=frame"));
+    CHECK(!FileHas("table="));
+    // The page is told the table that got used, not the one tried first.
+    CHECK(!g_controlFiles.empty() && g_controlFiles.back().compare(0, 13, "source=valve\n") == 0);
+}
+
+// Whatever the player chose, a game that has the Quest's controls and the Steam Frame's is told to the page as having both: choosing one must not take the choice of the other away.
+void ChoiceDoesNotTakeAwayThatTheGameHasBothTables() {
+    for (Present present : {Present::Auto, Present::Frame, Present::Touch}) {
+        Start(Family::Pico, present);
+        Game(kTouch, TouchVocab(), 30, 1000);
+        Game(kFrame, FrameVocab(), 33, 2000);
+        EmulateIfNeeded(nullptr);
+        CHECK(!g_controlFiles.empty() && g_controlFiles.back().find("both=1\n") != std::string::npos);
+    }
+    // A game with the Steam Frame's controls only is not told as having both.
+    Start(Family::Pico, Present::Frame);
+    Game(kFrame, FrameVocab(), 33, 2000);
+    EmulateIfNeeded(nullptr);
+    CHECK(!g_controlFiles.empty() && g_controlFiles.back().find("both=1\n") == std::string::npos);
+}
+
+void AutoPicoPreferFrameEnvKeepsTheFrame() {
+    Start(Family::Pico, Present::Auto);
+    g_preferFrame = true;  // GAMEPORT_XR_PREFER_FRAME=1 with no explicit choice
+    Game(kTouch, TouchVocab(), 30, 1000);
+    Game(kFrame, FrameVocab(), 33, 2000);
+    EmulateIfNeeded(nullptr);
+    CHECK(g_rt.names[g_emulatedSourcePath] == kFrame);
+    CHECK(!Has("the game has the Quest's controls"));
+    CHECK(FileHas("used=frame"));
+}
+
+// A game with the Steam Frame's own actions (more than its Touch table has): the Quest's controls are still what it reads on a Pico, the choice being to read what a Quest reads. The
+// page is told the game has both tables, so that the player may choose the Steam Frame's.
+void AutoPicoGameWithOwnFrameActionsStillUsesTheQuestControls() {
+    Start(Family::Pico, Present::Auto);
+    Game(kTouch, TouchVocab(), 30, 1000);
+    Game(kFrame, FrameVocab(), 44, 2000);
+    EmulateIfNeeded(nullptr);
+    CHECK(g_rt.names[g_emulatedSourcePath] == kTouch);
+    CHECK(FileHas("used=touch"));
+    CHECK(!g_controlFiles.empty() && g_controlFiles.back().compare(0, 13, "source=touch\n") == 0);
+    CHECK(!g_controlFiles.empty() && g_controlFiles.back().find("both=1\n") != std::string::npos);
+}
+
+void AutoPicoGameWithOnlyTheFrameKeepsTheFrame() {
+    Start(Family::Pico, Present::Auto);
+    Game(kFrame, FrameVocab(), 33, 2000);
+    EmulateIfNeeded(nullptr);
+    CHECK(g_rt.names[g_emulatedSourcePath] == kFrame);
+    CHECK(!Has("the game has the Quest's controls"));
+    CHECK(FileHas("used=frame") && !FileHas("table="));
 }
 
 void UsedReflectsTouchWhenFrameFailsThenTouchWorks() {
@@ -253,7 +336,13 @@ int main(int argc, char** argv) {
                               {"PresentTouchUnknownFamilyIsIgnored", PresentTouchUnknownFamilyIsIgnored},
                               {"ProfilesFileIsWrittenAtomically", ProfilesFileIsWrittenAtomically},
                               {"PresentFrameMetaBothTablesUsesPreferPath", PresentFrameMetaBothTablesUsesPreferPath},
-                              {"PresentFramePicoNoNativeSameAsAuto", PresentFramePicoNoNativeSameAsAuto},
+                              {"PresentFramePicoNoNativeKeepsTheFrame", PresentFramePicoNoNativeKeepsTheFrame},
+                              {"AutoPicoUsesTheQuestControlsOfAGameThatHasThem", AutoPicoUsesTheQuestControlsOfAGameThatHasThem},
+                              {"AutoPicoQuestControlsRefusedFallsBackToTheFrame", AutoPicoQuestControlsRefusedFallsBackToTheFrame},
+                              {"AutoPicoGameWithOnlyTheFrameKeepsTheFrame", AutoPicoGameWithOnlyTheFrameKeepsTheFrame},
+                              {"ChoiceDoesNotTakeAwayThatTheGameHasBothTables", ChoiceDoesNotTakeAwayThatTheGameHasBothTables},
+                              {"AutoPicoPreferFrameEnvKeepsTheFrame", AutoPicoPreferFrameEnvKeepsTheFrame},
+                              {"AutoPicoGameWithOwnFrameActionsStillUsesTheQuestControls", AutoPicoGameWithOwnFrameActionsStillUsesTheQuestControls},
                               {"PresentTouchPicoTranslatesTouchBeforeFrame", PresentTouchPicoTranslatesTouchBeforeFrame},
                               {"PresentTouchPicoWithoutTouchTableFallsBackToAuto", PresentTouchPicoWithoutTouchTableFallsBackToAuto},
                               {"PresentTouchMetaDoesNothing", PresentTouchMetaDoesNothing},

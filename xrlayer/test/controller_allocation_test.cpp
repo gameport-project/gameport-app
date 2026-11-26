@@ -71,13 +71,21 @@ int main() {
         CHECK(b["right:bumper"] == T({"right:squeeze"}));
         CHECK(gp::SharedTargets(b)["right:squeeze"].size() == 2);
     }
-    // The right menu goes to the left menu, and so does the left view button (the same action may be bound to both); the right view and unknown controls go nowhere.
+    // The right menu goes to the left menu, the left view button takes a face button the game does not use; the right view and unknown controls go nowhere.
     {
         auto a = gp::Allocate({"right:menu", "left:view", "right:view", "left:steam"}, none(), false);
         CHECK(a["right:menu"] == T({"left:menu"}));
-        CHECK(a["left:view"] == T({"left:menu"}));
+        CHECK(a["left:view"] == T({"left:y"}));
         CHECK(a["right:view"].empty() && a["left:steam"].empty());
-        CHECK(gp::SharedTargets(a)["left:menu"].size() == 2);
+        CHECK(gp::SharedTargets(a).empty());
+    }
+    // With X and Y of the Steam Frame in use, the view button shares the menu's control as before; alone, it has the menu's control to itself.
+    {
+        auto b = gp::Allocate({"right:menu", "left:view", "right:x", "right:y"}, none(), false);
+        CHECK(b["left:view"] == T({"left:menu"}));
+        CHECK(gp::SharedTargets(b)["left:menu"].size() == 2);
+        auto c = gp::Allocate({"left:view"}, none(), false);
+        CHECK(c["left:view"] == T({"left:menu"}));
     }
     // A control the game does not use takes nothing: only what is used competes.
     {

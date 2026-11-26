@@ -104,7 +104,33 @@ class ControllerMappingCodecTest {
         assertEquals(ControllerProfile.MAX_PROFILES, ControllerProfile.cleanAll(many).size)
         val record = ControllerMappingCodec.encode(ControllerMapping(profiles = many + ControllerProfile("/bad|one", 1)))
         assertEquals(ControllerProfile.MAX_PROFILES, ControllerMappingCodec.decode(record).profiles.size)
-        assertEquals(14, record.split('|').size)
+        assertEquals(16, record.split('|').size)
+    }
+
+    @Test
+    fun `the table the game is read through survives a round trip, and an older record reads without it`() {
+        val m = ControllerMapping(
+            detected = listOf(c("left:x")), source = "none", used = "native",
+            table = "/interaction_profiles/bytedance/pico4_controller", tableControls = listOf(c("left:x"), c("right:a"), c("left:thumbstick")),
+        )
+        val back = ControllerMappingCodec.decode(ControllerMappingCodec.encode(m))
+        assertEquals(m.table, back.table)
+        assertEquals(m.tableControls, back.tableControls)
+        // A record of 14 parts, as the previous version wrote it, has no table.
+        val old = ControllerMappingCodec.encode(m).split('|').take(14).joinToString("|")
+        assertEquals("", ControllerMappingCodec.decode(old).table)
+        assertTrue(ControllerMappingCodec.decode(old).tableControls.isEmpty())
+    }
+
+    @Test
+    fun `a table path with a separator is refused and the controls are capped`() {
+        assertEquals("", ControllerProfile.cleanTable("/a|b"))
+        assertEquals("", ControllerProfile.cleanTable("/a,b"))
+        assertEquals("", ControllerProfile.cleanTable("no-slash"))
+        assertEquals("", ControllerProfile.cleanTable("/" + "x".repeat(201)))
+        assertEquals("/ok/one", ControllerProfile.cleanTable(" /ok/one "))
+        val many = (1..60).map { c("left:c$it") }
+        assertEquals(ControllerProfile.MAX_TABLE_CONTROLS, ControllerProfile.cleanTableControls(many + many).size)
     }
 
     @Test

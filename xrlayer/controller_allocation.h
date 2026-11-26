@@ -70,8 +70,9 @@ inline const Targets& Fallbacks(const std::string& source) {
         {"right:x", {"left:x", "left:y"}},
         {"right:y", {"left:y", "left:x"}},
         {"right:menu", {"left:menu"}},
-        // Some games bind their menu to the view button as well as to the menu button: it shares the menu's control, the same action being bound to both.
-        {"left:view", {"left:menu"}},
+        // The view button takes the menu's control when nothing else has it. When the right menu has it, the view button takes a face button the game does not use
+        // (a game that binds both has two controls to give, and the device has free buttons for them); only when there is none does it share the menu's control.
+        {"left:view", {"left:menu", "left:y", "left:x"}},
         // Valve maps the Touch's top button onto the Frame's left, up and right and its bottom one onto down; the other way round, by what the game uses.
         {"left:dpad_up", {"left:y", "left:x"}},
         {"left:dpad_down", {"left:x", "left:y"}},

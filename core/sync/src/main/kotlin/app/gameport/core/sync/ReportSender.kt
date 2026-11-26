@@ -57,6 +57,8 @@ data class ReportMeta(
     val voter: String,
     /** The answer the player gave with the report ("fails" or "offline_only"), so the relay can tell it: the answer itself reaches the relay just after the report. */
     val answer: String? = null,
+    /** The answer is "it works" and the player said the controls do not: the relay tells it so, not as a plain "works". */
+    val noControls: Boolean = false,
 )
 
 /** Sends one report to the relay. */
@@ -106,7 +108,7 @@ internal fun urlEncode(text: String): String = URLEncoder.encode(text, "UTF-8")
 class HttpReportTransport(private val address: String) : ReportTransport {
     override suspend fun post(meta: ReportMeta, zip: ByteArray): Delivery = withContext(Dispatchers.IO) {
         fun q(text: String) = urlEncode(text)
-        postZip("$address?appId=${meta.appId}&app=${q(meta.appVersion)}&device=${q(meta.device)}&voter=${q(meta.voter)}${meta.answer?.let { "&answer=${q(it)}" }.orEmpty()}", zip, TIMEOUT_MS)
+        postZip("$address?appId=${meta.appId}&app=${q(meta.appVersion)}&device=${q(meta.device)}&voter=${q(meta.voter)}${meta.answer?.let { "&answer=${q(it)}" }.orEmpty()}${if (meta.noControls) "&noControls=1" else ""}", zip, TIMEOUT_MS)
     }
 
     companion object {
@@ -181,11 +183,17 @@ class ReportSender @Inject constructor(
     private val outbox by lazy { ReportOutbox(File(context.filesDir, "report-outbox")) }
     private val appVersion: String by lazy { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
 
-    private fun meta(appId: Int) = ReportMeta(
-        appId, appVersion, device.kind, verdicts.voterId,
-        // A report goes with an answer that says something went wrong; the answer that waits for it is the one told.
-        answer = verdicts.book.value.games[appId]?.verdict?.takeIf { it == Verdict.FAILS.wire || it == Verdict.OFFLINE_ONLY.wire },
-    )
+    private fun meta(appId: Int): ReportMeta {
+        val game = verdicts.book.value.games[appId]
+        // A game that works but whose controls do not also sends a report: its answer is told with it, as "works, but not the controls".
+        val noControls = game?.verdict == Verdict.WORKS.wire && app.gameport.core.model.Symptom.NO_CONTROLS.code in game.issues
+        return ReportMeta(
+            appId, appVersion, device.kind, verdicts.voterId,
+            // A report goes with an answer that says something went wrong; the answer that waits for it is the one told.
+            answer = game?.verdict?.takeIf { it == Verdict.FAILS.wire || it == Verdict.OFFLINE_ONLY.wire || noControls },
+            noControls = noControls,
+        )
+    }
 
     /** Sends what waited for a network, when GamePort starts. */
     fun start() {

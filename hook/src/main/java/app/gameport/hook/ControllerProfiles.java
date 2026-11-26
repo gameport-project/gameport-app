@@ -18,7 +18,13 @@ final class ControllerProfiles {
         String present;
         String presented;
         String used;
+        /** The profile of the table the game is read through when it is not the Steam Frame's (its own for the device, or the Touch's); null when none. */
+        String table;
+        /** The controls ({@code left:x}) that table binds, distinct, at most {@link #MAX_CONTROLS}. */
+        final List<String> controls = new ArrayList<>();
     }
+
+    static final int MAX_CONTROLS = 40;
 
     private ControllerProfiles() {}
 
@@ -33,20 +39,58 @@ final class ControllerProfiles {
         Report report = new Report();
         if (lines == null) return report;
         for (String raw : lines) {
-            if (raw == null) continue;
-            String line = raw.trim();
-            if (line.startsWith("profile=")) {
-                String entry = profileEntry(line.substring("profile=".length()));
-                if (entry != null && report.profiles.size() < MAX_PROFILES && !report.profiles.contains(entry)) report.profiles.add(entry);
-            } else if (line.startsWith("present=")) {
-                report.present = oneOf(line.substring("present=".length()), "auto", "frame", "touch");
-            } else if (line.startsWith("presented=")) {
-                report.presented = oneOf(line.substring("presented=".length()), "applied", "fallback", "ignored");
-            } else if (line.startsWith("used=")) {
-                report.used = oneOf(line.substring("used=".length()), "frame", "touch", "native", "none");
-            }
+            if (raw != null) readLine(report, raw.trim());
         }
         return report;
+    }
+
+    private static void readLine(Report report, String line) {
+        if (line.startsWith("profile=")) {
+            String entry = profileEntry(line.substring("profile=".length()));
+            if (entry != null && report.profiles.size() < MAX_PROFILES && !report.profiles.contains(entry)) report.profiles.add(entry);
+        } else if (line.startsWith("present=")) {
+            report.present = oneOf(line.substring("present=".length()), "auto", "frame", "touch");
+        } else if (line.startsWith("presented=")) {
+            report.presented = oneOf(line.substring("presented=".length()), "applied", "fallback", "ignored");
+        } else if (line.startsWith("used=")) {
+            report.used = oneOf(line.substring("used=".length()), "frame", "touch", "native", "none");
+        } else if (line.startsWith("table=")) {
+            report.table = tablePath(line.substring("table=".length()));
+        } else if (line.startsWith("control=")) {
+            addControl(report, line.substring("control=".length()));
+        }
+    }
+
+    private static void addControl(Report report, String value) {
+        String control = controlKey(value);
+        if (control != null && report.controls.size() < MAX_CONTROLS && !report.controls.contains(control)) report.controls.add(control);
+    }
+
+    /** A profile path ({@code /interaction_profiles/oculus/touch_controller}) with only printable characters and none the report uses as a separator; null otherwise. */
+    private static String tablePath(String value) {
+        String path = value.trim();
+        if (path.isEmpty() || path.charAt(0) != '/' || path.length() > MAX_ENTRY) return null;
+        for (int i = 0; i < path.length(); i++) {
+            char c = path.charAt(i);
+            if (c <= ' ' || c > '~' || c == '|' || c == ':' || c == ',' || c == '=') return null;
+        }
+        return path;
+    }
+
+    /** {@code left:x}: a hand, a colon and a lower-case name of letters, digits and underscores; null otherwise. */
+    private static String controlKey(String value) {
+        String key = value.trim();
+        int colon = key.indexOf(':');
+        if (colon < 0 || key.length() > 32) return null;
+        String hand = key.substring(0, colon);
+        String group = key.substring(colon + 1);
+        if (!hand.equals("left") && !hand.equals("right")) return null;
+        if (group.isEmpty()) return null;
+        for (int i = 0; i < group.length(); i++) {
+            char c = group.charAt(i);
+            if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_')) return null;
+        }
+        return key;
     }
 
     private static String oneOf(String value, String... allowed) {
