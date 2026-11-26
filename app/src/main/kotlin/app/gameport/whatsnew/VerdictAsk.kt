@@ -118,7 +118,11 @@ class VerdictAskViewModel @Inject constructor(
     private val reports: ReportSender,
     private val reporter: ProblemReporter,
     private val expansionVerifier: app.gameport.core.sync.ExpansionVerifier,
+    device: app.gameport.core.device.DeviceProfile,
 ) : ViewModel() {
+    /** "The game works, but not the controls" only makes sense where there are controllers to map (a device with VR). */
+    val offersNoControls: Boolean = device.isHeadset
+
     private val version: String get() = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
     private val today: String get() = LocalDate.now().toString()
 
@@ -151,12 +155,13 @@ class VerdictAskViewModel @Inject constructor(
     /** Whether the libraries go: the box is ticked and a Discord name is there, which the project needs to talk about them. */
     private fun librariesGo(current: ReportFollowUp) = current.withLibraries && app.gameport.core.model.DiscordName.clean(verdicts.discordName.value).isNotEmpty()
 
-    fun onAnswer(verdict: Verdict) {
+    /** [noControls]: the game worked but its controls did not (the verdict is "it worked", and the answer carries that one code). */
+    fun onAnswer(verdict: Verdict, noControls: Boolean = false) {
         val asked = question.value ?: return
         // A game that did not work, or whose online part does not, leaves something to look at in the report: the report goes first, and the answer waits to say what became of it.
         val withReport = verdict == Verdict.FAILS || verdict == Verdict.OFFLINE_ONLY
         val steady = steadiness.value.takeIf { asked.shared }
-        verdicts.answer(asked.appId, verdict, version, today, holdForReport = withReport, steadiness = steady)
+        verdicts.answer(asked.appId, verdict, version, today, holdForReport = withReport, steadiness = steady, noControls = noControls && verdict == Verdict.WORKS)
         if (withReport) prepareReport(asked.appId, offlineOnly = verdict == Verdict.OFFLINE_ONLY)
     }
 
@@ -280,12 +285,13 @@ fun VerdictAskHost(viewModel: VerdictAskViewModel = hiltViewModel()) {
             }
         },
         confirmButton = {
-            // The four buttons are stacked, each as wide as the window, so no label is cut or wraps: the three answers, then "not now" in white.
+            // The buttons are stacked, each as wide as the window, so no label is cut or wraps: the answers, then "not now" in white.
             // A button reserves an invisible margin to reach 48 dp of touch area, which adds to the space between them: it is taken away here, so the
             // space between the buttons is the one that is written.
             CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Answer(R.string.verdict_worked, glyph = Glyph.CHECK, tint = WorksGreen) { viewModel.onAnswer(Verdict.WORKS) }
+                    if (viewModel.offersNoControls) Answer(R.string.verdict_no_controls, glyph = Glyph.EXCLAMATION, tint = OfflineOrange) { viewModel.onAnswer(Verdict.WORKS, noControls = true) }
                     Answer(R.string.verdict_offline_only, glyph = Glyph.NO_NETWORK, tint = OfflineOrange) { viewModel.onAnswer(Verdict.OFFLINE_ONLY) }
                     Answer(R.string.verdict_failed, glyph = Glyph.CROSS, tint = FailsRed) { viewModel.onAnswer(Verdict.FAILS) }
                     NotNow(viewModel::onLater)

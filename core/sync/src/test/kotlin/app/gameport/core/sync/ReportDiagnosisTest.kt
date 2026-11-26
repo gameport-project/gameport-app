@@ -369,4 +369,21 @@ class ReportDiagnosisTest {
         assertTrue(text, text.contains("this system records none"))
         assertFalse(ReportDiagnosis.of("", "I GPHook : ok", "", null).contains("native crash"))
     }
+
+    @Test
+    fun `what the player chose for the controllers is said, with what became of it`() {
+        val text = ReportDiagnosis.of("", "I GPHook : plan: NONE", "", null, controllerChoice = ReportDiagnosis.ControllerChoice("touch", "fallback"))
+        assertTrue(text, text.contains("controllers, what the player chose: presented=touch, applied=fallback"))
+        val unreported = ReportDiagnosis.of("", "", "", null, controllerChoice = ReportDiagnosis.ControllerChoice("auto", ""))
+        assertTrue(unreported, unreported.contains("presented=auto, applied=not reported"))
+        assertFalse(ReportDiagnosis.of("", "", "", null).contains("what the player chose"))
+    }
+
+    @Test
+    fun `the layer's line about the choice is told among what it did`() {
+        val log = "I GPXR : xrSuggestInteractionProfileBindings(/interaction_profiles/oculus/touch_controller, 30 bindings, 12 actions) -> 0\n" +
+            "I GPXR : present=touch presented=applied used=touch\n"
+        val text = ReportDiagnosis.of("", log, "", null)
+        assertTrue(text, text.contains("controllers, what the layer did: present=touch presented=applied used=touch"))
+    }
 }

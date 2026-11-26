@@ -54,7 +54,7 @@ fun GameCompatScreen(onBack: () -> Unit, viewModel: GameCompatViewModel = hiltVi
     val showOpenInVr by viewModel.showOpenInVr.collectAsStateWithLifecycle()
     val showOvrPluginStandIn by viewModel.showOvrPluginStandIn.collectAsStateWithLifecycle()
     val renameNeeded by viewModel.renameNeeded.collectAsStateWithLifecycle()
-    GameCompatContent(mapping, settings, stageFallback, gameName, onBack, viewModel::onUseFrameChanged, viewModel::onRecenterChosen, showOpenInVr, viewModel::onOpenInVrChosen, showOvrPluginStandIn, viewModel::onOvrPluginStandInChosen, viewModel::onPassthroughChosen, viewModel.passthroughListed, viewModel.showEyeFoveation, viewModel::onEyeFoveationChosen, viewModel.showHaptics, viewModel::onHapticsChosen, viewModel::onPackageNameChosen, viewModel.refusesReSignedGames, renameNeeded)
+    GameCompatContent(mapping, settings, stageFallback, gameName, onBack, viewModel::onUseFrameChanged, viewModel::onRecenterChosen, showOpenInVr, viewModel::onOpenInVrChosen, showOvrPluginStandIn, viewModel::onOvrPluginStandInChosen, viewModel::onPassthroughChosen, viewModel.passthroughListed, viewModel.showEyeFoveation, viewModel::onEyeFoveationChosen, viewModel.showHaptics, viewModel::onHapticsChosen, viewModel::onPackageNameChosen, viewModel.refusesReSignedGames, renameNeeded, viewModel.controllerDeviceFamily, viewModel::onPresentedChosen)
 }
 
 /** The page of the options, from what it shows: the screen feeds it from the game, the tour of the page feeds it made-up values. */
@@ -80,22 +80,30 @@ internal fun GameCompatContent(
     onPackageNameChosen: (app.gameport.core.model.PackageNameMode) -> Unit = {},
     refusesReSignedGames: Boolean = false,
     renameNeeded: Boolean = false,
+    deviceFamily: String? = null,
+    onPresentedChosen: (app.gameport.core.model.PresentedControllers) -> Unit = {},
 ) {
+    val choice = ControllerChoiceState.of(mapping, deviceFamily)
     Scaffold { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 32.dp)) {
             PageHeader(onBack, stringResource(R.string.gamecompat_title), gameName, tour = app.gameport.core.model.TourKind.GAME_COMPAT) {
                 Icon(Icons.Filled.Build, contentDescription = null, tint = CompatOrange, modifier = Modifier.size(52.dp))
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                OptionBox(
-                    modifier = Modifier.tourTarget(TourIds.GAMECOMPAT_FRAME),
-                    title = stringResource(R.string.controllers_use_frame),
-                    legend = stringResource(R.string.controllers_use_frame_legend),
-                    checked = mapping.useFrame,
-                    onChecked = onUseFrameChanged,
-                    // Only when the game ran and the layer saw no control for the Steam Frame's controllers.
-                    warning = stringResource(R.string.controllers_use_frame_warning).takeIf { mapping.useFrame && mapping.noFrameControls },
-                )
+                if (choice.choosable) {
+                    PresentedControllersBox(Modifier.tourTarget(TourIds.GAMECOMPAT_FRAME), choice, mapping.presented, onPresentedChosen)
+                } else {
+                    OptionBox(
+                        modifier = Modifier.tourTarget(TourIds.GAMECOMPAT_FRAME),
+                        title = stringResource(R.string.controllers_use_frame),
+                        legend = stringResource(R.string.controllers_use_frame_legend),
+                        checked = mapping.useFrame,
+                        onChecked = onUseFrameChanged,
+                        // Only when the game ran and the layer saw no control for the Steam Frame's controllers.
+                        warning = stringResource(R.string.controllers_use_frame_warning).takeIf { mapping.useFrame && mapping.noFrameControls },
+                        hint = stringResource(R.string.controllers_offered_waiting).takeIf { choice.waitingForLaunch },
+                    )
+                }
                 ChoiceBox(
                     modifier = Modifier.tourTarget(TourIds.GAMECOMPAT_RECENTER),
                     title = stringResource(R.string.gamecompat_recenter),
@@ -197,6 +205,7 @@ private fun OptionBox(
     checked: Boolean,
     onChecked: (Boolean) -> Unit,
     warning: String? = null,
+    hint: String? = null,
 ) {
     Column(
         modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
@@ -209,6 +218,7 @@ private fun OptionBox(
             }
             Switch(checked = checked, onCheckedChange = onChecked)
         }
+        if (hint != null) Text(hint, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         if (warning != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
                 Icon(Icons.Filled.Warning, contentDescription = null, tint = CompatOrange, modifier = Modifier.size(20.dp))
@@ -216,6 +226,82 @@ private fun OptionBox(
             }
         }
     }
+}
+
+/**
+ * What the game says it handles, for information, and which of the Steam Frame's and the Touch's controllers to put forward, from its next start. Automatic
+ * is the first choice and leaves it to GamePort. A choice that could not be applied is told in orange under the option.
+ */
+@Composable
+private fun PresentedControllersBox(
+    modifier: Modifier,
+    choice: ControllerChoiceState,
+    selected: app.gameport.core.model.PresentedControllers,
+    onChosen: (app.gameport.core.model.PresentedControllers) -> Unit,
+) {
+    Column(
+        modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(stringResource(R.string.controllers_offered_title), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.controllers_offered_legend), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        Text(
+            stringResource(R.string.controllers_offered_listed, choice.listed.map { stringResource(kindName(it)) }.joinToString(", ")),
+            color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium,
+        )
+        if (choice.nothingToChoose) {
+            Text(stringResource(R.string.controllers_offered_nothing), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        } else {
+            PillTabs(
+                choice.offered.map { stringResource(presentedName(it)) },
+                choice.offered.indexOf(selected).coerceAtLeast(0),
+                { onChosen(choice.offered[it]) },
+                Modifier.fillMaxWidth(),
+            )
+        }
+        if (choice.ignored) {
+            Text(stringResource(R.string.controllers_offered_ignored), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+        if (choice.noFrameControlsWarning) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+                Icon(Icons.Filled.Warning, contentDescription = null, tint = CompatOrange, modifier = Modifier.size(20.dp))
+                Text(stringResource(R.string.controllers_use_frame_warning), color = CompatOrange, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        choice.used?.let { used ->
+            Text(stringResource(R.string.controllers_offered_used, stringResource(usedName(used))), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+        if (choice.fallback) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+                Icon(Icons.Filled.Warning, contentDescription = null, tint = CompatOrange, modifier = Modifier.size(20.dp))
+                Text(stringResource(R.string.controllers_offered_fallback), color = CompatOrange, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+private fun kindName(kind: app.gameport.core.model.ControllerProfile.Kind): Int = when (kind) {
+    app.gameport.core.model.ControllerProfile.Kind.FRAME -> R.string.controllers_kind_frame
+    app.gameport.core.model.ControllerProfile.Kind.TOUCH -> R.string.controllers_kind_touch
+    app.gameport.core.model.ControllerProfile.Kind.PICO -> R.string.controllers_kind_pico
+    app.gameport.core.model.ControllerProfile.Kind.INDEX -> R.string.controllers_kind_index
+    app.gameport.core.model.ControllerProfile.Kind.VIVE -> R.string.controllers_kind_vive
+    app.gameport.core.model.ControllerProfile.Kind.SIMPLE -> R.string.controllers_kind_simple
+    app.gameport.core.model.ControllerProfile.Kind.GAZE -> R.string.controllers_kind_gaze
+    app.gameport.core.model.ControllerProfile.Kind.OTHER -> R.string.controllers_kind_other
+}
+
+private fun presentedName(choice: app.gameport.core.model.PresentedControllers): Int = when (choice) {
+    app.gameport.core.model.PresentedControllers.AUTO -> R.string.gamecompat_mode_auto
+    app.gameport.core.model.PresentedControllers.FRAME -> R.string.controllers_kind_frame
+    app.gameport.core.model.PresentedControllers.TOUCH -> R.string.controllers_kind_touch
+}
+
+private fun usedName(used: String): Int = when (used) {
+    "frame" -> R.string.controllers_kind_frame
+    "touch" -> R.string.controllers_kind_touch
+    "native" -> R.string.controllers_used_native
+    else -> R.string.controllers_used_none
 }
 
 private val CompatOrange = Color(0xFFFFB74D)

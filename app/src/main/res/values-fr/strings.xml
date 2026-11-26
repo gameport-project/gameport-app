@@ -15,6 +15,7 @@
     <string name="verdict_worked">Ça a marché</string>
     <string name="verdict_failed">Ça n\'a pas marché</string>
     <string name="verdict_offline_only">Marche hors ligne seulement</string>
+    <string name="verdict_no_controls">Marche, mais pas les manettes</string>
     <string name="verdict_later">Pas maintenant</string>
     <string name="report_title">Merci pour la réponse</string>
     <string name="report_short_run">Le jeu n\'a tourné que quelques secondes. Décrire ce qui est apparu à l\'écran, ou le problème constaté après avoir joué un peu plus longtemps, rend le rapport bien plus utile.</string>

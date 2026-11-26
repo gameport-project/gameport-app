@@ -181,8 +181,11 @@ class CloudProvider : ContentProvider() {
                 putInt("xrGpuLevel", if (optimized) -1 else settings?.gpuLevel ?: -1)
                 // The player's controller mapping for the game, empty unless they customise it.
                 putString("xrMap", appId?.let { entryPoint.controllerMappings().layerConfig(it) }.orEmpty())
-                // The player chose the Steam Frame's controls for a game that also has its own (off by default).
-                putBoolean("xrPreferFrame", appId?.let { entryPoint.controllerMappings().get(it).useFrame } == true)
+                // Which controllers the player asked the game to be given: auto (the default, and what a hook that does not know the key assumes), frame or touch.
+                val presentation = ControllerPresentation.of(appId?.let { entryPoint.controllerMappings().get(it).presented })
+                putString("xrPresent", presentation.present)
+                // Kept for the hooks that only know this one: the Steam Frame's controls for a game that also has its own (off by default).
+                putBoolean("xrPreferFrame", presentation.preferFrame)
                 // The kind of headset (meta, pico, openxr), so the layer knows which controllers to translate onto.
                 putString("xrFamily", entryPoint.deviceProfile().vrPlatform?.id.orEmpty())
                 // For which games to open GamePort again when the game closes. Hooks from before the choice only know the first answer.
@@ -197,7 +200,11 @@ class CloudProvider : ContentProvider() {
             val controls = extras.getStringArray("controls").orEmpty().mapNotNull(app.gameport.core.model.ControlRef::parse)
             // The same file also says whether the layer gave the game a space that follows the recentering by itself.
             if (appId != null) entryPoint.gameSettings().setStageFallback(appId, extras.getBoolean("stageFallback"))
-            if (appId != null) entryPoint.controllerMappings().setDetected(appId, controls, extras.getString("source").orEmpty(), extras.getBoolean("both"), extras.getBoolean("silent"))
+            if (appId != null) {
+                // What a newer hook adds (the profiles the game proposed, which table was used, what became of the player's choice) is optional and read apart: a malformed extra is ignored.
+                val extra = runCatching { ControllerProfileExtras.read(extras) }.getOrDefault(ControllerProfileExtras())
+                entryPoint.controllerMappings().setDetected(appId, controls, extras.getString("source").orEmpty(), extras.getBoolean("both"), extras.getBoolean("silent"), extra.profiles, extra.used, extra.presented, extra.present)
+            }
             Bundle().apply { putString(STATUS, OK) }
         }
         // The game came to the screen, is still there, or left it: the time it is on screen is counted (see PlaytimeTracker).

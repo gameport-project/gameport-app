@@ -169,10 +169,11 @@ data class VerdictBook(
     /**
      * The player answered. [send] is false when they chose not to share: the answer stays on this device. [holdForReport] keeps the answer from going until the state of its report
      * is known ([reportStated]): the report is sent first, and the answer says what became of it. [steadiness] is what the player agreed to send about the run, if anything.
+     * [noControls] is "the game works, but not the controls": the verdict stays "it worked" and the answer carries the one code [Symptom.NO_CONTROLS], which the relay keeps on that verdict.
      */
-    fun answered(appId: Int, verdict: Verdict, appVersion: String, today: String, send: Boolean, holdForReport: Boolean = false, steadiness: Steadiness? = null): VerdictBook =
+    fun answered(appId: Int, verdict: Verdict, appVersion: String, today: String, send: Boolean, holdForReport: Boolean = false, steadiness: Steadiness? = null, noControls: Boolean = false): VerdictBook =
         copy(
-            games = games + (appId to GameVerdict(verdict.wire, appVersion, today, sent = !send, offline = verdict == Verdict.WORKS && appId in offlineRuns, holding = send && holdForReport, steadiness = steadiness?.takeIf { it.usable })),
+            games = games + (appId to GameVerdict(verdict.wire, appVersion, today, sent = !send, offline = verdict == Verdict.WORKS && appId in offlineRuns, issues = if (noControls && verdict == Verdict.WORKS) listOf(Symptom.NO_CONTROLS.code) else emptyList(), holding = send && holdForReport, steadiness = steadiness?.takeIf { it.usable })),
             pending = pending - appId,
             offlineRuns = offlineRuns - appId,
         )

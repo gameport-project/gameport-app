@@ -11,6 +11,7 @@ class GamePortApplication : Application() {
     @Inject lateinit var saveCatchUp: app.gameport.core.sync.SaveCatchUp
     @Inject lateinit var connectionKeeper: app.gameport.core.sync.ConnectionKeeper
     @Inject lateinit var verdictSender: app.gameport.core.sync.VerdictSender
+    @Inject lateinit var controllerFeedbackSender: app.gameport.core.sync.ControllerFeedbackSender
     @Inject lateinit var reportSender: app.gameport.core.sync.ReportSender
     @Inject lateinit var compat: app.gameport.core.sync.CompatRepository
     @Inject lateinit var gameDefaults: app.gameport.core.settings.GameDefaults
@@ -30,6 +31,8 @@ class GamePortApplication : Application() {
         connectionKeeper.start()
         // The answers the player gave about games are sent to the relay of the project (if they chose to share them).
         verdictSender.start()
+        // What the player says about the controls of a game goes the same way.
+        controllerFeedbackSender.start()
         reportSender.start()
         // What the players say about the games is read when GamePort starts (and when a page opens, if what is kept is old).
         compat.start()

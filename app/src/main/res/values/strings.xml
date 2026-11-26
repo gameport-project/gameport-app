@@ -15,6 +15,7 @@
     <string name="verdict_worked">It worked</string>
     <string name="verdict_failed">It did not work</string>
     <string name="verdict_offline_only">Works offline only</string>
+    <string name="verdict_no_controls">Works, but not the controls</string>
     <string name="verdict_later">Not now</string>
     <string name="report_title">Thanks for the answer</string>
     <string name="report_short_run">The game ran for only a few seconds. A description of what appeared on screen, or of the problem after playing a little longer, makes the report much more useful.</string>

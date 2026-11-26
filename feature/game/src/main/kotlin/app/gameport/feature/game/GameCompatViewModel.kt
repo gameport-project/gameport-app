@@ -75,6 +75,12 @@ class GameCompatViewModel @Inject constructor(
 
     fun onUseFrameChanged(useFrame: Boolean) = controllers.setUseFrame(appId, useFrame)
 
+    /** The VR platform of this device (`pico`, `meta`, `openxr`), null where there is no VR: the section about the controllers offered to the game depends on it. */
+    val controllerDeviceFamily: String? get() = deviceFamily
+
+    /** The controllers the player asks the game to be given, from its next start. */
+    fun onPresentedChosen(choice: app.gameport.core.model.PresentedControllers) = controllers.setPresented(appId, choice)
+
     /** Automatic leaves it to GamePort; on and off are the player's choice, kept even where GamePort would have decided otherwise. */
     fun onRecenterChosen(mode: RecenterMode) = settings.set(appId, gameSettings.value.copy(recenter = mode))
 

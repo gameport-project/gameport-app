@@ -16,6 +16,9 @@ object ReportDiagnosis {
      */
     data class Launch(val launchedAtMillis: Long?, val dataAtMillis: Long?, val nowMillis: Long, val onPico: Boolean = false)
 
+    /** What the player chose for the controllers presented to the game ([presented]: `auto`, `frame` or `touch`) and what became of it the last run ([applied]: `applied`, `fallback`, `ignored`, or empty when not reported). */
+    data class ControllerChoice(val presented: String, val applied: String)
+
     /** The manifest metadata a game installed under a name of GamePort's own carries, holding the package name its APK came with (see the patch `package_rename`). */
     private const val RENAMED_PACKAGE = "app.gameport.original_package"
 
@@ -33,7 +36,7 @@ object ReportDiagnosis {
         if (RENAMED_PACKAGE in metaKeys) add("Installed under a package name of GamePort's own, so a headset that refuses a re-signed game lets it start (the name the game came with is kept in $RENAMED_PACKAGE)")
     }
 
-    fun of(libraries: String, startLog: String, previousExit: String, dataAgeSeconds: Long?, expansion: Expansion? = null, launch: Launch? = null, vendorChecks: List<String> = emptyList(), digest: String = "", steamCalls: String = "", sessionMillis: Long? = null, calls: String = "", events: String = "", blackBox: String = ""): String = buildString {
+    fun of(libraries: String, startLog: String, previousExit: String, dataAgeSeconds: Long?, expansion: Expansion? = null, launch: Launch? = null, vendorChecks: List<String> = emptyList(), digest: String = "", steamCalls: String = "", sessionMillis: Long? = null, calls: String = "", events: String = "", blackBox: String = "", controllerChoice: ControllerChoice? = null): String = buildString {
         fun yes(value: Boolean) = if (value) "yes" else "no"
         // First of all: a game whose essential controls the runtime refused cannot be played with the controllers.
         leftOutControls(startLog).filter { it.essential.isNotBlank() }.forEach {
@@ -76,7 +79,7 @@ object ReportDiagnosis {
             vendorChecks.forEach { appendLine("  $it") }
         }
         expansion?.let { appendExpansion(it) }
-        appendControllers(startLog)
+        appendControllers(startLog, controllerChoice)
         val exits = previousExit.lineSequence().filter { it.startsWith("time=") }.toList()
         // A system that does not record how a game ended (before Android 11) still prints a native crash in the log: it is told here, from the log itself.
         val crashes = nativeCrashes(startLog)
@@ -299,14 +302,16 @@ object ReportDiagnosis {
 
     private val SUGGESTION = Regex("""xrSuggestInteractionProfileBindings\(([^,]*), (\d+) bindings(?:, (\d+) actions)?\) -> (-?\d+)""")
     private val ACTIVE_PROFILE = Regex("""IP changed: /user/hand/(left|right)(/interaction_profiles/[^,]+), (-?\d+)""")
-    private val DECISION = Regex("""GPXR\s*: (.*(?:nothing to translate|controls translated|taken for).*)""")
+    private val DECISION = Regex("""GPXR\s*: (.*(?:nothing to translate|controls translated|taken for|present(?:ed)?=).*)""")
 
     /**
      * What the game asked of the controllers, read from the start of its log: the profiles it suggested (with how many controls and actions, and what the
      * runtime answered), the profile the system made active, and what GamePort's layer did about it. A game that has controls for the device's own controllers
      * is left alone by the layer; one that has none is translated. The three lines are what tells the two apart in a report.
      */
-    private fun StringBuilder.appendControllers(startLog: String) {
+    private fun StringBuilder.appendControllers(startLog: String, choice: ControllerChoice?) {
+        // What the player chose is told whatever the log holds: it is the setting, not a line of the run.
+        choice?.let { appendLine("controllers, what the player chose: presented=${it.presented}, applied=${it.applied.ifEmpty { "not reported" }}") }
         if (startLog.isBlank() || startLog.startsWith("(")) return
         leftOutControls(startLog).forEach {
             fun say(text: String) = text.trim().ifEmpty { "none" }

@@ -2,6 +2,7 @@ package app.gameport.feature.game
 
 import app.gameport.core.model.reportable
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -117,6 +118,7 @@ class GameViewModel @Inject constructor(
     private val issuesRepository: GameIssuesRepository,
     private val saveSpaces: app.gameport.core.sync.SaveSpaceStore,
     private val controllerMappings: ControllerMappingStore,
+    private val controllerFeedback: app.gameport.core.settings.ControllerFeedbackStore,
     private val gameSettingsStore: app.gameport.core.settings.GameSettingsStore,
     device: DeviceProfile,
     settings: UserSettings,
@@ -157,6 +159,18 @@ class GameViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), app.gameport.core.model.DisplaySettings.DEFAULT_GAME_ARTWORK_HEIGHT)
 
     private val appId = savedStateHandle.toRoute<GameRoute>().appId
+
+    /**
+     * Whether the card that asks if the controls worked is shown: the mapping is the player's own, a run of the game ended since it last changed, and it was not answered yet
+     * (nor put off for that run). The mapping is looked at first, so a change made on another page is dated.
+     */
+    val controllerFeedbackAsked: StateFlow<Boolean> = controllerFeedback.observeAsk(appId)
+        .onStart { controllerFeedback.noteCurrent(appId) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
+
+    fun onControllerFeedback(answer: app.gameport.core.model.ControllerAnswer) = controllerFeedback.answer(appId, answer)
+
+    fun onControllerFeedbackLater() = controllerFeedback.later(appId)
 
     private val baseState: StateFlow<GameUiState> = combine(
         repository.observeLibrary().toGameState(appId),

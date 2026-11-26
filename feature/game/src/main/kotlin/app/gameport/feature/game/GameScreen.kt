@@ -278,6 +278,7 @@ fun GameScreen(onBack: () -> Unit, onOpenSettings: () -> Unit, onOpenSaves: () -
         extras = viewModel.extras.collectAsStateWithLifecycle().value,
         media = viewModel.media.collectAsStateWithLifecycle().value,
         onCompatNoticeSeen = viewModel::onCompatNoticeSeen,
+        controllerFeedback = ControllerFeedbackAsk(viewModel.controllerFeedbackAsked.collectAsStateWithLifecycle().value, viewModel::onControllerFeedback, viewModel::onControllerFeedbackLater),
         onToggleFavorite = viewModel::onToggleFavorite,
         onSetHidden = viewModel::onSetHidden,
         onBack = onBack,
@@ -359,6 +360,8 @@ internal fun GameContent(
     /** What the relay lists for the game, line by line, and what asks for it when the details behind the compatibility label are opened. */
     compatReports: app.gameport.core.model.CompatReports? = null,
     onCompatDetailsOpened: () -> Unit = {},
+    /** The card that asks whether the controls worked, once a run with the player's own mapping ended. */
+    controllerFeedback: ControllerFeedbackAsk = ControllerFeedbackAsk(),
 ) {
     Scaffold { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
@@ -431,6 +434,7 @@ internal fun GameContent(
                     extras = extras,
                     media = media,
                     onCompatNoticeSeen = onCompatNoticeSeen,
+                    controllerFeedback = controllerFeedback,
                     onOpenStore = onOpenStore,
                 )
             }
@@ -520,6 +524,7 @@ private fun GameDetails(
     media: app.gameport.core.model.AppMedia? = null,
     onCompatNoticeSeen: () -> Unit = {},
     onOpenStore: () -> Unit = {},
+    controllerFeedback: ControllerFeedbackAsk = ControllerFeedbackAsk(),
 ) {
     var actionsOpen by rememberSaveable { mutableStateOf(false) }
     // The card of the notifications: open when the page opens, closed from its cross or from the bell, opened again from the bell. Where the bell is says where its arrow points.
@@ -994,6 +999,8 @@ private fun GameDetails(
                         RefusedCard(onReinstall = onReinstallRenamed, busy = repatch is Repatch.Running)
                     }
                 }
+                // After a run with the player's own controller mapping: a card asking whether the controls worked, gone once answered.
+                if (controllerFeedback.visible && vrDevice && install is InstallState.Installed && repatch == Repatch.None) ControllerFeedbackCard(controllerFeedback)
                 // The notifications are in the card of the bell, the progress of a patch in the card of the install; what stays here is the report that can be sent, and a patch that failed.
                 val suspected = issues.filterIsInstance<GameIssue.ProblemSuspected>().firstOrNull()
                 if (install is InstallState.Installed && (suspected != null || repatch is Repatch.Failed || report.rateReset != null || report.lastRun?.adviseLowerResolution == true)) {
@@ -1495,56 +1502,58 @@ private fun Progress(state: InstallState, speedUnit: SpeedUnit, extras: List<Ext
     val pending = rows.filter { it.second != Stand.DONE }
     val shown = pending.take(EXTRAS_SHOWN)
     val gameInPlace = state is InstallState.ExtraContent
-    Column(Modifier.fillMaxWidth().glass(CardShape).padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    // Two columns: the steps and the bars at the left, the buttons stacked at the right, so the bars give way to the buttons and nothing is pushed down.
+    Row(Modifier.fillMaxWidth().glass(CardShape).padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         val small = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 0.dp)
-        // Only while Android waits for the confirmation, and on a line of its own above the two others, so the steps keep their width.
-        // White, like the page's own main button: it is the one thing this step waits for, and it has to catch the eye when the window was missed.
-        if (state is InstallState.Installing && onReopen != null) {
-            Button(onClick = onReopen, contentPadding = small, modifier = Modifier.height(32.dp).align(Alignment.End)) {
-                Text(stringResource(R.string.game_reopen_confirmation), style = MaterialTheme.typography.labelLarge)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            InstallStepper(stage, Modifier.fillMaxWidth())
+            // The game, then the extra content: the one being put in place has its bar, the game is greyed once it is in place.
+            InstallRow(
+                name = stringResource(R.string.install_game),
+                stand = if (gameInPlace) Stand.DONE else Stand.ACTIVE,
+                progress = (state as? InstallState.Downloading)?.progress ?: (state as? InstallState.Installing)?.takeIf { it.step == app.gameport.core.model.InstallStep.COPYING }?.progress,
+                status = if (gameInPlace) null else app.gameport.core.designsystem.installStatusText(state, speedUnit),
+                dimmed = gameInPlace,
+            )
+            shown.forEach { (item, stand) ->
+                InstallRow(
+                    name = item.name,
+                    stand = stand,
+                    progress = if (stand == Stand.ACTIVE) (state as? InstallState.ExtraContent)?.progress else null,
+                    status = when {
+                        stand == Stand.ACTIVE -> "${(((state as? InstallState.ExtraContent)?.progress ?: 0f) * 100).toInt()}%"
+                        item.withGame -> stringResource(R.string.install_extra_with_game)
+                        else -> null
+                    },
+                    dimmed = false,
+                )
+            }
+            val more = pending.size - shown.size
+            if (inPlace > 0 || more > 0) {
+                Text(
+                    listOfNotNull(
+                        if (inPlace > 0) stringResource(R.string.install_extras_in_place, inPlace) else null,
+                        if (more > 0) stringResource(R.string.install_extras_more, more) else null,
+                    ).joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            InstallStepper(stage, Modifier.weight(1f))
-            // Both stay where they are for the whole install, greyed when they cannot be used in this step: the card keeps its height from one step to the next.
-            androidx.compose.material3.OutlinedButton(onClick = { onPause?.invoke() }, enabled = onPause != null, contentPadding = small, modifier = Modifier.height(32.dp)) {
+        // The buttons, one under the other. The two others stay for the whole install, greyed when they cannot be used in this step: the card keeps its width from one step to the next.
+        Column(Modifier.width(IntrinsicSize.Max), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Only while Android waits for the confirmation. White, like the page's own main button: it is the one thing this step waits for, and it has to catch the eye when the window was missed.
+            if (state is InstallState.Installing && onReopen != null) {
+                Button(onClick = onReopen, contentPadding = small, modifier = Modifier.height(32.dp).fillMaxWidth()) {
+                    Text(stringResource(R.string.game_reopen_confirmation), style = MaterialTheme.typography.labelLarge)
+                }
+            }
+            androidx.compose.material3.OutlinedButton(onClick = { onPause?.invoke() }, enabled = onPause != null, contentPadding = small, modifier = Modifier.height(32.dp).fillMaxWidth()) {
                 Text(stringResource(R.string.game_pause), style = MaterialTheme.typography.labelLarge)
             }
-            DangerButton(onClick = { onCancel?.invoke() }, enabled = onCancel != null, contentPadding = small, modifier = Modifier.height(32.dp)) {
+            DangerButton(onClick = { onCancel?.invoke() }, enabled = onCancel != null, contentPadding = small, modifier = Modifier.height(32.dp).fillMaxWidth()) {
                 Text(stringResource(R.string.game_cancel), style = MaterialTheme.typography.labelLarge)
             }
-        }
-        // The game, then the extra content: the one being put in place has its bar, the game is greyed once it is in place.
-        InstallRow(
-            name = stringResource(R.string.install_game),
-            stand = if (gameInPlace) Stand.DONE else Stand.ACTIVE,
-            progress = (state as? InstallState.Downloading)?.progress ?: (state as? InstallState.Installing)?.takeIf { it.step == app.gameport.core.model.InstallStep.COPYING }?.progress,
-            status = if (gameInPlace) null else app.gameport.core.designsystem.installStatusText(state, speedUnit),
-            dimmed = gameInPlace,
-        )
-        shown.forEach { (item, stand) ->
-            InstallRow(
-                name = item.name,
-                stand = stand,
-                progress = if (stand == Stand.ACTIVE) (state as? InstallState.ExtraContent)?.progress else null,
-                status = when {
-                    stand == Stand.ACTIVE -> "${(((state as? InstallState.ExtraContent)?.progress ?: 0f) * 100).toInt()}%"
-                    item.withGame -> stringResource(R.string.install_extra_with_game)
-                    else -> null
-                },
-                dimmed = false,
-            )
-        }
-        val more = pending.size - shown.size
-        if (inPlace > 0 || more > 0) {
-            Text(
-                listOfNotNull(
-                    if (inPlace > 0) stringResource(R.string.install_extras_in_place, inPlace) else null,
-                    if (more > 0) stringResource(R.string.install_extras_more, more) else null,
-                ).joinToString(" · "),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }

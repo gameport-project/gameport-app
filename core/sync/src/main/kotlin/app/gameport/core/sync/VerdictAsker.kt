@@ -40,6 +40,7 @@ class VerdictAsker @Inject constructor(
     private val auth: SteamAuthRepository,
     private val playtime: PlaytimeTracker,
     private val settings: UserSettings,
+    private val controllerFeedback: app.gameport.core.settings.ControllerFeedbackStore,
 ) : PlaytimeTracker.SessionListener {
     private val ends = RecentEvents(DEDUP_MS)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -128,6 +129,8 @@ class VerdictAsker @Inject constructor(
             Log.i(TAG, "$packageName: a game known as incompatible, nothing to ask")
             return
         }
+        // A run of this game ended: the card about its controllers is only asked once one has ended since the mapping last changed.
+        runCatching { controllerFeedback.sessionEnded(appId) }.onFailure { Log.w(TAG, "$packageName: the end of the run could not be noted for the controllers", it) }
         val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
         val offlineRun = OfflineEvidence.qualifies(auth.connection.value, networkAvailable(), otherDeviceAsked)
         // A test build asks every time (it is the only way to try the question again and again); a release build follows the rules of [VerdictBook].
