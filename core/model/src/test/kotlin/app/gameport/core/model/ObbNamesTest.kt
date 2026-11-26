@@ -167,4 +167,21 @@ class ObbNamesTest {
         // Already under the right name: nothing to do.
         assertNull(ObbNames.aligned("overflow1.$pkg.obb", pkg, 75, came))
     }
+
+    @Test
+    fun `an asset-bundle expansion with a prefix and the package at the end (Vertigo) has only its package renamed, manifest too`() {
+        val pkg = "com.gameport.g2897700"
+        val came = "com.vertigogames.azs1hd"
+        // The custom-named asset bundles Arizona Sunshine Remake ships: prefix before the role, package at the end, no version code.
+        assertEquals("scenesmobilehq0.main.$pkg.obb", ObbNames.aligned("scenesmobilehq0.main.$came.obb", pkg, 1, came))
+        assertEquals("vertigoresourcesmobilehq2.main.$pkg.obb", ObbNames.aligned("vertigoresourcesmobilehq2.main.$came.obb", pkg, 1, came))
+        // The manifest beside it is renamed the same way.
+        assertEquals("scenesmobilehq0.main.$pkg.obb.manifest", ObbNames.aligned("scenesmobilehq0.main.$came.obb.manifest", pkg, 1, came))
+        // Already under the installed package: nothing to do.
+        assertNull(ObbNames.aligned("scenesmobilehq0.main.$pkg.obb", pkg, 1, came))
+        // Not a renamed game (no original, or original equals the package): an embedded foreign package is left alone.
+        assertNull(ObbNames.aligned("scenesmobilehq0.main.$came.obb", pkg, 1, null))
+        // A standard expansion still goes through the version-aware path, untouched by the new case.
+        assertEquals("main.75.$pkg.obb", ObbNames.aligned("main.38.$came.obb", pkg, 75, came))
+    }
 }

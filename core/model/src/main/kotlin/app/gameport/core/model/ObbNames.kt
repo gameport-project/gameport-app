@@ -67,8 +67,17 @@ object ObbNames {
         }
         if (match == null) {
             // A depot may publish the file under a name of its own (`<game>.main.obb`, for one), which the engine never looks for.
-            val role = Regex("^(?:.*[._-])?(main|patch)\\.obb$", RegexOption.IGNORE_CASE).matchEntire(fileName)?.groupValues?.get(1) ?: return null
-            return "${role.lowercase()}.$code.$packageName.obb"
+            Regex("^(?:.*[._-])?(main|patch)\\.obb$", RegexOption.IGNORE_CASE).matchEntire(fileName)?.let {
+                return "${it.groupValues[1].lowercase()}.$code.$packageName.obb"
+            }
+            // An asset-bundle expansion that carries a prefix before its role and the package at the end, as Vertigo's games publish them
+            // (`scenesmobilehq0.main.<package>.obb`, with a `.obb.manifest` beside it): the game asks for the package it runs under, so only the
+            // package part is renamed to the installed one, the prefix, the role and any `.obb.manifest` tail kept as they are.
+            val embedded = Regex("^(.+)\\.($ROLES)\\.(${namesOf(packageName, original).joinToString("|") { Regex.escape(it) }})\\.obb(\\.[A-Za-z0-9_]+)?$").matchEntire(fileName)
+            if (embedded != null) {
+                return "${embedded.groupValues[1]}.${embedded.groupValues[2]}.$packageName.obb${embedded.groupValues[4]}".takeIf { it != fileName }
+            }
+            return null
         }
         if (match.groupValues[2] == code.toString() && match.groupValues[3] == packageName) return null
         return "${match.groupValues[1]}.$code.$packageName.obb"
