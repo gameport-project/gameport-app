@@ -127,11 +127,37 @@ data class ControllerMapping(
     val noticeSeen: Boolean = false,
     /** The game has controls for the device's controllers and for the Steam Frame's: by default it uses its own. */
     val both: Boolean = false,
-    /** The player chose the Steam Frame's controls for a game that also has its own. Off by default. */
-    val useFrame: Boolean = false,
+    /** Which of the game's controller tables the player asked to be put forward: automatic (GamePort decides, the default), the Steam Frame's, or the Touch's. */
+    val presented: PresentedControllers = PresentedControllers.AUTO,
+    /** The controller profiles the game proposed the last time it ran, with the number of controls of each (empty until it ran with a patch that reports them). */
+    val profiles: List<ControllerProfile> = emptyList(),
+    /** The table that was really translated or used the last run: `frame`, `touch`, `native` or `none` (empty when not reported). */
+    val used: String = "",
+    /** What became of the player's choice the last run: `applied`, `fallback` (it could not be applied, automatic was used) or `ignored` (empty when not reported). */
+    val presentedResult: String = "",
     /** The last run asked for the game's actions for a minute and none was ever active: the game did not hear the controllers. */
     val silent: Boolean = false,
+    /** The key of the ready-made preset the player chose, or empty (automatic, or a mix made by hand). */
+    val preset: String = "",
 ) {
+    /** The ready-made preset the player chose, or empty (automatic, or a mix made by hand). It drives the menu's label; the overrides carry the real links. */
+    val chosenPreset: ControllerPreset? get() = ControllerPreset.entries.firstOrNull { it.key == preset }
+
+    /**
+     * This mapping with [p] applied as the player's exclusive choice: its links placed, and every device button it claims taken away from any other control
+     * that held it, so one button fires one thing. Everything else is frozen as it is, customising on. A device has fewer buttons than the Steam Frame, so
+     * choosing the D-pad displaces the face buttons that shared those buttons, and choosing the faces displaces the D-pad.
+     */
+    fun withPreset(p: ControllerPreset): ControllerMapping {
+        val frozen = frozenAsNow()
+        val links = p.changesFor(detected.toSet())
+        val claimed = links.values.flatten().toSet()
+        val placed = links.mapKeys { it.key.key }.mapValues { ControllerLayout.encodeTargets(it.value) }
+        val stripped = frozen.overrides
+            .filterKeys { it !in placed }
+            .mapValues { (_, value) -> ControllerLayout.encodeTargets(ControllerLayout.parseTargets(value).filterNot { it in claimed }) }
+        return frozen.copy(enabled = true, preset = p.key, overrides = frozen.overrides + stripped + placed)
+    }
     private fun withChoicesFor(fill: (ControlRef) -> List<ControlRef>): ControllerMapping =
         copy(overrides = overrides + detected.filter { it.key !in overrides }.associate { it.key to ControllerLayout.encodeTargets(fill(it)) })
 
@@ -150,6 +176,43 @@ data class ControllerMapping(
         return ControllerLayout.allocate(detected.toSet(), chosen)
     }
 
+    /** The player chose the Steam Frame's controls for a game that also has its own. Off by default; derived from [presented]. */
+    val useFrame: Boolean get() = presented == PresentedControllers.FRAME
+
+    /** A new choice forgets what became of the previous one: the result belongs to the choice it was made for. */
+    fun withPresented(choice: PresentedControllers): ControllerMapping = if (presented == choice) this else copy(presented = choice, presentedResult = "")
+
+    /** Turning the Steam Frame's controls on or off; turning them off leaves a choice of the Touch's controllers as it is. */
+    fun withUseFrame(on: Boolean): ControllerMapping = when {
+        on -> withPresented(PresentedControllers.FRAME)
+        presented == PresentedControllers.FRAME -> withPresented(PresentedControllers.AUTO)
+        else -> this
+    }
+
+    /**
+     * What the game's hook reported. The profiles, [used] and [result] come from a hook and a layer that may be older: when they are null or empty,
+     * what is kept is left alone and nothing is erased. [present] is the choice the layer says it was given: when it is known and is not the choice kept here,
+     * the report is of another choice (an old file read for a new start), so what became of the choice is not taken.
+     */
+    fun withDetected(
+        controls: List<ControlRef>,
+        source: String,
+        both: Boolean,
+        silent: Boolean,
+        profiles: List<ControllerProfile>? = null,
+        used: String? = null,
+        result: String? = null,
+        present: String? = null,
+    ): ControllerMapping = copy(
+        detected = controls.sortedBy { it.key },
+        source = source,
+        both = both,
+        silent = silent,
+        profiles = profiles?.let(ControllerProfile::cleanAll)?.takeIf { it.isNotEmpty() } ?: this.profiles,
+        used = used?.takeIf { it.isNotEmpty() } ?: this.used,
+        presentedResult = result?.takeIf { it.isNotEmpty() && (present == null || present == presented.key) } ?: presentedResult,
+    )
+
     /** The Steam Frame's controls are put on this device's controllers because the player forced it. */
     val forced: Boolean get() = useFrame && !noFrameControls
 
@@ -167,4 +230,64 @@ data class ControllerMapping(
 
     /** The device controls that now take more than one control of the game. */
     fun sharedTargets(): Map<ControlRef, List<ControlRef>> = ControllerLayout.shared(allocation())
+}
+
+/** The controllers the player asks the game to be given. Anything but [AUTO] is the player's own choice and only takes effect at the next start of the game. */
+enum class PresentedControllers(val key: String) {
+    AUTO("auto"),
+    FRAME("frame"),
+    TOUCH("touch"),
+    ;
+
+    companion object {
+        /** An unknown or empty key is automatic. */
+        fun of(key: String?): PresentedControllers = entries.firstOrNull { it.key == key } ?: AUTO
+    }
+}
+
+/** One controller profile the game proposed to the runtime: its OpenXR path and how many controls it binds. */
+data class ControllerProfile(val path: String, val bindings: Int) {
+    /** What kind of controllers the profile is for, from its path. */
+    val kind: Kind
+        get() = when {
+            path.endsWith("/valve/frame_controller_valve") -> Kind.FRAME
+            path.endsWith("/valve/index_controller") -> Kind.INDEX
+            path.contains("touch_controller") -> Kind.TOUCH
+            path.contains("/bytedance/") -> Kind.PICO
+            path.contains("/htc/vive") -> Kind.VIVE
+            path.endsWith("/khr/simple_controller") -> Kind.SIMPLE
+            path.contains("eye_gaze") -> Kind.GAZE
+            else -> Kind.OTHER
+        }
+
+    enum class Kind { FRAME, TOUCH, PICO, INDEX, VIVE, SIMPLE, GAZE, OTHER }
+
+    companion object {
+        const val MAX_PROFILES = 16
+        const val MAX_LENGTH = 200
+
+        /** A profile that can be kept in a record: no separator of the record or of its parts, not empty, not too long, a count that is not negative. */
+        fun clean(path: String, bindings: Int): ControllerProfile? {
+            val trimmed = path.trim()
+            if (trimmed.isEmpty() || trimmed.length > MAX_LENGTH || bindings < 0) return null
+            if (trimmed.any { it == '|' || it == ',' || it == '=' || it.isISOControl() }) return null
+            return ControllerProfile(trimmed, bindings)
+        }
+
+        /** The profiles of a list, cleaned, without repeats and capped. */
+        fun cleanAll(profiles: List<ControllerProfile>): List<ControllerProfile> =
+            profiles.mapNotNull { clean(it.path, it.bindings) }.distinctBy { it.path }.take(MAX_PROFILES)
+
+        /**
+         * One entry as the hook sends it: the path, then the number of controls after a space, a colon, an equal sign, a comma or a semicolon
+         * (`/interaction_profiles/x/y:33`). An entry with no number counts no controls; a malformed one (empty, with `|`) is dropped.
+         */
+        fun parseEntry(entry: String): ControllerProfile? {
+            val text = entry.trim()
+            val match = ENTRY.matchEntire(text)
+            return if (match != null) clean(match.groupValues[1], match.groupValues[2].toIntOrNull() ?: return null) else clean(text, 0)
+        }
+
+        private val ENTRY = Regex("""(.+?)[ :=,;]\s*(\d+)""")
+    }
 }

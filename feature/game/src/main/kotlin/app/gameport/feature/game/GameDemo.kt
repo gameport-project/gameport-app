@@ -189,7 +189,7 @@ private fun ControllersDemoScreen(onBack: () -> Unit) {
             gameName = DemoGames.main.name,
             onBack = onBack,
             onEnabledChanged = {},
-            onTargetsChosen = { _, _ -> },
+            onChoose = {},
             onReset = {},
         )
         DemoNotice(Modifier.align(Alignment.TopEnd))

@@ -4,6 +4,10 @@ import android.content.Context
 import app.gameport.core.model.ControlRef
 import app.gameport.core.model.ControllerLayout
 import app.gameport.core.model.ControllerMapping
+import app.gameport.core.model.ControllerMappingCodec
+import app.gameport.core.model.ControllerPreset
+import app.gameport.core.model.ControllerProfile
+import app.gameport.core.model.PresentedControllers
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -27,22 +31,47 @@ class ControllerMappingStore @Inject constructor(
 
     fun get(appId: Int): ControllerMapping = state.value[appId] ?: ControllerMapping()
 
-    /** What the game's hook was told about the controls the game uses; a game seen for the first time gets the page. */
-    fun setDetected(appId: Int, controls: List<ControlRef>, source: String, both: Boolean = false, silent: Boolean = false) =
-        update(appId) { it.copy(detected = controls.sortedBy { c -> c.key }, source = source, both = both, silent = silent) }
+    /**
+     * What the game's hook was told about the controls the game uses; a game seen for the first time gets the page. The profiles, [used] and [presentedResult]
+     * come from a hook and a layer that may be older: when they are null or empty, what is kept is left alone and nothing is erased.
+     */
+    fun setDetected(
+        appId: Int,
+        controls: List<ControlRef>,
+        source: String,
+        both: Boolean = false,
+        silent: Boolean = false,
+        profiles: List<ControllerProfile>? = null,
+        used: String? = null,
+        presentedResult: String? = null,
+        present: String? = null,
+    ) = update(appId) { it.withDetected(controls, source, both, silent, profiles, used, presentedResult, present) }
 
     /** Customising starts from what the game does now, so a later change of the defaults does not move a control the player did not touch. */
     fun setEnabled(appId: Int, enabled: Boolean) = update(appId) { if (enabled && !it.enabled) it.frozenAsNow().copy(enabled = true) else it.copy(enabled = enabled) }
 
-    /** The Steam Frame's controls for a game that also has its own: off by default. */
-    fun setUseFrame(appId: Int, useFrame: Boolean) = update(appId) { it.copy(useFrame = useFrame) }
+    /** The Steam Frame's controls for a game that also has its own: off by default. Turning it off leaves a choice of the Touch's controllers as it is. */
+    fun setUseFrame(appId: Int, useFrame: Boolean) = update(appId) { it.withUseFrame(useFrame) }
 
-    /** Sends [source] to [targets] (none: to nothing) instead of its default. */
+    /** Which of the game's controller tables to put forward, from the next start. A new choice forgets what became of the previous one. */
+    fun setPresented(appId: Int, presented: PresentedControllers) = update(appId) { it.withPresented(presented) }
+
+    /** Applies a ready-made preset as the player's exclusive choice: replaces the links of its family, freezes the rest, switches customising on. */
+    fun applyPreset(appId: Int, preset: ControllerPreset) = update(appId) { it.withPreset(preset) }
+
+    /**
+     * Sends [source] to [targets] (none: to nothing) instead of its default. Any hand-made retouch (a single link, the dialogs, a community mapping) clears the
+     * chosen preset: this is the one place the menu's label is kept in step, so the choice falls back to "Personnalisé" as soon as it no longer is a whole preset.
+     */
     fun setOverride(appId: Int, source: ControlRef, targets: List<ControlRef>) =
-        update(appId) { it.copy(overrides = it.overrides + (source.key to ControllerLayout.encodeTargets(targets))) }
+        update(appId) { it.copy(overrides = it.overrides + (source.key to ControllerLayout.encodeTargets(targets)), preset = "") }
+
+    /** Puts the player's choices back as they were (undo and redo): whether customising is on, what each control was sent to, and the chosen preset. */
+    fun restoreChoices(appId: Int, enabled: Boolean, overrides: Map<String, String>, preset: String) =
+        update(appId) { it.copy(enabled = enabled, overrides = overrides, preset = preset) }
 
     /** Back to GamePort's own mapping. */
-    fun reset(appId: Int) = update(appId) { it.copy(overrides = emptyMap()) }
+    fun reset(appId: Int) = update(appId) { it.copy(overrides = emptyMap(), preset = "") }
 
     /** The notice about this page was shown and followed. */
     fun markNoticeSeen(appId: Int) {
@@ -57,55 +86,16 @@ class ControllerMappingStore @Inject constructor(
 
     private fun update(appId: Int, change: (ControllerMapping) -> ControllerMapping) {
         val updated = change(get(appId))
-        prefs.edit().putString(appId.toString(), encode(updated)).apply()
+        prefs.edit().putString(appId.toString(), ControllerMappingCodec.encode(updated)).apply()
         state.value = state.value + (appId to updated)
-    }
-
-    private fun encode(mapping: ControllerMapping): String = listOf(
-        mapping.detected.joinToString(",") { it.key },
-        if (mapping.enabled) "1" else "0",
-        mapping.overrides.entries.joinToString(";") { "${it.key}=${it.value}" },
-        if (mapping.noticeSeen) "1" else "0",
-        mapping.source,
-        VERSION,
-        if (mapping.useFrame) "1" else "0",
-        if (mapping.both) "1" else "0",
-        if (mapping.silent) "1" else "0",
-    ).joinToString("|")
-
-    /** A mapping written before the version was kept, and customised, is frozen as it worked then: the rules have changed since. */
-    private fun decode(text: String): ControllerMapping {
-        val parts = text.split('|')
-        val mapping = decodeParts(parts)
-        return if (parts.getOrNull(5) == VERSION) mapping else mapping.frozenAsBefore()
-    }
-
-    private fun decodeParts(parts: List<String>): ControllerMapping {
-        return ControllerMapping(
-            detected = parts.getOrNull(0).orEmpty().split(',').mapNotNull(ControlRef::parse),
-            enabled = parts.getOrNull(1) == "1",
-            overrides = parts.getOrNull(2).orEmpty().split(';').mapNotNull { entry ->
-                entry.split('=', limit = 2).takeIf { it.size == 2 && it[0].isNotEmpty() }?.let { it[0] to it[1] }
-            }.toMap(),
-            noticeSeen = parts.getOrNull(3) == "1",
-            source = parts.getOrNull(4).orEmpty(),
-            useFrame = parts.getOrNull(6) == "1",
-            both = parts.getOrNull(7) == "1",
-            silent = parts.getOrNull(8) == "1",
-        )
     }
 
     private fun readAll(): Map<Int, ControllerMapping> = prefs.all.mapNotNull { (key, value) ->
         key.toIntOrNull()?.let { appId ->
-            val mapping = decode(value.toString())
+            val mapping = ControllerMappingCodec.decode(value.toString())
             // Written back in the new form, so the freezing is done once.
-            if (value.toString().split('|').getOrNull(5) != VERSION) prefs.edit().putString(key, encode(mapping)).apply()
+            if (!ControllerMappingCodec.isCurrent(value.toString())) prefs.edit().putString(key, ControllerMappingCodec.encode(mapping)).apply()
             appId to mapping
         }
     }.toMap()
-
-    private companion object {
-        /** Marks a mapping written since the defaults changed (0.7.4); the ones before it have no mark. */
-        const val VERSION = "v2"
-    }
 }

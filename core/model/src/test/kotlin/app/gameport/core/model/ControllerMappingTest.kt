@@ -164,8 +164,119 @@ class ControllerMappingTest {
     }
 
     @Test
+    fun `a preset claims its buttons exclusively, displacing whatever else held them, and freezes the rest`() {
+        // Arizona: the four face buttons and the whole D-pad. The device has only X and Y on the left, so the D-pad and the faces share them.
+        val arizona = ControllerMapping(detected = list("right:a", "right:b", "right:x", "right:y", "left:dpad_up", "left:dpad_down", "left:dpad_left", "left:dpad_right"), source = "valve")
+        val vertical = arizona.withPreset(ControllerPreset.DPAD_VERTICAL)
+        assertEquals(list("left:y"), vertical.targetsFor(c("left:dpad_up")))
+        assertEquals(list("left:x"), vertical.targetsFor(c("left:dpad_down")))
+        // The D-pad's left and right are not placed, and they held X and Y, which the preset now claims: they go nowhere.
+        assertTrue(vertical.targetsFor(c("left:dpad_left")).isEmpty())
+        assertTrue(vertical.targetsFor(c("left:dpad_right")).isEmpty())
+        // The faces X and Y shared the same buttons: the vertical D-pad claims them, so those faces are displaced. A and B keep their own buttons.
+        assertEquals(list("right:a"), vertical.targetsFor(c("right:a")))
+        assertEquals(list("right:b"), vertical.targetsFor(c("right:b")))
+        assertTrue(vertical.targetsFor(c("right:x")).isEmpty())
+        assertTrue(vertical.targetsFor(c("right:y")).isEmpty())
+        assertEquals("dpad_vertical", vertical.preset)
+        assertTrue(vertical.enabled)
+
+        // Switching to the horizontal preset replaces, it does not pile up.
+        val horizontal = vertical.withPreset(ControllerPreset.DPAD_HORIZONTAL)
+        assertTrue(horizontal.targetsFor(c("left:dpad_up")).isEmpty())
+        assertTrue(horizontal.targetsFor(c("left:dpad_down")).isEmpty())
+        assertEquals(list("left:x"), horizontal.targetsFor(c("left:dpad_left")))
+        assertEquals(list("left:y"), horizontal.targetsFor(c("left:dpad_right")))
+        assertEquals("dpad_horizontal", horizontal.preset)
+        assertEquals(horizontal.chosenPreset, ControllerPreset.DPAD_HORIZONTAL)
+
+        // The faces preset takes X and Y back and displaces the D-pad that held them: one device button, one action.
+        val faces = horizontal.withPreset(ControllerPreset.FACE_BUTTONS)
+        assertEquals(list("left:x"), faces.targetsFor(c("right:x")))
+        assertEquals(list("left:y"), faces.targetsFor(c("right:y")))
+        assertTrue(faces.targetsFor(c("left:dpad_left")).isEmpty())
+        assertTrue(faces.targetsFor(c("left:dpad_right")).isEmpty())
+    }
+
+    @Test
     fun `the Steam Frame's controls are off by default`() {
         val mapping = ControllerMapping(both = true)
         assertTrue(!mapping.useFrame)
+    }
+
+    @Test
+    fun `forced and automatic are what they were while the choice is automatic`() {
+        val valve = ControllerMapping(source = "valve", detected = list("right:a"))
+        assertTrue(valve.automatic)
+        assertTrue(!valve.forced)
+        assertTrue(valve.translated)
+        val both = ControllerMapping(source = "valve", both = true, detected = list("right:a"))
+        assertTrue(!both.automatic && !both.forced && !both.translated)
+        val frame = both.copy(presented = PresentedControllers.FRAME)
+        assertTrue(frame.useFrame && frame.forced && frame.translated && !frame.automatic)
+        assertTrue(!frame.copy(source = "none").forced)
+    }
+
+    @Test
+    fun `touch is not the frame forced`() {
+        val touch = ControllerMapping(source = "valve", both = true, detected = list("right:a"), presented = PresentedControllers.TOUCH)
+        assertTrue(!touch.useFrame && !touch.forced)
+    }
+
+    @Test
+    fun `turning the frame off does not overwrite a touch choice`() {
+        val touch = ControllerMapping(presented = PresentedControllers.TOUCH, presentedResult = "applied")
+        assertEquals(touch, touch.withUseFrame(false))
+        assertEquals(PresentedControllers.FRAME, touch.withUseFrame(true).presented)
+        assertEquals(PresentedControllers.AUTO, ControllerMapping(presented = PresentedControllers.FRAME).withUseFrame(false).presented)
+    }
+
+    @Test
+    fun `a new choice forgets the result of the previous one`() {
+        val m = ControllerMapping(presented = PresentedControllers.TOUCH, presentedResult = "fallback")
+        assertEquals("", m.withPresented(PresentedControllers.AUTO).presentedResult)
+        assertEquals("fallback", m.withPresented(PresentedControllers.TOUCH).presentedResult)
+    }
+
+    @Test
+    fun `a report without profiles does not erase what is known`() {
+        val known = ControllerMapping(profiles = listOf(ControllerProfile("/p/a", 3)), used = "frame", presentedResult = "applied")
+        val older = known.withDetected(list("right:a"), "valve", both = false, silent = false)
+        assertEquals(known.profiles, older.profiles)
+        assertEquals("frame", older.used)
+        assertEquals("applied", older.presentedResult)
+        val empty = known.withDetected(list("right:a"), "valve", both = false, silent = false, profiles = emptyList(), used = "", result = "")
+        assertEquals(known.profiles, empty.profiles)
+        val newer = known.withDetected(list("right:a"), "valve", both = false, silent = false, profiles = listOf(ControllerProfile("/p/b", 4)), used = "touch", result = "fallback")
+        assertEquals(listOf(ControllerProfile("/p/b", 4)), newer.profiles)
+        assertEquals("touch", newer.used)
+        assertEquals("fallback", newer.presentedResult)
+    }
+
+    @Test
+    fun `detected controls are still sorted and the source kept`() {
+        val m = ControllerMapping().withDetected(list("right:b", "left:x"), "touch", both = true, silent = true)
+        assertEquals(list("left:x", "right:b"), m.detected)
+        assertEquals("touch", m.source)
+        assertTrue(m.both && m.silent)
+    }
+
+    @Test
+    fun `a result for another choice than the one kept is not attributed to it`() {
+        val kept = ControllerMapping(presented = PresentedControllers.TOUCH, presentedResult = "applied")
+        // The report says it was given frame, the choice now is touch: an old file, the result is left alone.
+        val stale = kept.withDetected(list("right:a"), "valve", both = false, silent = false, result = "fallback", present = "frame")
+        assertEquals("applied", stale.presentedResult)
+        // The same choice: taken.
+        val fresh = kept.withDetected(list("right:a"), "valve", both = false, silent = false, result = "fallback", present = "touch")
+        assertEquals("fallback", fresh.presentedResult)
+        // No present given (an older hook): as before.
+        val older = kept.withDetected(list("right:a"), "valve", both = false, silent = false, result = "ignored")
+        assertEquals("ignored", older.presentedResult)
+        // Automatic reported for an automatic choice.
+        val auto = ControllerMapping().withDetected(list("right:a"), "valve", both = false, silent = false, result = "applied", present = "auto")
+        assertEquals("applied", auto.presentedResult)
+        // An old file of a past choice for a game now set to automatic is not taken either.
+        assertEquals("", ControllerMapping().withDetected(list("right:a"), "valve", both = false, silent = false, result = "fallback", present = "frame").presentedResult)
     }
 }

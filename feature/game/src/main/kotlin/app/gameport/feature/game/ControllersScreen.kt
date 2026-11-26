@@ -6,15 +6,24 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.draw.clip
 import app.gameport.core.designsystem.GlassChip
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,11 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -54,6 +59,7 @@ import app.gameport.core.designsystem.GlassButton
 import app.gameport.core.designsystem.glass
 import app.gameport.core.model.ControlRef
 import app.gameport.core.model.ControllerLayout
+import app.gameport.core.model.ControllerPreset
 import app.gameport.core.model.ControllerMapping
 import app.gameport.core.model.Hand
 
@@ -65,7 +71,15 @@ import app.gameport.core.model.Hand
 fun ControllersScreen(onBack: () -> Unit, viewModel: ControllersViewModel = hiltViewModel()) {
     val mapping by viewModel.mapping.collectAsStateWithLifecycle()
     val gameName by viewModel.gameName.collectAsStateWithLifecycle()
-    ControllersContent(mapping, gameName, onBack, viewModel::onEnabledChanged, viewModel::onTargetsChosen, viewModel::onReset)
+    val history by viewModel.history.collectAsStateWithLifecycle()
+    val answer by viewModel.myAnswer.collectAsStateWithLifecycle()
+    val community by viewModel.community.collectAsStateWithLifecycle()
+    ControllersContent(
+        mapping, gameName, onBack, viewModel::onEnabledChanged, viewModel::onChoose, viewModel::onReset, viewModel.deviceFamily,
+        canUndo = history.canUndo, canRedo = history.canRedo, onUndo = viewModel::onUndo, onRedo = viewModel::onRedo,
+        onPreset = viewModel::onPreset,
+        feedback = ControllerFeedbackPage(answer, viewModel::onAnswer, community),
+    )
 }
 
 /** The page of the controllers, from what it shows: the screen feeds it from the game, the tour of the page feeds it made-up values. */
@@ -75,12 +89,75 @@ internal fun ControllersContent(
     gameName: String,
     onBack: () -> Unit,
     onEnabledChanged: (Boolean) -> Unit,
-    onTargetsChosen: (ControlRef, List<ControlRef>) -> Unit,
+    onChoose: (Map<ControlRef, List<ControlRef>>) -> Unit,
     onReset: () -> Unit,
+    deviceFamily: String? = null,
+    canUndo: Boolean = false,
+    canRedo: Boolean = false,
+    onUndo: () -> Unit = {},
+    onRedo: () -> Unit = {},
+    /** A ready-made preset chosen from the menu, or automatic when null. */
+    onPreset: (ControllerPreset?) -> Unit = {},
+    /** The player's answer about the controls and the mappings players say work; null where there is nothing to say (the tour of the page). */
+    feedback: ControllerFeedbackPage? = null,
 ) {
     var confirmingReset by remember { mutableStateOf(false) }
     // The Steam Frame (or Meta) control being remapped, while the player picks where it goes.
     var capturing by remember { mutableStateOf<ControlRef?>(null) }
+    // The control selected on the drawing or in the list: its destination stands out on the device's controller.
+    var focused by remember { mutableStateOf<ControlRef?>(null) }
+    // A touch on the drawing only selects a control (its destination lights up); the window to choose it opens from the panel under the drawing.
+    val select: (ControlRef?) -> Unit = { source -> focused = source }
+    // A touch on a row of the list selects it and, when the mapping can be customised, opens the window at once.
+    val selectFromList: (ControlRef) -> Unit = { source -> focused = source; if (mapping.enabled) capturing = source }
+    var showList by remember { mutableStateOf(false) }
+    // Which controller is on the left of the drawing: the one of this device (where the player's own buttons are) unless the player swaps them.
+    var deviceFirst by rememberSaveable { mutableStateOf(true) }
+    // A link that would sit next to existing ones waits for the player to say whether it replaces them or comes in addition.
+    var conflict by remember { mutableStateOf<LinkConflict?>(null) }
+    val requestLink: (ControlRef, ControlRef) -> Unit = { source, target ->
+        val allocation = mapping.allocation()
+        val goesTo = allocation[source].orEmpty()
+        val triggers = allocation.filter { (other, targets) -> other != source && target in targets }.keys.toList()
+        when {
+            // The link exists: touching it again takes it away (and undo brings it back).
+            target in goesTo -> onChoose(mapOf(source to goesTo - target))
+            goesTo.isEmpty() && triggers.isEmpty() -> onChoose(mapOf(source to listOf(target)))
+            else -> conflict = LinkConflict(source, target, goesTo, triggers)
+        }
+    }
+
+    conflict?.let { c ->
+        val allocation = mapping.allocation()
+        BackdropDialog(
+            onDismissRequest = { conflict = null },
+            title = { Text(stringResource(R.string.controllers_conflict_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (c.goesTo.isNotEmpty()) Text(stringResource(R.string.controllers_conflict_goes, targetLabel(c.source), c.goesTo.map { targetLabel(it) }.joinToString(", ")))
+                    if (c.triggers.isNotEmpty()) Text(stringResource(R.string.controllers_conflict_triggers, targetLabel(c.target), c.triggers.map { targetLabel(it) }.joinToString(", ")))
+                    Text(stringResource(R.string.controllers_conflict_hint), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                }
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    GlassButton(onClick = {
+                        conflict = null
+                        onChoose(mapOf(c.source to c.goesTo + c.target))
+                    }) { Icon(Icons.Filled.Add, null, modifier = Modifier.padding(end = 8.dp)); Text(stringResource(R.string.controllers_conflict_add)) }
+                    GlassButton(onClick = {
+                        conflict = null
+                        // Replacing: the control goes only here, and the others no longer trigger this button.
+                        val changes = LinkedHashMap<ControlRef, List<ControlRef>>()
+                        changes[c.source] = listOf(c.target)
+                        for (other in c.triggers) changes[other] = allocation[other].orEmpty() - c.target
+                        onChoose(changes)
+                    }) { Icon(Icons.Filled.Check, null, modifier = Modifier.padding(end = 8.dp)); Text(stringResource(R.string.controllers_conflict_replace)) }
+                }
+            },
+            dismissButton = { DangerTextButton(onClick = { conflict = null }) { Text(stringResource(R.string.game_settings_cancel)) } },
+        )
+    }
 
     if (confirmingReset) {
         BackdropDialog(
@@ -115,7 +192,7 @@ internal fun ControllersContent(
                     }
                 }
             },
-            confirmButton = { GlassButton(onClick = { onTargetsChosen(source, picked); capturing = null }) { Text(stringResource(R.string.controllers_apply)) } },
+            confirmButton = { GlassButton(onClick = { onChoose(mapOf(source to picked)); capturing = null }) { Text(stringResource(R.string.controllers_apply)) } },
             dismissButton = { DangerTextButton(onClick = { capturing = null }) { Text(stringResource(R.string.game_settings_cancel)) } },
         )
     }
@@ -158,51 +235,114 @@ internal fun ControllersContent(
                     Text(
                         stringResource(R.string.controllers_explanation),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.widthIn(max = 720.dp),
                     )
 
-                    val shared = mapping.sharedTargets().keys.toList()
-                    if (shared.isNotEmpty()) {
-                        Text(
-                            stringResource(R.string.controllers_shared, shared.map { targetLabel(it) }.joinToString(", ")),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.widthIn(max = 720.dp),
-                        )
-                    }
-
-                    BoxWithConstraints(Modifier.fillMaxWidth().tourTarget(TourIds.CONTROLLERS_CARDS)) {
-                        val wide = maxWidth >= 720.dp
-                        val cards: @Composable (Modifier) -> Unit = { modifier ->
-                            ControllerCard(Hand.LEFT, mapping, { capturing = it }, modifier)
-                            ControllerCard(Hand.RIGHT, mapping, { capturing = it }, modifier)
+                    Column(Modifier.fillMaxWidth().tourTarget(TourIds.CONTROLLERS_CARDS), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        // Ready-made mappings for the cases that come back from game to game: one touch instead of adding and removing links by hand.
+                        var presetMenu by remember { mutableStateOf(false) }
+                        // The automatic mapping is in effect while nothing is customised, even when it happens to match a preset: the choice shows "Automatic", not that preset.
+                        val onAutomatic = !mapping.enabled || mapping.overrides.isEmpty()
+                        // The chosen preset is stored, not guessed: any hand-made retouch clears it, so a touched-up mapping shows "Custom".
+                        val currentPreset = if (onAutomatic) null else mapping.chosenPreset
+                        // Only the presets that change something for this game are offered: one that touches controls the game does not use would do nothing.
+                        val offered = remember(mapping.detected) { ControllerPreset.entries.filter { it.changesFor(mapping.detected).isNotEmpty() } }
+                        Box {
+                            GlassButton(onClick = { presetMenu = true }) {
+                                Text(
+                                    stringResource(
+                                        R.string.controllers_preset_label,
+                                        when {
+                                            onAutomatic -> stringResource(R.string.controllers_preset_auto)
+                                            currentPreset != null -> presetName(currentPreset)
+                                            else -> stringResource(R.string.controllers_preset_custom)
+                                        },
+                                    ),
+                                )
+                                Icon(Icons.Filled.ArrowDropDown, null)
+                            }
+                            DropdownMenu(expanded = presetMenu, onDismissRequest = { presetMenu = false }) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text(stringResource(R.string.controllers_preset_auto))
+                                            Text(stringResource(R.string.controllers_preset_auto_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    },
+                                    trailingIcon = { if (onAutomatic) Icon(Icons.Filled.Check, null) },
+                                    onClick = { presetMenu = false; if (mapping.enabled) confirmingReset = true },
+                                )
+                                offered.forEach { preset ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(presetName(preset))
+                                                Text(presetHint(preset), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                        },
+                                        trailingIcon = { if (currentPreset == preset) Icon(Icons.Filled.Check, null) },
+                                        // The preset replaces the links of its family and freezes the rest; the choice is remembered. One step, so one undo takes it back.
+                                        onClick = { presetMenu = false; onPreset(preset) },
+                                    )
+                                }
+                            }
                         }
-                        if (wide) Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) { cards(Modifier.weight(1f)) }
-                        else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { cards(Modifier.fillMaxWidth()) }
+                        // Undo and redo for every choice, and the side each controller is drawn on.
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            GlassButton(onClick = onUndo, enabled = canUndo) {
+                                Icon(Icons.AutoMirrored.Filled.Undo, null, modifier = Modifier.padding(end = 8.dp))
+                                Text(stringResource(R.string.controllers_undo))
+                            }
+                            GlassButton(onClick = onRedo, enabled = canRedo) {
+                                Icon(Icons.AutoMirrored.Filled.Redo, null, modifier = Modifier.padding(end = 8.dp))
+                                Text(stringResource(R.string.controllers_redo))
+                            }
+                            Spacer(Modifier.weight(1f))
+                            GlassButton(onClick = { deviceFirst = !deviceFirst }) {
+                                Icon(Icons.Filled.SwapHoriz, null, modifier = Modifier.padding(end = 8.dp))
+                                Text(stringResource(R.string.controllers_swap))
+                            }
+                        }
+                        ControllerStage(mapping, deviceFamily, focused, select, onToggleTarget = requestLink, deviceFirst = deviceFirst)
+                        // The list stays available, folded: the same choices, for a screen reader or a finger that misses a small control.
+                        GlassButton(onClick = { showList = !showList }) {
+                            Icon(Icons.AutoMirrored.Filled.List, null, modifier = Modifier.padding(end = 8.dp))
+                            Text(stringResource(if (showList) R.string.controllers_list_hide else R.string.controllers_list_show))
+                        }
+                        if (showList) BoxWithConstraints(Modifier.fillMaxWidth()) {
+                            val wide = maxWidth >= 720.dp
+                            val cards: @Composable (Modifier) -> Unit = { modifier ->
+                                ControllerCard(Hand.LEFT, mapping, selectFromList, modifier)
+                                ControllerCard(Hand.RIGHT, mapping, selectFromList, modifier)
+                            }
+                            if (wide) Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) { cards(Modifier.weight(1f)) }
+                            else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { cards(Modifier.fillMaxWidth()) }
+                        }
                     }
 
                     GlassButton(onClick = { confirmingReset = true }, enabled = mapping.overrides.isNotEmpty(), modifier = Modifier.padding(bottom = 24.dp).tourTarget(TourIds.CONTROLLERS_RESET)) {
                         Text(stringResource(R.string.controllers_reset))
                     }
+                    if (feedback != null) ControllerFeedbackSections(mapping, feedback, onChoose)
                 }
             }
         }
     }
 }
 
+/** A link the player asked for that would sit next to existing ones: [goesTo] are where its control already goes, [triggers] the controls its button already triggers. */
+private data class LinkConflict(val source: ControlRef, val target: ControlRef, val goesTo: List<ControlRef>, val triggers: List<ControlRef>)
+
 @Composable
 private fun ControllerCard(hand: Hand, mapping: ControllerMapping, onSelect: (ControlRef) -> Unit, modifier: Modifier) {
     val controls = mapping.detected.filter { it.hand == hand && it.group != "thumbrest" }.sortedBy { ORDER.indexOf(it.group).let { i -> if (i < 0) ORDER.size else i } }
     Column(modifier.glass(RoundedCornerShape(18.dp)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            ControllerDrawing(hand)
-            Text(stringResource(if (hand == Hand.LEFT) R.string.controllers_left else R.string.controllers_right), style = MaterialTheme.typography.titleLarge)
-        }
+        Text(stringResource(if (hand == Hand.LEFT) R.string.controllers_left else R.string.controllers_right), style = MaterialTheme.typography.titleLarge)
         if (controls.isEmpty()) Text(stringResource(R.string.controllers_none), color = MaterialTheme.colorScheme.onSurfaceVariant)
         controls.forEach { source ->
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(enabled = mapping.enabled) { onSelect(source) }.padding(vertical = 4.dp),
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onSelect(source) }.padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -220,22 +360,26 @@ private fun ControllerCard(hand: Hand, mapping: ControllerMapping, onSelect: (Co
     }
 }
 
-/** A simple outline of a controller: the body, the stick and the buttons. */
 @Composable
-private fun ControllerDrawing(hand: Hand) {
-    Canvas(Modifier.size(width = 84.dp, height = 56.dp)) {
-        val line = Color.White.copy(alpha = 0.85f)
-        drawRoundRect(line, size = Size(size.width, size.height), cornerRadius = CornerRadius(size.height / 2), style = Stroke(3f))
-        val stickX = if (hand == Hand.LEFT) size.width * 0.32f else size.width * 0.68f
-        drawCircle(line, radius = size.height * 0.16f, center = Offset(stickX, size.height * 0.5f), style = Stroke(3f))
-        val buttonsX = if (hand == Hand.LEFT) size.width * 0.72f else size.width * 0.30f
-        drawCircle(line, radius = size.height * 0.07f, center = Offset(buttonsX, size.height * 0.34f))
-        drawCircle(line, radius = size.height * 0.07f, center = Offset(buttonsX + size.width * 0.08f, size.height * 0.62f))
-    }
-}
+internal fun presetName(preset: ControllerPreset): String = stringResource(
+    when (preset) {
+        ControllerPreset.FACE_BUTTONS -> R.string.controllers_preset_faces
+        ControllerPreset.DPAD_VERTICAL -> R.string.controllers_preset_dpad_vertical
+        ControllerPreset.DPAD_HORIZONTAL -> R.string.controllers_preset_dpad_horizontal
+    },
+)
 
 @Composable
-private fun controlLabel(group: String): String = when (group) {
+private fun presetHint(preset: ControllerPreset): String = stringResource(
+    when (preset) {
+        ControllerPreset.FACE_BUTTONS -> R.string.controllers_preset_faces_hint
+        ControllerPreset.DPAD_VERTICAL -> R.string.controllers_preset_dpad_vertical_hint
+        ControllerPreset.DPAD_HORIZONTAL -> R.string.controllers_preset_dpad_horizontal_hint
+    },
+)
+
+@Composable
+internal fun controlLabel(group: String): String = when (group) {
     "trigger" -> stringResource(R.string.control_trigger)
     "squeeze" -> stringResource(R.string.control_squeeze)
     "thumbstick" -> stringResource(R.string.control_thumbstick)
@@ -251,7 +395,7 @@ private fun controlLabel(group: String): String = when (group) {
 }
 
 @Composable
-private fun targetLabel(target: ControlRef): String =
+internal fun targetLabel(target: ControlRef): String =
     stringResource(R.string.controllers_target, stringResource(if (target.hand == Hand.LEFT) R.string.controllers_left_short else R.string.controllers_right_short), controlLabel(target.group))
 
 private val ORDER = listOf("thumbstick", "trigger", "squeeze", "bumper", "shoulder", "a", "b", "x", "y", "menu", "view", "dpad_up", "dpad_down", "dpad_left", "dpad_right")
