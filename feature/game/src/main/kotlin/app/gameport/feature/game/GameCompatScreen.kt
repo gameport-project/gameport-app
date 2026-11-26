@@ -280,7 +280,7 @@ private fun PresentedControllersBox(
     }
 }
 
-private fun kindName(kind: app.gameport.core.model.ControllerProfile.Kind): Int = when (kind) {
+internal fun kindName(kind: app.gameport.core.model.ControllerProfile.Kind): Int = when (kind) {
     app.gameport.core.model.ControllerProfile.Kind.FRAME -> R.string.controllers_kind_frame
     app.gameport.core.model.ControllerProfile.Kind.TOUCH -> R.string.controllers_kind_touch
     app.gameport.core.model.ControllerProfile.Kind.PICO -> R.string.controllers_kind_pico

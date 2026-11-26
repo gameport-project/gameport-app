@@ -24,6 +24,14 @@ class ControllerChoiceStateTest {
     }
 
     @Test
+    fun `a choice kept with no profile known any more still shows its cards, so it can be taken back`() {
+        val s = state(ControllerMapping(presented = PresentedControllers.TOUCH))
+        assertTrue(s.choosable)
+        assertFalse(s.waitingForLaunch)
+        assertTrue(PresentedControllers.AUTO in s.offered && PresentedControllers.TOUCH in s.offered)
+    }
+
+    @Test
     fun `a device with no VR shows the single switch and says nothing more`() {
         val s = state(ControllerMapping(profiles = listOf(touch, frame)), family = null)
         assertFalse(s.choosable)
@@ -45,10 +53,35 @@ class ControllerChoiceStateTest {
     }
 
     @Test
-    fun `a game with only the Steam Frame table has nothing to choose`() {
+    fun `a game with only the Steam Frame table has nothing to choose, and the page says it is normal`() {
         val s = state(ControllerMapping(profiles = listOf(frame)))
         assertTrue(s.nothingToChoose)
-        assertEquals(listOf(PresentedControllers.AUTO, PresentedControllers.FRAME), s.offered)
+        // One set of controls: nothing to choose, so no choice is offered.
+        assertEquals(listOf(PresentedControllers.AUTO), s.offered)
+        // The generic profiles a game gives next to it (eye gaze, simple controller) are not tables to choose from.
+        val withGeneric = state(ControllerMapping(profiles = listOf(frame, simple)))
+        assertEquals(listOf(PresentedControllers.AUTO), withGeneric.offered)
+    }
+
+    @Test
+    fun `a game with its own table and no Steam Frame table has nothing to choose either`() {
+        val pico = state(ControllerMapping(profiles = listOf(touch, index, simple)))
+        assertEquals(listOf(PresentedControllers.AUTO), pico.offered)
+        val meta = state(ControllerMapping(profiles = listOf(touch, index)), family = "meta")
+        assertEquals(listOf(PresentedControllers.AUTO), meta.offered)
+    }
+
+    @Test
+    fun `a game with its own table and the Steam Frame's has a real choice, no explanation`() {
+        val s = state(ControllerMapping(profiles = listOf(touch, frame)))
+        assertEquals(listOf(PresentedControllers.AUTO, PresentedControllers.FRAME, PresentedControllers.TOUCH), s.offered)
+        assertEquals(listOf(PresentedControllers.AUTO, PresentedControllers.FRAME), state(ControllerMapping(profiles = listOf(touch, frame)), family = "meta").offered)
+    }
+
+    @Test
+    fun `a choice kept from before still shows its cards for a game that has nothing to choose now`() {
+        val s = state(ControllerMapping(profiles = listOf(frame), presented = PresentedControllers.TOUCH))
+        assertTrue(PresentedControllers.TOUCH in s.offered && s.offered.size > 1)
     }
 
     @Test
@@ -96,6 +129,27 @@ class ControllerChoiceStateTest {
         assertTrue(s.ignored)
         assertFalse(s.fallback)
         assertFalse(state(ControllerMapping(profiles = listOf(touch, frame), presentedResult = "ignored")).ignored)
+    }
+
+    @Test
+    fun `automatic says which controllers the game read at its last start and through which profile`() {
+        val pico = ControllerProfile("/interaction_profiles/bytedance/pico4_controller", 40)
+        val frameUsed = state(ControllerMapping(profiles = listOf(touch, index, frame), used = "frame")).usedTable
+        assertEquals(ControllerChoiceState.UsedTable(ControllerProfile.Kind.FRAME), frameUsed)
+        val touchUsed = state(ControllerMapping(profiles = listOf(touch, frame), used = "touch")).usedTable
+        assertEquals(ControllerChoiceState.UsedTable(ControllerProfile.Kind.TOUCH), touchUsed)
+        // The game's own table for a Pico is its Pico profile; for a Meta device, its Touch one.
+        assertEquals(ControllerChoiceState.UsedTable(ControllerProfile.Kind.PICO), state(ControllerMapping(profiles = listOf(touch, pico, frame), used = "native")).usedTable)
+        assertEquals(ControllerChoiceState.UsedTable(ControllerProfile.Kind.TOUCH), state(ControllerMapping(profiles = listOf(touch, pico, frame), used = "native"), family = "meta").usedTable)
+    }
+
+    @Test
+    fun `nothing is said in brackets while the table used is not known or has no matching profile`() {
+        assertEquals(null, state(ControllerMapping(profiles = listOf(touch, frame))).usedTable)
+        assertEquals(null, state(ControllerMapping(profiles = listOf(touch, frame), used = "none")).usedTable)
+        assertEquals(null, state(ControllerMapping(profiles = listOf(touch), used = "frame")).usedTable)
+        // A native table with no profile of this device's controllers among the ones the game gave.
+        assertEquals(null, state(ControllerMapping(profiles = listOf(frame, simple), used = "native")).usedTable)
     }
 
     @Test

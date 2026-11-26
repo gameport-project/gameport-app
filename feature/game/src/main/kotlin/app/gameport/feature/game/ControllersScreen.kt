@@ -2,7 +2,10 @@ package app.gameport.feature.game
 
 import app.gameport.core.designsystem.TourIds
 import app.gameport.core.designsystem.tourTarget
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -14,7 +17,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -38,7 +40,6 @@ import androidx.compose.foundation.verticalScroll
 import app.gameport.core.designsystem.BackdropDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -75,9 +76,10 @@ fun ControllersScreen(onBack: () -> Unit, viewModel: ControllersViewModel = hilt
     val answer by viewModel.myAnswer.collectAsStateWithLifecycle()
     val community by viewModel.community.collectAsStateWithLifecycle()
     ControllersContent(
-        mapping, gameName, onBack, viewModel::onEnabledChanged, viewModel::onChoose, viewModel::onReset, viewModel.deviceFamily,
+        mapping, gameName, onBack, viewModel::onChoose, viewModel::onReset, viewModel.deviceFamily,
         canUndo = history.canUndo, canRedo = history.canRedo, onUndo = viewModel::onUndo, onRedo = viewModel::onRedo,
         onPreset = viewModel::onPreset,
+        onPresented = viewModel::onPresented,
         feedback = ControllerFeedbackPage(answer, viewModel::onAnswer, community),
     )
 }
@@ -88,7 +90,6 @@ internal fun ControllersContent(
     mapping: ControllerMapping,
     gameName: String,
     onBack: () -> Unit,
-    onEnabledChanged: (Boolean) -> Unit,
     onChoose: (Map<ControlRef, List<ControlRef>>) -> Unit,
     onReset: () -> Unit,
     deviceFamily: String? = null,
@@ -98,6 +99,8 @@ internal fun ControllersContent(
     onRedo: () -> Unit = {},
     /** A ready-made preset chosen from the menu, or automatic when null. */
     onPreset: (ControllerPreset?) -> Unit = {},
+    /** The table of the game put forward (its Steam Frame's or its Quest's, or automatic), chosen from the menu shown when the game has more than one. */
+    onPresented: (app.gameport.core.model.PresentedControllers) -> Unit = {},
     /** The player's answer about the controls and the mappings players say work; null where there is nothing to say (the tour of the page). */
     feedback: ControllerFeedbackPage? = null,
 ) {
@@ -109,7 +112,7 @@ internal fun ControllersContent(
     // A touch on the drawing only selects a control (its destination lights up); the window to choose it opens from the panel under the drawing.
     val select: (ControlRef?) -> Unit = { source -> focused = source }
     // A touch on a row of the list selects it and, when the mapping can be customised, opens the window at once.
-    val selectFromList: (ControlRef) -> Unit = { source -> focused = source; if (mapping.enabled) capturing = source }
+    val selectFromList: (ControlRef) -> Unit = { source -> focused = source; capturing = source }
     var showList by remember { mutableStateOf(false) }
     // Which controller is on the left of the drawing: the one of this device (where the player's own buttons are) unless the player swaps them.
     var deviceFirst by rememberSaveable { mutableStateOf(true) }
@@ -211,27 +214,31 @@ internal fun ControllersContent(
                 app.gameport.core.designsystem.TourHelpButton(app.gameport.core.model.TourKind.GAME_CONTROLLERS)
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // When the game has more than one table of controls (its Steam Frame's, its Quest's), which one is read can be chosen here, next to the presets. It is shown whatever the
+                // table in use, so a choice can always be taken back.
+                val tables = ControllerChoiceState.of(mapping, deviceFamily)
+                if (tables.choosable && tables.offered.size > 1) TableChoice(tables.offered, mapping.presented, tables.usedTable, onPresented)
+                // What the game reads, under the choice. With the Quest's controls chosen nothing of the Steam Frame's appears on the page: the game's own table is shown once it has run with them,
+                // and until then a line says what will happen at the next start.
+                val touchChosen = mapping.presented == app.gameport.core.model.PresentedControllers.TOUCH
+                if (mapping.showsRealTable) {
+                    RealTableCard(mapping, canChoose = tables.choosable && tables.offered.size > 1)
+                } else if (mapping.presented != app.gameport.core.model.PresentedControllers.AUTO && (tables.fallback || tables.ignored)) {
+                    // The choice was tried and could not be followed: said, instead of what would happen at the next start.
+                    Text(stringResource(R.string.controllers_choice_failed), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.widthIn(max = 720.dp))
+                } else if (touchChosen) {
+                    Text(stringResource(R.string.controllers_touch_next), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.widthIn(max = 720.dp))
+                } else if (tables.waitingForLaunch || (!mapping.translated && (mapping.used == "native" || mapping.used == "touch") && mapping.tableControls.isEmpty())) {
+                    // The game has not told yet what it reads (never started, or started with a patch that does not say): it comes after a start with the patch up to date. Said whatever is
+                    // shown below, so that a page that cannot say which tables the game has says why.
+                    PatchNotice(stringResource(R.string.controllers_real_waiting))
+                }
                 // Only what GamePort does by itself is told here; forcing the Steam Frame's controls adds no message above.
                 if (mapping.automatic) {
                     Text(stringResource(R.string.controllers_status_automatic), style = MaterialTheme.typography.titleMedium, modifier = Modifier.widthIn(max = 720.dp))
                 }
-                Row(
-                    Modifier.fillMaxWidth().widthIn(max = 720.dp).tourTarget(TourIds.CONTROLLERS_SWITCH).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.controllers_customise), style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            stringResource(if (!mapping.translated) R.string.controllers_customise_unavailable else if (mapping.enabled) R.string.controllers_customise_on else R.string.controllers_customise_off),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    Switch(checked = mapping.enabled, onCheckedChange = onEnabledChanged, enabled = mapping.translated)
-                }
-
-                // Nothing to remap while GamePort puts nothing on the controllers.
-                if (mapping.translated) {
+                // Nothing to remap while GamePort puts nothing on the controllers, nor when the Steam Frame's were asked for and the game was given its own table (the card says so).
+                if (mapping.translated && !mapping.showsRealTable) {
                     Text(
                         stringResource(R.string.controllers_explanation),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -244,6 +251,9 @@ internal fun ControllersContent(
                         var presetMenu by remember { mutableStateOf(false) }
                         // The automatic mapping is in effect while nothing is customised, even when it happens to match a preset: the choice shows "Automatic", not that preset.
                         val onAutomatic = !mapping.enabled || mapping.overrides.isEmpty()
+                        // "Automatic" says which of the presets its mapping is, when it is one: the player sees what is chosen for them.
+                        val autoPreset = remember(mapping.detected) { ControllerPreset.matching(ControllerLayout.allocate(mapping.detected.toSet())) }
+                        val autoLabel = autoPreset?.let { stringResource(R.string.controllers_preset_auto_named, presetName(it)) } ?: stringResource(R.string.controllers_preset_auto)
                         // The chosen preset is stored, not guessed: any hand-made retouch clears it, so a touched-up mapping shows "Custom".
                         val currentPreset = if (onAutomatic) null else mapping.chosenPreset
                         // Only the presets that change something for this game are offered: one that touches controls the game does not use would do nothing.
@@ -254,7 +264,7 @@ internal fun ControllersContent(
                                     stringResource(
                                         R.string.controllers_preset_label,
                                         when {
-                                            onAutomatic -> stringResource(R.string.controllers_preset_auto)
+                                            onAutomatic -> autoLabel
                                             currentPreset != null -> presetName(currentPreset)
                                             else -> stringResource(R.string.controllers_preset_custom)
                                         },
@@ -266,7 +276,7 @@ internal fun ControllersContent(
                                 DropdownMenuItem(
                                     text = {
                                         Column {
-                                            Text(stringResource(R.string.controllers_preset_auto))
+                                            Text(autoLabel)
                                             Text(stringResource(R.string.controllers_preset_auto_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                     },
@@ -348,12 +358,12 @@ private fun ControllerCard(hand: Hand, mapping: ControllerMapping, onSelect: (Co
             ) {
                 Text(controlLabel(source.group), modifier = Modifier.weight(1f))
                 val targets = mapping.targetsFor(source)
-                val color = if (mapping.enabled) Color.White else Color.White.copy(alpha = 0.5f)
+                val color = Color.White
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (targets.isEmpty()) GlassChip(label = stringResource(R.string.controllers_nothing), contentColor = color)
                     targets.forEach { GlassChip(label = targetLabel(it), contentColor = color) }
                     // Adding a button: the same window, where more than one can be ticked.
-                    if (mapping.enabled) Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.controllers_add), tint = color, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.controllers_add), tint = color, modifier = Modifier.size(20.dp))
                 }
             }
         }
@@ -386,6 +396,8 @@ internal fun controlLabel(group: String): String = when (group) {
     "menu" -> stringResource(R.string.control_menu)
     "view" -> stringResource(R.string.control_view)
     "bumper", "shoulder" -> stringResource(R.string.control_bumper)
+    "thumbrest" -> stringResource(R.string.control_thumbrest)
+    "system" -> stringResource(R.string.control_system)
     "dpad_up" -> stringResource(R.string.control_dpad_up)
     "dpad_down" -> stringResource(R.string.control_dpad_down)
     "dpad_left" -> stringResource(R.string.control_dpad_left)
@@ -397,5 +409,109 @@ internal fun controlLabel(group: String): String = when (group) {
 @Composable
 internal fun targetLabel(target: ControlRef): String =
     stringResource(R.string.controllers_target, stringResource(if (target.hand == Hand.LEFT) R.string.controllers_left_short else R.string.controllers_right_short), controlLabel(target.group))
+
+/** A notice in orange for what is missing on the game's side (here, a patch that does not tell which tables the game has): a small wrench, the one of the patch button, and a short text. */
+@Composable
+private fun PatchNotice(text: String) {
+    val shape = RoundedCornerShape(14.dp)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .widthIn(max = 720.dp)
+            .clip(shape)
+            .background(NoteColors.Orange.copy(alpha = 0.10f))
+            .border(1.dp, NoteColors.Orange.copy(alpha = 0.45f), shape)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.Build, contentDescription = null, tint = NoteColors.Orange, modifier = Modifier.size(18.dp))
+        Text(text, color = NoteColors.OrangeText, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/** The words for each table of the game that can be put forward, and what it means at the next start. */
+private fun tableName(choice: app.gameport.core.model.PresentedControllers): Int = when (choice) {
+    app.gameport.core.model.PresentedControllers.AUTO -> R.string.controllers_preset_auto
+    app.gameport.core.model.PresentedControllers.FRAME -> R.string.controllers_kind_frame
+    app.gameport.core.model.PresentedControllers.TOUCH -> R.string.controllers_kind_touch
+}
+
+private fun tableHint(choice: app.gameport.core.model.PresentedControllers): Int = when (choice) {
+    app.gameport.core.model.PresentedControllers.AUTO -> R.string.controllers_table_auto_hint
+    app.gameport.core.model.PresentedControllers.FRAME -> R.string.controllers_table_frame_hint
+    app.gameport.core.model.PresentedControllers.TOUCH -> R.string.controllers_table_touch_hint
+}
+
+/**
+ * Which table of the game is read, as a drop-down: its button says the one in use and each entry says in small letters what it means. For "Automatic", the controllers and the profile the
+ * game was read through at its last start, once known.
+ */
+@Composable
+private fun TableChoice(
+    offered: List<app.gameport.core.model.PresentedControllers>,
+    selected: app.gameport.core.model.PresentedControllers,
+    used: ControllerChoiceState.UsedTable?,
+    onChoose: (app.gameport.core.model.PresentedControllers) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    val autoName = used?.let { stringResource(R.string.controllers_auto_detail, stringResource(kindName(it.kind))) } ?: stringResource(R.string.controllers_preset_auto)
+    Box {
+        GlassButton(onClick = { open = true }) {
+            Text(stringResource(R.string.controllers_table_label, if (selected == app.gameport.core.model.PresentedControllers.AUTO) autoName else stringResource(tableName(selected))))
+            Icon(Icons.Filled.ArrowDropDown, null)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            offered.forEach { choice ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(stringResource(tableName(choice)))
+                            Text(stringResource(tableHint(choice)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    },
+                    trailingIcon = { if (choice == selected) Icon(Icons.Filled.Check, null) },
+                    onClick = { open = false; onChoose(choice) },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * What the game really binds on the table it is read through, when nothing of the Steam Frame's is translated (its own table for this device, or the Touch's): the profile it came
+ * from and, for each hand, the controls it uses. Read only: the choice of the Steam Frame's controls, above, is what opens the mapping.
+ */
+@Composable
+private fun RealTableCard(mapping: ControllerMapping, canChoose: Boolean) {
+    val byHand = remember(mapping.tableControls) {
+        mapping.tableControls
+            .sortedWith(compareBy({ it.hand.ordinal }, { ORDER.indexOf(it.group).let { i -> if (i < 0) ORDER.size else i } }, { it.group }))
+            .groupBy { it.hand }
+    }
+    Column(
+        Modifier.fillMaxWidth().widthIn(max = 720.dp).glass(RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(stringResource(R.string.controllers_real_title), style = MaterialTheme.typography.titleMedium)
+        Text(
+            stringResource(R.string.controllers_real_profile, mapping.table.removePrefix("/interaction_profiles/")),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        byHand.forEach { (hand, controls) ->
+            Text(
+                stringResource(
+                    R.string.controllers_real_hand,
+                    stringResource(if (hand == Hand.LEFT) R.string.controllers_left else R.string.controllers_right),
+                    controls.map { controlLabel(it.group) }.joinToString(", "),
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        // The way to the Steam Frame's controls is only mentioned when the menu that offers them is on the page.
+        Text(stringResource(if (mapping.presented == app.gameport.core.model.PresentedControllers.FRAME) R.string.controllers_real_hint_fallback else if (mapping.used == "touch") R.string.controllers_real_hint_touch else if (canChoose) R.string.controllers_real_hint else R.string.controllers_real_hint_alone), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+    }
+}
 
 private val ORDER = listOf("thumbstick", "trigger", "squeeze", "bumper", "shoulder", "a", "b", "x", "y", "menu", "view", "dpad_up", "dpad_down", "dpad_left", "dpad_right")

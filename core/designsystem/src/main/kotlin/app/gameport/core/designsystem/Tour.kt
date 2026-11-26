@@ -360,7 +360,6 @@ object TourIds {
     const val GAMECOMPAT_FRAME = "gamecompat_frame"
     const val GAMECOMPAT_RECENTER = "gamecompat_recenter"
 
-    const val CONTROLLERS_SWITCH = "controllers_switch"
     const val CONTROLLERS_CARDS = "controllers_cards"
     const val CONTROLLERS_RESET = "controllers_reset"
 

@@ -90,8 +90,6 @@ class ControllersViewModel @Inject constructor(
 
     private fun publish() { _history.value = History(canUndo = undone.isNotEmpty(), canRedo = redone.isNotEmpty()) }
 
-    fun onEnabledChanged(enabled: Boolean) { remember(); store.setEnabled(appId, enabled) }
-
     /** Several controls sent somewhere new as one step: customising is switched on by it when it was not, and one undo takes all of it back. */
     fun onChoose(changes: Map<ControlRef, List<ControlRef>>) {
         if (changes.isEmpty()) return
@@ -101,6 +99,9 @@ class ControllersViewModel @Inject constructor(
     }
 
     fun onReset() { remember(); store.reset(appId) }
+
+    /** The table of the game to put forward (its Steam Frame's, its Quest's, or automatic): taken at the next start of the game, and kept apart from the undo of the mapping. */
+    fun onPresented(choice: app.gameport.core.model.PresentedControllers) = store.setPresented(appId, choice)
 
     /** A ready-made preset, or automatic when null: both are one step, so one undo takes them back. */
     fun onPreset(preset: ControllerPreset?) { remember(); if (preset == null) store.reset(appId) else store.applyPreset(appId, preset) }

@@ -624,11 +624,15 @@ private fun GameDetails(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     // One sentence for what is waiting: a new version and a newer patch, or one of them.
-                    Text(stringResource(when {
-                        updatePending && patchPending -> R.string.game_play_pending_both
-                        updatePending -> R.string.issue_update_available
-                        else -> R.string.issue_patch_outdated
-                    }))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        // A small orange wrench, the one of the patch button, when the sentence is about the patch.
+                        if (patchPending) Icon(Icons.Filled.Build, contentDescription = null, tint = NoteColors.Orange, modifier = Modifier.padding(top = 2.dp).size(18.dp))
+                        Text(stringResource(when {
+                            updatePending && patchPending -> R.string.game_play_pending_both
+                            updatePending -> R.string.issue_update_available
+                            else -> R.string.issue_patch_outdated
+                        }))
+                    }
                     // The words start at the left, under one another, as in the actions panel; every button is as wide as the dialog.
                     Button(onClick = { choosingPlay = false; onPlay() }, modifier = Modifier.fillMaxWidth().height(ACTION_ROW_HEIGHT)) {
                         Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -1540,19 +1544,22 @@ private fun Progress(state: InstallState, speedUnit: SpeedUnit, extras: List<Ext
                 )
             }
         }
-        // The buttons, one under the other. The two others stay for the whole install, greyed when they cannot be used in this step: the card keeps its width from one step to the next.
-        Column(Modifier.width(IntrinsicSize.Max), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // The buttons: the confirmation on top, alone, and under it the two others side by side. The two under it stay for the whole install, greyed when they cannot be used in this step.
+        // A width of its own, never narrower than the confirmation button's, so the card does not change its width when that button comes and goes.
+        Column(Modifier.width(IntrinsicSize.Max).widthIn(min = BUTTONS_MIN_WIDTH), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             // Only while Android waits for the confirmation. White, like the page's own main button: it is the one thing this step waits for, and it has to catch the eye when the window was missed.
             if (state is InstallState.Installing && onReopen != null) {
                 Button(onClick = onReopen, contentPadding = small, modifier = Modifier.height(32.dp).fillMaxWidth()) {
                     Text(stringResource(R.string.game_reopen_confirmation), style = MaterialTheme.typography.labelLarge)
                 }
             }
-            androidx.compose.material3.OutlinedButton(onClick = { onPause?.invoke() }, enabled = onPause != null, contentPadding = small, modifier = Modifier.height(32.dp).fillMaxWidth()) {
-                Text(stringResource(R.string.game_pause), style = MaterialTheme.typography.labelLarge)
-            }
-            DangerButton(onClick = { onCancel?.invoke() }, enabled = onCancel != null, contentPadding = small, modifier = Modifier.height(32.dp).fillMaxWidth()) {
-                Text(stringResource(R.string.game_cancel), style = MaterialTheme.typography.labelLarge)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                androidx.compose.material3.OutlinedButton(onClick = { onPause?.invoke() }, enabled = onPause != null, contentPadding = small, modifier = Modifier.weight(1f).height(32.dp)) {
+                    Text(stringResource(R.string.game_pause), style = MaterialTheme.typography.labelLarge)
+                }
+                DangerButton(onClick = { onCancel?.invoke() }, enabled = onCancel != null, contentPadding = small, modifier = Modifier.weight(1f).height(32.dp)) {
+                    Text(stringResource(R.string.game_cancel), style = MaterialTheme.typography.labelLarge)
+                }
             }
         }
     }
@@ -1560,6 +1567,9 @@ private fun Progress(state: InstallState, speedUnit: SpeedUnit, extras: List<Ext
 
 /** How many of the extra content still to come are named in the card; the rest are counted. */
 private const val EXTRAS_SHOWN = 2
+
+/** The width of the buttons of the install card: the one of the confirmation button, which is the widest, so the card keeps the same width from one step to the next. */
+private val BUTTONS_MIN_WIDTH = 190.dp
 
 private val InstallGreen = Color(0xFF4CAF50)
 

@@ -188,7 +188,6 @@ private fun ControllersDemoScreen(onBack: () -> Unit) {
             mapping = ControllerMapping(source = "valve", detected = demoControls(), enabled = true),
             gameName = DemoGames.main.name,
             onBack = onBack,
-            onEnabledChanged = {},
             onChoose = {},
             onReset = {},
         )

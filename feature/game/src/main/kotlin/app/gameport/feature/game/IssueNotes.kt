@@ -89,7 +89,7 @@ internal fun issueNotes(
                 )
             } else {
                 NoteItem(
-                    stringResource(R.string.issue_controllers_silent), NoteColors.Info, NoteColors.InfoText,
+                    stringResource(R.string.issue_controllers_silent), NoteColors.Orange, NoteColors.OrangeText,
                     onClick = onActivateFrame, action = stringResource(R.string.issue_controllers_silent_action), actionEnabled = !busy,
                 )
             }

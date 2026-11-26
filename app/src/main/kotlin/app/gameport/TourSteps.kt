@@ -78,7 +78,6 @@ internal fun tourSteps(kind: TourKind): List<TourStep> = when (kind) {
         TourStep(TourIds.GAMECOMPAT_RECENTER, R.string.tour_gamecompat_recenter_title, R.string.tour_gamecompat_recenter_text),
     )
     TourKind.GAME_CONTROLLERS -> listOf(
-        TourStep(TourIds.CONTROLLERS_SWITCH, R.string.tour_controllers_switch_title, R.string.tour_controllers_switch_text),
         TourStep(TourIds.CONTROLLERS_CARDS, R.string.tour_controllers_cards_title, R.string.tour_controllers_cards_text),
         TourStep(TourIds.CONTROLLERS_RESET, R.string.tour_controllers_reset_title, R.string.tour_controllers_reset_text),
     )

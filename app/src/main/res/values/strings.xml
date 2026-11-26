@@ -20,6 +20,7 @@
     <string name="report_title">Thanks for the answer</string>
     <string name="report_short_run">The game ran for only a few seconds. A description of what appeared on screen, or of the problem after playing a little longer, makes the report much more useful.</string>
     <string name="report_intro">Sorry it did not work. A small technical report goes with the answer: versions, files and logs of the game, never a name, an e-mail address or an account.</string>
+    <string name="report_auto_sending">Sending the report…</string>
     <string name="report_intro_offline">Thanks for the answer. A small technical report goes with it: versions, files and logs of the game, never a name, an e-mail address or an account.</string>
     <string name="report_status_working">Preparing the report…</string>
     <string name="report_status_ready">The report is ready and goes with the answer.</string>
@@ -130,8 +131,6 @@
     <string name="tour_gamecompat_frame_text">Forces the detection of the Steam Frame\'s controllers. Useful when the game starts but does not react to the controllers. A warning appears when no control for them was seen the last time the game ran.</string>
     <string name="tour_gamecompat_recenter_title">Recentering</string>
     <string name="tour_gamecompat_recenter_text">Automatic, On or Off. Useful when recentering does not bring the game back in front. Automatic decides by itself, and says so when it turned recentering on.</string>
-    <string name="tour_controllers_switch_title">Custom mapping</string>
-    <string name="tour_controllers_switch_text">Off, GamePort\'s default mapping applies. On, the choices below apply to this game. It is available once the Steam Frame\'s controls are put on this device\'s controllers.</string>
     <string name="tour_controllers_cards_title">Controls and destinations</string>
     <string name="tour_controllers_cards_text">Each control of the Steam Frame\'s controllers is listed with where it goes on this device\'s controllers. Selecting one opens a list where one or more destinations are ticked.</string>
     <string name="tour_controllers_reset_title">Reset</string>

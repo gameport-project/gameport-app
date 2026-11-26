@@ -94,6 +94,8 @@ data class ReportFollowUp(
     val savedName: String? = null,
     val saveFailed: Boolean = false,
     val offlineOnly: Boolean = false,
+    /** The game works but its controls do not: the report goes by itself, with its libraries, and the window only says it is being sent. */
+    val automatic: Boolean = false,
     val describedAndSent: Boolean = false,
     /** The run that just ended lasted under a minute: what the player saw says more than the files then. */
     val shortRun: Boolean = false,
@@ -158,11 +160,29 @@ class VerdictAskViewModel @Inject constructor(
     /** [noControls]: the game worked but its controls did not (the verdict is "it worked", and the answer carries that one code). */
     fun onAnswer(verdict: Verdict, noControls: Boolean = false) {
         val asked = question.value ?: return
-        // A game that did not work, or whose online part does not, leaves something to look at in the report: the report goes first, and the answer waits to say what became of it.
-        val withReport = verdict == Verdict.FAILS || verdict == Verdict.OFFLINE_ONLY
+        val noControlsAnswer = noControls && verdict == Verdict.WORKS
+        // A game that did not work, whose online part does not, or whose controls do not, leaves something to look at in the report: the report goes first, and the answer waits to say what became of it.
+        val withReport = verdict == Verdict.FAILS || verdict == Verdict.OFFLINE_ONLY || noControlsAnswer
         val steady = steadiness.value.takeIf { asked.shared }
-        verdicts.answer(asked.appId, verdict, version, today, holdForReport = withReport, steadiness = steady, noControls = noControls && verdict == Verdict.WORKS)
-        if (withReport) prepareReport(asked.appId, offlineOnly = verdict == Verdict.OFFLINE_ONLY)
+        verdicts.answer(asked.appId, verdict, version, today, holdForReport = withReport, steadiness = steady, noControls = noControlsAnswer)
+        if (noControlsAnswer) sendControlsReport(asked.appId)
+        else if (withReport) prepareReport(asked.appId, offlineOnly = verdict == Verdict.OFFLINE_ONLY)
+    }
+
+    /**
+     * "Works, but not the controls": nothing to fill in. The report is made and sent at once with the game's libraries (the Discord name kept in the settings goes with them; without one,
+     * or when they cannot go, the plain report goes), and the answer leaves with what became of it. The window only says the report is being sent, then closes by itself.
+     */
+    private fun sendControlsReport(appId: Int) {
+        _followUp.value = ReportFollowUp(appId, status = null, automatic = true)
+        viewModelScope.launch {
+            val symptoms = setOf(Symptom.NO_CONTROLS)
+            // Whatever goes wrong while the report is made or sent, the answer is let go and the window ends: it never stays on "sending".
+            val status = if (!verdicts.share.value) ReportStatus.OFF
+            else runCatching { gameOf(appId)?.let { reports.sendByHand(it, symptoms = symptoms, withLibraries = true) } }.getOrNull() ?: ReportStatus.UNAVAILABLE
+            verdicts.reportStated(appId, status.state())
+            _followUp.update { it?.copy(status = status, delivered = true) }
+        }
     }
 
     /**
@@ -301,9 +321,51 @@ fun VerdictAskHost(viewModel: VerdictAskViewModel = hiltViewModel()) {
     )
 }
 
+/** After "works, but not the controls": the report goes by itself, the window says so and closes once it is done. Nothing to fill in. */
+@Composable
+private fun AutomaticReportDialog(state: ReportFollowUp, onClose: (String, Set<Symptom>) -> Unit) {
+    androidx.compose.runtime.LaunchedEffect(state.delivered) {
+        if (state.delivered) {
+            kotlinx.coroutines.delay(2_000L)
+            onClose("", emptySet())
+        }
+    }
+    BackdropDialog(
+        onDismissRequest = {},
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Icons.Filled.Info, contentDescription = null, tint = KindBlue, modifier = Modifier.size(24.dp))
+                Text(stringResource(R.string.report_title))
+            }
+        },
+        text = {
+            if (state.status == ReportStatus.SENT) app.gameport.core.designsystem.ReportSentMark()
+            else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (state.status == null) androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                Text(
+                    stringResource(
+                        when (state.status) {
+                            null -> R.string.report_auto_sending
+                            ReportStatus.SENT -> R.string.report_status_sent
+                            ReportStatus.WAITING -> R.string.report_status_waiting
+                            ReportStatus.OFF -> R.string.report_status_off
+                            ReportStatus.REFUSED -> R.string.report_status_refused
+                            ReportStatus.UNAVAILABLE -> R.string.report_status_unavailable
+                        },
+                    ),
+                )
+            }
+        },
+    )
+}
+
 /** After "it did not work": the report that goes with the answer, what became of it, and the two ways to take it by hand. Closed by its button only. */
 @Composable
 private fun ReportFollowUpDialog(state: ReportFollowUp, discordName: String, onDiscordName: (String) -> Unit, plan: app.gameport.core.model.LibraryChoice.Pick?, onLibraries: (Boolean) -> Unit, onDownload: (String, Set<Symptom>) -> Unit, onSend: (String, Set<Symptom>) -> Unit, onClose: (String, Set<Symptom>) -> Unit) {
+    if (state.automatic) {
+        AutomaticReportDialog(state, onClose)
+        return
+    }
     // What the player writes goes in the report, in their own words: the files show how the game ran, not what was seen.
     var description by rememberSaveable { mutableStateOf("") }
     // The Discord name is kept as it is typed, so the answer that leaves when the window closes carries it; it is filled in from the last time, and never asked again.
