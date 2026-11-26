@@ -1000,6 +1000,26 @@ std::unordered_map<std::string, std::vector<XrActionSuggestedBinding>> g_stash; 
 std::atomic<bool> g_emulating{false};
 std::atomic<bool> g_gameHasBoth{false};  // the game has its own controls for the device's controllers and the Steam Frame's
 std::atomic<bool> g_preferFrame{false};  // the player asked for the Steam Frame's controls even when the game has its own for the device (GAMEPORT_XR_PREFER_FRAME)
+// The controllers the player chose to present to the game (GAMEPORT_XR_PRESENT): "auto" is the layer's own choice (what it did before the player could choose), "frame" the
+// Steam Frame's controls (the same path as GAMEPORT_XR_PREFER_FRAME), "touch" the Touch controls translated onto a Pico's when the game has none of its own for it.
+enum class Present { Auto, Frame, Touch };
+std::atomic<int> g_present{static_cast<int>(Present::Auto)};
+std::string g_usedKind;    // the kind of table a translation succeeded for ("valve" or "touch"), empty when none did (the thread that attaches the game's actions)
+std::string g_usedSource;  // and its profile
+
+// Strict: only "auto", "frame" and "touch" count; absent, empty or anything else is "auto" ([unknown] says the value was not empty and not understood).
+Present ParsePresent(const char* text, bool* unknown) {
+    if (unknown) *unknown = false;
+    if (!text || !text[0]) return Present::Auto;
+    if (strcmp(text, "auto") == 0) return Present::Auto;
+    if (strcmp(text, "frame") == 0) return Present::Frame;
+    if (strcmp(text, "touch") == 0) return Present::Touch;
+    if (unknown) *unknown = true;
+    return Present::Auto;
+}
+
+const char* PresentName(Present present) { return present == Present::Frame ? "frame" : present == Present::Touch ? "touch" : "auto"; }
+
 // The strings the game gave xrStringToPath for interaction profiles: a runtime may not give a profile it does not know back (g_namesMutex).
 std::mutex g_namesMutex;
 std::unordered_map<XrPath, std::string> g_pathNames;
@@ -1279,6 +1299,8 @@ bool EmulateFrom(XrInstance instance, const std::string& sourceProfile, const ch
             else g_stringToPath(instance, sourceProfile.c_str(), &g_emulatedSourcePath);
         }
         g_emulating.store(true);
+        g_usedKind = sourceKind;
+        g_usedSource = sourceProfile;
     }
     return XR_SUCCEEDED(result);
 }
@@ -1348,8 +1370,52 @@ void ReplayDeviceProfiles(XrInstance instance, const std::unordered_map<std::str
     }
 }
 
+// A line that is logged once per process, whatever the number of times the game attaches its actions.
+void LogOnce(const std::string& text) {
+    static std::set<std::string> said;
+    if (said.insert(text).second) LOGI("%s", text.c_str());
+}
+
+// The richest suggestion of the profiles [profiles] among the game's, or "".
+std::string RichestOf(const std::unordered_map<std::string, std::vector<XrActionSuggestedBinding>>& stash, const char* const* profiles, size_t count) {
+    std::string best;
+    size_t size = 0;
+    for (size_t i = 0; i < count; i++) {
+        auto it = stash.find(profiles[i]);
+        if (it != stash.end() && it->second.size() > size) { best = profiles[i]; size = it->second.size(); }
+    }
+    return best;
+}
+
+// The player chose the Touch controls (GAMEPORT_XR_PRESENT=touch). Only a Pico gives them a meaning: its runtime has no table of its own for a game made for the Meta's
+// (nor for the Steam Frame's), so the Touch's is translated before the Steam Frame's gets its turn. True when that was done; false leaves the automatic path to go on,
+// with whatever was kept back given to the runtime again if the translation failed.
+bool PresentedFirst(XrInstance instance, const std::unordered_map<std::string, std::vector<XrActionSuggestedBinding>>& stash, const std::string& native) {
+    if (g_present.load() != static_cast<int>(Present::Touch)) return false;  // "frame" goes through the existing preference (g_preferFrame)
+    if (g_family != Family::Pico) {
+        LogOnce("the player chose the Touch controls: this device has no use for that choice, it is ignored");
+        return false;
+    }
+    if (!native.empty()) {
+        LogOnce("the player chose the Touch controls, but the game has its own for this device: the choice is ignored");
+        return false;
+    }
+    const std::string touch = RichestOf(stash, kMetaProfiles, sizeof(kMetaProfiles) / sizeof(*kMetaProfiles));
+    if (touch.empty()) {
+        LogOnce("the player chose the Touch controls, but the game has no table for them: the automatic choice is used");
+        return false;
+    }
+    if (EmulateFrom(instance, touch, "touch", stash.at(touch))) {
+        LogOnce("the game uses the Touch controls, as the player asked");
+        return true;
+    }
+    LogOnce("the Touch controls could not be translated: the game's tables are given back to the runtime and the automatic choice is used");
+    ReplayDeviceProfiles(instance, stash);
+    return false;
+}
+
 // Runs once the game has said everything it knows, right before it attaches its action sets.
-void EmulateIfNeeded(XrInstance instance) {
+void EmulateCore(XrInstance instance) {
     if (g_family == Family::Unknown || !g_stringToPath || !g_pathToString) return;
     std::unordered_map<std::string, std::vector<XrActionSuggestedBinding>> stash;
     {
@@ -1362,6 +1428,8 @@ void EmulateIfNeeded(XrInstance instance) {
         if (IsNativeProfile(profile) && (native.empty() || bindings.size() > stash[native].size())) native = profile;
         if (IsValveProfile(profile) && (valve.empty() || bindings.size() > stash[valve].size())) valve = profile;
     }
+    // The controllers the player chose to present (not "automatic"): decided first, the rest below stays as it was.
+    if (g_present.load() != static_cast<int>(Present::Auto) && PresentedFirst(instance, stash, native)) return;
     if (!native.empty()) {
         g_emulating.store(false);
         // The game has controls for the device's controllers: nothing to translate. When it also has the Steam Frame's, the log says how the two compare. Unity
@@ -1426,6 +1494,109 @@ void EmulateIfNeeded(XrInstance instance) {
         if (!touch.empty() && EmulateFrom(instance, touch, "touch", stash[touch])) return;
     }
     if (!valve.empty()) EmulateFrom(instance, valve, "valve", stash[valve]);
+}
+
+// What became of the player's choice: "applied" (also said when there was no choice to make), "fallback" (the game has what was asked for, but it could not be
+// used) or "ignored" (the choice has no meaning for this device or this game).
+const char* PresentedOutcome(Present present, Family family, bool native, bool valve, const std::string& used) {
+    // A device whose family is unknown has nothing translated at all: the choice has no meaning there.
+    if (present == Present::Frame) return !valve || family == Family::Unknown ? "ignored" : used == "frame" ? "applied" : "fallback";
+    if (present == Present::Touch) return family != Family::Pico || native ? "ignored" : used == "touch" ? "applied" : "fallback";
+    return "applied";
+}
+
+// A text that goes in a line of the report: no separator of the format, no control character, a sane length.
+bool ReportableProfile(const std::string& name) {
+    if (name.empty() || name.size() > 150) return false;
+    for (unsigned char c : name) if (c < 0x21 || c > 0x7e || c == '|' || c == ':') return false;
+    return true;
+}
+
+// The lines of xr_profiles.txt: every profile the game gave bindings for, what the player chose, what became of it and which table is in use.
+std::string ProfilesFileText(const std::vector<std::pair<std::string, size_t>>& profiles, Present present, const char* presented, const char* used) {
+    std::string text;
+    int shown = 0;
+    for (const auto& [name, count] : profiles) {
+        if (shown++ >= 16) break;
+        text += "profile=" + name + "|" + std::to_string(count) + "\n";
+    }
+    text += std::string("present=") + PresentName(present) + "\n";
+    text += std::string("presented=") + presented + "\n";
+    text += std::string("used=") + used + "\n";
+    return text;
+}
+
+// Test seam: where the text goes instead of the file, when set.
+void (*g_writeProfilesText)(const std::string&) = nullptr;
+
+// Written whole or not at all: a temporary file in the same folder, then renamed over the real one, so that a reader never sees half a file.
+bool WriteFileAtomically(const std::string& path, const std::string& text) {
+    const std::string temporary = path + ".tmp";
+    FILE* out = fopen(temporary.c_str(), "w");
+    if (!out) return false;
+    const bool written = fputs(text.c_str(), out) >= 0;
+    const bool closed = fclose(out) == 0;
+    if (!written || !closed || rename(temporary.c_str(), path.c_str()) != 0) {
+        remove(temporary.c_str());
+        return false;
+    }
+    return true;
+}
+
+// A new run starts without the report of the last one: a hook that reads it before this run wrote its own must not take an old answer for the new choice.
+void RemoveStaleProfilesText(const std::string& folder) {
+    if (!folder.empty()) remove((folder + "xr_profiles.txt").c_str());
+}
+
+void WriteProfilesText(const std::string& text) {
+    if (g_writeProfilesText) {
+        g_writeProfilesText(text);
+        return;
+    }
+    const std::string folder = GamePortFolder();
+    if (folder.empty()) return;
+    WriteFileAtomically(folder + "xr_profiles.txt", text);
+}
+
+// Tells GamePort (a file of its own, next to xr_controls.txt, which is left as it was) which profiles the game gave bindings for, what the player chose and what became of it,
+// and which table is used. The log gets a line for each table that was not translated (the translated one has its own, per action). Written again only when it changed.
+void ReportProfiles() {
+    std::unordered_map<std::string, std::vector<XrActionSuggestedBinding>> stash;
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        stash = g_stash;
+    }
+    std::vector<std::pair<std::string, size_t>> profiles;
+    bool native = false, valve = false;
+    for (const auto& [profile, bindings] : stash) {
+        if (IsNativeProfile(profile)) native = true;
+        if (IsValveProfile(profile)) valve = true;
+        if (!ReportableProfile(profile)) continue;
+        profiles.push_back({profile, bindings.size()});
+        if (profile != g_usedSource) {
+            std::set<XrAction> distinct;
+            for (const auto& binding : bindings) distinct.insert(binding.action);
+            LogOnce("controller profile: " + profile + ", " + std::to_string(bindings.size()) + " binding(s), " + std::to_string(distinct.size()) + " distinct action(s)");
+        }
+    }
+    std::sort(profiles.begin(), profiles.end());
+    const std::string used = g_usedKind == "valve" ? "frame" : !g_usedKind.empty() ? g_usedKind : native ? "native" : "none";
+    const Present present = static_cast<Present>(g_present.load());
+    const char* outcome = PresentedOutcome(present, g_family, native, valve, used);
+    const std::string text = ProfilesFileText(profiles, present, outcome, used.c_str());
+    LogOnce(std::string("controller profile: present=") + PresentName(present) + " presented=" + outcome + " used=" + used);
+    static std::string written;
+    if (text == written) return;
+    written = text;
+    WriteProfilesText(text);
+}
+
+// Runs once the game has said everything it knows, right before it attaches its action sets, then reports what the game has and what was done.
+void EmulateIfNeeded(XrInstance instance) {
+    g_usedKind.clear();
+    g_usedSource.clear();
+    EmulateCore(instance);
+    ReportProfiles();
 }
 
 // The calls that end a session or an instance: logged, so that a report shows who closed what (the game by itself, or the runtime).
@@ -2102,6 +2273,7 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
     Load("xrEnumerateDisplayRefreshRatesFB", g_refreshEnumerate);
     // A new run starts without the report of the last one.
     remove((GamePortFolder() + "xr_refresh.txt").c_str());
+    RemoveStaleProfilesText(GamePortFolder());
 
     // Which controllers this device has: GamePort says (its VrPlatform), else the runtime's name tells.
     auto familyOf = [](const std::string& text) {
@@ -2139,10 +2311,17 @@ XrResult XRAPI_CALL Layer_xrCreateApiLayerInstance(const XrInstanceCreateInfo* i
     }
     const char* prefer = getenv("GAMEPORT_XR_PREFER_FRAME");
     g_preferFrame = prefer && strcmp(prefer, "1") == 0;
+    bool unknownPresent = false;
+    const char* presentText = getenv("GAMEPORT_XR_PRESENT");
+    g_present = static_cast<int>(ParsePresent(presentText, &unknownPresent));
+    if (unknownPresent) LOGI("GAMEPORT_XR_PRESENT '%s' is not understood: the automatic choice is used", presentText);
+    // "frame" is the existing preference of the Steam Frame's controls: the same variable's path, nothing new.
+    if (g_present.load() == static_cast<int>(Present::Frame)) g_preferFrame = true;
     const char* floor = getenv("GAMEPORT_XR_LOCAL_FLOOR");
     g_recenterMode = floor && (strcmp(floor, "on") == 0 || strcmp(floor, "1") == 0) ? 1 : (floor && strcmp(floor, "off") == 0 ? 2 : 0);
     if (g_recenterMode.load() != 0) LOGI("recentering of the headset: %s, as the player chose", g_recenterMode.load() == 1 ? "followed" : "left to the game");
     if (g_preferFrame) LOGI("the player asked for the Steam Frame's controls where the game has them");
+    if (g_present.load() == static_cast<int>(Present::Touch)) LOGI("the player asked for the Touch controls where the device has none of its own");
     g_hapticPercent = gp::ParseHapticPercent(getenv("GAMEPORT_XR_HAPTICS"));
     if (g_hapticPercent.load() != 100) LOGI("vibration strength: %d%%, as the player chose", g_hapticPercent.load());
 

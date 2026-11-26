@@ -516,10 +516,33 @@ public final class GamePortHookProvider extends ContentProvider {
             extras.putBoolean("silent", new File(marker.getParentFile(), "xr_silent.txt").isFile());
             // The layer leaves this mark when the headset has no play area and it gave the game a space that follows the recentering.
             extras.putBoolean("stageFallback", new File(marker.getParentFile(), "xr_stage_fallback.txt").isFile());
+            addProfileExtras(extras, new File(marker.getParentFile(), "xr_profiles.txt"));
             Calls.call(context, Owner.cloud(context), "controller_profile", context.getPackageName(), extras);
             Log.i(TAG, "reported " + controls.size() + " " + source + " controls");
         } catch (Throwable t) {
             Log.w(TAG, "could not report the controller profile", t);
+        }
+    }
+
+    /** The optional extras of the report, from the layer's xr_profiles.txt: no file, an old one or a damaged one adds nothing. */
+    private static void addProfileExtras(Bundle extras, File file) {
+        try {
+            if (!file.isFile()) return;
+            java.util.List<String> lines = new java.util.ArrayList<>();
+            java.io.BufferedReader in = new java.io.BufferedReader(new java.io.FileReader(file));
+            try {
+                String line;
+                while ((line = in.readLine()) != null && lines.size() < 200) lines.add(line);
+            } finally {
+                in.close();
+            }
+            ControllerProfiles.Report report = ControllerProfiles.parse(lines);
+            if (!report.profiles.isEmpty()) extras.putStringArray("profiles", report.profiles.toArray(new String[0]));
+            if (report.present != null) extras.putString("present", report.present);
+            if (report.presented != null) extras.putString("presented", report.presented);
+            if (report.used != null) extras.putString("used", report.used);
+        } catch (Throwable t) {
+            Log.w(TAG, "could not read the controller profiles", t);
         }
     }
 
@@ -1119,6 +1142,8 @@ public final class GamePortHookProvider extends ContentProvider {
         String controls = "";
         String family = "";
         String preferFrame = "0";
+        // The controllers the player chose to present to the game: auto, frame or touch (the 14th line of the cache, last; an older cache has none).
+        String present = "auto";
         String localFloor = "auto";
         String eyeFov = "auto";
         String haptics = "100";
@@ -1140,6 +1165,7 @@ public final class GamePortHookProvider extends ContentProvider {
             String platform = config.getString("xrFamily");
             family = platform == null ? "" : platform;
             preferFrame = config.getBoolean("xrPreferFrame") ? "1" : "0";
+            present = ControllerProfiles.normalizePresent(config.getString("xrPresent"));
             String recenter = config.getString("xrRecenter");
             localFloor = recenter == null || recenter.isEmpty() ? "auto" : recenter;
             String eyeFoveation = config.getString("xrEyeFoveation");
@@ -1154,7 +1180,7 @@ public final class GamePortHookProvider extends ContentProvider {
             // A GamePort from before the choice only says whether to come back for a game it started.
             returnMode = mode != null ? mode : (config.getBoolean("returnToGamePort") ? "app" : "never");
             java.io.FileWriter out = new java.io.FileWriter(cache);
-            out.write(seated + "\n" + eyeCm + "\n" + controls + "\n" + family + "\n" + preferFrame + "\n" + localFloor + "\n" + eyeFov + "\n" + haptics + "\n" + resolution + "\n" + refresh + "\n" + cpuLevel + "\n" + gpuLevel + "\n" + resolutionHeight + "\n");
+            out.write(seated + "\n" + eyeCm + "\n" + controls + "\n" + family + "\n" + preferFrame + "\n" + localFloor + "\n" + eyeFov + "\n" + haptics + "\n" + resolution + "\n" + refresh + "\n" + cpuLevel + "\n" + gpuLevel + "\n" + resolutionHeight + "\n" + present + "\n");
             out.close();
         } catch (Throwable t) {
             try {
@@ -1183,6 +1209,7 @@ public final class GamePortHookProvider extends ContentProvider {
                 gpuLevel = gpu == null || gpu.isEmpty() ? "-1" : gpu;
                 String resHeight = in.readLine();
                 resolutionHeight = resHeight == null || resHeight.isEmpty() ? "0" : resHeight;
+                present = ControllerProfiles.normalizePresent(in.readLine());
                 in.close();
             } catch (Throwable ignored) {
                 // No earlier answer either: seated mode stays off.
@@ -1197,6 +1224,8 @@ public final class GamePortHookProvider extends ContentProvider {
             android.system.Os.setenv("GAMEPORT_XR_FAMILY", family, true);
             // The Steam Frame's controls, for a game that also has its own for the device's controllers (off by default).
             android.system.Os.setenv("GAMEPORT_XR_PREFER_FRAME", preferFrame, true);
+            // The controllers presented to the game: auto, frame or touch.
+            android.system.Os.setenv("GAMEPORT_XR_PRESENT", present, true);
             // The play space that the headset's recentering moves, in place of the fixed one a game asks for (auto, on or off).
             android.system.Os.setenv("GAMEPORT_XR_LOCAL_FLOOR", localFloor, true);
             // The foveation that follows the eyes: kept where the device can do it (auto), always (on) or never (off).
@@ -1212,6 +1241,7 @@ public final class GamePortHookProvider extends ContentProvider {
             // A game whose passthrough GamePort declared (the player chose it): the layer offers the alpha blend mode that shows the real world when the headset does not.
             android.system.Os.setenv("GAMEPORT_XR_ALPHA_BLEND", hasPatchMark(context, "app.gameport.passthrough_feature") ? "1" : "0", true);
             Log.i(TAG, "seated mode " + seated + ", eye height " + eyeCm + " cm, controller overrides " + (controls.isEmpty() ? "none" : controls));
+            Log.i(TAG, "present=" + present);
             Log.i(TAG, "patches: vr_game_activity=" + hasPatchMark(context, "app.gameport.vr_game_activity") + " ovrplugin_stand_in=" + hasPatchMark(context, "app.gameport.ovrplugin_stand_in") + " passthrough_feature=" + hasPatchMark(context, "app.gameport.passthrough_feature"));
         } catch (Throwable t) {
             Log.w(TAG, "could not pass the seated settings on", t);
